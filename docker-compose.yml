@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: aitasker-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aitasker_db
+      POSTGRES_USER: aitasker
+      POSTGRES_PASSWORD: aitasker123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
