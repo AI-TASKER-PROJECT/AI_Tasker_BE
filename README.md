@@ -28,3 +28,10 @@ echo $env:JAVA_TOOL_OPTIONS
 ```bash
 docker compose down
 ```
+
+## Reset DB + Migrate (Backend)
+
+```bash
+docker compose down -v
+docker compose up -d
+./mvnw spring-boot:run
