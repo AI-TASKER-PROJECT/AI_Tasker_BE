@@ -1,0 +1,241 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AITASKER API (Min Draft)",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080/api/v1"
+    }
+  ],
+  "tags": [
+    { "name": "Auth" },
+    { "name": "Profile" },
+    { "name": "Job" },
+    { "name": "Proposal" }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "409": { "description": "Conflict" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/profiles/business": {
+      "post": {
+        "tags": ["Profile"],
+        "summary": "Create/Update business profile",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BusinessProfileRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+    "/profiles/expert": {
+      "post": {
+        "tags": ["Profile"],
+        "summary": "Create/Update expert profile",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExpertProfileRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+    "/jobs": {
+      "post": {
+        "tags": ["Job"],
+        "summary": "Create job",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateJobRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "403": { "description": "Forbidden" }
+        }
+      },
+      "get": {
+        "tags": ["Job"],
+        "summary": "List jobs",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/jobs/{jobId}": {
+      "get": {
+        "tags": ["Job"],
+        "summary": "Get job detail",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int32" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "OK" },
+          "404": { "description": "Not Found" }
+        }
+      }
+    },
+    "/proposals": {
+      "post": {
+        "tags": ["Proposal"],
+        "summary": "Submit proposal",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateProposalRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" },
+          "409": { "description": "Duplicate proposal" }
+        }
+      }
+    },
+    "/jobs/{jobId}/proposals": {
+      "get": {
+        "tags": ["Proposal"],
+        "summary": "List proposals by job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int32" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "password", "fullName", "role"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8 },
+          "fullName": { "type": "string" },
+          "phone": { "type": "string" },
+          "role": { "type": "string", "enum": ["BUSINESS", "EXPERT"] }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        }
+      },
+      "BusinessProfileRequest": {
+        "type": "object",
+        "required": ["taxCode", "companyName"],
+        "properties": {
+          "taxCode": { "type": "string" },
+          "companyName": { "type": "string" },
+          "address": { "type": "string" },
+          "businessLicenseUrl": { "type": "string" }
+        }
+      },
+      "ExpertProfileRequest": {
+        "type": "object",
+        "required": ["nationalId"],
+        "properties": {
+          "nationalId": { "type": "string" },
+          "idCardFrontUrl": { "type": "string" },
+          "idCardBackUrl": { "type": "string" }
+        }
+      },
+      "CreateJobRequest": {
+        "type": "object",
+        "required": ["title", "rawRequirements", "budget"],
+        "properties": {
+          "title": { "type": "string" },
+          "rawRequirements": { "type": "string" },
+          "budget": { "type": "number", "format": "double" }
+        }
+      },
+      "CreateProposalRequest": {
+        "type": "object",
+        "required": ["jobId", "technicalSolution", "bidAmount"],
+        "properties": {
+          "jobId": { "type": "integer", "format": "int32" },
+          "technicalSolution": { "type": "string" },
+          "bidAmount": { "type": "number", "format": "double" }
+        }
+      }
+    }
+  }
+}
