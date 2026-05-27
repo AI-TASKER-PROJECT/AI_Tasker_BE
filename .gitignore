@@ -12,6 +12,7 @@
 
 #Environment file
 .env
+application.properties
 
 # Package Files #
 *.jar

@@ -1,5 +1,10 @@
 package com.aitasker.be.service.auth;
 
-public class AuthService {
-    
+import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.LoginRequest;
+import com.aitasker.be.dto.auth.RegisterRequest;
+
+public interface AuthService {
+    AuthResponse register(RegisterRequest req);
+    AuthResponse login(LoginRequest req);
 }

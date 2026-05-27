@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -42,7 +43,7 @@ public class AccountEntity {
     private String fullName;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false) // optional = false: NGHĨA LÀ Ở MỖI BẢNG TABLE BẮT BUỘC PHẢI CÓ MỘT role_id 
-    @Column(name = "role_id", nullable = false)
+    @JoinColumn(name = "role_id", nullable = false)
     private RoleEntity role;
 
     @Column(name = "is_active", nullable = false)
