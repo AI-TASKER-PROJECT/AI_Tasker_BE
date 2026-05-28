@@ -12,7 +12,7 @@
 
 #Environment file
 .env
-application.properties
+.env.docker
 
 node_modules
 
