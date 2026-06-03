@@ -45,7 +45,7 @@ public AuthResponse register(RegisterRequest req) {
 
     AccountEntity saved = accountRepository.save(account);
 
-    String accessToken = jwtService.generateAccessToken(saved.getEmail());
+    String accessToken = jwtService.generateAccessToken(saved.getEmail(), saved.getRole().getRoleName());
     String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
 
     return AuthResponse.builder()
@@ -71,7 +71,7 @@ public AuthResponse login(LoginRequest req) {
         throw new UnauthorizedException("Sai email hoặc mật khẩu");
     }
 
-    String accessToken = jwtService.generateAccessToken(account.getEmail());
+    String accessToken = jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName());
     String refreshToken = jwtService.generateRefreshToken(account.getEmail());
 
     return AuthResponse.builder()

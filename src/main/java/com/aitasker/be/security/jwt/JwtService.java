@@ -25,8 +25,10 @@ public class JwtService {
     @Value("${app.jwt.refresh-expiration-ms:604800000}")
     private long refreshExpirationMs;
 
-    public String generateAccessToken(String username) {
-        return generateToken(username, accessExpirationMs, new HashMap<>());
+    public String generateAccessToken(String username, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role);
+        return generateToken(username, accessExpirationMs, claims);
     }
 
     public String generateRefreshToken(String username) {
@@ -41,6 +43,10 @@ public class JwtService {
 
     public boolean isTokenValid(String token, String username) {
         return username.equals(extractUsername(token)) && !isTokenExpired(token);
+    }
+
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
     }
 
     private String generateToken(String username, long expirationMs, Map<String, Object> claims) {

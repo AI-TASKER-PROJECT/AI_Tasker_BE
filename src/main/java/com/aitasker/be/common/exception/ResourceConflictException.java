@@ -1,6 +1,6 @@
 package com.aitasker.be.common.exception;
 
-// lỗi trùng dữ liệu (vd email đã tồn tại)
+// LOI TRUNG DU LIEU (VI DU EMAIL DA TON TAI).
 public class ResourceConflictException extends AppException {
     public ResourceConflictException(String message) {
         super(message);

@@ -1,173 +1,337 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "AITASKER API (Min Draft)",
-    "version": "1.0.0"
+    "title": "AITASKER Backend API",
+    "version": "1.2.0"
   },
   "servers": [
-    {
-      "url": "http://localhost:8080/api/v1"
-    }
+    { "url": "http://localhost:8080" }
   ],
   "tags": [
     { "name": "Auth" },
     { "name": "Profile" },
-    { "name": "Job" },
-    { "name": "Proposal" }
+    { "name": "Marketplace" },
+    { "name": "ContractExecution" },
+    { "name": "Admin" }
   ],
   "paths": {
-    "/auth/register": {
+    "/api/auth/register": {
       "post": {
         "tags": ["Auth"],
         "summary": "Register",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
-            }
-          }
-        },
-        "responses": {
-          "201": { "description": "Created" },
-          "409": { "description": "Conflict" }
-        }
+        "responses": { "200": { "description": "OK" }, "409": { "description": "Conflict" } }
       }
     },
-    "/auth/login": {
+    "/api/auth/login": {
       "post": {
         "tags": ["Auth"],
         "summary": "Login",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/LoginRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "OK" },
-          "401": { "description": "Unauthorized" }
-        }
+        "responses": { "200": { "description": "OK" }, "401": { "description": "Unauthorized" } }
       }
     },
-    "/profiles/business": {
+    "/api/v1/profiles/business": {
+      "post": { "tags": ["Profile"], "summary": "Upsert business profile", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
+      "get": { "tags": ["Profile"], "summary": "List business profiles", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/profiles/expert": {
+      "post": { "tags": ["Profile"], "summary": "Upsert expert profile", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
+      "get": { "tags": ["Profile"], "summary": "List expert profiles", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/profiles/portfolio": {
+      "post": { "tags": ["Profile"], "summary": "Upsert portfolio", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
+      "get": { "tags": ["Profile"], "summary": "List portfolios", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/profiles/approve/{type}/{id}": {
       "post": {
         "tags": ["Profile"],
-        "summary": "Create/Update business profile",
+        "summary": "Approve profile",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/BusinessProfileRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "OK" },
-          "403": { "description": "Forbidden" }
-        }
+        "parameters": [
+          { "name": "type", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
       }
     },
-    "/profiles/expert": {
-      "post": {
-        "tags": ["Profile"],
-        "summary": "Create/Update expert profile",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/ExpertProfileRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "OK" },
-          "403": { "description": "Forbidden" }
-        }
-      }
+    "/api/v1/jobs": {
+      "post": { "tags": ["Marketplace"], "summary": "Create job", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
+      "get": { "tags": ["Marketplace"], "summary": "List jobs", "responses": { "200": { "description": "OK" } } }
     },
-    "/jobs": {
-      "post": {
-        "tags": ["Job"],
-        "summary": "Create job",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateJobRequest" }
-            }
-          }
-        },
-        "responses": {
-          "201": { "description": "Created" },
-          "403": { "description": "Forbidden" }
-        }
-      },
+    "/api/v1/jobs/{jobId}": {
       "get": {
-        "tags": ["Job"],
-        "summary": "List jobs",
-        "responses": {
-          "200": { "description": "OK" }
-        }
-      }
-    },
-    "/jobs/{jobId}": {
-      "get": {
-        "tags": ["Job"],
+        "tags": ["Marketplace"],
         "summary": "Get job detail",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int32" }
-          }
-        ],
-        "responses": {
-          "200": { "description": "OK" },
-          "404": { "description": "Not Found" }
-        }
+        "parameters": [{ "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" }, "404": { "description": "Not Found" } }
       }
     },
-    "/proposals": {
-      "post": {
-        "tags": ["Proposal"],
-        "summary": "Submit proposal",
+    "/api/v1/jobs/{jobId}/status": {
+      "patch": {
+        "tags": ["Marketplace"],
+        "summary": "Update job status",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateProposalRequest" }
-            }
-          }
-        },
-        "responses": {
-          "201": { "description": "Created" },
-          "409": { "description": "Duplicate proposal" }
-        }
+        "parameters": [
+          { "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
       }
     },
-    "/jobs/{jobId}/proposals": {
-      "get": {
-        "tags": ["Proposal"],
-        "summary": "List proposals by job",
+    "/api/v1/proposals": {
+      "post": { "tags": ["Marketplace"], "summary": "Submit proposal", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" }, "409": { "description": "Conflict" } } }
+    },
+    "/api/v1/proposals/{proposalId}/status": {
+      "patch": {
+        "tags": ["Marketplace"],
+        "summary": "Review proposal",
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int32" }
-          }
+          { "name": "proposalId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
         ],
-        "responses": {
-          "200": { "description": "OK" }
-        }
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/jobs/{jobId}/proposals": {
+      "get": {
+        "tags": ["Marketplace"],
+        "summary": "List proposals by job",
+        "parameters": [{ "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/contracts/from-proposals/{proposalId}": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Create draft contract from proposal",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "proposalId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/contracts/change-requests": {
+      "post": { "tags": ["ContractExecution"], "summary": "Create contract change request", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/contracts/{contractId}/activate": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Activate contract",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/contracts/{contractId}/nda-sign": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Sign NDA for active contract",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/contracts/{contractId}/terminate": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Terminate contract",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "reason", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/contracts": {
+      "get": { "tags": ["ContractExecution"], "summary": "List contracts", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/milestones": {
+      "post": { "tags": ["ContractExecution"], "summary": "Create milestone", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/contracts/{contractId}/milestones": {
+      "get": {
+        "tags": ["ContractExecution"],
+        "summary": "List milestones by contract",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/criteria": {
+      "post": { "tags": ["ContractExecution"], "summary": "Create acceptance criteria", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/milestones/{milestoneId}/criteria": {
+      "get": {
+        "tags": ["ContractExecution"],
+        "summary": "List criteria by milestone",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "milestoneId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/deliverables": {
+      "post": { "tags": ["ContractExecution"], "summary": "Submit deliverable", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/transactions": {
+      "post": { "tags": ["ContractExecution"], "summary": "Create transaction", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/transactions/{transactionId}/status": {
+      "patch": {
+        "tags": ["ContractExecution"],
+        "summary": "Update transaction status",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "transactionId", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } },
+          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/transactions/{transactionId}/webhook": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Process payment webhook",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "transactionId", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } },
+          { "name": "paymentStatus", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "bankTxCode", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "receiptImgUrl", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/invoices": {
+      "post": { "tags": ["ContractExecution"], "summary": "Create invoice", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/disputes": {
+      "post": { "tags": ["ContractExecution"], "summary": "Create dispute", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/v1/disputes/{disputeId}/assign": {
+      "patch": {
+        "tags": ["ContractExecution"],
+        "summary": "Assign dispute",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "staffId", "in": "query", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/disputes/{disputeId}/resolve": {
+      "patch": {
+        "tags": ["ContractExecution"],
+        "summary": "Resolve dispute",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "proposedAction", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/disputes/{disputeId}/demo-testing": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Record demo testing result",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "testResult", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/disputes/{disputeId}/technical-report": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Issue technical report",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "reportContent", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "proposedAction", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/milestones/sla-auto-approve": {
+      "post": {
+        "tags": ["ContractExecution"],
+        "summary": "Run SLA auto approve milestones",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/jobs/{jobId}/matching": {
+      "get": {
+        "tags": ["ContractExecution"],
+        "summary": "Matching by keyword",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/admin/reviews": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Create review",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/admin/reviews/contracts/{contractId}": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List reviews by contract",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List system settings",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/admin/settings/{key}": {
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Update system setting",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "key", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "value", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "isActive", "in": "query", "required": false, "schema": { "type": "boolean" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/admin/staffs": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List staffs",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Create staff",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/v1/admin/analytics/overview": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Analytics overview",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
       }
     }
   },
@@ -177,64 +341,6 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT"
-      }
-    },
-    "schemas": {
-      "RegisterRequest": {
-        "type": "object",
-        "required": ["email", "password", "fullName", "role"],
-        "properties": {
-          "email": { "type": "string", "format": "email" },
-          "password": { "type": "string", "minLength": 8 },
-          "fullName": { "type": "string" },
-          "phone": { "type": "string" },
-          "role": { "type": "string", "enum": ["BUSINESS", "EXPERT"] }
-        }
-      },
-      "LoginRequest": {
-        "type": "object",
-        "required": ["email", "password"],
-        "properties": {
-          "email": { "type": "string", "format": "email" },
-          "password": { "type": "string" }
-        }
-      },
-      "BusinessProfileRequest": {
-        "type": "object",
-        "required": ["taxCode", "companyName"],
-        "properties": {
-          "taxCode": { "type": "string" },
-          "companyName": { "type": "string" },
-          "address": { "type": "string" },
-          "businessLicenseUrl": { "type": "string" }
-        }
-      },
-      "ExpertProfileRequest": {
-        "type": "object",
-        "required": ["nationalId"],
-        "properties": {
-          "nationalId": { "type": "string" },
-          "idCardFrontUrl": { "type": "string" },
-          "idCardBackUrl": { "type": "string" }
-        }
-      },
-      "CreateJobRequest": {
-        "type": "object",
-        "required": ["title", "rawRequirements", "budget"],
-        "properties": {
-          "title": { "type": "string" },
-          "rawRequirements": { "type": "string" },
-          "budget": { "type": "number", "format": "double" }
-        }
-      },
-      "CreateProposalRequest": {
-        "type": "object",
-        "required": ["jobId", "technicalSolution", "bidAmount"],
-        "properties": {
-          "jobId": { "type": "integer", "format": "int32" },
-          "technicalSolution": { "type": "string" },
-          "bidAmount": { "type": "number", "format": "double" }
-        }
       }
     }
   }

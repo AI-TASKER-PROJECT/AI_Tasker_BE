@@ -12,12 +12,14 @@ import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.service.auth.AuthService;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@SecurityRequirements
 public class AuthController {
     private final AuthService authService;
 
