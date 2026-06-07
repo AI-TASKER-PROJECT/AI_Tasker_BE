@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface JobRepository extends JpaRepository<JobEntity, Integer> {
     List<JobEntity> findByBusinessId(Integer businessId);
+    List<JobEntity> findByStatus(String status);
 }

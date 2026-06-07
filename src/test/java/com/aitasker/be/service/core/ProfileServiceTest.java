@@ -3,6 +3,7 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.repository.AuditLogRepository;
+import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.BusinessProfileRepository;
 import com.aitasker.be.repository.ExpertProfileRepository;
 import com.aitasker.be.repository.PortfolioRepository;
@@ -21,6 +22,7 @@ class ProfileServiceTest {
     @Mock private AccessService accessService;
     @Mock private BusinessProfileRepository businessProfileRepository;
     @Mock private ExpertProfileRepository expertProfileRepository;
+    @Mock private AccountRepository accountRepository;
     @Mock private PortfolioRepository portfolioRepository;
     @Mock private StaffRepository staffRepository;
     @Mock private AuditLogRepository auditLogRepository;

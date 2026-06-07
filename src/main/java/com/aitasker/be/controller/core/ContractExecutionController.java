@@ -58,11 +58,6 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("CREATE TRANSACTION SUCCESS", service.createTransaction(request)));
     }
 
-    @PostMapping("/invoices")
-    public ResponseEntity<ApiResponse<InvoiceEntity>> createInvoice(@RequestBody InvoiceEntity request) {
-        return ResponseEntity.ok(ApiResponse.success("CREATE INVOICE SUCCESS", service.createInvoice(request)));
-    }
-
     @PostMapping("/disputes")
     public ResponseEntity<ApiResponse<DisputeEntity>> createDispute(@RequestBody DisputeEntity request) {
         return ResponseEntity.ok(ApiResponse.success("CREATE DISPUTE SUCCESS", service.createDispute(request)));
@@ -117,8 +112,23 @@ public class ContractExecutionController {
     @GetMapping("/contracts/{contractId}/milestones")
     public ResponseEntity<ApiResponse<Object>> listMilestones(@PathVariable Integer contractId) { return ResponseEntity.ok(ApiResponse.success("LIST MILESTONES SUCCESS", service.listMilestonesByContract(contractId))); }
 
+    @GetMapping("/jobs/{jobId}/milestones")
+    public ResponseEntity<ApiResponse<Object>> listJobMilestones(@PathVariable Integer jobId) { return ResponseEntity.ok(ApiResponse.success("LIST JOB MILESTONES SUCCESS", service.listMilestonesByJob(jobId))); }
+
     @GetMapping("/milestones/{milestoneId}/criteria")
     public ResponseEntity<ApiResponse<Object>> listCriteria(@PathVariable Integer milestoneId) { return ResponseEntity.ok(ApiResponse.success("LIST CRITERIA SUCCESS", service.listCriteriaByMilestone(milestoneId))); }
+
+    @GetMapping("/milestones/{milestoneId}/deliverables")
+    public ResponseEntity<ApiResponse<Object>> listDeliverables(@PathVariable Integer milestoneId) { return ResponseEntity.ok(ApiResponse.success("LIST DELIVERABLES SUCCESS", service.listDeliverablesByMilestone(milestoneId))); }
+
+    @GetMapping("/milestones/{milestoneId}/transactions")
+    public ResponseEntity<ApiResponse<Object>> listTransactions(@PathVariable Integer milestoneId) { return ResponseEntity.ok(ApiResponse.success("LIST TRANSACTIONS SUCCESS", service.listTransactionsByMilestone(milestoneId))); }
+
+    @GetMapping("/contracts/{contractId}/disputes")
+    public ResponseEntity<ApiResponse<Object>> listDisputes(@PathVariable Integer contractId) { return ResponseEntity.ok(ApiResponse.success("LIST DISPUTES SUCCESS", service.listDisputesByContract(contractId))); }
+
+    @GetMapping("/disputes/{disputeId}")
+    public ResponseEntity<ApiResponse<DisputeEntity>> getDispute(@PathVariable Integer disputeId) { return ResponseEntity.ok(ApiResponse.success("GET DISPUTE SUCCESS", service.getDispute(disputeId))); }
 
     @GetMapping("/jobs/{jobId}/matching")
     public ResponseEntity<ApiResponse<Object>> matching(@PathVariable Integer jobId) { return ResponseEntity.ok(ApiResponse.success("MATCHING SUCCESS", service.matchingByKeyword(jobId))); }

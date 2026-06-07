@@ -21,6 +21,8 @@ public class ContractEntity {
     @Column(name = "timeline_days", nullable = false) private Integer timelineDays;
     @Column(name = "nda_signed", nullable = false) private Boolean ndaSigned;
     @Column(name = "status", nullable = false, length = 50) private String status;
+    @Column(name = "business_accepted_at") private LocalDateTime businessAcceptedAt;
+    @Column(name = "expert_accepted_at") private LocalDateTime expertAcceptedAt;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
 }

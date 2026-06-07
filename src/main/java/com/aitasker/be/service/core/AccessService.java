@@ -27,4 +27,12 @@ public class AccessService {
         }
         throw new ForbiddenException("BAN KHONG CO QUYEN THUC HIEN CHUC NANG NAY");
     }
+
+    // Chan cac chuc nang nghiep vu cua BUSINESS/EXPERT cho toi khi ho so KYB/KYC duoc duyet.
+    public void requireApprovedAccount() {
+        AccountEntity account = currentAccount();
+        if (!"Approved".equalsIgnoreCase(account.getStatus())) {
+            throw new ForbiddenException("TAI KHOAN CHUA DUOC DUYET HO SO KYB/KYC");
+        }
+    }
 }

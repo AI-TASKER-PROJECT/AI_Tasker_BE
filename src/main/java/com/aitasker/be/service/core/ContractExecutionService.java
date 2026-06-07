@@ -26,17 +26,19 @@ public class ContractExecutionService {
     private final AcceptanceCriteriaRepository criteriaRepository;
     private final DeliverableRepository deliverableRepository;
     private final TransactionRepository transactionRepository;
-    private final InvoiceRepository invoiceRepository;
     private final DisputeRepository disputeRepository;
     private final StaffRepository staffRepository;
     private final SystemSettingRepository systemSettingRepository;
+    private final SystemWalletService systemWalletService;
 
     @Transactional
     public ContractEntity createDraftFromProposal(Integer proposalId, ContractEntity input) {
         accessService.requireRole("BUSINESS");
+        accessService.requireApprovedAccount();
         Integer accountId = accessService.currentAccount().getAccountId();
         Integer businessId = businessProfileRepository.findByAccountId(accountId).map(BusinessProfileEntity::getBusinessId).orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
         ProposalEntity proposal = proposalRepository.findById(proposalId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY PROPOSAL"));
+        if (!"Accepted".equalsIgnoreCase(proposal.getStatus())) throw new AppException("CHI DUOC TAO CONTRACT TU PROPOSAL DA ACCEPTED");
         JobEntity job = proposalRepository.findById(proposalId)
                 .flatMap(p -> Optional.ofNullable(p.getJobId()).flatMap(jobId -> jobRepository.findById(jobId)))
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA PROPOSAL"));
@@ -50,11 +52,14 @@ public class ContractExecutionService {
         input.setBusinessId(businessId);
         input.setNdaSigned(Boolean.FALSE);
         input.setStatus("Draft");
+        input.setBusinessAcceptedAt(null);
+        input.setExpertAcceptedAt(null);
         return contractRepository.save(input);
     }
 
     @Transactional
     public ContractChangeRequestEntity requestChange(ContractChangeRequestEntity input) {
+        requireApprovedForBusinessOrExpert();
         Integer accountId = accessService.currentAccount().getAccountId();
         // CHI CHO PHEP GUI YEU CAU SUA DOI KHI CONTRACT DANG O DRAFT/NEGOTIATING.
         ContractEntity contract = contractRepository.findById(input.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
@@ -72,11 +77,17 @@ public class ContractExecutionService {
         input.setRequestId(null);
         input.setRequestedByAccountId(accountId);
         input.setStatus("Pending");
+        // MOI CHANGE REQUEST LAM MO LAI DAM PHAN, NEN HAI BEN PHAI ACCEPT LAI.
+        contract.setStatus("Negotiating");
+        contract.setBusinessAcceptedAt(null);
+        contract.setExpertAcceptedAt(null);
+        contractRepository.save(contract);
         return changeRequestRepository.save(input);
     }
 
     @Transactional
     public ContractEntity activateContract(Integer contractId) {
+        requireApprovedForBusinessOrExpert();
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer accountId = accessService.currentAccount().getAccountId();
         Integer businessId = businessProfileRepository.findByAccountId(accountId).map(BusinessProfileEntity::getBusinessId).orElse(null);
@@ -84,8 +95,12 @@ public class ContractExecutionService {
         boolean isParticipant = (businessId != null && businessId.equals(contract.getBusinessId()))
                 || (expertId != null && expertId.equals(contract.getExpertId()));
         if (!isParticipant) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        if ("Active".equals(contract.getStatus())) return contract;
         if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI KICH HOAT");
-        contract.setStatus("Active");
+        LocalDateTime now = LocalDateTime.now();
+        if (businessId != null && businessId.equals(contract.getBusinessId())) contract.setBusinessAcceptedAt(now);
+        if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertAcceptedAt(now);
+        contract.setStatus(contract.getBusinessAcceptedAt() != null && contract.getExpertAcceptedAt() != null ? "Active" : "Negotiating");
         contract.setUpdatedAt(LocalDateTime.now());
         return contractRepository.save(contract);
     }
@@ -94,6 +109,7 @@ public class ContractExecutionService {
     public ContractEntity signNda(Integer contractId) {
         // CHI CHO BEN EXPERT KY NDA SAU KHI CONTRACT DA ACTIVE.
         accessService.requireRole("EXPERT");
+        accessService.requireApprovedAccount();
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer accountId = accessService.currentAccount().getAccountId();
         Integer expertId = expertProfileRepository.findByAccountId(accountId)
@@ -115,6 +131,7 @@ public class ContractExecutionService {
             throw new AppException("CONTRACT KHONG THE CHAM DUT O TRANG THAI HIEN TAI");
         }
         if (reason == null || reason.isBlank()) throw new AppException("LY DO CHAM DUT KHONG DUOC DE TRONG");
+        requireApprovedForBusinessOrExpert();
         AccountEntity actor = accessService.currentAccount();
         if ("BUSINESS".equals(actor.getRole().getRoleName())) {
             Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId())
@@ -128,30 +145,62 @@ public class ContractExecutionService {
     }
 
     @Transactional public MilestoneEntity createMilestone(MilestoneEntity input) {
+        accessService.requireRole("BUSINESS");
+        accessService.requireApprovedAccount();
+        JobEntity job = requireBusinessOwnedJob(input.getJobId());
+        if (!List.of("DRAFT", "OPEN").contains(job.getStatus())) throw new AppException("JOB KHONG CHO PHEP TAO MILESTONE");
         if (input.getFundsAllocated() == null || input.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
         if (input.getOrderIndex() == null || input.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
-        if (milestoneRepository.existsByContractIdAndOrderIndex(input.getContractId(), input.getOrderIndex())) {
-            throw new AppException("ORDER INDEX DA TON TAI TRONG CONTRACT");
+        if (milestoneRepository.existsByJobIdAndOrderIndex(input.getJobId(), input.getOrderIndex())) {
+            throw new AppException("ORDER INDEX DA TON TAI TRONG JOB");
         }
+        input.setContractId(null);
         if (input.getStatus() == null) input.setStatus("Pending");
         return milestoneRepository.save(input);
     }
-    @Transactional public AcceptanceCriteriaEntity createCriteria(AcceptanceCriteriaEntity input) { if (input.getIsPassed() == null) input.setIsPassed(false); return criteriaRepository.save(input); }
-    @Transactional public DeliverableEntity submitDeliverable(DeliverableEntity input) { return deliverableRepository.save(input); }
+    @Transactional public AcceptanceCriteriaEntity createCriteria(AcceptanceCriteriaEntity input) {
+        accessService.requireRole("BUSINESS");
+        accessService.requireApprovedAccount();
+        MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        requireBusinessOwnedJob(milestone.getJobId());
+        if (input.getDescription() == null || input.getDescription().isBlank()) throw new AppException("CRITERIA DESCRIPTION KHONG DUOC DE TRONG");
+        if (input.getIsPassed() == null) input.setIsPassed(false);
+        return criteriaRepository.save(input);
+    }
+    @Transactional public DeliverableEntity submitDeliverable(DeliverableEntity input) {
+        accessService.requireRole("EXPERT");
+        accessService.requireApprovedAccount();
+        MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        ContractEntity contract = requireExpertOwnedContractByJob(milestone.getJobId());
+        if (!"Active".equals(contract.getStatus())) throw new AppException("CHI DUOC SUBMIT DELIVERABLE KHI CONTRACT ACTIVE");
+        if (!Boolean.TRUE.equals(contract.getNdaSigned())) throw new AppException("EXPERT PHAI KY NDA TRUOC KHI BAN GIAO");
+        DeliverableEntity saved = deliverableRepository.save(input);
+        milestone.setStatus("Under Review");
+        milestone.setUpdatedAt(LocalDateTime.now());
+        milestoneRepository.save(milestone);
+        return saved;
+    }
     @Transactional public TransactionEntity createTransaction(TransactionEntity input) {
+        MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        ContractEntity contract = contractRepository.findByJobId(milestone.getJobId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA JOB"));
+        AccountEntity actor = accessService.currentAccount();
+        String role = actor.getRole().getRoleName();
+        if ("BUSINESS".equals(role)) {
+            accessService.requireApprovedAccount();
+            requireBusinessOwnedContract(contract.getContractId());
+            if (!"Deposit".equals(input.getTransactionType())) throw new AppException("BUSINESS CHI DUOC TAO GIAO DICH DEPOSIT");
+        } else {
+            accessService.requireRole("ADMIN");
+        }
         if (input.getAmount() == null || input.getAmount().signum() < 0) throw new AppException("AMOUNT KHONG HOP LE");
         if (!List.of("Deposit", "Payout", "Refund").contains(input.getTransactionType())) throw new AppException("TRANSACTION TYPE KHONG HOP LE");
         if (input.getStatus() == null) input.setStatus("Pending");
-        return transactionRepository.save(input);
-    }
-    @Transactional public InvoiceEntity createInvoice(InvoiceEntity input) {
-        transactionRepository.findById(input.getTransactionId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY TRANSACTION"));
-        if (invoiceRepository.existsByTransactionId(input.getTransactionId())) {
-            throw new AppException("TRANSACTION DA CO INVOICE");
-        }
-        return invoiceRepository.save(input);
+        TransactionEntity saved = transactionRepository.save(input);
+        systemWalletService.syncWallet();
+        return saved;
     }
     @Transactional public DisputeEntity createDispute(DisputeEntity input) {
+        requireApprovedForBusinessOrExpert();
         ContractEntity contract = contractRepository.findById(input.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer accountId = accessService.currentAccount().getAccountId();
         Integer businessId = businessProfileRepository.findByAccountId(accountId).map(BusinessProfileEntity::getBusinessId).orElse(null);
@@ -164,14 +213,73 @@ public class ContractExecutionService {
             staffRepository.findAll().stream().findFirst().ifPresent(staff -> input.setAssignedStaffId(staff.getStaffId()));
         }
         if (input.getStatus() == null) input.setStatus("Open");
-        return disputeRepository.save(input);
+        DisputeEntity saved = disputeRepository.save(input);
+        systemWalletService.syncWallet();
+        return saved;
     }
 
-    public List<ContractEntity> listContracts() { return contractRepository.findAll(); }
-    public List<MilestoneEntity> listMilestonesByContract(Integer contractId) { return milestoneRepository.findByContractIdOrderByOrderIndexAsc(contractId); }
-    public List<AcceptanceCriteriaEntity> listCriteriaByMilestone(Integer milestoneId) { return criteriaRepository.findByMilestoneId(milestoneId); }
+    public List<ContractEntity> listContracts() {
+        AccountEntity actor = accessService.currentAccount();
+        String role = actor.getRole().getRoleName();
+        if ("ADMIN".equals(role)) return contractRepository.findAll();
+        if ("STAFF".equals(role)) {
+            Integer staffId = staffRepository.findByAccountId(actor.getAccountId())
+                    .map(StaffEntity::getStaffId)
+                    .orElseThrow(() -> new NotFoundException("CHUA CO STAFF PROFILE"));
+            return disputeRepository.findByAssignedStaffId(staffId).stream()
+                    .map(DisputeEntity::getContractId)
+                    .distinct()
+                    .map(contractRepository::findById)
+                    .flatMap(Optional::stream)
+                    .toList();
+        }
+        if ("BUSINESS".equals(role)) {
+            accessService.requireApprovedAccount();
+            Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId()).map(BusinessProfileEntity::getBusinessId).orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
+            return contractRepository.findByBusinessId(businessId);
+        }
+        if ("EXPERT".equals(role)) {
+            accessService.requireApprovedAccount();
+            Integer expertId = expertProfileRepository.findByAccountId(actor.getAccountId()).map(ExpertProfileEntity::getExpertId).orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+            return contractRepository.findByExpertId(expertId);
+        }
+        throw new AppException("ROLE KHONG HOP LE");
+    }
+    public List<MilestoneEntity> listMilestonesByContract(Integer contractId) {
+        ContractEntity contract = requireContractParticipantOrOperator(contractId);
+        return milestoneRepository.findByJobIdOrderByOrderIndexAsc(contract.getJobId());
+    }
+    public List<MilestoneEntity> listMilestonesByJob(Integer jobId) {
+        requireJobParticipantOrOwner(jobId);
+        return milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId);
+    }
+    public List<AcceptanceCriteriaEntity> listCriteriaByMilestone(Integer milestoneId) {
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        requireJobParticipantOrOwner(milestone.getJobId());
+        return criteriaRepository.findByMilestoneId(milestoneId);
+    }
+    public List<DeliverableEntity> listDeliverablesByMilestone(Integer milestoneId) {
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        requireJobParticipantOrOwner(milestone.getJobId());
+        return deliverableRepository.findByMilestoneId(milestoneId);
+    }
+    public List<TransactionEntity> listTransactionsByMilestone(Integer milestoneId) {
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        requireJobParticipantOrOwner(milestone.getJobId());
+        return transactionRepository.findByMilestoneId(milestoneId);
+    }
+    public List<DisputeEntity> listDisputesByContract(Integer contractId) {
+        requireContractParticipantOrOperator(contractId);
+        return disputeRepository.findByContractId(contractId);
+    }
+    public DisputeEntity getDispute(Integer disputeId) {
+        DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requireContractParticipantOrOperator(dispute.getContractId());
+        return dispute;
+    }
     public List<ProposalEntity> matchingByKeyword(Integer jobId) {
-        final String keyword = "AI";
+        JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        final String keyword = Optional.ofNullable(job.getAiTag()).filter(v -> !v.isBlank()).orElse("AI").toUpperCase();
         return proposalRepository.findByJobId(jobId).stream()
                 .filter(p -> p.getTechnicalSolution() != null && p.getTechnicalSolution().toUpperCase().contains(keyword))
                 .toList();
@@ -179,7 +287,7 @@ public class ContractExecutionService {
 
     @Transactional
     public TransactionEntity updateTransactionStatus(Long transactionId, String status) {
-        accessService.requireRole("ADMIN", "STAFF");
+        accessService.requireRole("ADMIN");
         // RANG BUOC TRANG THAI GIAO DICH THEO FLOW ESCROW.
         if (!List.of("Pending", "Success", "Failed").contains(status)) {
             throw new AppException("STATUS TRANSACTION KHONG HOP LE");
@@ -187,7 +295,9 @@ public class ContractExecutionService {
         TransactionEntity transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY TRANSACTION"));
         transaction.setStatus(status);
-        return transactionRepository.save(transaction);
+        TransactionEntity saved = transactionRepository.save(transaction);
+        systemWalletService.syncWallet();
+        return saved;
     }
 
     @Transactional
@@ -199,7 +309,9 @@ public class ContractExecutionService {
         if ("Open".equalsIgnoreCase(dispute.getStatus())) {
             dispute.setStatus("UnderReview");
         }
-        return disputeRepository.save(dispute);
+        DisputeEntity saved = disputeRepository.save(dispute);
+        systemWalletService.syncWallet();
+        return saved;
     }
 
     @Transactional
@@ -211,12 +323,14 @@ public class ContractExecutionService {
         dispute.setProposedAction(proposedAction);
         dispute.setStatus("Resolved");
         dispute.setAdminApprovedBy(accessService.currentAccount().getAccountId());
-        return disputeRepository.save(dispute);
+        DisputeEntity saved = disputeRepository.save(dispute);
+        systemWalletService.syncWallet();
+        return saved;
     }
 
     @Transactional
     public List<MilestoneEntity> runSlaAutoApprove() {
-        accessService.requireRole("ADMIN", "STAFF");
+        accessService.requireRole("ADMIN");
         // MO PHONG JOB SLA: TU DONG RELEASE MILESTONE NEU QUA SO NGAY CAU HINH SAU KHI CO DELIVERABLE.
         int slaDays = systemSettingRepository.findById("default_sla_days")
                 .map(SystemSettingEntity::getSettingValue)
@@ -246,31 +360,37 @@ public class ContractExecutionService {
 
     @Transactional
     public DisputeEntity recordDemoTesting(Integer disputeId, String testResult) {
-        accessService.requireRole("STAFF", "ADMIN");
-        // STAFF GHI NHAN KET QUA TEST DEMO KY THUAT DE PHUC VU QUY TRINH THAM DINH.
+        accessService.requireRole("STAFF");
+        // STAFF chi ghi nhan demo testing cho dispute duoc admin phan cong.
         if (testResult == null || testResult.isBlank()) throw new AppException("KET QUA DEMO TEST KHONG DUOC DE TRONG");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requireAssignedStaff(dispute);
         dispute.setEvidenceReport(testResult);
         if ("Open".equals(dispute.getStatus())) dispute.setStatus("UnderReview");
-        return disputeRepository.save(dispute);
+        DisputeEntity saved = disputeRepository.save(dispute);
+        systemWalletService.syncWallet();
+        return saved;
     }
 
     @Transactional
     public DisputeEntity issueTechnicalReport(Integer disputeId, String reportContent, String proposedAction) {
-        accessService.requireRole("STAFF", "ADMIN");
-        // STAFF BAN HANH BAO CAO THAM DINH VA DE XUAT HUONG XU LY TRANH CHAP.
+        accessService.requireRole("STAFF");
+        // STAFF de xuat huong xu ly, ADMIN la nguoi chot o resolveDispute.
         if (reportContent == null || reportContent.isBlank()) throw new AppException("TECHNICAL REPORT KHONG DUOC DE TRONG");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requireAssignedStaff(dispute);
         dispute.setEvidenceReport(reportContent);
         if (proposedAction != null && !proposedAction.isBlank()) dispute.setProposedAction(proposedAction);
         dispute.setStatus("Escalated");
-        return disputeRepository.save(dispute);
+        DisputeEntity saved = disputeRepository.save(dispute);
+        systemWalletService.syncWallet();
+        return saved;
     }
 
     @Transactional
     public TransactionEntity processPaymentWebhook(Long transactionId, String paymentStatus, String bankTxCode, String receiptImgUrl) {
-        accessService.requireRole("ADMIN", "STAFF");
-        // MO PHONG XU LY WEBHOOK THANH TOAN: CAP NHAT TRANG THAI GIAO DICH VA GHI HOA DON DOI SOAT.
+        accessService.requireRole("ADMIN");
+        // VNPay sandbox webhook chi cap nhat transaction; du an khong con bang invoice noi bo.
         if (!List.of("Success", "Failed").contains(paymentStatus)) {
             throw new AppException("PAYMENT STATUS KHONG HOP LE");
         }
@@ -278,13 +398,105 @@ public class ContractExecutionService {
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY TRANSACTION"));
         transaction.setStatus(paymentStatus);
         transaction = transactionRepository.save(transaction);
-
-        InvoiceEntity invoice = invoiceRepository.findByTransactionId(transactionId)
-                .orElseGet(() -> InvoiceEntity.builder().transactionId(transactionId).build());
-        invoice.setBankTxCode(bankTxCode);
-        invoice.setReceiptImgUrl(receiptImgUrl);
-        invoiceRepository.save(invoice);
+        systemWalletService.syncWallet();
         return transaction;
+    }
+
+    private ContractEntity requireBusinessOwnedContract(Integer contractId) {
+        ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        Integer businessId = businessProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())
+                .map(BusinessProfileEntity::getBusinessId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
+        if (!businessId.equals(contract.getBusinessId())) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        return contract;
+    }
+
+    private JobEntity requireBusinessOwnedJob(Integer jobId) {
+        JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        Integer businessId = businessProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())
+                .map(BusinessProfileEntity::getBusinessId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
+        if (!businessId.equals(job.getBusinessId())) throw new AppException("BAN KHONG THUOC JOB NAY");
+        return job;
+    }
+
+    private ContractEntity requireExpertOwnedContract(Integer contractId) {
+        ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        Integer expertId = expertProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())
+                .map(ExpertProfileEntity::getExpertId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+        if (!expertId.equals(contract.getExpertId())) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        return contract;
+    }
+
+    private ContractEntity requireExpertOwnedContractByJob(Integer jobId) {
+        ContractEntity contract = contractRepository.findByJobId(jobId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA JOB"));
+        Integer expertId = expertProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())
+                .map(ExpertProfileEntity::getExpertId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+        if (!expertId.equals(contract.getExpertId())) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        return contract;
+    }
+
+    private ContractEntity requireContractParticipantOrOperator(Integer contractId) {
+        ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        AccountEntity actor = accessService.currentAccount();
+        String role = actor.getRole().getRoleName();
+        if ("ADMIN".equals(role)) return contract;
+        if ("STAFF".equals(role)) {
+            Integer staffId = getCurrentStaffId(actor);
+            boolean assigned = disputeRepository.findByContractId(contractId).stream()
+                    .anyMatch(dispute -> staffId.equals(dispute.getAssignedStaffId()));
+            if (!assigned) throw new AppException("STAFF CHI DUOC XEM CONTRACT CO DISPUTE DUOC GAN");
+            return contract;
+        }
+        Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId()).map(BusinessProfileEntity::getBusinessId).orElse(null);
+        Integer expertId = expertProfileRepository.findByAccountId(actor.getAccountId()).map(ExpertProfileEntity::getExpertId).orElse(null);
+        boolean participant = (businessId != null && businessId.equals(contract.getBusinessId()))
+                || (expertId != null && expertId.equals(contract.getExpertId()));
+        if (!participant) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        return contract;
+    }
+
+    private void requireJobParticipantOrOwner(Integer jobId) {
+        AccountEntity actor = accessService.currentAccount();
+        String role = actor.getRole().getRoleName();
+        if ("ADMIN".equals(role)) return;
+        Optional<ContractEntity> contract = contractRepository.findByJobId(jobId);
+        if ("STAFF".equals(role)) {
+            if (contract.isEmpty()) throw new AppException("STAFF CHI DUOC XEM JOB CO DISPUTE DUOC GAN");
+            requireContractParticipantOrOperator(contract.get().getContractId());
+            return;
+        }
+        Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId()).map(BusinessProfileEntity::getBusinessId).orElse(null);
+        if (businessId != null) {
+            JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+            if (businessId.equals(job.getBusinessId())) return;
+        }
+        Integer expertId = expertProfileRepository.findByAccountId(actor.getAccountId()).map(ExpertProfileEntity::getExpertId).orElse(null);
+        if (expertId != null && contract.map(c -> expertId.equals(c.getExpertId())).orElse(false)) return;
+        throw new AppException("BAN KHONG THUOC JOB NAY");
+    }
+
+    private void requireAssignedStaff(DisputeEntity dispute) {
+        Integer staffId = getCurrentStaffId(accessService.currentAccount());
+        if (dispute.getAssignedStaffId() == null || !staffId.equals(dispute.getAssignedStaffId())) {
+            throw new AppException("STAFF CHI DUOC XU LY DISPUTE DUOC GAN");
+        }
+    }
+
+    private Integer getCurrentStaffId(AccountEntity actor) {
+        return staffRepository.findByAccountId(actor.getAccountId())
+                .map(StaffEntity::getStaffId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO STAFF PROFILE"));
+    }
+
+    private void requireApprovedForBusinessOrExpert() {
+        String role = accessService.currentAccount().getRole().getRoleName();
+        if ("BUSINESS".equals(role) || "EXPERT".equals(role)) {
+            accessService.requireApprovedAccount();
+        }
     }
 
     private boolean isAutoAssignStaffEnabled() {

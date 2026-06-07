@@ -2,9 +2,12 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
+import com.aitasker.be.dto.admin.AccountRequest;
+import com.aitasker.be.dto.admin.AccountResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,11 +30,14 @@ public class AdminService {
     private final StaffRepository staffRepository;
     private final ReviewRepository reviewRepository;
     private final SystemSettingRepository systemSettingRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public ReviewEntity createReview(ReviewEntity input) {
         // CHI CHO BUSINESS/EXPERT TAO DANH GIA SAU KHI HOP DONG DA KET THUC.
         accessService.requireRole("BUSINESS", "EXPERT");
+        accessService.requireApprovedAccount();
         if (input.getRating() == null || input.getRating().doubleValue() < 1.0 || input.getRating().doubleValue() > 5.0) {
             throw new AppException("RATING PHAI NAM TRONG KHOANG 1 DEN 5");
         }
@@ -68,7 +74,7 @@ public class AdminService {
     }
 
     public List<SystemSettingEntity> listSettings() {
-        accessService.requireRole("ADMIN", "STAFF");
+        accessService.requireRole("ADMIN");
         return systemSettingRepository.findAll();
     }
 
@@ -79,12 +85,12 @@ public class AdminService {
         // CHI CHO PHEP CAP NHAT GIA TRI/CO HIEU LUC, KHONG CHO DOI VALUE_TYPE TRANH VO HOP DONG DU LIEU.
         if (value != null && !value.isBlank()) setting.setSettingValue(value);
         if (isActive != null) setting.setIsActive(isActive);
-        setting.setUpdatedBy(accessService.currentAccount().getAccountId());
+        setting.setUpdatedByRoleId(accessService.currentAccount().getRole().getRoleId());
         return systemSettingRepository.save(setting);
     }
 
     public List<StaffEntity> listStaffs() {
-        accessService.requireRole("ADMIN", "STAFF");
+        accessService.requireRole("ADMIN");
         return staffRepository.findAll();
     }
 
@@ -102,7 +108,7 @@ public class AdminService {
     }
 
     public Map<String, Object> analyticsOverview() {
-        accessService.requireRole("ADMIN", "STAFF");
+        accessService.requireRole("ADMIN");
         // TONG HOP CHI SO CO BAN DE HO TRO DASHBOARD QUAN TRI MVP.
         long totalContracts = contractRepository.count();
         long completedContracts = contractRepository.findAll().stream().filter(c -> "Completed".equals(c.getStatus())).count();
@@ -128,5 +134,120 @@ public class AdminService {
         result.put("totalTransactions", totalTransactions);
         result.put("transactionVolume", totalVolume);
         return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountResponse> listAccounts() {
+        accessService.requireRole("ADMIN");
+        return accountRepository.findAll().stream()
+                .map(AccountResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public AccountResponse createAccount(AccountRequest request) {
+        accessService.requireRole("ADMIN");
+        validateAccountRequest(request, true);
+        String email = normalizeEmail(request.getEmail());
+        if (accountRepository.existsByEmailIgnoreCase(email)) {
+            throw new AppException("EMAIL DA TON TAI");
+        }
+        RoleEntity role = roleRepository.findByRoleName(request.getRole())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ROLE"));
+        AccountEntity account = AccountEntity.builder()
+                .email(email)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .phone(trimToNull(request.getPhone()))
+                .fullName(request.getFullName().trim())
+                .role(role)
+                .status(resolveRequestedStatus(request.getStatus(), role.getRoleName()))
+                .build();
+        return AccountResponse.from(accountRepository.save(account));
+    }
+
+    @Transactional
+    public AccountResponse updateAccount(Integer accountId, AccountRequest request) {
+        accessService.requireRole("ADMIN");
+        AccountEntity account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            String email = normalizeEmail(request.getEmail());
+            accountRepository.findByEmailIgnoreCase(email)
+                    .filter(existing -> !existing.getAccountId().equals(accountId))
+                    .ifPresent(existing -> { throw new AppException("EMAIL DA TON TAI"); });
+            account.setEmail(email);
+        }
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            if (request.getPassword().length() < 8) throw new AppException("PASSWORD TOI THIEU 8 KY TU");
+            account.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+        if (request.getPhone() != null) account.setPhone(trimToNull(request.getPhone()));
+        if (request.getFullName() != null && !request.getFullName().isBlank()) account.setFullName(request.getFullName().trim());
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            RoleEntity role = roleRepository.findByRoleName(request.getRole())
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ROLE"));
+            account.setRole(role);
+        }
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            account.setStatus(normalizeStatus(request.getStatus()));
+        }
+        return AccountResponse.from(accountRepository.save(account));
+    }
+
+    @Transactional
+    public AccountResponse setAccountStatus(Integer accountId, String status) {
+        accessService.requireRole("ADMIN");
+        String normalizedStatus = normalizeStatus(status);
+        AccountEntity actor = accessService.currentAccount();
+        if (actor.getAccountId().equals(accountId) && "Lock".equals(normalizedStatus)) {
+            throw new AppException("ADMIN KHONG THE TU KHOA TAI KHOAN DANG DANG NHAP");
+        }
+        AccountEntity account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
+        account.setStatus(normalizedStatus);
+        return AccountResponse.from(accountRepository.save(account));
+    }
+
+    @Transactional
+    public AccountResponse setAccountActive(Integer accountId, boolean active) {
+        return setAccountStatus(accountId, active ? "Approved" : "Lock");
+    }
+
+    @Transactional
+    public AccountResponse deactivateAccount(Integer accountId) {
+        return setAccountStatus(accountId, "Lock");
+    }
+
+    private void validateAccountRequest(AccountRequest request, boolean creating) {
+        if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
+        if (creating && (request.getEmail() == null || request.getEmail().isBlank())) throw new AppException("EMAIL KHONG DUOC DE TRONG");
+        if (creating && (request.getPassword() == null || request.getPassword().length() < 8)) throw new AppException("PASSWORD TOI THIEU 8 KY TU");
+        if (creating && (request.getFullName() == null || request.getFullName().isBlank())) throw new AppException("FULL NAME KHONG DUOC DE TRONG");
+        if (creating && (request.getRole() == null || request.getRole().isBlank())) throw new AppException("ROLE KHONG DUOC DE TRONG");
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String resolveRequestedStatus(String requestedStatus, String roleName) {
+        if (requestedStatus != null && !requestedStatus.isBlank()) return normalizeStatus(requestedStatus);
+        if ("ADMIN".equals(roleName) || "STAFF".equals(roleName)) return "Approved";
+        return "Pending";
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) throw new AppException("ACCOUNT STATUS KHONG DUOC DE TRONG");
+        String normalized = status.trim();
+        for (String allowed : List.of("Pending", "Approved", "Rejected", "Lock")) {
+            if (allowed.equalsIgnoreCase(normalized)) return allowed;
+        }
+        throw new AppException("ACCOUNT STATUS KHONG HOP LE");
     }
 }

@@ -3,6 +3,7 @@
 
 # Log file
 *.log
+db-backup-*.sql
 
 # BlueJ files
 *.ctxt

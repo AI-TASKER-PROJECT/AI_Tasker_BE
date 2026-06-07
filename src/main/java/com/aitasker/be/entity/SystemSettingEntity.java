@@ -31,8 +31,8 @@ public class SystemSettingEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
-    @Column(name = "updated_by")
-    private Integer updatedBy;
+    @Column(name = "updated_by_role_id")
+    private Integer updatedByRoleId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

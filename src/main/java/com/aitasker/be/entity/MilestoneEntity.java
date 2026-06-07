@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 public class MilestoneEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "milestone_id") private Integer milestoneId;
-    @Column(name = "contract_id", nullable = false) private Integer contractId;
+    @Column(name = "job_id", nullable = false) private Integer jobId;
+    @Column(name = "contract_id") private Integer contractId;
     @Column(name = "milestone_name", nullable = false, length = 255) private String milestoneName;
     @Column(name = "funds_allocated", nullable = false) private BigDecimal fundsAllocated;
     @Column(name = "order_index", nullable = false) private Integer orderIndex;

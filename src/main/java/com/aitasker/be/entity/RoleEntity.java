@@ -3,6 +3,7 @@ package com.aitasker.be.entity;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public class RoleEntity {
     private String roleName;
 
     @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
+    @JsonIgnore
     @Builder.Default // KHI BULDER MÀ KO TRUYỀN GIÁ TRỊ THÌ SẼ DÙNG GIÁ TRỊ MẶC ĐỊNH ĐÃ KHAI BÁO SẴN
     private List<AccountEntity> accounts = new ArrayList<>();
 }

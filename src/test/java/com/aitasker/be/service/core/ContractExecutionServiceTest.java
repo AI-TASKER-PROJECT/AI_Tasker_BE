@@ -32,7 +32,6 @@ class ContractExecutionServiceTest {
     @Mock private AcceptanceCriteriaRepository criteriaRepository;
     @Mock private DeliverableRepository deliverableRepository;
     @Mock private TransactionRepository transactionRepository;
-    @Mock private InvoiceRepository invoiceRepository;
     @Mock private DisputeRepository disputeRepository;
     @Mock private StaffRepository staffRepository;
     @Mock private SystemSettingRepository systemSettingRepository;

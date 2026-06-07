@@ -25,61 +25,68 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
 
     @Override
-@Transactional
-public AuthResponse register(RegisterRequest req) {
-    if (accountRepository.existsByEmail(req.getEmail())) {
-        throw new ResourceConflictException("Email đã tồn tại");
+    @Transactional
+    public AuthResponse register(RegisterRequest req) {
+        String email = normalizeEmail(req.getEmail());
+        if (accountRepository.existsByEmailIgnoreCase(email)) {
+            throw new ResourceConflictException("Email da ton tai");
+        }
+
+        RoleEntity role = roleRepository.findByRoleName(req.getRole())
+                .orElseThrow(() -> new UnauthorizedException("Role khong hop le"));
+
+        AccountEntity account = AccountEntity.builder()
+                .email(email)
+                .password(passwordEncoder.encode(req.getPassword()))
+                .phone(req.getPhone())
+                .fullName(req.getFullName())
+                .role(role)
+                .status("Pending")
+                .build();
+
+        AccountEntity saved = accountRepository.save(account);
+
+        String accessToken = jwtService.generateAccessToken(saved.getEmail(), saved.getRole().getRoleName());
+        String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .role(saved.getRole().getRoleName())
+                .accountStatus(saved.getStatus())
+                .email(saved.getEmail())
+                .fullName(saved.getFullName())
+                .build();
     }
 
-    RoleEntity role = roleRepository.findByRoleName(req.getRole())
-            .orElseThrow(() -> new UnauthorizedException("Role không hợp lệ"));
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse login(LoginRequest req) {
+        AccountEntity account = accountRepository.findByEmailWithRole(normalizeEmail(req.getEmail()))
+                .orElseThrow(() -> new UnauthorizedException("Sai email hoac mat khau"));
 
-    AccountEntity account = AccountEntity.builder()
-            .email(req.getEmail())
-            .password(passwordEncoder.encode(req.getPassword()))
-            .phone(req.getPhone())
-            .fullName(req.getFullName())
-            .role(role)
-            .isActive(true)
-            .build();
+        if ("Lock".equalsIgnoreCase(account.getStatus())) {
+            throw new UnauthorizedException("Tai khoan da bi khoa");
+        }
 
-    AccountEntity saved = accountRepository.save(account);
+        if (!passwordEncoder.matches(req.getPassword(), account.getPassword())) {
+            throw new UnauthorizedException("Sai email hoac mat khau");
+        }
 
-    String accessToken = jwtService.generateAccessToken(saved.getEmail(), saved.getRole().getRoleName());
-    String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
+        String accessToken = jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName());
+        String refreshToken = jwtService.generateRefreshToken(account.getEmail());
 
-    return AuthResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .role(saved.getRole().getRoleName())
-            .email(saved.getEmail())
-            .fullName(saved.getFullName())
-            .build();
-}
-
-@Override
-@Transactional(readOnly = true)
-public AuthResponse login(LoginRequest req) {
-    AccountEntity account = accountRepository.findByEmailWithRole(req.getEmail())
-            .orElseThrow(() -> new UnauthorizedException("Sai email hoặc mật khẩu"));
-
-    if (!Boolean.TRUE.equals(account.getIsActive())) {
-        throw new UnauthorizedException("Tài khoản đã bị khóa");
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .role(account.getRole().getRoleName())
+                .accountStatus(account.getStatus())
+                .email(account.getEmail())
+                .fullName(account.getFullName())
+                .build();
     }
 
-    if (!passwordEncoder.matches(req.getPassword(), account.getPassword())) {
-        throw new UnauthorizedException("Sai email hoặc mật khẩu");
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
     }
-
-    String accessToken = jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName());
-    String refreshToken = jwtService.generateRefreshToken(account.getEmail());
-
-    return AuthResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .role(account.getRole().getRoleName())
-            .email(account.getEmail())
-            .fullName(account.getFullName())
-            .build();
-}
 }

@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -30,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=aitasker",
         "spring.datasource.password=aitasker123"
 })
+@Transactional
 class AuthFlowIntegrationTest {
 
     private MockMvc mockMvc;
@@ -77,6 +79,42 @@ class AuthFlowIntegrationTest {
         JsonNode root = objectMapper.readTree(loginResult.getResponse().getContentAsString());
         assertThat(root.path("data").path("accessToken").asText()).isNotBlank();
         assertThat(root.path("data").path("role").asText()).isEqualTo("BUSINESS");
+    }
+
+    @Test
+    void register_shouldNormalizeEmailBeforeLogin() throws Exception {
+        String suffix = String.valueOf(System.currentTimeMillis());
+        String storedEmail = "mixed_" + suffix + "@mail.com";
+        String registerBody = """
+                {
+                  "email": "Mixed_%s@Mail.Com",
+                  "password": "12345678",
+                  "fullName": "MIXED EMAIL TEST",
+                  "phone": "0900000001",
+                  "role": "BUSINESS"
+                }
+                """.formatted(suffix);
+
+        MvcResult registerResult = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode registerRoot = objectMapper.readTree(registerResult.getResponse().getContentAsString());
+        assertThat(registerRoot.path("data").path("email").asText()).isEqualTo(storedEmail);
+
+        String loginBody = """
+                {
+                  "email": "%s",
+                  "password": "12345678"
+                }
+                """.formatted(storedEmail);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isOk());
     }
 
     @Test

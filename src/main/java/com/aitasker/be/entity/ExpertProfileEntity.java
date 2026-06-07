@@ -14,8 +14,8 @@ public class ExpertProfileEntity {
     @Column(name = "expert_id") private Integer expertId;
     @Column(name = "account_id", nullable = false, unique = true) private Integer accountId;
     @Column(name = "national_id", nullable = false, unique = true, length = 50) private String nationalId;
-    @Column(name = "id_card_front_url", length = 255) private String idCardFrontUrl;
-    @Column(name = "id_card_back_url", length = 255) private String idCardBackUrl;
+    @Column(name = "portfolio_url", length = 255) private String portfolioUrl;
+    @Column(name = "years_of_experience") private Integer yearsOfExperience;
     @Column(name = "kyc_status", nullable = false, length = 50) private String kycStatus;
     @Column(name = "approved_by") private Integer approvedBy;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;

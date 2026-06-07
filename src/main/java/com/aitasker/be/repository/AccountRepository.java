@@ -9,8 +9,11 @@ import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<AccountEntity, Integer> {
     Optional<AccountEntity> findByEmail(String email);
+    Optional<AccountEntity> findByEmailIgnoreCase(String email);
+    Optional<AccountEntity> findFirstByRoleRoleNameOrderByAccountIdAsc(String roleName);
     boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
 
-    @Query("select a from AccountEntity a join fetch a.role where a.email = :email")
+    @Query("select a from AccountEntity a join fetch a.role where lower(a.email) = lower(:email)")
     Optional<AccountEntity> findByEmailWithRole(@Param("email") String email);
 }

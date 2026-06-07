@@ -5,4 +5,6 @@ import java.util.List;
 public interface MilestoneRepository extends JpaRepository<MilestoneEntity, Integer> {
     List<MilestoneEntity> findByContractIdOrderByOrderIndexAsc(Integer contractId);
     boolean existsByContractIdAndOrderIndex(Integer contractId, Integer orderIndex);
+    List<MilestoneEntity> findByJobIdOrderByOrderIndexAsc(Integer jobId);
+    boolean existsByJobIdAndOrderIndex(Integer jobId, Integer orderIndex);
 }

@@ -46,8 +46,10 @@ public class AccountEntity {
     @JoinColumn(name = "role_id", nullable = false)
     private RoleEntity role;
 
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive;
+    // Pending: chi duoc dang nhap va nop ho so. Approved: duoc dung day du chuc nang.
+    // Rejected: duoc dang nhap de nop lai ho so. Lock: bi khoa dang nhap.
+    @Column(name = "status", nullable = false, length = 20)
+    private String status;
 
     @CreationTimestamp // ANNOTATION CỦA HIBERNATE DÙNG ĐỂ GÁN TỰ ĐỘNG THỜI GIAN LÚC CREATE CHO FIELD
     @Column(name = "created_at", nullable = false, updatable = false)
