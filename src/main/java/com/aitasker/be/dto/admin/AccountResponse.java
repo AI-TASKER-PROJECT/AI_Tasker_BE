@@ -15,6 +15,7 @@ public class AccountResponse {
     private String fullName;
     private String role;
     private String status;
+    private String specialization;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

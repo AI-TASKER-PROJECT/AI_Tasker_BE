@@ -4,6 +4,7 @@ import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.admin.AccountRequest;
 import com.aitasker.be.dto.admin.AccountResponse;
+import com.aitasker.be.dto.admin.StaffResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -89,22 +90,32 @@ public class AdminService {
         return systemSettingRepository.save(setting);
     }
 
-    public List<StaffEntity> listStaffs() {
+    public List<StaffResponse> listStaffs() {
         accessService.requireRole("ADMIN");
-        return staffRepository.findAll();
+        return staffRepository.findAll().stream()
+                .map(this::toStaffResponse)
+                .toList();
     }
 
     @Transactional
-    public StaffEntity createStaff(StaffEntity input) {
+    public StaffResponse createStaff(StaffEntity input) {
         accessService.requireRole("ADMIN");
-        // KIEM TRA ACCOUNT TON TAI VA CHUA DUOC GAN HO SO STAFF.
         if (input.getAccountId() == null) throw new AppException("ACCOUNT ID KHONG DUOC DE TRONG");
-        accountRepository.findById(input.getAccountId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
-        if (staffRepository.findByAccountId(input.getAccountId()).isPresent()) {
-            throw new AppException("ACCOUNT NAY DA CO HO SO STAFF");
+        AccountEntity account = accountRepository.findById(input.getAccountId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
+        if (!hasRole(account.getRole(), "STAFF")) {
+            throw new AppException("ACCOUNT PHAI CO ROLE STAFF");
         }
-        input.setStaffId(null);
-        return staffRepository.save(input);
+        StaffEntity staff = ensureStaffProfile(account.getAccountId(), input.getSpecialization());
+        return toStaffResponse(staff);
+    }
+
+    @Transactional
+    public StaffResponse updateStaff(Integer staffId, StaffEntity input) {
+        accessService.requireRole("ADMIN");
+        StaffEntity staff = staffRepository.findById(staffId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY STAFF"));
+        staff.setSpecialization(normalizeStaffSpecialization(input == null ? null : input.getSpecialization()));
+        return toStaffResponse(staffRepository.save(staff));
     }
 
     public Map<String, Object> analyticsOverview() {
@@ -140,7 +151,7 @@ public class AdminService {
     public List<AccountResponse> listAccounts() {
         accessService.requireRole("ADMIN");
         return accountRepository.findAll().stream()
-                .map(AccountResponse::from)
+                .map(this::toAccountResponse)
                 .toList();
     }
 
@@ -152,7 +163,7 @@ public class AdminService {
         if (accountRepository.existsByEmailIgnoreCase(email)) {
             throw new AppException("EMAIL DA TON TAI");
         }
-        RoleEntity role = roleRepository.findByRoleName(request.getRole())
+        RoleEntity role = roleRepository.findByRoleNameIgnoreCase(request.getRole())
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ROLE"));
         AccountEntity account = AccountEntity.builder()
                 .email(email)
@@ -162,7 +173,11 @@ public class AdminService {
                 .role(role)
                 .status(resolveRequestedStatus(request.getStatus(), role.getRoleName()))
                 .build();
-        return AccountResponse.from(accountRepository.save(account));
+        AccountEntity saved = accountRepository.save(account);
+        if (hasRole(role, "STAFF")) {
+            ensureStaffProfile(saved.getAccountId(), request.getSpecialization());
+        }
+        return toAccountResponse(saved);
     }
 
     @Transactional
@@ -184,14 +199,24 @@ public class AdminService {
         if (request.getPhone() != null) account.setPhone(trimToNull(request.getPhone()));
         if (request.getFullName() != null && !request.getFullName().isBlank()) account.setFullName(request.getFullName().trim());
         if (request.getRole() != null && !request.getRole().isBlank()) {
-            RoleEntity role = roleRepository.findByRoleName(request.getRole())
+            RoleEntity role = roleRepository.findByRoleNameIgnoreCase(request.getRole())
                     .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ROLE"));
             account.setRole(role);
         }
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             account.setStatus(normalizeStatus(request.getStatus()));
         }
-        return AccountResponse.from(accountRepository.save(account));
+        AccountEntity saved = accountRepository.save(account);
+        if (hasRole(saved.getRole(), "STAFF")) {
+            StaffEntity staff = ensureStaffProfile(saved.getAccountId(), request.getSpecialization());
+            if (request.getSpecialization() != null) {
+                staff.setSpecialization(normalizeStaffSpecialization(request.getSpecialization()));
+                staffRepository.save(staff);
+            }
+        } else {
+            staffRepository.findByAccountId(saved.getAccountId()).ifPresent(staffRepository::delete);
+        }
+        return toAccountResponse(saved);
     }
 
     @Transactional
@@ -205,7 +230,7 @@ public class AdminService {
         AccountEntity account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
         account.setStatus(normalizedStatus);
-        return AccountResponse.from(accountRepository.save(account));
+        return toAccountResponse(accountRepository.save(account));
     }
 
     @Transactional
@@ -238,8 +263,44 @@ public class AdminService {
 
     private String resolveRequestedStatus(String requestedStatus, String roleName) {
         if (requestedStatus != null && !requestedStatus.isBlank()) return normalizeStatus(requestedStatus);
-        if ("ADMIN".equals(roleName) || "STAFF".equals(roleName)) return "Approved";
+        if (isRoleName(roleName, "ADMIN") || isRoleName(roleName, "STAFF")) return "Approved";
         return "Pending";
+    }
+
+    private StaffEntity ensureStaffProfile(Integer accountId, String specialization) {
+        return staffRepository.findByAccountId(accountId)
+                .orElseGet(() -> staffRepository.save(StaffEntity.builder()
+                        .accountId(accountId)
+                        .specialization(normalizeStaffSpecialization(specialization))
+                        .build()));
+    }
+
+    private String normalizeStaffSpecialization(String specialization) {
+        String normalized = trimToNull(specialization);
+        return normalized == null ? "KYB/KYC profile verification" : normalized;
+    }
+
+    private StaffResponse toStaffResponse(StaffEntity staff) {
+        AccountEntity account = accountRepository.findById(staff.getAccountId()).orElse(null);
+        return StaffResponse.from(staff, account);
+    }
+
+    private AccountResponse toAccountResponse(AccountEntity account) {
+        AccountResponse response = AccountResponse.from(account);
+        if (hasRole(account.getRole(), "STAFF")) {
+            staffRepository.findByAccountId(account.getAccountId())
+                    .map(StaffEntity::getSpecialization)
+                    .ifPresent(response::setSpecialization);
+        }
+        return response;
+    }
+
+    private boolean hasRole(RoleEntity role, String expectedRole) {
+        return role != null && isRoleName(role.getRoleName(), expectedRole);
+    }
+
+    private boolean isRoleName(String roleName, String expectedRole) {
+        return roleName != null && expectedRole.equalsIgnoreCase(roleName.trim());
     }
 
     private String normalizeStatus(String status) {
