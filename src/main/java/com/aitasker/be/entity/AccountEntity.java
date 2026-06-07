@@ -39,6 +39,9 @@ public class AccountEntity {
     @Column(name = "phone", length = 20)
     private String phone;
 
+    @Column(name = "emailVerified", nullable = false)
+    private boolean emailVerified;
+
     @Column(name = "full_name", nullable = false, length = 255)
     private String fullName;
 

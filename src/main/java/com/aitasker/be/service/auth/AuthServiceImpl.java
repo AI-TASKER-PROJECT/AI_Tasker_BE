@@ -1,5 +1,6 @@
 package com.aitasker.be.service.auth;
 
+import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.ResourceConflictException;
 import com.aitasker.be.common.exception.UnauthorizedException;
 import com.aitasker.be.dto.auth.AuthResponse;
@@ -23,11 +24,16 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailOtpService emailOtpService;
 
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest req) {
         String email = normalizeEmail(req.getEmail());
+        if (!emailOtpService.isEmailVerified(email)) {
+            throw new AppException("Email chưa xác thực OTP");
+        }
+
         if (accountRepository.existsByEmailIgnoreCase(email)) {
             throw new ResourceConflictException("Email da ton tai");
         }
@@ -45,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         AccountEntity saved = accountRepository.save(account);
+        emailOtpService.clearVerifiedEmail(email);
 
         String accessToken = jwtService.generateAccessToken(saved.getEmail(), saved.getRole().getRoleName());
         String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
