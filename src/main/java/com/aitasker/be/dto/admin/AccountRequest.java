@@ -10,4 +10,5 @@ public class AccountRequest {
     private String fullName;
     private String role;
     private String status;
+    private String specialization;
 }

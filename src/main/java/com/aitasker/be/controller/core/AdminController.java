@@ -3,6 +3,7 @@ package com.aitasker.be.controller.core;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.admin.AccountRequest;
 import com.aitasker.be.dto.admin.AccountResponse;
+import com.aitasker.be.dto.admin.StaffResponse;
 import com.aitasker.be.entity.ReviewEntity;
 import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.entity.SystemWalletEntity;
@@ -49,8 +50,13 @@ public class AdminController {
     }
 
     @PostMapping("/staffs")
-    public ResponseEntity<ApiResponse<StaffEntity>> createStaff(@RequestBody StaffEntity request) {
+    public ResponseEntity<ApiResponse<StaffResponse>> createStaff(@RequestBody StaffEntity request) {
         return ResponseEntity.ok(ApiResponse.success("CREATE STAFF SUCCESS", adminService.createStaff(request)));
+    }
+
+    @PatchMapping("/staffs/{staffId}")
+    public ResponseEntity<ApiResponse<StaffResponse>> updateStaff(@PathVariable Integer staffId, @RequestBody StaffEntity request) {
+        return ResponseEntity.ok(ApiResponse.success("UPDATE STAFF SUCCESS", adminService.updateStaff(staffId, request)));
     }
 
     @GetMapping("/analytics/overview")
