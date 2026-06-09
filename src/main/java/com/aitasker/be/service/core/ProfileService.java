@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/ProfileService.java
+ * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
@@ -10,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class ProfileService {
     private final AccessService accessService;
@@ -22,7 +29,9 @@ public class ProfileService {
     private final AuditLogRepository auditLogRepository;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `upsertBusiness` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public BusinessProfileEntity upsertBusiness(BusinessProfileEntity input) {
         accessService.requireRole("BUSINESS");
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
@@ -45,7 +54,9 @@ public class ProfileService {
     }
 
     // TAO HOAC CAP NHAT HO SO CHUYEN GIA DE PHUC VU LUONG KYC.
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `upsertExpert` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ExpertProfileEntity upsertExpert(ExpertProfileEntity input) {
         accessService.requireRole("EXPERT");
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
@@ -71,7 +82,9 @@ public class ProfileService {
     }
 
     // STAFF duyet ho so business/expert va ghi log audit.
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `approveProfile` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public Object approveProfile(String type, Integer id, String status) {
         accessService.requireRole("STAFF");
         // CHI CHO PHEP 2 GIA TRI PHE DUYET DUNG THEO BUSINESS RULE.
@@ -100,38 +113,44 @@ public class ProfileService {
     }
 
     public List<BusinessProfileEntity> allBusinessProfiles() { accessService.requireRole("STAFF"); return businessProfileRepository.findAll(); }
-    public List<ExpertProfileEntity> allExpertProfiles() { accessService.requireRole("STAFF"); return expertProfileRepository.findAll(); }
-    public List<PortfolioEntity> allPortfolios() { accessService.requireRole("STAFF"); return portfolioRepository.findAll(); }
+    // Note: Hàm `allExpertProfiles` cho STAFF quản trị hồ sơ và BUSINESS đọc thông tin expert khi xem proposal.
+    public List<ExpertProfileEntity> allExpertProfiles() { accessService.requireRole("STAFF", "BUSINESS"); return expertProfileRepository.findAll(); }
+    // Note: Hàm `allPortfolios` cho STAFF quản trị portfolio và BUSINESS xem năng lực expert trong màn proposal.
+    public List<PortfolioEntity> allPortfolios() { accessService.requireRole("STAFF", "BUSINESS"); return portfolioRepository.findAll(); }
 
-    // TAO HOAC CAP NHAT PORTFOLIO 4 THANH PHAN BAT BUOC CUA CHUYEN GIA.
+    // TAO HOAC CAP NHAT PORTFOLIO MOI CUA CHUYEN GIA DE BUSINESS DOC KHI REVIEW PROPOSAL.
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `upsertPortfolio` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public PortfolioEntity upsertPortfolio(PortfolioEntity input) {
         accessService.requireRole("EXPERT");
         accessService.requireApprovedAccount();
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
-        // KIEM TRA DAY DU CAC TRUONG CHUYEN MON THEO RULE PRF-01.
-        if (input.getContext() == null || input.getContext().isBlank()) throw new AppException("CONTEXT KHONG DUOC DE TRONG");
-        if (input.getDataProcessing() == null || input.getDataProcessing().isBlank()) throw new AppException("DATA PROCESSING KHONG DUOC DE TRONG");
-        if (input.getModelArchitecture() == null || input.getModelArchitecture().isBlank()) throw new AppException("MODEL ARCHITECTURE KHONG DUOC DE TRONG");
-        if (input.getPerformanceMetrics() == null || input.getPerformanceMetrics().isBlank()) throw new AppException("PERFORMANCE METRICS KHONG DUOC DE TRONG");
+        // KIEM TRA CAC TRUONG PORTFOLIO MOI DE PHUC VU BUSINESS XEM CHI TIET CHUYEN GIA.
+        if (input.getDomainIds() == null || input.getDomainIds().isBlank()) throw new AppException("DOMAIN IDS KHONG DUOC DE TRONG");
+        if (input.getSkillIds() == null || input.getSkillIds().isBlank()) throw new AppException("SKILL IDS KHONG DUOC DE TRONG");
+        if (input.getYearsExperience() == null || input.getYearsExperience() < 0) throw new AppException("YEARS EXPERIENCE KHONG HOP LE");
+        if (input.getSelfDescription() == null || input.getSelfDescription().isBlank()) throw new AppException("SELF DESCRIPTION KHONG DUOC DE TRONG");
         Integer accountId = accessService.currentAccount().getAccountId();
         Integer expertId = expertProfileRepository.findByAccountId(accountId)
                 .map(ExpertProfileEntity::getExpertId)
                 .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
         PortfolioEntity entity = portfolioRepository.findByExpertId(expertId).orElseGet(PortfolioEntity::new);
         entity.setExpertId(expertId);
-        entity.setContext(input.getContext());
-        entity.setDataProcessing(input.getDataProcessing());
-        entity.setModelArchitecture(input.getModelArchitecture());
-        entity.setPerformanceMetrics(input.getPerformanceMetrics());
-        entity.setPocUrl(input.getPocUrl());
+        entity.setDomainIds(input.getDomainIds());
+        entity.setSkillIds(input.getSkillIds());
+        entity.setYearsExperience(input.getYearsExperience());
+        entity.setCertificates(input.getCertificates());
+        entity.setSelfDescription(input.getSelfDescription());
         return portfolioRepository.save(entity);
     }
 
+    // Note: Hàm `audit` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void audit(String action, String entityName, String entityId, Integer actorId) {
         auditLogRepository.save(AuditLogEntity.builder().action(action).entityName(entityName).entityId(entityId).actorAccountId(actorId).build());
     }
 
+    // Note: Hàm `updateAccountStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void updateAccountStatus(Integer accountId, String approvalStatus) {
         AccountEntity account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT CUA PROFILE"));
@@ -140,6 +159,7 @@ public class ProfileService {
     }
 
     // BAT BUOC TAI KHOAN STAFF PHAI CO BAN GHI TRONG BANG staffs DE LUU approvedBy.
+    // Note: Hàm `resolveStaffId` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private Integer resolveStaffId(Integer accountId) {
         return staffRepository.findByAccountId(accountId)
                 .map(StaffEntity::getStaffId)

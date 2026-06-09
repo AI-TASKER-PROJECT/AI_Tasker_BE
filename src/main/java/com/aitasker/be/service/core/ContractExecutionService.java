@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/ContractExecutionService.java
+ * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
@@ -12,7 +17,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class ContractExecutionService {
     private final AccessService accessService;
@@ -31,7 +38,9 @@ public class ContractExecutionService {
     private final SystemSettingRepository systemSettingRepository;
     private final SystemWalletService systemWalletService;
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `createDraftFromProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ContractEntity createDraftFromProposal(Integer proposalId, ContractEntity input) {
         accessService.requireRole("BUSINESS");
         accessService.requireApprovedAccount();
@@ -57,7 +66,9 @@ public class ContractExecutionService {
         return contractRepository.save(input);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `requestChange` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ContractChangeRequestEntity requestChange(ContractChangeRequestEntity input) {
         requireApprovedForBusinessOrExpert();
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -85,7 +96,9 @@ public class ContractExecutionService {
         return changeRequestRepository.save(input);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `activateContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ContractEntity activateContract(Integer contractId) {
         requireApprovedForBusinessOrExpert();
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
@@ -105,7 +118,9 @@ public class ContractExecutionService {
         return contractRepository.save(contract);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `signNda` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ContractEntity signNda(Integer contractId) {
         // CHI CHO BEN EXPERT KY NDA SAU KHI CONTRACT DA ACTIVE.
         accessService.requireRole("EXPERT");
@@ -122,7 +137,9 @@ public class ContractExecutionService {
         return contractRepository.save(contract);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `terminateContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ContractEntity terminateContract(Integer contractId, String reason) {
         // CHI BUSINESS HOAC ADMIN DUOC CHAM DUT CONTRACT KHI CHUA HOAN TAT.
         accessService.requireRole("BUSINESS", "ADMIN");
@@ -144,6 +161,7 @@ public class ContractExecutionService {
         return contractRepository.save(contract);
     }
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public MilestoneEntity createMilestone(MilestoneEntity input) {
         accessService.requireRole("BUSINESS");
         accessService.requireApprovedAccount();
@@ -158,6 +176,7 @@ public class ContractExecutionService {
         if (input.getStatus() == null) input.setStatus("Pending");
         return milestoneRepository.save(input);
     }
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public AcceptanceCriteriaEntity createCriteria(AcceptanceCriteriaEntity input) {
         accessService.requireRole("BUSINESS");
         accessService.requireApprovedAccount();
@@ -167,6 +186,7 @@ public class ContractExecutionService {
         if (input.getIsPassed() == null) input.setIsPassed(false);
         return criteriaRepository.save(input);
     }
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public DeliverableEntity submitDeliverable(DeliverableEntity input) {
         accessService.requireRole("EXPERT");
         accessService.requireApprovedAccount();
@@ -180,6 +200,7 @@ public class ContractExecutionService {
         milestoneRepository.save(milestone);
         return saved;
     }
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public TransactionEntity createTransaction(TransactionEntity input) {
         MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         ContractEntity contract = contractRepository.findByJobId(milestone.getJobId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA JOB"));
@@ -199,6 +220,7 @@ public class ContractExecutionService {
         systemWalletService.syncWallet();
         return saved;
     }
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public DisputeEntity createDispute(DisputeEntity input) {
         requireApprovedForBusinessOrExpert();
         ContractEntity contract = contractRepository.findById(input.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
@@ -218,6 +240,7 @@ public class ContractExecutionService {
         return saved;
     }
 
+    // Note: Hàm `listContracts` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<ContractEntity> listContracts() {
         AccountEntity actor = accessService.currentAccount();
         String role = actor.getRole().getRoleName();
@@ -245,38 +268,46 @@ public class ContractExecutionService {
         }
         throw new AppException("ROLE KHONG HOP LE");
     }
+    // Note: Hàm `listMilestonesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> listMilestonesByContract(Integer contractId) {
         ContractEntity contract = requireContractParticipantOrOperator(contractId);
         return milestoneRepository.findByJobIdOrderByOrderIndexAsc(contract.getJobId());
     }
+    // Note: Hàm `listMilestonesByJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> listMilestonesByJob(Integer jobId) {
         requireJobParticipantOrOwner(jobId);
         return milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId);
     }
+    // Note: Hàm `listCriteriaByMilestone` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<AcceptanceCriteriaEntity> listCriteriaByMilestone(Integer milestoneId) {
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         requireJobParticipantOrOwner(milestone.getJobId());
         return criteriaRepository.findByMilestoneId(milestoneId);
     }
+    // Note: Hàm `listDeliverablesByMilestone` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<DeliverableEntity> listDeliverablesByMilestone(Integer milestoneId) {
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         requireJobParticipantOrOwner(milestone.getJobId());
         return deliverableRepository.findByMilestoneId(milestoneId);
     }
+    // Note: Hàm `listTransactionsByMilestone` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<TransactionEntity> listTransactionsByMilestone(Integer milestoneId) {
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         requireJobParticipantOrOwner(milestone.getJobId());
         return transactionRepository.findByMilestoneId(milestoneId);
     }
+    // Note: Hàm `listDisputesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<DisputeEntity> listDisputesByContract(Integer contractId) {
         requireContractParticipantOrOperator(contractId);
         return disputeRepository.findByContractId(contractId);
     }
+    // Note: Hàm `getDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public DisputeEntity getDispute(Integer disputeId) {
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
         requireContractParticipantOrOperator(dispute.getContractId());
         return dispute;
     }
+    // Note: Hàm `matchingByKeyword` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<ProposalEntity> matchingByKeyword(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         final String keyword = Optional.ofNullable(job.getAiTag()).filter(v -> !v.isBlank()).orElse("AI").toUpperCase();
@@ -285,7 +316,9 @@ public class ContractExecutionService {
                 .toList();
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `updateTransactionStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public TransactionEntity updateTransactionStatus(Long transactionId, String status) {
         accessService.requireRole("ADMIN");
         // RANG BUOC TRANG THAI GIAO DICH THEO FLOW ESCROW.
@@ -300,7 +333,9 @@ public class ContractExecutionService {
         return saved;
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `assignDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public DisputeEntity assignDispute(Integer disputeId, Integer staffId) {
         accessService.requireRole("ADMIN");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
@@ -314,7 +349,9 @@ public class ContractExecutionService {
         return saved;
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `resolveDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public DisputeEntity resolveDispute(Integer disputeId, String proposedAction) {
         accessService.requireRole("ADMIN");
         // ADMIN CHOT PHUONG AN XU LY TRANH CHAP VA DONG CASE.
@@ -328,7 +365,9 @@ public class ContractExecutionService {
         return saved;
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `runSlaAutoApprove` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> runSlaAutoApprove() {
         accessService.requireRole("ADMIN");
         // MO PHONG JOB SLA: TU DONG RELEASE MILESTONE NEU QUA SO NGAY CAU HINH SAU KHI CO DELIVERABLE.
@@ -358,7 +397,9 @@ public class ContractExecutionService {
         return updated;
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `recordDemoTesting` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public DisputeEntity recordDemoTesting(Integer disputeId, String testResult) {
         accessService.requireRole("STAFF");
         // STAFF chi ghi nhan demo testing cho dispute duoc admin phan cong.
@@ -372,7 +413,9 @@ public class ContractExecutionService {
         return saved;
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `issueTechnicalReport` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public DisputeEntity issueTechnicalReport(Integer disputeId, String reportContent, String proposedAction) {
         accessService.requireRole("STAFF");
         // STAFF de xuat huong xu ly, ADMIN la nguoi chot o resolveDispute.
@@ -387,7 +430,9 @@ public class ContractExecutionService {
         return saved;
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `processPaymentWebhook` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public TransactionEntity processPaymentWebhook(Long transactionId, String paymentStatus, String bankTxCode, String receiptImgUrl) {
         accessService.requireRole("ADMIN");
         // VNPay sandbox webhook chi cap nhat transaction; du an khong con bang invoice noi bo.
@@ -402,6 +447,7 @@ public class ContractExecutionService {
         return transaction;
     }
 
+    // Note: Hàm `requireBusinessOwnedContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private ContractEntity requireBusinessOwnedContract(Integer contractId) {
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer businessId = businessProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())
@@ -411,6 +457,7 @@ public class ContractExecutionService {
         return contract;
     }
 
+    // Note: Hàm `requireBusinessOwnedJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private JobEntity requireBusinessOwnedJob(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         Integer businessId = businessProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())
@@ -420,6 +467,7 @@ public class ContractExecutionService {
         return job;
     }
 
+    // Note: Hàm `requireExpertOwnedContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private ContractEntity requireExpertOwnedContract(Integer contractId) {
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer expertId = expertProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())
@@ -429,6 +477,7 @@ public class ContractExecutionService {
         return contract;
     }
 
+    // Note: Hàm `requireExpertOwnedContractByJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private ContractEntity requireExpertOwnedContractByJob(Integer jobId) {
         ContractEntity contract = contractRepository.findByJobId(jobId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA JOB"));
@@ -439,6 +488,7 @@ public class ContractExecutionService {
         return contract;
     }
 
+    // Note: Hàm `requireContractParticipantOrOperator` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private ContractEntity requireContractParticipantOrOperator(Integer contractId) {
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         AccountEntity actor = accessService.currentAccount();
@@ -459,6 +509,7 @@ public class ContractExecutionService {
         return contract;
     }
 
+    // Note: Hàm `requireJobParticipantOrOwner` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void requireJobParticipantOrOwner(Integer jobId) {
         AccountEntity actor = accessService.currentAccount();
         String role = actor.getRole().getRoleName();
@@ -479,6 +530,7 @@ public class ContractExecutionService {
         throw new AppException("BAN KHONG THUOC JOB NAY");
     }
 
+    // Note: Hàm `requireAssignedStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void requireAssignedStaff(DisputeEntity dispute) {
         Integer staffId = getCurrentStaffId(accessService.currentAccount());
         if (dispute.getAssignedStaffId() == null || !staffId.equals(dispute.getAssignedStaffId())) {
@@ -486,12 +538,14 @@ public class ContractExecutionService {
         }
     }
 
+    // Note: Hàm `getCurrentStaffId` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private Integer getCurrentStaffId(AccountEntity actor) {
         return staffRepository.findByAccountId(actor.getAccountId())
                 .map(StaffEntity::getStaffId)
                 .orElseThrow(() -> new NotFoundException("CHUA CO STAFF PROFILE"));
     }
 
+    // Note: Hàm `requireApprovedForBusinessOrExpert` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void requireApprovedForBusinessOrExpert() {
         String role = accessService.currentAccount().getRole().getRoleName();
         if ("BUSINESS".equals(role) || "EXPERT".equals(role)) {
@@ -499,6 +553,7 @@ public class ContractExecutionService {
         }
     }
 
+    // Note: Hàm `isAutoAssignStaffEnabled` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private boolean isAutoAssignStaffEnabled() {
         return systemSettingRepository.findById("auto_assign_staff_enabled")
                 .map(SystemSettingEntity::getSettingValue)

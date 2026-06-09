@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/test/java/com/aitasker/be/integration/AuthFlowIntegrationTest.java
+ * Đây là file gì: File test kiểm tra luồng hoặc nghiệp vụ để phát hiện lỗi hồi quy khi thay đổi code.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Note: Annotation này chạy test với Spring context đầy đủ.
 @SpringBootTest(properties = {
         "spring.config.import=",
         "DB_HOST=127.0.0.1",
@@ -35,21 +41,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=aitasker",
         "spring.datasource.password=aitasker123"
 })
+// Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
 @Transactional
 class AuthFlowIntegrationTest {
 
     private MockMvc mockMvc;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Autowired private WebApplicationContext webApplicationContext;
     @MockitoBean private EmailOtpService emailOtpService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @BeforeEach
+    // Note: Hàm `setupMockMvc` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void setupMockMvc() {
         this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
         when(emailOtpService.isEmailVerified(anyString())).thenReturn(true);
     }
 
+    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
+    // Note: Hàm `registerAndLoginBusiness_shouldReturnTokenAndRole` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void registerAndLoginBusiness_shouldReturnTokenAndRole() throws Exception {
         // TAO EMAIL UNIQUE DE TRANH XUNG DOT DU LIEU GIUA CAC LAN CHAY TEST.
         String email = "biz_" + System.currentTimeMillis() + "@mail.com";
@@ -87,7 +99,9 @@ class AuthFlowIntegrationTest {
         assertThat(root.path("data").path("role").asText()).isEqualTo("BUSINESS");
     }
 
+    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
+    // Note: Hàm `register_shouldNormalizeEmailBeforeLogin` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void register_shouldNormalizeEmailBeforeLogin() throws Exception {
         String suffix = String.valueOf(System.currentTimeMillis());
         String storedEmail = "mixed_" + suffix + "@mail.com";
@@ -123,7 +137,9 @@ class AuthFlowIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
+    // Note: Hàm `secureEndpoint_withValidToken_shouldReturnOk` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void secureEndpoint_withValidToken_shouldReturnOk() throws Exception {
         // KIEM CHUNG JWT DA DUOC CAP VA DUNG DE GOI ENDPOINT PRIVATE.
         String email = "secure_" + System.currentTimeMillis() + "@mail.com";

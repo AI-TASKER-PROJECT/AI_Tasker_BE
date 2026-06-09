@@ -1,3 +1,6 @@
+# NOTE FILE: docker-compose.yml
+# Đây là file gì: File Docker Compose khai báo dịch vụ hạ tầng cần chạy cùng back-end.
+# Mục đích note: mô tả vai trò file cấu hình/script, không note rải vào từng khai báo.
 services:
   postgres:
     image: postgres:16
