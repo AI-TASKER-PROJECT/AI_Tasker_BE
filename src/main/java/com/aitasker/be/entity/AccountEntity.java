@@ -54,13 +54,11 @@ public class AccountEntity {
     @Column(name = "phone", length = 20)
     private String phone;
 
-<<<<<<< HEAD
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
-=======
+
     @Column(name = "emailVerified", nullable = false)
     private boolean emailVerified;
 
->>>>>>> feat/week4-MST
     @Column(name = "full_name", nullable = false, length = 255)
     private String fullName;
 
