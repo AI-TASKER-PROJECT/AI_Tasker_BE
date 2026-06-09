@@ -13,9 +13,13 @@ db-backup-*.sql
 
 #Environment file
 .env
-.env.docker
 
 node_modules
+
+# Firebase service account key
+/secrets/
+*.firebase-service-account.json
+firebase-service-account.json
 
 # Package Files #
 *.jar
