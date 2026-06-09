@@ -31,6 +31,7 @@ public class MarketplaceController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/jobs")
+    // Note: Hàm `listJobs` trả về các job đang OPEN để chuyên gia nhìn thấy trên marketplace.
     public ResponseEntity<ApiResponse<Object>> listJobs() { return ResponseEntity.ok(ApiResponse.success("LIST JOBS SUCCESS", marketplaceService.listJobs())); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
@@ -40,6 +41,7 @@ public class MarketplaceController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/jobs/{jobId}")
+    // Note: Hàm `jobDetail` lấy chi tiết job, cho public xem job OPEN và chỉ chủ doanh nghiệp xem job nháp của mình.
     public ResponseEntity<ApiResponse<JobEntity>> jobDetail(@PathVariable Integer jobId) { return ResponseEntity.ok(ApiResponse.success("GET JOB SUCCESS", marketplaceService.getJob(jobId))); }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/security/filter/JwtAuthenticationFilter.java
+ * Đây là file gì: File security cấu hình hoặc xử lý xác thực, phân quyền và JWT cho các API.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.security.filter;
 
 import com.aitasker.be.security.jwt.JwtService;
@@ -16,12 +21,15 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+// Note: Annotation này cho Spring quản lý class như một component dùng chung.
 @Component
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,

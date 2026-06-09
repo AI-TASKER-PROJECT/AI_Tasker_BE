@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/test/java/com/aitasker/be/integration/MarketplaceFlowIntegrationTest.java
+ * Đây là file gì: File test kiểm tra luồng hoặc nghiệp vụ để phát hiện lỗi hồi quy khi thay đổi code.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.integration;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Note: Annotation này chạy test với Spring context đầy đủ.
 @SpringBootTest(properties = {
         "spring.config.import=",
         "DB_HOST=127.0.0.1",
@@ -28,14 +34,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MarketplaceFlowIntegrationTest {
 
     private MockMvc mockMvc;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Autowired private WebApplicationContext webApplicationContext;
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @BeforeEach
+    // Note: Hàm `setupMockMvc` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void setupMockMvc() {
         this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
     }
 
+    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
+    // Note: Hàm `createJob_withoutToken_shouldReturnUnauthorized` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void createJob_withoutToken_shouldReturnUnauthorized() throws Exception {
         // KIEM THU BAT BUOC SECURITY: API PRIVATE PHAI CHAN KHI THIEU JWT.
         String jobBody = """

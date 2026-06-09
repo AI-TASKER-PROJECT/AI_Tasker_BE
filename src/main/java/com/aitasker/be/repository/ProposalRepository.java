@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ProposalRepository extends JpaRepository<ProposalEntity, Integer> {
+    // Note: Hàm `existsByJobIdAndExpertId` kiểm tra expert đã gửi proposal cho job chưa để tránh nộp trùng.
     boolean existsByJobIdAndExpertId(Integer jobId, Integer expertId);
     // Note: Hàm `findByJobId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<ProposalEntity> findByJobId(Integer jobId);

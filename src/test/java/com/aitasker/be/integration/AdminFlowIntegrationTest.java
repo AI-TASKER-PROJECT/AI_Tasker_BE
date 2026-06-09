@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/test/java/com/aitasker/be/integration/AdminFlowIntegrationTest.java
+ * Đây là file gì: File test kiểm tra luồng hoặc nghiệp vụ để phát hiện lỗi hồi quy khi thay đổi code.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,6 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Note: Annotation này chạy test với Spring context đầy đủ.
 @SpringBootTest(properties = {
         "spring.config.import=",
         "DB_HOST=127.0.0.1",
@@ -30,19 +36,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=aitasker",
         "spring.datasource.password=aitasker123"
 })
+// Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
 @Transactional
 class AdminFlowIntegrationTest {
 
     private MockMvc mockMvc;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Autowired private WebApplicationContext webApplicationContext;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @BeforeEach
+    // Note: Hàm `setupMockMvc` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void setupMockMvc() {
         this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
     }
 
+    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
+    // Note: Hàm `adminEndpoints_shouldEnforceAuthorization` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void adminEndpoints_shouldEnforceAuthorization() throws Exception {
         // API ADMIN PHAI CHAN KHI KHONG CO JWT.
         mockMvc.perform(get("/api/v1/admin/settings"))
@@ -58,6 +70,7 @@ class AdminFlowIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // Note: Hàm `registerAccount` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     private void registerAccount(String email, String role) throws Exception {
         String body = """
                 {
@@ -74,6 +87,7 @@ class AdminFlowIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    // Note: Hàm `loginAndGetToken` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     private String loginAndGetToken(String email) throws Exception {
         String loginBody = """
                 {

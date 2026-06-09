@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/AdminService.java
+ * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
@@ -18,7 +23,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class AdminService {
     private final AccessService accessService;
@@ -34,7 +41,9 @@ public class AdminService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `createReview` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ReviewEntity createReview(ReviewEntity input) {
         // CHI CHO BUSINESS/EXPERT TAO DANH GIA SAU KHI HOP DONG DA KET THUC.
         accessService.requireRole("BUSINESS", "EXPERT");
@@ -69,17 +78,21 @@ public class AdminService {
         return reviewRepository.save(input);
     }
 
+    // Note: Hàm `listReviewsByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<ReviewEntity> listReviewsByContract(Integer contractId) {
         accessService.requireRole("ADMIN", "STAFF", "BUSINESS", "EXPERT");
         return reviewRepository.findByContractId(contractId);
     }
 
+    // Note: Hàm `listSettings` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<SystemSettingEntity> listSettings() {
         accessService.requireRole("ADMIN");
         return systemSettingRepository.findAll();
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `updateSetting` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public SystemSettingEntity updateSetting(String key, String value, Boolean isActive) {
         accessService.requireRole("ADMIN");
         SystemSettingEntity setting = systemSettingRepository.findById(key).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
@@ -90,6 +103,7 @@ public class AdminService {
         return systemSettingRepository.save(setting);
     }
 
+    // Note: Hàm `listStaffs` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<StaffResponse> listStaffs() {
         accessService.requireRole("ADMIN");
         return staffRepository.findAll().stream()
@@ -97,7 +111,9 @@ public class AdminService {
                 .toList();
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `createStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public StaffResponse createStaff(StaffEntity input) {
         accessService.requireRole("ADMIN");
         if (input.getAccountId() == null) throw new AppException("ACCOUNT ID KHONG DUOC DE TRONG");
@@ -109,7 +125,9 @@ public class AdminService {
         return toStaffResponse(staff);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `updateStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public StaffResponse updateStaff(Integer staffId, StaffEntity input) {
         accessService.requireRole("ADMIN");
         StaffEntity staff = staffRepository.findById(staffId)
@@ -118,6 +136,7 @@ public class AdminService {
         return toStaffResponse(staffRepository.save(staff));
     }
 
+    // Note: Hàm `analyticsOverview` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public Map<String, Object> analyticsOverview() {
         accessService.requireRole("ADMIN");
         // TONG HOP CHI SO CO BAN DE HO TRO DASHBOARD QUAN TRI MVP.
@@ -147,7 +166,9 @@ public class AdminService {
         return result;
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional(readOnly = true)
+    // Note: Hàm `listAccounts` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<AccountResponse> listAccounts() {
         accessService.requireRole("ADMIN");
         return accountRepository.findAll().stream()
@@ -155,7 +176,9 @@ public class AdminService {
                 .toList();
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `createAccount` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AccountResponse createAccount(AccountRequest request) {
         accessService.requireRole("ADMIN");
         validateAccountRequest(request, true);
@@ -180,7 +203,9 @@ public class AdminService {
         return toAccountResponse(saved);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `updateAccount` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AccountResponse updateAccount(Integer accountId, AccountRequest request) {
         accessService.requireRole("ADMIN");
         AccountEntity account = accountRepository.findById(accountId)
@@ -219,7 +244,9 @@ public class AdminService {
         return toAccountResponse(saved);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `setAccountStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AccountResponse setAccountStatus(Integer accountId, String status) {
         accessService.requireRole("ADMIN");
         String normalizedStatus = normalizeStatus(status);
@@ -233,16 +260,21 @@ public class AdminService {
         return toAccountResponse(accountRepository.save(account));
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `setAccountActive` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AccountResponse setAccountActive(Integer accountId, boolean active) {
         return setAccountStatus(accountId, active ? "Approved" : "Lock");
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `deactivateAccount` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AccountResponse deactivateAccount(Integer accountId) {
         return setAccountStatus(accountId, "Lock");
     }
 
+    // Note: Hàm `validateAccountRequest` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void validateAccountRequest(AccountRequest request, boolean creating) {
         if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         if (creating && (request.getEmail() == null || request.getEmail().isBlank())) throw new AppException("EMAIL KHONG DUOC DE TRONG");
@@ -251,22 +283,26 @@ public class AdminService {
         if (creating && (request.getRole() == null || request.getRole().isBlank())) throw new AppException("ROLE KHONG DUOC DE TRONG");
     }
 
+    // Note: Hàm `normalizeEmail` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }
 
+    // Note: Hàm `trimToNull` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String trimToNull(String value) {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    // Note: Hàm `resolveRequestedStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String resolveRequestedStatus(String requestedStatus, String roleName) {
         if (requestedStatus != null && !requestedStatus.isBlank()) return normalizeStatus(requestedStatus);
         if (isRoleName(roleName, "ADMIN") || isRoleName(roleName, "STAFF")) return "Approved";
         return "Pending";
     }
 
+    // Note: Hàm `ensureStaffProfile` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private StaffEntity ensureStaffProfile(Integer accountId, String specialization) {
         return staffRepository.findByAccountId(accountId)
                 .orElseGet(() -> staffRepository.save(StaffEntity.builder()
@@ -275,16 +311,19 @@ public class AdminService {
                         .build()));
     }
 
+    // Note: Hàm `normalizeStaffSpecialization` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String normalizeStaffSpecialization(String specialization) {
         String normalized = trimToNull(specialization);
         return normalized == null ? "KYB/KYC profile verification" : normalized;
     }
 
+    // Note: Hàm `toStaffResponse` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private StaffResponse toStaffResponse(StaffEntity staff) {
         AccountEntity account = accountRepository.findById(staff.getAccountId()).orElse(null);
         return StaffResponse.from(staff, account);
     }
 
+    // Note: Hàm `toAccountResponse` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private AccountResponse toAccountResponse(AccountEntity account) {
         AccountResponse response = AccountResponse.from(account);
         if (hasRole(account.getRole(), "STAFF")) {
@@ -295,14 +334,17 @@ public class AdminService {
         return response;
     }
 
+    // Note: Hàm `hasRole` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private boolean hasRole(RoleEntity role, String expectedRole) {
         return role != null && isRoleName(role.getRoleName(), expectedRole);
     }
 
+    // Note: Hàm `isRoleName` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private boolean isRoleName(String roleName, String expectedRole) {
         return roleName != null && expectedRole.equalsIgnoreCase(roleName.trim());
     }
 
+    // Note: Hàm `normalizeStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String normalizeStatus(String status) {
         if (status == null || status.isBlank()) throw new AppException("ACCOUNT STATUS KHONG DUOC DE TRONG");
         String normalized = status.trim();

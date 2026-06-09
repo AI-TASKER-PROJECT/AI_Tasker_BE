@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/auth/AuthServiceImpl.java
+ * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.service.auth;
 
 import com.aitasker.be.common.exception.ResourceConflictException;
@@ -15,7 +20,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
@@ -24,8 +31,11 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Override
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `register` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AuthResponse register(RegisterRequest req) {
         String email = normalizeEmail(req.getEmail());
         if (accountRepository.existsByEmailIgnoreCase(email)) {
@@ -59,8 +69,11 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Override
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional(readOnly = true)
+    // Note: Hàm `login` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AuthResponse login(LoginRequest req) {
         AccountEntity account = accountRepository.findByEmailWithRole(normalizeEmail(req.getEmail()))
                 .orElseThrow(() -> new UnauthorizedException("Sai email hoac mat khau"));
@@ -86,6 +99,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    // Note: Hàm `normalizeEmail` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }

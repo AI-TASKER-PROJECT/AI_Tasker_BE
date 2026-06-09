@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/SystemWalletService.java
+ * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
@@ -11,7 +16,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class SystemWalletService {
     private final AccessService accessService;
@@ -23,7 +30,9 @@ public class SystemWalletService {
     private final MilestoneRepository milestoneRepository;
     private final ContractRepository contractRepository;
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `getWalletForAdmin` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public SystemWalletEntity getWalletForAdmin() {
         accessService.requireRole("ADMIN");
         syncWallet();
@@ -33,7 +42,9 @@ public class SystemWalletService {
                 .orElseThrow(() -> new NotFoundException("CHUA CO VI HE THONG"));
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `getCurrentWallet` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public SystemWalletEntity getCurrentWallet() {
         syncWallet();
         AccountEntity actor = accessService.currentAccount();
@@ -41,7 +52,9 @@ public class SystemWalletService {
                 .orElseThrow(() -> new NotFoundException("CHUA CO VI CHO TAI KHOAN NAY"));
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `syncWallet` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public SystemWalletEntity syncWallet() {
         AccountEntity admin = accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN")
                 .orElseThrow(() -> new NotFoundException("CHUA CO TAI KHOAN ADMIN DE QUAN LY SYSTEM WALLET"));
@@ -114,11 +127,13 @@ public class SystemWalletService {
                 .orElseThrow(() -> new NotFoundException("CHUA CO VI HE THONG"));
     }
 
+    // Note: Hàm `resolveLatestTransactionId` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private Long resolveLatestTransactionId() {
         Long latest = transactionRepository.latestTransactionId();
         return latest == null || latest == 0 ? null : latest;
     }
 
+    // Note: Hàm `nonNegativeMoney` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private BigDecimal nonNegativeMoney(BigDecimal value) {
         if (value == null || value.signum() < 0) {
             return BigDecimal.ZERO;
@@ -126,6 +141,7 @@ public class SystemWalletService {
         return value;
     }
 
+    // Note: Hàm `walletType` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String walletType(String role) {
         return switch (role) {
             case "ADMIN" -> "ADMIN_SYSTEM";
@@ -135,6 +151,7 @@ public class SystemWalletService {
         };
     }
 
+    // Note: Hàm `calculateBusinessSuccessfulDeposits` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private BigDecimal calculateBusinessSuccessfulDeposits(Integer accountId) {
         Integer businessId = businessProfileRepository.findByAccountId(accountId)
                 .map(BusinessProfileEntity::getBusinessId)
@@ -151,6 +168,7 @@ public class SystemWalletService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    // Note: Hàm `calculateExpertSuccessfulPayouts` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private BigDecimal calculateExpertSuccessfulPayouts(Integer accountId) {
         Integer expertId = expertProfileRepository.findByAccountId(accountId)
                 .map(ExpertProfileEntity::getExpertId)
@@ -169,6 +187,7 @@ public class SystemWalletService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    // Note: Hàm `jobIdsByBusiness` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private List<Integer> jobIdsByBusiness(Integer businessId) {
         return contractRepository.findByBusinessId(businessId).stream()
                 .map(ContractEntity::getJobId)

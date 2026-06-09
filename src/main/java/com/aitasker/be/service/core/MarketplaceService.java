@@ -46,6 +46,7 @@ public class MarketplaceService {
         return jobRepository.save(input);
     }
 
+    // Note: Hàm `listJobs` chỉ lấy job OPEN để marketplace không làm lộ job nháp của doanh nghiệp.
     public List<JobEntity> listJobs() { return jobRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc("OPEN"); }
 
     // Note: Hàm `listMyJobs` lấy toàn bộ job của business hiện tại, bao gồm DRAFT để doanh nghiệp kiểm tra trước khi public.
@@ -55,6 +56,7 @@ public class MarketplaceService {
         return jobRepository.findByBusinessIdOrderByCreatedAtDesc(business.getBusinessId());
     }
 
+    // Note: Hàm `getJob` kiểm soát quyền xem chi tiết job theo trạng thái public hoặc quyền sở hữu job nháp.
     public JobEntity getJob(Integer id) {
         JobEntity job = jobRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         if ("OPEN".equalsIgnoreCase(job.getStatus())) return job;
@@ -89,6 +91,7 @@ public class MarketplaceService {
         return proposalRepository.save(input);
     }
 
+    // Note: Hàm `listProposalsByJob` lấy proposal theo job và chỉ cho doanh nghiệp sở hữu job xem danh sách này.
     public List<ProposalEntity> listProposalsByJob(Integer jobId) {
         accessService.requireRole("BUSINESS");
         requireBusinessOwnedJob(jobId);
