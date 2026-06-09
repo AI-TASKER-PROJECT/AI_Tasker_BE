@@ -28,7 +28,8 @@ public class CatalogService {
     private final JobSkillRepository jobSkillRepository;
 
     public List<DomainEntity> listDomains(Boolean activeOnly) {
-        if (Boolean.TRUE.equals(activeOnly)) return domainRepository.findByIsActiveTrueOrderBySortOrderAscDomainNameAsc();
+        if (Boolean.TRUE.equals(activeOnly))
+            return domainRepository.findByIsActiveTrueOrderBySortOrderAscDomainNameAsc();
         return domainRepository.findAll();
     }
 
@@ -61,10 +62,13 @@ public class CatalogService {
             String code = normalizeCode(request.getDomainCode());
             domainRepository.findByDomainCode(code)
                     .filter(existing -> !existing.getDomainId().equals(domainId))
-                    .ifPresent(existing -> { throw new ResourceConflictException("DOMAIN CODE DA TON TAI"); });
+                    .ifPresent(existing -> {
+                        throw new ResourceConflictException("DOMAIN CODE DA TON TAI");
+                    });
             entity.setDomainCode(code);
         }
-        if (request.getDomainName() != null && !request.getDomainName().isBlank()) entity.setDomainName(request.getDomainName().trim());
+        if (request.getDomainName() != null && !request.getDomainName().isBlank())
+            entity.setDomainName(request.getDomainName().trim());
         if (request.getDescription() != null) entity.setDescription(request.getDescription());
         if (request.getIsActive() != null) entity.setIsActive(request.getIsActive());
         if (request.getSortOrder() != null) entity.setSortOrder(request.getSortOrder());
@@ -94,10 +98,13 @@ public class CatalogService {
             String code = normalizeCode(request.getSkillCode());
             skillRepository.findBySkillCode(code)
                     .filter(existing -> !existing.getSkillId().equals(skillId))
-                    .ifPresent(existing -> { throw new ResourceConflictException("SKILL CODE DA TON TAI"); });
+                    .ifPresent(existing -> {
+                        throw new ResourceConflictException("SKILL CODE DA TON TAI");
+                    });
             entity.setSkillCode(code);
         }
-        if (request.getSkillName() != null && !request.getSkillName().isBlank()) entity.setSkillName(request.getSkillName().trim());
+        if (request.getSkillName() != null && !request.getSkillName().isBlank())
+            entity.setSkillName(request.getSkillName().trim());
         if (request.getDescription() != null) entity.setDescription(request.getDescription());
         if (request.getIsActive() != null) entity.setIsActive(request.getIsActive());
         return skillRepository.save(entity);
@@ -163,14 +170,18 @@ public class CatalogService {
 
     private void validateDomainRequest(DomainRequest request, boolean requireAll) {
         if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
-        if (requireAll && (request.getDomainCode() == null || request.getDomainCode().isBlank())) throw new AppException("DOMAIN CODE KHONG DUOC DE TRONG");
-        if (requireAll && (request.getDomainName() == null || request.getDomainName().isBlank())) throw new AppException("DOMAIN NAME KHONG DUOC DE TRONG");
+        if (requireAll && (request.getDomainCode() == null || request.getDomainCode().isBlank()))
+            throw new AppException("DOMAIN CODE KHONG DUOC DE TRONG");
+        if (requireAll && (request.getDomainName() == null || request.getDomainName().isBlank()))
+            throw new AppException("DOMAIN NAME KHONG DUOC DE TRONG");
     }
 
     private void validateSkillRequest(SkillRequest request, boolean requireAll) {
         if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
-        if (requireAll && (request.getSkillCode() == null || request.getSkillCode().isBlank())) throw new AppException("SKILL CODE KHONG DUOC DE TRONG");
-        if (requireAll && (request.getSkillName() == null || request.getSkillName().isBlank())) throw new AppException("SKILL NAME KHONG DUOC DE TRONG");
+        if (requireAll && (request.getSkillCode() == null || request.getSkillCode().isBlank()))
+            throw new AppException("SKILL CODE KHONG DUOC DE TRONG");
+        if (requireAll && (request.getSkillName() == null || request.getSkillName().isBlank()))
+            throw new AppException("SKILL NAME KHONG DUOC DE TRONG");
     }
 
     private String normalizeCode(String value) {
