@@ -119,6 +119,18 @@
             <version>0.12.6</version>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- Send email -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

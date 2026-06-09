@@ -5,6 +5,7 @@
  */
 package com.aitasker.be.integration;
 
+import com.aitasker.be.service.auth.EmailOtpService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,12 +13,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,6 +47,7 @@ class AdminFlowIntegrationTest {
     private MockMvc mockMvc;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Autowired private WebApplicationContext webApplicationContext;
+    @MockitoBean private EmailOtpService emailOtpService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -50,6 +55,7 @@ class AdminFlowIntegrationTest {
     // Note: Hàm `setupMockMvc` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void setupMockMvc() {
         this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        when(emailOtpService.isEmailVerified(anyString())).thenReturn(true);
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.

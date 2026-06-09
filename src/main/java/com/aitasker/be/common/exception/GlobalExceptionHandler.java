@@ -36,7 +36,16 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+<<<<<<< HEAD
     // Note: Annotation này khai báo hàm xử lý một loại exception cụ thể.
+=======
+    @ExceptionHandler(BadGatewayException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBadGateway(BadGatewayException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+>>>>>>> feat/week4-MST
     @ExceptionHandler(AppException.class)
     // Note: Hàm `handleAppException` xử lý hoặc chuẩn hóa lỗi để API trả response nhất quán.
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {

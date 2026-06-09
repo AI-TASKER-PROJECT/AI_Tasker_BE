@@ -1,0 +1,2 @@
+- RSK-01: Khi phát sinh tranh chấp, Staff dùng Acceptance Criteria làm căn cứ kiểm tra.
+- RSK-02: Khi giải thể hợp đồng, hệ thống tính toán hoàn tiền hoặc giải ngân theo tiến độ thực tế.
