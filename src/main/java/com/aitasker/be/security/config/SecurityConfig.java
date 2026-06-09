@@ -52,7 +52,8 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/v3/api-docs.yaml",
                     "/swagger-ui/**",
-                    "/swagger-ui.html"
+                    "/swagger-ui.html",
+                    "/api/chatbot/**"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/jobs", "/api/v1/jobs/*", "/api/v1/domains", "/api/v1/skills").permitAll()
                 .anyRequest().authenticated()

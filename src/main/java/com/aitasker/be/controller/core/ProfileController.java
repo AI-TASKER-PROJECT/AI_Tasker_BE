@@ -11,8 +11,10 @@ import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.PortfolioEntity;
 import com.aitasker.be.service.core.ProfileService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 // Note: Annotation này biến class thành REST controller để nhận request và trả JSON.
 @RestController
@@ -28,6 +30,13 @@ public class ProfileController {
     // Note: Hàm `upsertBusiness` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<BusinessProfileEntity>> upsertBusiness(@RequestBody BusinessProfileEntity request) {
         return ResponseEntity.ok(ApiResponse.success("UPSERT BUSINESS PROFILE SUCCESS", profileService.upsertBusiness(request)));
+    }
+
+    // Note: Annotation này khai báo API upload file bằng multipart/form-data.
+    @PostMapping(value = "/business/license-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // Note: Hàm `uploadBusinessLicense` nhận file giấy phép kinh doanh, gọi service upload Firebase và trả về storage path.
+    public ResponseEntity<ApiResponse<String>> uploadBusinessLicense(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("UPLOAD BUSINESS LICENSE SUCCESS", profileService.uploadBusinessLicense(file)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
@@ -57,6 +66,13 @@ public class ProfileController {
     // Note: Hàm `upsertPortfolio` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<PortfolioEntity>> upsertPortfolio(@RequestBody PortfolioEntity request) {
         return ResponseEntity.ok(ApiResponse.success("UPSERT PORTFOLIO SUCCESS", profileService.upsertPortfolio(request)));
+    }
+
+    // Note: Annotation này khai báo API upload file bằng multipart/form-data.
+    @PostMapping(value = "/portfolio/certificate-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // Note: Hàm `uploadExpertCertificate` nhận file chứng chỉ chuyên gia, gọi service upload Firebase và trả về storage path.
+    public ResponseEntity<ApiResponse<String>> uploadExpertCertificate(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("UPLOAD EXPERT CERTIFICATE SUCCESS", profileService.uploadExpertCertificate(file)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.

@@ -12,6 +12,7 @@ import com.aitasker.be.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +28,7 @@ public class ProfileService {
     private final PortfolioRepository portfolioRepository;
     private final StaffRepository staffRepository;
     private final AuditLogRepository auditLogRepository;
+    private final FirebaseStorageService firebaseStorageService;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -114,9 +116,28 @@ public class ProfileService {
 
     public List<BusinessProfileEntity> allBusinessProfiles() { accessService.requireRole("STAFF"); return businessProfileRepository.findAll(); }
     // Note: Hàm `allExpertProfiles` cho STAFF quản trị hồ sơ và BUSINESS đọc thông tin expert khi xem proposal.
-    public List<ExpertProfileEntity> allExpertProfiles() { accessService.requireRole("STAFF", "BUSINESS"); return expertProfileRepository.findAll(); }
+    public List<ExpertProfileEntity> allExpertProfiles() {
+        accessService.requireRole("STAFF", "BUSINESS");
+        return expertProfileRepository.findAll().stream()
+                .map(this::attachExpertAccountInfo)
+                .toList();
+    }
     // Note: Hàm `allPortfolios` cho STAFF quản trị portfolio và BUSINESS xem năng lực expert trong màn proposal.
     public List<PortfolioEntity> allPortfolios() { accessService.requireRole("STAFF", "BUSINESS"); return portfolioRepository.findAll(); }
+
+    // Note: Hàm `uploadBusinessLicense` upload file giấy phép kinh doanh lên Firebase Storage và trả về storage path để lưu vào hồ sơ KYB.
+    public String uploadBusinessLicense(MultipartFile file) {
+        accessService.requireRole("BUSINESS");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        return firebaseStorageService.upload(file, "business-licenses/accounts/" + accountId);
+    }
+
+    // Note: Hàm `uploadExpertCertificate` upload file chứng chỉ chuyên gia lên Firebase Storage và trả về storage path để lưu vào portfolio.
+    public String uploadExpertCertificate(MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        return firebaseStorageService.upload(file, "expert-certificates/accounts/" + accountId);
+    }
 
     // TAO HOAC CAP NHAT PORTFOLIO MOI CUA CHUYEN GIA DE BUSINESS DOC KHI REVIEW PROPOSAL.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -124,7 +145,6 @@ public class ProfileService {
     // Note: Hàm `upsertPortfolio` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public PortfolioEntity upsertPortfolio(PortfolioEntity input) {
         accessService.requireRole("EXPERT");
-        accessService.requireApprovedAccount();
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         // KIEM TRA CAC TRUONG PORTFOLIO MOI DE PHUC VU BUSINESS XEM CHI TIET CHUYEN GIA.
         if (input.getDomainIds() == null || input.getDomainIds().isBlank()) throw new AppException("DOMAIN IDS KHONG DUOC DE TRONG");
@@ -143,6 +163,16 @@ public class ProfileService {
         entity.setCertificates(input.getCertificates());
         entity.setSelfDescription(input.getSelfDescription());
         return portfolioRepository.save(entity);
+    }
+
+    // Note: Hàm `attachExpertAccountInfo` gắn thông tin tài khoản đọc được vào response expert để BUSINESS xem chi tiết proposal.
+    private ExpertProfileEntity attachExpertAccountInfo(ExpertProfileEntity expert) {
+        accountRepository.findById(expert.getAccountId()).ifPresent(account -> {
+            expert.setFullName(account.getFullName());
+            expert.setPhone(account.getPhone());
+            expert.setTitle("Chuyên gia AI");
+        });
+        return expert;
     }
 
     // Note: Hàm `audit` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
