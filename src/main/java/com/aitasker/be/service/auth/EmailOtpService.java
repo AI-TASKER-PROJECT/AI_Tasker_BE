@@ -1,5 +1,6 @@
 package com.aitasker.be.service.auth;
 
+import com.aitasker.be.dto.auth.SendOtpResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
@@ -7,6 +8,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -25,11 +27,13 @@ public class EmailOtpService {
     private static final long OTP_TTL_MINUTES = 1;
     private static final long VERIFIED_TTL_MINUTES = 30;
 
-    public void sendOtp(String email) {
+    public SendOtpResponse sendOtp(String email) {
         String normalizedEmail = normalizeEmail(email);
         String otp = String.valueOf(
                 ThreadLocalRandom.current().nextInt(100000, 1000000)
         );
+        long expiresInSeconds = TimeUnit.MINUTES.toSeconds(OTP_TTL_MINUTES);
+        LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(expiresInSeconds);
 
         redisTemplate.opsForValue().set(
                 otpKey(normalizedEmail),
@@ -47,6 +51,11 @@ public class EmailOtpService {
         message.setText("Mã OTP xác thực của bạn là: " + otp);
 
         mailSender.send(message);
+
+        return SendOtpResponse.builder()
+                .expiresAt(expiresAt)
+                .expiresInSeconds(expiresInSeconds)
+                .build();
     }
 
     public boolean verifyOtp(String email, String otp) {

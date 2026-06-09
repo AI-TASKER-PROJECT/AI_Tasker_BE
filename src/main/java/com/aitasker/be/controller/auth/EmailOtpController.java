@@ -3,6 +3,7 @@ package com.aitasker.be.controller.auth;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.auth.SendOtpRequest;
+import com.aitasker.be.dto.auth.SendOtpResponse;
 import com.aitasker.be.dto.auth.VerifyOtpRequest;
 import com.aitasker.be.service.auth.EmailOtpService;
 import jakarta.validation.Valid;
@@ -20,9 +21,9 @@ public class EmailOtpController {
     private final EmailOtpService emailOtpService;
 
     @PostMapping("/send-otp")
-    public ResponseEntity<ApiResponse<Object>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
-        emailOtpService.sendOtp(request.getEmail());
-        return ResponseEntity.ok(ApiResponse.success("OTP gửi thành công", null));
+    public ResponseEntity<ApiResponse<SendOtpResponse>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
+        SendOtpResponse response = emailOtpService.sendOtp(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success("OTP gửi thành công", response));
     }
 
     @PostMapping("/verify-otp")
