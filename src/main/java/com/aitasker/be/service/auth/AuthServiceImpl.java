@@ -44,10 +44,6 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException("Email chưa xác thực OTP");
         }
 
-        if (accountRepository.existsByEmailIgnoreCase(email)) {
-            throw new ResourceConflictException("Email đã tồn tại");
-        }
-
         RoleEntity role = roleRepository.findByRoleName(req.getRole())
                 .orElseThrow(() -> new UnauthorizedException("Role khong hop le"));
 
@@ -104,6 +100,11 @@ public class AuthServiceImpl implements AuthService {
                 .email(account.getEmail())
                 .fullName(account.getFullName())
                 .build();
+    }
+
+    @Override
+    public boolean validateEmailNotExists(String email) {
+        return accountRepository.existsByEmailIgnoreCase(email);
     }
 
     // Note: Hàm `normalizeEmail` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
