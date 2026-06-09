@@ -35,7 +35,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (accountRepository.existsByEmailIgnoreCase(email)) {
-            throw new ResourceConflictException("Email da ton tai");
+            throw new ResourceConflictException("Email đã tồn tại");
         }
 
         RoleEntity role = roleRepository.findByRoleName(req.getRole())

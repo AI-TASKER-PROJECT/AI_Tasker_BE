@@ -22,16 +22,16 @@ public class EmailOtpController {
     @PostMapping("/send-otp")
     public ResponseEntity<ApiResponse<Object>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
         emailOtpService.sendOtp(request.getEmail());
-        return ResponseEntity.ok(ApiResponse.success("OTP sent successfully", null));
+        return ResponseEntity.ok(ApiResponse.success("OTP gửi thành công", null));
     }
 
     @PostMapping("/verify-otp")
     public ResponseEntity<ApiResponse<Object>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
         boolean verified = emailOtpService.verifyOtp(request.getEmail(), request.getOtp());
         if (!verified) {
-            throw new AppException("OTP khong hop le hoac da het han");
+            throw new AppException("OTP thất bại!!!");
         }
-        return ResponseEntity.ok(ApiResponse.success("Email verified successfully", null));
+        return ResponseEntity.ok(ApiResponse.success("Đã xác nhận Email!!!", null));
     }
 
 }

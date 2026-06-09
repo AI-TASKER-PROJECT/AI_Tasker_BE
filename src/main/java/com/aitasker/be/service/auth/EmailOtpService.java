@@ -22,7 +22,7 @@ public class EmailOtpService {
 
     private static final String OTP_PREFIX = "EMAIL_OTP:";
     private static final String VERIFIED_PREFIX = "EMAIL_VERIFIED:";
-    private static final long OTP_TTL_MINUTES = 5;
+    private static final long OTP_TTL_MINUTES = 1;
     private static final long VERIFIED_TTL_MINUTES = 30;
 
     public void sendOtp(String email) {
@@ -43,8 +43,8 @@ public class EmailOtpService {
             message.setFrom(mailFrom);
         }
         message.setTo(normalizedEmail);
-        message.setSubject("AI Tasker Email Verification OTP");
-        message.setText("Ma OTP xac thuc email cua ban la: " + otp + ". Ma co hieu luc trong 5 phut.");
+        message.setSubject("Xác minh bằng mã OTP qua Email");
+        message.setText("Mã OTP xác thực của bạn là: " + otp);
 
         mailSender.send(message);
     }
