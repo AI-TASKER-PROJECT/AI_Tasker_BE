@@ -14,4 +14,6 @@ public interface AuthService {
     AuthResponse register(RegisterRequest req);
     // Note: Hàm `login` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     AuthResponse login(LoginRequest req);
+
+    boolean validateEmailNotExists(String email);
 }

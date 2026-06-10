@@ -20,11 +20,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+// Note: Annotation này ánh xạ class Java với một bảng trong database.
 @Entity
+// Note: Annotation này chỉ rõ bảng database tương ứng với entity.
 @Table(name = "account")
+// Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
 @Getter @Setter @Builder
+// Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
 @AllArgsConstructor @NoArgsConstructor
 public class AccountEntity {
+    // Note: Annotation này đánh dấu khóa chính của entity.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "account_id")
@@ -38,6 +43,11 @@ public class AccountEntity {
 
     @Column(name = "phone", length = 20)
     private String phone;
+
+    // Note: Annotation này cấu hình cột database tương ứng với field entity.
+
+    @Column(name = "emailVerified", nullable = false)
+    private boolean emailVerified;
 
     @Column(name = "full_name", nullable = false, length = 255)
     private String fullName;
