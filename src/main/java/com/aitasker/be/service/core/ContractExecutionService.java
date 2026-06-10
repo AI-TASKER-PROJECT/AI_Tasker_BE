@@ -275,7 +275,10 @@ public class ContractExecutionService {
     }
     // Note: Hàm `listMilestonesByJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> listMilestonesByJob(Integer jobId) {
-        requireJobParticipantOrOwner(jobId);
+        JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
+            requireJobParticipantOrOwner(jobId);
+        }
         return milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId);
     }
     // Note: Hàm `listCriteriaByMilestone` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.

@@ -29,6 +29,7 @@ public class ProfileService {
     private final StaffRepository staffRepository;
     private final AuditLogRepository auditLogRepository;
     private final FirebaseStorageService firebaseStorageService;
+    private final JobRepository jobRepository;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -120,6 +121,17 @@ public class ProfileService {
         Integer accountId = accessService.currentAccount().getAccountId();
         return businessProfileRepository.findByAccountId(accountId)
                 .orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
+    }
+
+    // Note: Hàm `businessProfileByJob` lấy hồ sơ doanh nghiệp đăng một job để chuyên gia xem chi tiết khi job đã public.
+    public BusinessProfileEntity businessProfileByJob(Integer jobId) {
+        JobEntity job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
+            accessService.requireRole("STAFF", "ADMIN", "BUSINESS");
+        }
+        return businessProfileRepository.findById(job.getBusinessId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
     }
 
     // Note: Hàm `currentExpertProfile` lấy hồ sơ KYC của chính chuyên gia đang đăng nhập để reload trang vẫn thấy status mới nhất.
