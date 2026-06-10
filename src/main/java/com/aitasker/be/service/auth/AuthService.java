@@ -16,4 +16,6 @@ public interface AuthService {
     AuthResponse login(LoginRequest req);
     // Note: Hàm `currentSession` lấy lại thông tin tài khoản hiện tại từ database để frontend cập nhật status sau khi reload.
     AuthResponse currentSession();
+
+    boolean validateEmailNotExists(String email);
 }
