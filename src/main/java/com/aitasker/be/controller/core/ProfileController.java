@@ -58,8 +58,22 @@ public class ProfileController {
     public ResponseEntity<ApiResponse<Object>> listBusiness() { return ResponseEntity.ok(ApiResponse.success("LIST BUSINESS PROFILE SUCCESS", profileService.allBusinessProfiles())); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/business/me")
+    // Note: Hàm `myBusiness` trả hồ sơ KYB của chính doanh nghiệp đang đăng nhập để reload trang vẫn thấy dữ liệu mới.
+    public ResponseEntity<ApiResponse<BusinessProfileEntity>> myBusiness() {
+        return ResponseEntity.ok(ApiResponse.success("GET MY BUSINESS PROFILE SUCCESS", profileService.currentBusinessProfile()));
+    }
+
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/expert")
     public ResponseEntity<ApiResponse<Object>> listExpert() { return ResponseEntity.ok(ApiResponse.success("LIST EXPERT PROFILE SUCCESS", profileService.allExpertProfiles())); }
+
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/expert/me")
+    // Note: Hàm `myExpert` trả hồ sơ KYC của chính chuyên gia đang đăng nhập để reload trang vẫn thấy status mới.
+    public ResponseEntity<ApiResponse<ExpertProfileEntity>> myExpert() {
+        return ResponseEntity.ok(ApiResponse.success("GET MY EXPERT PROFILE SUCCESS", profileService.currentExpertProfile()));
+    }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/portfolio")
@@ -78,4 +92,18 @@ public class ProfileController {
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/portfolio")
     public ResponseEntity<ApiResponse<Object>> listPortfolio() { return ResponseEntity.ok(ApiResponse.success("LIST PORTFOLIO SUCCESS", profileService.allPortfolios())); }
+
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/portfolio/me")
+    // Note: Hàm `myPortfolio` trả portfolio của chính chuyên gia đang đăng nhập để form không bị trống sau khi reload.
+    public ResponseEntity<ApiResponse<PortfolioEntity>> myPortfolio() {
+        return ResponseEntity.ok(ApiResponse.success("GET MY PORTFOLIO SUCCESS", profileService.currentPortfolio()));
+    }
+
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/files/view-url")
+    // Note: Hàm `fileViewUrl` trả signed URL tạm thời để staff/business/expert bấm xem file Firebase thay vì chỉ thấy raw path.
+    public ResponseEntity<ApiResponse<String>> fileViewUrl(@RequestParam String path) {
+        return ResponseEntity.ok(ApiResponse.success("GET FIREBASE FILE VIEW URL SUCCESS", profileService.createFileViewUrl(path)));
+    }
 }

@@ -114,6 +114,43 @@ public class ProfileService {
         return expertProfileRepository.save(e);
     }
 
+    // Note: Hàm `currentBusinessProfile` lấy hồ sơ KYB của chính doanh nghiệp đang đăng nhập để reload trang vẫn thấy status/file mới nhất.
+    public BusinessProfileEntity currentBusinessProfile() {
+        accessService.requireRole("BUSINESS");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        return businessProfileRepository.findByAccountId(accountId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
+    }
+
+    // Note: Hàm `currentExpertProfile` lấy hồ sơ KYC của chính chuyên gia đang đăng nhập để reload trang vẫn thấy status mới nhất.
+    public ExpertProfileEntity currentExpertProfile() {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        return expertProfileRepository.findByAccountId(accountId)
+                .map(this::attachExpertAccountInfo)
+                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+    }
+
+    // Note: Hàm `currentPortfolio` lấy portfolio của chính chuyên gia đang đăng nhập để form không mất dữ liệu sau khi reload.
+    public PortfolioEntity currentPortfolio() {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        Integer expertId = expertProfileRepository.findByAccountId(accountId)
+                .map(ExpertProfileEntity::getExpertId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+        return portfolioRepository.findByExpertId(expertId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO PORTFOLIO"));
+    }
+
+    // Note: Hàm `createFileViewUrl` tạo link xem file Firebase cho người dùng có quyền trong hệ thống thay vì trả raw storage path lên UI.
+    public String createFileViewUrl(String path) {
+        accessService.requireRole("STAFF", "ADMIN", "BUSINESS", "EXPERT");
+        if (path != null && (path.startsWith("http://") || path.startsWith("https://"))) {
+            return path;
+        }
+        return firebaseStorageService.createReadUrl(path);
+    }
+
     public List<BusinessProfileEntity> allBusinessProfiles() { accessService.requireRole("STAFF"); return businessProfileRepository.findAll(); }
     // Note: Hàm `allExpertProfiles` cho STAFF quản trị hồ sơ và BUSINESS đọc thông tin expert khi xem proposal.
     public List<ExpertProfileEntity> allExpertProfiles() {

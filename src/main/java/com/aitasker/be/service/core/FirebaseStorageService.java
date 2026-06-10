@@ -6,7 +6,10 @@
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.common.exception.NotFoundException;
+import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.Storage;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.cloud.StorageClient;
 import org.springframework.stereotype.Service;
@@ -15,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.text.Normalizer;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
 // Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
@@ -47,6 +51,19 @@ public class FirebaseStorageService {
     }
 
     // Note: Hàm `validateFirebaseReady` bảo đảm Firebase đã được cấu hình trước khi cho upload file.
+    // Note: Hàm `createReadUrl` tạo signed URL tạm thời để người dùng đã đăng nhập có thể bấm xem file Firebase.
+    public String createReadUrl(String objectName) {
+        validateFirebaseReady();
+        if (objectName == null || objectName.isBlank()) {
+            throw new AppException("FILE PATH KHONG HOP LE");
+        }
+        Blob blob = StorageClient.getInstance().bucket().get(objectName);
+        if (blob == null) {
+            throw new NotFoundException("KHONG TIM THAY FILE FIREBASE");
+        }
+        return blob.signUrl(15, TimeUnit.MINUTES, Storage.SignUrlOption.withV4Signature()).toString();
+    }
+
     private void validateFirebaseReady() {
         if (FirebaseApp.getApps().isEmpty()) {
             throw new AppException("CHUA CAU HINH FIREBASE STORAGE");
