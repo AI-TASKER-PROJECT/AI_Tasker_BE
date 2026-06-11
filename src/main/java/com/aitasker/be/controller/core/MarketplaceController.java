@@ -6,9 +6,13 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.recommendation.ExpertRecommendationResponse;
+import com.aitasker.be.dto.recommendation.RecommendExpertsRequest;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.ProposalEntity;
+import com.aitasker.be.service.core.ExpertRecommendationService;
 import com.aitasker.be.service.core.MarketplaceService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class MarketplaceController {
     private final MarketplaceService marketplaceService;
+    private final ExpertRecommendationService expertRecommendationService;
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/jobs")
@@ -70,6 +75,14 @@ public class MarketplaceController {
     // Note: Hàm `updateJobStatus` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<JobEntity>> updateJobStatus(@PathVariable Integer jobId, @RequestParam String status) {
         return ResponseEntity.ok(ApiResponse.success("UPDATE JOB STATUS SUCCESS", marketplaceService.updateJobStatus(jobId, status)));
+    }
+
+    @PostMapping("/jobs/{jobId}/expert-recommendations")
+    public ResponseEntity<ApiResponse<ExpertRecommendationResponse>> recommendExperts(
+            @PathVariable Integer jobId,
+            @Valid @RequestBody(required = false) RecommendExpertsRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("RECOMMEND EXPERTS SUCCESS", expertRecommendationService.recommendExperts(jobId, request)));
     }
 
     // Note: Annotation này khai báo API cập nhật một phần dữ liệu bằng HTTP PATCH.

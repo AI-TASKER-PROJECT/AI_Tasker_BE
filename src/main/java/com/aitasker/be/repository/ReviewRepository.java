@@ -7,6 +7,8 @@ package com.aitasker.be.repository;
 
 import com.aitasker.be.entity.ReviewEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -14,4 +16,7 @@ public interface ReviewRepository extends JpaRepository<ReviewEntity, Integer> {
     // Note: Hàm `findByContractId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<ReviewEntity> findByContractId(Integer contractId);
     boolean existsByContractIdAndReviewerId(Integer contractId, Integer reviewerId);
+
+    @Query("select avg(r.rating) from ReviewEntity r where r.revieweeId = :revieweeId")
+    Double findAverageRatingByRevieweeId(@Param("revieweeId") Integer revieweeId);
 }

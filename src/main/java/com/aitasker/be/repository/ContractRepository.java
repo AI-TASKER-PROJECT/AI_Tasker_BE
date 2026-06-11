@@ -15,4 +15,5 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Intege
     List<ContractEntity> findByExpertId(Integer expertId);
     // Note: Hàm `findByJobId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     Optional<ContractEntity> findByJobId(Integer jobId);
+    long countByExpertIdAndStatus(Integer expertId, String status);
 }

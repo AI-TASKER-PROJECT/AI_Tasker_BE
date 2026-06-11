@@ -10,6 +10,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -29,6 +30,8 @@ public class ExpertProfileEntity {
     @Column(name = "portfolio_url", length = 255) private String portfolioUrl;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "years_of_experience") private Integer yearsOfExperience;
+    @Column(name = "hourly_rate") private BigDecimal hourlyRate;
+    @Column(name = "availability", nullable = false, length = 50) private String availability;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "kyc_status", nullable = false, length = 50) private String kycStatus;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
