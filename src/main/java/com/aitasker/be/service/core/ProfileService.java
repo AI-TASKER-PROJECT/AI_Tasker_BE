@@ -65,7 +65,7 @@ public class ProfileService {
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         // KIEM TRA CAC TRUONG BAT BUOC CHO LUONG KYC.
         if (input.getNationalId() == null || input.getNationalId().isBlank()) throw new AppException("NATIONAL ID KHONG DUOC DE TRONG");
-        if (input.getPortfolioUrl() == null || input.getPortfolioUrl().isBlank()) throw new AppException("PORTFOLIO URL KHONG DUOC DE TRONG");
+        if (input.getPortfolioUrl() == null || input.getPortfolioUrl().isBlank()) throw new AppException("PORTFOLIO FILE KHONG DUOC DE TRONG");
         if (input.getYearsOfExperience() == null || input.getYearsOfExperience() < 0) throw new AppException("YEARS OF EXPERIENCE KHONG HOP LE");
         AccountEntity account = accessService.currentAccount();
         expertProfileRepository.findByNationalId(input.getNationalId().trim())
@@ -182,6 +182,12 @@ public class ProfileService {
     }
 
     // Note: Hàm `uploadExpertCertificate` upload file chứng chỉ chuyên gia lên Firebase Storage và trả về storage path để lưu vào portfolio.
+    public String uploadExpertPortfolio(MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        return firebaseStorageService.upload(file, "expert-portfolios/accounts/" + accountId);
+    }
+
     public String uploadExpertCertificate(MultipartFile file) {
         accessService.requireRole("EXPERT");
         Integer accountId = accessService.currentAccount().getAccountId();

@@ -46,6 +46,11 @@ public class ProfileController {
         return ResponseEntity.ok(ApiResponse.success("UPSERT EXPERT PROFILE SUCCESS", profileService.upsertExpert(request)));
     }
 
+    @PostMapping(value = "/expert/portfolio-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<String>> uploadExpertPortfolio(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("UPLOAD EXPERT PORTFOLIO SUCCESS", profileService.uploadExpertPortfolio(file)));
+    }
+
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/approve/{type}/{id}")
     // Note: Hàm `approve` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
