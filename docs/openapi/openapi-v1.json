@@ -52,7 +52,8 @@
         "parameters": [
           { "name": "type", "in": "path", "required": true, "schema": { "type": "string" } },
           { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "reason", "in": "query", "required": false, "schema": { "type": "string" } }
         ],
         "responses": { "200": { "description": "OK" } }
       }

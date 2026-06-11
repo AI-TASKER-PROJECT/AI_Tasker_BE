@@ -42,16 +42,29 @@ public class ProfileService {
         if (input.getTaxCode() == null || input.getTaxCode().isBlank()) throw new AppException("TAX CODE KHONG DUOC DE TRONG");
         if (input.getCompanyName() == null || input.getCompanyName().isBlank()) throw new AppException("COMPANY NAME KHONG DUOC DE TRONG");
         AccountEntity account = accessService.currentAccount();
+        String requestedTaxCode = input.getTaxCode().trim();
+        businessProfileRepository.findByTaxCode(requestedTaxCode)
+                .filter(existing -> !existing.getAccountId().equals(account.getAccountId()))
+                .ifPresent(existing -> { throw new AppException("TAX CODE DA DUOC SU DUNG"); });
         BusinessProfileEntity entity = businessProfileRepository.findByAccountId(account.getAccountId()).orElseGet(BusinessProfileEntity::new);
+        boolean approvedProfile = "Approved".equalsIgnoreCase(entity.getKybStatus());
+        if (approvedProfile && entity.getTaxCode() != null && !entity.getTaxCode().equals(requestedTaxCode)) {
+            throw new AppException("HO SO DA APPROVED KHONG DUOC SUA TAX CODE");
+        }
         entity.setAccountId(account.getAccountId());
-        entity.setTaxCode(input.getTaxCode());
+        entity.setTaxCode(approvedProfile ? entity.getTaxCode() : requestedTaxCode);
         entity.setCompanyName(input.getCompanyName());
         entity.setAddress(input.getAddress());
         entity.setBusinessLicenseUrl(input.getBusinessLicenseUrl());
-        // Moi lan nop/cap nhat KYB deu dua account ve Pending de staff duyet lai.
-        entity.setKybStatus("Pending");
-        entity.setApprovedBy(null);
-        account.setStatus("Pending");
+        if (!approvedProfile) {
+            // Moi lan nop/cap nhat KYB chua approved deu dua account ve Pending de staff duyet lai.
+            entity.setKybStatus("Pending");
+            entity.setApprovedBy(null);
+            entity.setRejectionReason(null);
+            account.setStatus("Pending");
+        } else {
+            account.setStatus("Approved");
+        }
         accountRepository.save(account);
         return businessProfileRepository.save(entity);
     }
@@ -68,18 +81,28 @@ public class ProfileService {
         if (input.getPortfolioUrl() == null || input.getPortfolioUrl().isBlank()) throw new AppException("PORTFOLIO FILE KHONG DUOC DE TRONG");
         if (input.getYearsOfExperience() == null || input.getYearsOfExperience() < 0) throw new AppException("YEARS OF EXPERIENCE KHONG HOP LE");
         AccountEntity account = accessService.currentAccount();
-        expertProfileRepository.findByNationalId(input.getNationalId().trim())
+        String requestedNationalId = input.getNationalId().trim();
+        expertProfileRepository.findByNationalId(requestedNationalId)
                 .filter(existing -> !existing.getAccountId().equals(account.getAccountId()))
                 .ifPresent(existing -> { throw new AppException("NATIONAL ID DA DUOC SU DUNG"); });
         ExpertProfileEntity entity = expertProfileRepository.findByAccountId(account.getAccountId()).orElseGet(ExpertProfileEntity::new);
+        boolean approvedProfile = "Approved".equalsIgnoreCase(entity.getKycStatus());
+        if (approvedProfile && entity.getNationalId() != null && !entity.getNationalId().equals(requestedNationalId)) {
+            throw new AppException("HO SO DA APPROVED KHONG DUOC SUA NATIONAL ID");
+        }
         entity.setAccountId(account.getAccountId());
-        entity.setNationalId(input.getNationalId().trim());
+        entity.setNationalId(approvedProfile ? entity.getNationalId() : requestedNationalId);
         entity.setPortfolioUrl(input.getPortfolioUrl().trim());
         entity.setYearsOfExperience(input.getYearsOfExperience());
-        // Moi lan nop/cap nhat KYC deu dua account ve Pending de staff duyet lai.
-        entity.setKycStatus("Pending");
-        entity.setApprovedBy(null);
-        account.setStatus("Pending");
+        if (!approvedProfile) {
+            // Moi lan nop/cap nhat KYC chua approved deu dua account ve Pending de staff duyet lai.
+            entity.setKycStatus("Pending");
+            entity.setApprovedBy(null);
+            entity.setRejectionReason(null);
+            account.setStatus("Pending");
+        } else {
+            account.setStatus("Approved");
+        }
         accountRepository.save(account);
         return expertProfileRepository.save(entity);
     }
@@ -88,18 +111,20 @@ public class ProfileService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `approveProfile` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public Object approveProfile(String type, Integer id, String status) {
+    public Object approveProfile(String type, Integer id, String status, String reason) {
         accessService.requireRole("STAFF");
         // CHI CHO PHEP 2 GIA TRI PHE DUYET DUNG THEO BUSINESS RULE.
         if (!"Approved".equalsIgnoreCase(status) && !"Rejected".equalsIgnoreCase(status)) {
             throw new AppException("STATUS PHE DUYET KHONG HOP LE");
         }
+        String normalizedReason = normalizeRejectionReason(status, reason);
         AccountEntity actor = accessService.currentAccount();
         Integer staffId = resolveStaffId(actor.getAccountId());
         if ("BUSINESS".equalsIgnoreCase(type)) {
             BusinessProfileEntity b = businessProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
             b.setKybStatus(status);
             b.setApprovedBy(staffId);
+            b.setRejectionReason(normalizedReason);
             updateAccountStatus(b.getAccountId(), status);
             audit("APPROVE_BUSINESS_PROFILE", "business_profiles", String.valueOf(id), actor.getAccountId());
             return businessProfileRepository.save(b);
@@ -110,6 +135,7 @@ public class ProfileService {
         ExpertProfileEntity e = expertProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
         e.setKycStatus(status);
         e.setApprovedBy(staffId);
+        e.setRejectionReason(normalizedReason);
         updateAccountStatus(e.getAccountId(), status);
         audit("APPROVE_EXPERT_PROFILE", "expert_profiles", String.valueOf(id), actor.getAccountId());
         return expertProfileRepository.save(e);
@@ -241,6 +267,18 @@ public class ProfileService {
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT CUA PROFILE"));
         account.setStatus("Approved".equalsIgnoreCase(approvalStatus) ? "Approved" : "Rejected");
         accountRepository.save(account);
+    }
+
+    private String normalizeRejectionReason(String status, String reason) {
+        if (!"Rejected".equalsIgnoreCase(status)) return null;
+        if (reason == null || reason.isBlank()) {
+            throw new AppException("LY DO TU CHOI KHONG DUOC DE TRONG");
+        }
+        String normalized = reason.trim();
+        if (normalized.length() > 500) {
+            throw new AppException("LY DO TU CHOI KHONG DUOC VUOT QUA 500 KY TU");
+        }
+        return normalized;
     }
 
     // BAT BUOC TAI KHOAN STAFF PHAI CO BAN GHI TRONG BANG staffs DE LUU approvedBy.

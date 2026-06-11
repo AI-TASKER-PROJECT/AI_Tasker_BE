@@ -13,5 +13,6 @@ import java.util.Optional;
 public interface BusinessProfileRepository extends JpaRepository<BusinessProfileEntity, Integer> {
     // Note: Hàm `findByAccountId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     Optional<BusinessProfileEntity> findByAccountId(Integer accountId);
+    Optional<BusinessProfileEntity> findByTaxCode(String taxCode);
     boolean existsByTaxCode(String taxCode);
 }

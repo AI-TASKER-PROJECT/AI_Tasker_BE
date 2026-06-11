@@ -33,6 +33,7 @@ public class ExpertProfileEntity {
     @Column(name = "kyc_status", nullable = false, length = 50) private String kycStatus;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "approved_by") private Integer approvedBy;
+    @Column(name = "rejection_reason", length = 500) private String rejectionReason;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
