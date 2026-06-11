@@ -1,8 +1,3 @@
-/*
- * NOTE FILE: src/main/java/com/aitasker/be/controller/auth/AuthController.java
- * Đây là file gì: File controller nhận request HTTP, gọi service phù hợp và trả response cho client.
- * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
- */
 package com.aitasker.be.controller.auth;
 
 import org.springframework.http.ResponseEntity;
