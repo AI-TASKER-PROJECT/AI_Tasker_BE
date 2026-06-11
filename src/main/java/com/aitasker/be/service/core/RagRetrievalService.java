@@ -11,7 +11,7 @@ import java.util.Map;
 
 @Service
 public class RagRetrievalService {
-    private static final String KNOWLEDGE_PATH = "knowledge/";
+    private static final String KNOWLEDGE_PATH = "knowledge/chatbot/";
 
     public Map<String, String> retrieveRelevantContext(String question) {
         String sourceFile = resolveSourceFile(question);
