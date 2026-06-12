@@ -6,6 +6,11 @@
 package com.aitasker.be.controller.auth;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.*;
 
 import com.aitasker.be.common.response.ApiResponse;
@@ -49,5 +54,12 @@ public class AuthController {
     // Note: Hàm `login` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Login success", authService.login(req)));
+    }
+
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/me")
+    // Note: Hàm `me` trả lại thông tin tài khoản mới nhất theo JWT để frontend cập nhật trạng thái duyệt khi reload.
+    public ResponseEntity<ApiResponse<AuthResponse>> me() {
+        return ResponseEntity.ok(ApiResponse.success("Current session", authService.currentSession()));
     }
 }

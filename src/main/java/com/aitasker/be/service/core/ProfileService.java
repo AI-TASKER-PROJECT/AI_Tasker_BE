@@ -12,6 +12,7 @@ import com.aitasker.be.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -26,7 +27,9 @@ public class ProfileService {
     private final AccountRepository accountRepository;
     private final PortfolioRepository portfolioRepository;
     private final StaffRepository staffRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
+    private final FirebaseStorageService firebaseStorageService;
+    private final JobRepository jobRepository;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -50,7 +53,9 @@ public class ProfileService {
         entity.setApprovedBy(null);
         account.setStatus("Pending");
         accountRepository.save(account);
-        return businessProfileRepository.save(entity);
+        BusinessProfileEntity saved = businessProfileRepository.save(entity);
+        auditLogService.record(AuditLogService.ACTION_UPSERT_BUSINESS_PROFILE, "business_profiles", String.valueOf(saved.getBusinessId()), account.getAccountId());
+        return saved;
     }
 
     // TAO HOAC CAP NHAT HO SO CHUYEN GIA DE PHUC VU LUONG KYC.
@@ -78,7 +83,9 @@ public class ProfileService {
         entity.setApprovedBy(null);
         account.setStatus("Pending");
         accountRepository.save(account);
-        return expertProfileRepository.save(entity);
+        ExpertProfileEntity saved = expertProfileRepository.save(entity);
+        auditLogService.record(AuditLogService.ACTION_UPSERT_EXPERT_PROFILE, "expert_profiles", String.valueOf(saved.getExpertId()), account.getAccountId());
+        return saved;
     }
 
     // STAFF duyet ho so business/expert va ghi log audit.
@@ -98,7 +105,7 @@ public class ProfileService {
             b.setKybStatus(status);
             b.setApprovedBy(staffId);
             updateAccountStatus(b.getAccountId(), status);
-            audit("APPROVE_BUSINESS_PROFILE", "business_profiles", String.valueOf(id), actor.getAccountId());
+            audit(approvalAction("BUSINESS", status), "business_profiles", String.valueOf(id), actor.getAccountId());
             return businessProfileRepository.save(b);
         }
         if (!"EXPERT".equalsIgnoreCase(type)) {
@@ -108,15 +115,89 @@ public class ProfileService {
         e.setKycStatus(status);
         e.setApprovedBy(staffId);
         updateAccountStatus(e.getAccountId(), status);
-        audit("APPROVE_EXPERT_PROFILE", "expert_profiles", String.valueOf(id), actor.getAccountId());
+        audit(approvalAction("EXPERT", status), "expert_profiles", String.valueOf(id), actor.getAccountId());
         return expertProfileRepository.save(e);
+    }
+
+    // Note: Hàm `currentBusinessProfile` lấy hồ sơ KYB của chính doanh nghiệp đang đăng nhập để reload trang vẫn thấy status/file mới nhất.
+    public BusinessProfileEntity currentBusinessProfile() {
+        accessService.requireRole("BUSINESS");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        return businessProfileRepository.findByAccountId(accountId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
+    }
+
+    // Note: Hàm `businessProfileByJob` lấy hồ sơ doanh nghiệp đăng một job để chuyên gia xem chi tiết khi job đã public.
+    public BusinessProfileEntity businessProfileByJob(Integer jobId) {
+        JobEntity job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        // Job OPEN là dữ liệu public nên chuyên gia được xem doanh nghiệp đăng job; job chưa public vẫn giới hạn cho nội bộ có quyền.
+        if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
+            accessService.requireRole("STAFF", "ADMIN", "BUSINESS");
+        }
+        return businessProfileRepository.findById(job.getBusinessId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
+    }
+
+    // Note: Hàm `currentExpertProfile` lấy hồ sơ KYC của chính chuyên gia đang đăng nhập để reload trang vẫn thấy status mới nhất.
+    public ExpertProfileEntity currentExpertProfile() {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        return expertProfileRepository.findByAccountId(accountId)
+                .map(this::attachExpertAccountInfo)
+                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+    }
+
+    // Note: Hàm `currentPortfolio` lấy portfolio của chính chuyên gia đang đăng nhập để form không mất dữ liệu sau khi reload.
+    public PortfolioEntity currentPortfolio() {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        Integer expertId = expertProfileRepository.findByAccountId(accountId)
+                .map(ExpertProfileEntity::getExpertId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+        return portfolioRepository.findByExpertId(expertId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO PORTFOLIO"));
+    }
+
+    // Note: Hàm `createFileViewUrl` tạo link xem file Firebase cho người dùng có quyền trong hệ thống thay vì trả raw storage path lên UI.
+    public String createFileViewUrl(String path) {
+        accessService.requireRole("STAFF", "ADMIN", "BUSINESS", "EXPERT");
+        if (path != null && (path.startsWith("http://") || path.startsWith("https://"))) {
+            return path;
+        }
+        return firebaseStorageService.createReadUrl(path);
     }
 
     public List<BusinessProfileEntity> allBusinessProfiles() { accessService.requireRole("STAFF"); return businessProfileRepository.findAll(); }
     // Note: Hàm `allExpertProfiles` cho STAFF quản trị hồ sơ và BUSINESS đọc thông tin expert khi xem proposal.
-    public List<ExpertProfileEntity> allExpertProfiles() { accessService.requireRole("STAFF", "BUSINESS"); return expertProfileRepository.findAll(); }
+    public List<ExpertProfileEntity> allExpertProfiles() {
+        accessService.requireRole("STAFF", "BUSINESS");
+        return expertProfileRepository.findAll().stream()
+                .map(this::attachExpertAccountInfo)
+                .toList();
+    }
     // Note: Hàm `allPortfolios` cho STAFF quản trị portfolio và BUSINESS xem năng lực expert trong màn proposal.
     public List<PortfolioEntity> allPortfolios() { accessService.requireRole("STAFF", "BUSINESS"); return portfolioRepository.findAll(); }
+
+    // Note: Hàm `uploadBusinessLicense` upload file giấy phép kinh doanh lên Firebase Storage và trả về storage path để lưu vào hồ sơ KYB.
+    public String uploadBusinessLicense(MultipartFile file) {
+        accessService.requireRole("BUSINESS");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        String path = firebaseStorageService.upload(file, "business-licenses/accounts/" + accountId);
+        businessProfileRepository.findByAccountId(accountId)
+                .ifPresent(profile -> auditLogService.record(AuditLogService.ACTION_UPLOAD_BUSINESS_LICENSE, "business_profiles", String.valueOf(profile.getBusinessId()), accountId));
+        return path;
+    }
+
+    // Note: Hàm `uploadExpertCertificate` upload file chứng chỉ chuyên gia lên Firebase Storage và trả về storage path để lưu vào portfolio.
+    public String uploadExpertCertificate(MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        String path = firebaseStorageService.upload(file, "expert-certificates/accounts/" + accountId);
+        expertProfileRepository.findByAccountId(accountId)
+                .ifPresent(profile -> auditLogService.record(AuditLogService.ACTION_UPLOAD_EXPERT_CERTIFICATE, "expert_profiles", String.valueOf(profile.getExpertId()), accountId));
+        return path;
+    }
 
     // TAO HOAC CAP NHAT PORTFOLIO MOI CUA CHUYEN GIA DE BUSINESS DOC KHI REVIEW PROPOSAL.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -124,7 +205,6 @@ public class ProfileService {
     // Note: Hàm `upsertPortfolio` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public PortfolioEntity upsertPortfolio(PortfolioEntity input) {
         accessService.requireRole("EXPERT");
-        accessService.requireApprovedAccount();
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         // KIEM TRA CAC TRUONG PORTFOLIO MOI DE PHUC VU BUSINESS XEM CHI TIET CHUYEN GIA.
         if (input.getDomainIds() == null || input.getDomainIds().isBlank()) throw new AppException("DOMAIN IDS KHONG DUOC DE TRONG");
@@ -142,12 +222,33 @@ public class ProfileService {
         entity.setYearsExperience(input.getYearsExperience());
         entity.setCertificates(input.getCertificates());
         entity.setSelfDescription(input.getSelfDescription());
-        return portfolioRepository.save(entity);
+        PortfolioEntity saved = portfolioRepository.save(entity);
+        auditLogService.record(AuditLogService.ACTION_UPSERT_PORTFOLIO, "portfolios", String.valueOf(saved.getPortfolioId()), accountId);
+        return saved;
+    }
+
+    // Note: Hàm `attachExpertAccountInfo` gắn thông tin tài khoản đọc được vào response expert để BUSINESS xem chi tiết proposal.
+    private ExpertProfileEntity attachExpertAccountInfo(ExpertProfileEntity expert) {
+        accountRepository.findById(expert.getAccountId()).ifPresent(account -> {
+            expert.setFullName(account.getFullName());
+            expert.setPhone(account.getPhone());
+            expert.setTitle("Chuyên gia AI");
+        });
+        return expert;
     }
 
     // Note: Hàm `audit` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void audit(String action, String entityName, String entityId, Integer actorId) {
-        auditLogRepository.save(AuditLogEntity.builder().action(action).entityName(entityName).entityId(entityId).actorAccountId(actorId).build());
+        auditLogService.record(action, entityName, entityId, actorId);
+    }
+
+    // Note: Hàm `approvalAction` chọn action audit tiếng Việt đúng với loại hồ sơ và kết quả duyệt.
+    private String approvalAction(String type, String status) {
+        boolean approved = "Approved".equalsIgnoreCase(status);
+        if ("BUSINESS".equalsIgnoreCase(type)) {
+            return approved ? AuditLogService.ACTION_APPROVE_BUSINESS_PROFILE : AuditLogService.ACTION_REJECT_BUSINESS_PROFILE;
+        }
+        return approved ? AuditLogService.ACTION_APPROVE_EXPERT_PROFILE : AuditLogService.ACTION_REJECT_EXPERT_PROFILE;
     }
 
     // Note: Hàm `updateAccountStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.

@@ -14,6 +14,8 @@ public interface AuthService {
     AuthResponse register(RegisterRequest req);
     // Note: Hàm `login` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     AuthResponse login(LoginRequest req);
+    // Note: Hàm `currentSession` lấy lại thông tin tài khoản hiện tại từ database để frontend cập nhật status sau khi reload.
+    AuthResponse currentSession();
 
     boolean validateEmailNotExists(String email);
 }

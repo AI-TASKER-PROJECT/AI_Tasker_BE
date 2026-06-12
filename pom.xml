@@ -120,6 +120,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.9.0</version>
+        </dependency>
+
         <!-- Send email -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

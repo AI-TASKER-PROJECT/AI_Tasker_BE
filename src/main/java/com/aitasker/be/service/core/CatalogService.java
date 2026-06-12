@@ -162,9 +162,7 @@ public class CatalogService {
                         .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SKILL " + assignment.getSkillId()));
                 jobSkillRepository.save(JobSkillEntity.builder()
                         .id(new JobSkillId(jobId, assignment.getSkillId()))
-                        .requiredLevel(assignment.getRequiredLevel())
                         .isMandatory(assignment.getIsMandatory() == null || assignment.getIsMandatory())
-                        .minYearsExperience(assignment.getMinYearsExperience())
                         .build());
             }
         }
@@ -203,4 +201,5 @@ public class CatalogService {
     private String normalizeCode(String value) {
         return value.trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "").toUpperCase();
     }
+
 }

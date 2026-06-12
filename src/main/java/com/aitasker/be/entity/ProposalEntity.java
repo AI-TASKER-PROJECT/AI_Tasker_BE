@@ -27,6 +27,10 @@ public class ProposalEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "expert_id", nullable = false) private Integer expertId;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
+    @Column(name = "domain_id") private Integer domainId;
+    // Note: Annotation này cấu hình cột database tương ứng với field entity.
+    @Column(name = "skill_id") private Integer skillId;
+    // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "technical_solution", nullable = false) private String technicalSolution;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "bid_amount", nullable = false) private BigDecimal bidAmount;

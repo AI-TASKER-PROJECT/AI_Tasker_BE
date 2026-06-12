@@ -15,6 +15,7 @@ import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.RoleRepository;
+import com.aitasker.be.security.SecurityUtils;
 import com.aitasker.be.security.jwt.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -108,6 +109,20 @@ public class AuthServiceImpl implements AuthService {
     }
 
     // Note: Hàm `normalizeEmail` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Note: Hàm `currentSession` đọc account mới nhất theo JWT hiện tại để frontend không cần đăng xuất rồi đăng nhập lại khi status đổi.
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse currentSession() {
+        AccountEntity account = accountRepository.findByEmailWithRole(SecurityUtils.getCurrentEmail())
+                .orElseThrow(() -> new UnauthorizedException("Tai khoan khong hop le"));
+        return AuthResponse.builder()
+                .role(account.getRole().getRoleName())
+                .accountStatus(account.getStatus())
+                .email(account.getEmail())
+                .fullName(account.getFullName())
+                .build();
+    }
+
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }

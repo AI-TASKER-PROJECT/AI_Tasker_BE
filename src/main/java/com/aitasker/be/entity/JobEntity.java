@@ -31,8 +31,6 @@ public class JobEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "structured_sow") private String structuredSow;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "ai_tag", length = 50) private String aiTag;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "budget", nullable = false) private BigDecimal budget;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "status", nullable = false, length = 50) private String status;
@@ -50,4 +48,6 @@ public class JobEntity {
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
+    // Note: Field này không lưu database, chỉ trả về tổng proposal để giao diện job public hiển thị số liệu.
+    @Transient private Long proposalsCount;
 }
