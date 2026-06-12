@@ -5,6 +5,7 @@
  */
 package com.aitasker.be.entity;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -28,9 +29,11 @@ public class MilestoneEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "contract_id") private Integer contractId;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
+    @JsonAlias("name")
     @Column(name = "milestone_name", nullable = false, length = 255) private String milestoneName;
     @Column(name = "description") private String description;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
+    @JsonAlias("budget")
     @Column(name = "funds_allocated", nullable = false) private BigDecimal fundsAllocated;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "order_index", nullable = false) private Integer orderIndex;

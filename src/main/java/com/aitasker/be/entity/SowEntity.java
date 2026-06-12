@@ -5,6 +5,9 @@
  */
 package com.aitasker.be.entity;
 
+import com.aitasker.be.common.json.JsonTextDeserializer;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -33,18 +36,24 @@ public class SowEntity {
     @Column(name = "overview") private String overview;
 
     // Note: Danh sách mục tiêu, lưu dạng text JSON để giữ đúng cấu trúc AI trả về.
+    @JsonDeserialize(using = JsonTextDeserializer.class)
     @Column(name = "objectives") private String objectives;
 
     // Note: Danh sách phạm vi công việc, lưu dạng text JSON để frontend đọc lại được theo mảng.
+    @JsonDeserialize(using = JsonTextDeserializer.class)
     @Column(name = "scope_of_work") private String scopeOfWork;
 
     // Note: Danh sách sản phẩm bàn giao, đặt tên theo yêu cầu database là deliverable.
+    @JsonAlias("deliverables")
+    @JsonDeserialize(using = JsonTextDeserializer.class)
     @Column(name = "deliverable") private String deliverable;
 
     // Note: Các giả định khi thực hiện dự án.
+    @JsonDeserialize(using = JsonTextDeserializer.class)
     @Column(name = "assumptions") private String assumptions;
 
     // Note: Các hạng mục không nằm trong phạm vi thực hiện.
+    @JsonDeserialize(using = JsonTextDeserializer.class)
     @Column(name = "out_of_scope") private String outOfScope;
 
     // Note: Thời điểm tạo bản SoW.

@@ -212,7 +212,9 @@ public class MarketplaceService {
     private void saveMilestones(JobEntity job, List<MilestoneEntity> milestones) {
         if (milestones == null || milestones.isEmpty()) return;
         Set<Integer> orderIndexes = new LinkedHashSet<>();
+        int defaultOrderIndex = 1;
         for (MilestoneEntity milestone : milestones) {
+            if (milestone.getOrderIndex() == null) milestone.setOrderIndex(defaultOrderIndex);
             if (milestone.getMilestoneName() == null || milestone.getMilestoneName().isBlank()) throw new AppException("MILESTONE NAME KHONG DUOC DE TRONG");
             if (milestone.getFundsAllocated() == null || milestone.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
             if (milestone.getOrderIndex() == null || milestone.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
@@ -223,6 +225,7 @@ public class MarketplaceService {
             if (milestone.getStatus() == null) milestone.setStatus("Pending");
             MilestoneEntity saved = milestoneRepository.save(milestone);
             replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getCriteriaIds());
+            defaultOrderIndex++;
         }
     }
 

@@ -19,5 +19,4 @@ public class SowDto {
     private List<String> deliverables;
     private List<String> assumptions;
     private List<String> outOfScope;
-    private List<String> acceptanceCriteria;
 }
