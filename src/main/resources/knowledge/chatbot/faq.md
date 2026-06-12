@@ -1,0 +1,2 @@
+- AITasker là nền tảng kết nối Doanh nghiệp với Chuyên gia AI.
+- Chatbot chỉ trả lời dựa trên tài liệu nội bộ hiện có.

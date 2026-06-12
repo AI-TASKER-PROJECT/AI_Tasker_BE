@@ -39,10 +39,5 @@ public class AuditLogEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "new_value_json", columnDefinition = "jsonb") private Object newValueJson;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "ip_address", length = 45) private String ipAddress;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "user_agent") private String userAgent;
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
 }
