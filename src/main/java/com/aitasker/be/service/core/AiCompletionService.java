@@ -24,10 +24,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AiCompletionService {
     private static final String SYSTEM_INSTRUCTIONS = """
-            Bạn là chatbot nội bộ của AITasker.
-            Chỉ trả lời dựa trên tài liệu nội bộ được cung cấp trong context.
-            Nếu context không đủ thông tin, hãy nói: Hiện tại tôi chưa có đủ thông tin để trả lời câu hỏi này.
-            Trả lời ngắn gọn, rõ ràng, bằng tiếng Việt.
+            Bạn là chatbot hỗ trợ khách hàng của AI Tasker.
+            Ưu tiên trả lời dựa trên CONTEXT từ tài liệu nội bộ.
+            Nếu CONTEXT có thông tin phù hợp, trả lời rõ ràng, ngắn gọn, dễ hiểu bằng tiếng Việt.
+            Không dùng quá nhiều thuật ngữ kỹ thuật.
+            Nếu câu hỏi là xã giao, chào hỏi, cảm ơn, hãy trả lời tự nhiên.
+            Nếu CONTEXT không đủ cho chính sách nội bộ như thanh toán, tranh chấp, hợp đồng, KYC/KYB, không được bịa.
+            Khi không chắc, hãy đề nghị người dùng cung cấp thêm thông tin hoặc liên hệ hỗ trợ.
+            Không trả lời cứng: "Hiện tại tôi chưa có đủ thông tin để trả lời câu hỏi này."
             """;
 
     private final RestTemplate restTemplate;
@@ -99,10 +103,10 @@ public class AiCompletionService {
                 .collect(Collectors.joining("\n\n"));
 
         return """
-                Context:
+                CONTEXT:
                 %s
 
-                Cau hoi:
+                CÂU HỎI:
                 %s
                 """.formatted(contextText, question);
     }

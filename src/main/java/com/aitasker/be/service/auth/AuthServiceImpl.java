@@ -105,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean validateEmailNotExists(String email) {
-        return accountRepository.existsByEmailIgnoreCase(email);
+        return !accountRepository.existsByEmailIgnoreCase(email);
     }
 
     // Note: Hàm `normalizeEmail` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
