@@ -103,7 +103,7 @@ public class MarketplaceService {
         input.setStatus(input.getStatus() == null ? "Pending" : input.getStatus());
         ProposalEntity saved = proposalRepository.save(input);
         auditLogService.record(AuditLogService.ACTION_SUBMIT_PROPOSAL, "proposals", String.valueOf(saved.getProposalId()), accessService.currentAccount().getAccountId());
-        return attachProposalCount(saved);
+        return saved;
     }
 
     // Note: Hàm `listProposalsByJob` lấy proposal theo job và chỉ cho doanh nghiệp sở hữu job xem danh sách này.
