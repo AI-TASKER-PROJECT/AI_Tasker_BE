@@ -51,6 +51,15 @@ public class AdminController {
     }
 
     // Note: Annotation này khai báo API cập nhật một phần dữ liệu bằng HTTP PATCH.
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/audit-logs")
+    // Note: Hàm `listAuditLogs` trả audit log cho admin, có thể lọc theo nhóm role nội bộ hoặc bên ngoài.
+    public ResponseEntity<ApiResponse<Object>> listAuditLogs(
+            // Note: Annotation này lấy query parameter đưa vào tham số hàm.
+            @RequestParam(required = false) String actorGroup) {
+        return ResponseEntity.ok(ApiResponse.success("LIST AUDIT LOGS SUCCESS", adminService.listAuditLogs(actorGroup)));
+    }
+
     @PatchMapping("/settings/{key}")
     public ResponseEntity<ApiResponse<SystemSettingEntity>> updateSetting(
             // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

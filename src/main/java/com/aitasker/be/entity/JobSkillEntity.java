@@ -21,11 +21,7 @@ public class JobSkillEntity {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @EmbeddedId private JobSkillId id;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "required_level", length = 50) private String requiredLevel;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "is_mandatory", nullable = false) private Boolean isMandatory;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "min_years_experience") private Integer minYearsExperience;
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
 }
