@@ -1,0 +1,2 @@
+- REG-01: Người dùng bắt buộc chọn vai trò Doanh nghiệp hoặc Chuyên gia khi đăng ký.
+- REG-02: Doanh nghiệp nộp mã số thuế, Chuyên gia nộp CCCD và Portfolio. Trạng thái mặc định là Pending. Staff duyệt thành Approved mới mở khóa giao dịch.

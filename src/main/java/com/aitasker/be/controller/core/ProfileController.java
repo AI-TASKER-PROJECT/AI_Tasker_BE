@@ -66,7 +66,6 @@ public class ProfileController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/business/by-job/{jobId}")
-    // Note: Hàm `businessByJob` trả hồ sơ doanh nghiệp theo job để chuyên gia xem thông tin bên đăng dự án.
     public ResponseEntity<ApiResponse<BusinessProfileEntity>> businessByJob(@PathVariable Integer jobId) {
         return ResponseEntity.ok(ApiResponse.success("GET BUSINESS PROFILE BY JOB SUCCESS", profileService.businessProfileByJob(jobId)));
     }

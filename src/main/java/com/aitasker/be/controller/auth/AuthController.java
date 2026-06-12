@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.GoogleRegisterRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.service.auth.AuthService;
@@ -34,6 +35,11 @@ public class AuthController {
     // Note: Hàm `register` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Register success", authService.register(req)));
+    }
+
+    @PostMapping("/google/register")
+    public ResponseEntity<ApiResponse<AuthResponse>> googleRegister(@Valid @RequestBody GoogleRegisterRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Google register success", authService.googleRegister(req)));
     }
 
     @GetMapping("/check-email")
