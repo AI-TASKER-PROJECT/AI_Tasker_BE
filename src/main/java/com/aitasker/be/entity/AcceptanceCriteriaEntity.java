@@ -1,7 +1,7 @@
 /*
  * NOTE FILE: src/main/java/com/aitasker/be/entity/AcceptanceCriteriaEntity.java
- * Đây là file gì: File entity ánh xạ bảng database sang object Java, thể hiện cấu trúc dữ liệu được lưu trữ.
- * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ * Đây là file gì: Entity ánh xạ bảng acceptance_criteria, lưu danh mục tiêu chí nghiệm thu do nền tảng cung cấp.
+ * Mục đích note: giải thích các trường dùng để business chọn tiêu chí cho từng milestone.
  */
 package com.aitasker.be.entity;
 
@@ -12,23 +12,35 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-// Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
-@Entity @Table(name = "acceptance_criteria")
-// Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+// Note: Annotation này ánh xạ class Java với bảng acceptance_criteria.
+@Entity
+// Note: Annotation này chỉ rõ bảng lưu danh mục tiêu chí nghiệm thu của hệ thống.
+@Table(name = "acceptance_criteria")
+// Note: Lombok sinh getter, setter, builder và constructor để thao tác dữ liệu tiêu chí.
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class AcceptanceCriteriaEntity {
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+    // Note: Khóa chính của tiêu chí nghiệm thu.
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "criteria_id") private Integer criteriaId;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "milestone_id", nullable = false) private Integer milestoneId;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
+
+    // Note: Mã tiêu chí duy nhất, dùng để quản lý dữ liệu seed và tránh trùng.
+    @Column(name = "criteria_code", nullable = false, unique = true, length = 100) private String criteriaCode;
+
+    // Note: Nhóm tiêu chí để giao diện có thể phân loại khi business chọn cho milestone.
+    @Column(name = "category", length = 100) private String category;
+
+    // Note: Nội dung tiêu chí nghiệm thu hiển thị cho business và expert.
     @Column(name = "description", nullable = false) private String description;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "is_passed", nullable = false) private Boolean isPassed;
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+
+    // Note: Cờ bật/tắt tiêu chí trong danh mục hệ thống.
+    @Column(name = "is_active", nullable = false) private Boolean isActive;
+
+    // Note: Thứ tự hiển thị của tiêu chí trên giao diện.
+    @Column(name = "sort_order", nullable = false) private Integer sortOrder;
+
+    // Note: Thời điểm tạo tiêu chí.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+
+    // Note: Thời điểm cập nhật tiêu chí gần nhất.
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
 }

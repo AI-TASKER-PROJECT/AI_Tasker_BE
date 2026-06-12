@@ -15,7 +15,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.time.LocalDateTime;
@@ -33,6 +36,10 @@ public class MarketplaceService {
     private final JobSkillRepository jobSkillRepository;
     private final PortfolioRepository portfolioRepository;
     private final ProposalRepository proposalRepository;
+    private final SowRepository sowRepository;
+    private final MilestoneRepository milestoneRepository;
+    private final AcceptanceCriteriaRepository criteriaRepository;
+    private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     private final AuditLogService auditLogService;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -44,32 +51,36 @@ public class MarketplaceService {
         if (input.getTitle() == null || input.getTitle().isBlank()) throw new AppException("TITLE KHONG DUOC DE TRONG");
         if (input.getRawRequirements() == null || input.getRawRequirements().isBlank()) throw new AppException("RAW REQUIREMENTS KHONG DUOC DE TRONG");
         if (input.getBudget() == null || input.getBudget().signum() <= 0) throw new AppException("BUDGET PHAI LON HON 0");
+        SowEntity sow = input.getSow();
+        List<MilestoneEntity> milestones = input.getMilestones();
         BusinessProfileEntity business = currentApprovedBusiness();
         input.setJobId(null);
         input.setBusinessId(business.getBusinessId());
         input.setStatus("DRAFT");
         input.setPublishedAt(null);
         JobEntity saved = jobRepository.save(input);
+        saveSow(saved.getJobId(), sow);
+        saveMilestones(saved, milestones);
         auditLogService.record(AuditLogService.ACTION_CREATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
-        return attachProposalCount(saved);
+        return attachJobDetails(saved);
     }
 
     // Note: Hàm `listJobs` chỉ lấy job OPEN để marketplace không làm lộ job nháp của doanh nghiệp.
     public List<JobEntity> listJobs() {
-        return attachProposalCounts(jobRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc("OPEN"));
+        return attachJobDetails(jobRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc("OPEN"));
     }
 
     // Note: Hàm `listMyJobs` lấy toàn bộ job của business hiện tại, bao gồm DRAFT để doanh nghiệp kiểm tra trước khi public.
     public List<JobEntity> listMyJobs() {
         accessService.requireRole("BUSINESS");
         BusinessProfileEntity business = currentApprovedBusiness();
-        return attachProposalCounts(jobRepository.findByBusinessIdOrderByCreatedAtDesc(business.getBusinessId()));
+        return attachJobDetails(jobRepository.findByBusinessIdOrderByCreatedAtDesc(business.getBusinessId()));
     }
 
     // Note: Hàm `getJob` kiểm soát quyền xem chi tiết job theo trạng thái public hoặc quyền sở hữu job nháp.
     public JobEntity getJob(Integer id) {
         JobEntity job = jobRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
-        if ("OPEN".equalsIgnoreCase(job.getStatus())) return attachProposalCount(job);
+        if ("OPEN".equalsIgnoreCase(job.getStatus())) return attachJobDetails(job);
         if (!SecurityUtils.hasRole("BUSINESS")) {
             throw new NotFoundException("JOB CHUA DUOC PUBLIC");
         }
@@ -77,7 +88,7 @@ public class MarketplaceService {
         if (!business.getBusinessId().equals(job.getBusinessId())) {
             throw new ForbiddenException("BAN KHONG CO QUYEN XEM JOB NAY");
         }
-        return attachProposalCount(job);
+        return attachJobDetails(job);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -138,7 +149,7 @@ public class MarketplaceService {
         if ("OPEN".equals(status) && job.getPublishedAt() == null) job.setPublishedAt(LocalDateTime.now());
         JobEntity saved = jobRepository.save(job);
         auditLogService.record(AuditLogService.ACTION_CHANGE_JOB_STATUS, "jobs", String.valueOf(jobId), accessService.currentAccount().getAccountId());
-        return saved;
+        return attachJobDetails(saved);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -188,6 +199,81 @@ public class MarketplaceService {
             job.setProposalsCount(proposalRepository.countByJobId(job.getJobId()));
         }
         return job;
+    }
+
+    private void saveSow(Integer jobId, SowEntity sow) {
+        if (sow == null) return;
+        if (sow.getTitle() == null || sow.getTitle().isBlank()) throw new AppException("SOW TITLE KHONG DUOC DE TRONG");
+        sow.setSowId(null);
+        sow.setJobId(jobId);
+        sowRepository.save(sow);
+    }
+
+    private void saveMilestones(JobEntity job, List<MilestoneEntity> milestones) {
+        if (milestones == null || milestones.isEmpty()) return;
+        Set<Integer> orderIndexes = new LinkedHashSet<>();
+        for (MilestoneEntity milestone : milestones) {
+            if (milestone.getMilestoneName() == null || milestone.getMilestoneName().isBlank()) throw new AppException("MILESTONE NAME KHONG DUOC DE TRONG");
+            if (milestone.getFundsAllocated() == null || milestone.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
+            if (milestone.getOrderIndex() == null || milestone.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
+            if (!orderIndexes.add(milestone.getOrderIndex())) throw new AppException("ORDER INDEX BI TRUNG TRONG MILESTONE");
+            milestone.setMilestoneId(null);
+            milestone.setJobId(job.getJobId());
+            milestone.setContractId(null);
+            if (milestone.getStatus() == null) milestone.setStatus("Pending");
+            MilestoneEntity saved = milestoneRepository.save(milestone);
+            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getCriteriaIds());
+        }
+    }
+
+    private List<JobEntity> attachJobDetails(List<JobEntity> jobs) {
+        jobs.forEach(this::attachJobDetails);
+        return jobs;
+    }
+
+    private JobEntity attachJobDetails(JobEntity job) {
+        if (job != null && job.getJobId() != null) {
+            job.setProposalsCount(proposalRepository.countByJobId(job.getJobId()));
+            job.setSow(sowRepository.findByJobId(job.getJobId()).orElse(null));
+            job.setMilestones(attachMilestoneCriteria(milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId())));
+        }
+        return job;
+    }
+
+    private List<MilestoneEntity> attachMilestoneCriteria(List<MilestoneEntity> milestones) {
+        milestones.forEach(this::attachMilestoneCriteria);
+        return milestones;
+    }
+
+    private MilestoneEntity attachMilestoneCriteria(MilestoneEntity milestone) {
+        List<Integer> criteriaIds = milestoneCriteriaRepository.findByIdMilestoneId(milestone.getMilestoneId()).stream()
+                .map(item -> item.getId().getCriteriaId())
+                .toList();
+        milestone.setCriteriaIds(criteriaIds);
+        if (criteriaIds.isEmpty()) {
+            milestone.setCriteria(List.of());
+            return milestone;
+        }
+        Map<Integer, AcceptanceCriteriaEntity> criteriaById = criteriaRepository.findAllById(criteriaIds).stream()
+                .collect(Collectors.toMap(AcceptanceCriteriaEntity::getCriteriaId, item -> item));
+        milestone.setCriteria(criteriaIds.stream()
+                .map(criteriaById::get)
+                .filter(Objects::nonNull)
+                .toList());
+        return milestone;
+    }
+
+    private void replaceMilestoneCriteria(Integer milestoneId, List<Integer> criteriaIds) {
+        milestoneCriteriaRepository.deleteByIdMilestoneId(milestoneId);
+        if (criteriaIds == null || criteriaIds.isEmpty()) return;
+        for (Integer criteriaId : new LinkedHashSet<>(criteriaIds)) {
+            AcceptanceCriteriaEntity criteria = criteriaRepository.findById(criteriaId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCEPTANCE CRITERIA " + criteriaId));
+            if (!Boolean.TRUE.equals(criteria.getIsActive())) throw new AppException("ACCEPTANCE CRITERIA KHONG CON HOAT DONG " + criteriaId);
+            milestoneCriteriaRepository.save(MilestoneAcceptanceCriteriaEntity.builder()
+                    .id(new MilestoneAcceptanceCriteriaId(milestoneId, criteriaId))
+                    .build());
+        }
     }
 
     private BusinessProfileEntity currentApprovedBusiness() {

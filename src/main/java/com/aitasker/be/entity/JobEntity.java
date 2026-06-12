@@ -12,6 +12,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
 @Entity @Table(name = "jobs")
@@ -50,4 +51,6 @@ public class JobEntity {
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
     // Note: Field này không lưu database, chỉ trả về tổng proposal để giao diện job public hiển thị số liệu.
     @Transient private Long proposalsCount;
+    @Transient private SowEntity sow;
+    @Transient private List<MilestoneEntity> milestones;
 }
