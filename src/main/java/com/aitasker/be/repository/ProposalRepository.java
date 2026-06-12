@@ -15,6 +15,8 @@ public interface ProposalRepository extends JpaRepository<ProposalEntity, Intege
     boolean existsByJobIdAndExpertId(Integer jobId, Integer expertId);
     // Note: Hàm `findByJobId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<ProposalEntity> findByJobId(Integer jobId);
+    // Note: Hàm `countByJobId` đếm tổng proposal của một job để giao diện public hiển thị số lượng proposal hiện có.
+    long countByJobId(Integer jobId);
     // Note: Hàm `findByExpertIdOrderByCreatedAtDesc` lấy các proposal của chuyên gia hiện tại để expert theo dõi lịch sử đã nộp.
     List<ProposalEntity> findByExpertIdOrderByCreatedAtDesc(Integer expertId);
 }

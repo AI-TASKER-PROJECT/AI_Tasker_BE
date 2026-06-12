@@ -6,4 +6,10 @@
 package com.aitasker.be.repository;
 import com.aitasker.be.entity.AuditLogEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
-public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Integer> {}
+
+import java.util.List;
+
+public interface AuditLogRepository extends JpaRepository<AuditLogEntity, Integer> {
+    // Note: Hàm `findTop200ByOrderByCreatedAtDesc` lấy các audit log mới nhất để admin rà soát hoạt động hệ thống.
+    List<AuditLogEntity> findTop200ByOrderByCreatedAtDesc();
+}

@@ -37,6 +37,7 @@ public class ContractExecutionService {
     private final StaffRepository staffRepository;
     private final SystemSettingRepository systemSettingRepository;
     private final SystemWalletService systemWalletService;
+    private final AuditLogService auditLogService;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -63,7 +64,9 @@ public class ContractExecutionService {
         input.setStatus("Draft");
         input.setBusinessAcceptedAt(null);
         input.setExpertAcceptedAt(null);
-        return contractRepository.save(input);
+        ContractEntity saved = contractRepository.save(input);
+        auditLogService.record(AuditLogService.ACTION_CREATE_CONTRACT_DRAFT, "contracts", String.valueOf(saved.getContractId()), accountId);
+        return saved;
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -93,7 +96,9 @@ public class ContractExecutionService {
         contract.setBusinessAcceptedAt(null);
         contract.setExpertAcceptedAt(null);
         contractRepository.save(contract);
-        return changeRequestRepository.save(input);
+        ContractChangeRequestEntity saved = changeRequestRepository.save(input);
+        auditLogService.record(AuditLogService.ACTION_REQUEST_CONTRACT_CHANGE, "contracts", String.valueOf(contract.getContractId()), accountId);
+        return saved;
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -115,7 +120,9 @@ public class ContractExecutionService {
         if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertAcceptedAt(now);
         contract.setStatus(contract.getBusinessAcceptedAt() != null && contract.getExpertAcceptedAt() != null ? "Active" : "Negotiating");
         contract.setUpdatedAt(LocalDateTime.now());
-        return contractRepository.save(contract);
+        ContractEntity saved = contractRepository.save(contract);
+        auditLogService.record(AuditLogService.ACTION_ACCEPT_CONTRACT, "contracts", String.valueOf(contractId), accountId);
+        return saved;
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -134,7 +141,9 @@ public class ContractExecutionService {
         if (!"Active".equals(contract.getStatus())) throw new AppException("CHI DUOC KY NDA KHI CONTRACT DA ACTIVE");
         contract.setNdaSigned(Boolean.TRUE);
         contract.setUpdatedAt(LocalDateTime.now());
-        return contractRepository.save(contract);
+        ContractEntity saved = contractRepository.save(contract);
+        auditLogService.record(AuditLogService.ACTION_SIGN_NDA, "contracts", String.valueOf(contractId), accountId);
+        return saved;
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -158,7 +167,9 @@ public class ContractExecutionService {
         }
         contract.setStatus("Terminated");
         contract.setUpdatedAt(LocalDateTime.now());
-        return contractRepository.save(contract);
+        ContractEntity saved = contractRepository.save(contract);
+        auditLogService.record(AuditLogService.ACTION_TERMINATE_CONTRACT, "contracts", String.valueOf(contractId), actor.getAccountId());
+        return saved;
     }
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -174,7 +185,9 @@ public class ContractExecutionService {
         }
         input.setContractId(null);
         if (input.getStatus() == null) input.setStatus("Pending");
-        return milestoneRepository.save(input);
+        MilestoneEntity saved = milestoneRepository.save(input);
+        auditLogService.record(AuditLogService.ACTION_CREATE_MILESTONE, "milestones", String.valueOf(saved.getMilestoneId()), accessService.currentAccount().getAccountId());
+        return saved;
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public AcceptanceCriteriaEntity createCriteria(AcceptanceCriteriaEntity input) {
@@ -184,7 +197,9 @@ public class ContractExecutionService {
         requireBusinessOwnedJob(milestone.getJobId());
         if (input.getDescription() == null || input.getDescription().isBlank()) throw new AppException("CRITERIA DESCRIPTION KHONG DUOC DE TRONG");
         if (input.getIsPassed() == null) input.setIsPassed(false);
-        return criteriaRepository.save(input);
+        AcceptanceCriteriaEntity saved = criteriaRepository.save(input);
+        auditLogService.record(AuditLogService.ACTION_CREATE_ACCEPTANCE_CRITERIA, "milestones", String.valueOf(input.getMilestoneId()), accessService.currentAccount().getAccountId());
+        return saved;
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public DeliverableEntity submitDeliverable(DeliverableEntity input) {
@@ -198,6 +213,7 @@ public class ContractExecutionService {
         milestone.setStatus("Under Review");
         milestone.setUpdatedAt(LocalDateTime.now());
         milestoneRepository.save(milestone);
+        auditLogService.record(AuditLogService.ACTION_SUBMIT_DELIVERABLE, "milestones", String.valueOf(milestone.getMilestoneId()), accessService.currentAccount().getAccountId());
         return saved;
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -218,6 +234,7 @@ public class ContractExecutionService {
         if (input.getStatus() == null) input.setStatus("Pending");
         TransactionEntity saved = transactionRepository.save(input);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_CREATE_TRANSACTION, "transactions", String.valueOf(saved.getTransactionId()), actor.getAccountId());
         return saved;
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -237,6 +254,7 @@ public class ContractExecutionService {
         if (input.getStatus() == null) input.setStatus("Open");
         DisputeEntity saved = disputeRepository.save(input);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_CREATE_DISPUTE, "disputes", String.valueOf(saved.getDisputeId()), accountId);
         return saved;
     }
 
@@ -276,6 +294,7 @@ public class ContractExecutionService {
     // Note: Hàm `listMilestonesByJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> listMilestonesByJob(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        // Job OPEN cho chuyên gia xem milestone trước khi gửi proposal; job chưa public vẫn phải kiểm tra quyền sở hữu/tham gia.
         if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
             requireJobParticipantOrOwner(jobId);
         }
@@ -313,7 +332,11 @@ public class ContractExecutionService {
     // Note: Hàm `matchingByKeyword` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<ProposalEntity> matchingByKeyword(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
-        final String keyword = Optional.ofNullable(job.getAiTag()).filter(v -> !v.isBlank()).orElse("AI").toUpperCase();
+        final String keyword = List.of(job.getTitle(), job.getStructuredSow(), job.getRawRequirements()).stream()
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse("AI")
+                .toUpperCase();
         return proposalRepository.findByJobId(jobId).stream()
                 .filter(p -> p.getTechnicalSolution() != null && p.getTechnicalSolution().toUpperCase().contains(keyword))
                 .toList();
@@ -333,6 +356,7 @@ public class ContractExecutionService {
         transaction.setStatus(status);
         TransactionEntity saved = transactionRepository.save(transaction);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_UPDATE_TRANSACTION_STATUS, "transactions", String.valueOf(transactionId), accessService.currentAccount().getAccountId());
         return saved;
     }
 
@@ -349,6 +373,7 @@ public class ContractExecutionService {
         }
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_ASSIGN_DISPUTE, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
         return saved;
     }
 
@@ -365,6 +390,7 @@ public class ContractExecutionService {
         dispute.setAdminApprovedBy(accessService.currentAccount().getAccountId());
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_RESOLVE_DISPUTE, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
         return saved;
     }
 
@@ -397,6 +423,7 @@ public class ContractExecutionService {
                 updated.add(milestoneRepository.save(milestone));
             }
         }
+        auditLogService.record(AuditLogService.ACTION_RUN_SLA_AUTO_APPROVE, "system_settings", "default_sla_days", accessService.currentAccount().getAccountId());
         return updated;
     }
 
@@ -413,6 +440,7 @@ public class ContractExecutionService {
         if ("Open".equals(dispute.getStatus())) dispute.setStatus("UnderReview");
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_RECORD_DEMO_TESTING, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
         return saved;
     }
 
@@ -430,6 +458,7 @@ public class ContractExecutionService {
         dispute.setStatus("Escalated");
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_ISSUE_TECHNICAL_REPORT, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
         return saved;
     }
 
@@ -447,6 +476,7 @@ public class ContractExecutionService {
         transaction.setStatus(paymentStatus);
         transaction = transactionRepository.save(transaction);
         systemWalletService.syncWallet();
+        auditLogService.record(AuditLogService.ACTION_PROCESS_PAYMENT_WEBHOOK, "transactions", String.valueOf(transactionId), accessService.currentAccount().getAccountId());
         return transaction;
     }
 

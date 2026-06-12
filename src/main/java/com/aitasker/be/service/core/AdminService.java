@@ -9,6 +9,7 @@ import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.admin.AccountRequest;
 import com.aitasker.be.dto.admin.AccountResponse;
+import com.aitasker.be.dto.admin.AuditLogResponse;
 import com.aitasker.be.dto.admin.StaffResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
@@ -40,6 +41,7 @@ public class AdminService {
     private final SystemSettingRepository systemSettingRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -75,7 +77,9 @@ public class AdminService {
                     .map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY TAI KHOAN BUSINESS"));
             input.setRevieweeId(targetAccountId);
         }
-        return reviewRepository.save(input);
+        ReviewEntity saved = reviewRepository.save(input);
+        auditLogService.record(AuditLogService.ACTION_CREATE_REVIEW, "reviews", String.valueOf(saved.getReviewId()), actor.getAccountId());
+        return saved;
     }
 
     // Note: Hàm `listReviewsByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -90,6 +94,11 @@ public class AdminService {
         return systemSettingRepository.findAll();
     }
 
+    // Note: Hàm `listAuditLogs` chỉ cho admin lấy danh sách audit log và lọc theo nhóm role nội bộ/bên ngoài.
+    public List<AuditLogResponse> listAuditLogs(String actorGroup) {
+        return auditLogService.listForAdmin(actorGroup);
+    }
+
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `updateSetting` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -99,8 +108,11 @@ public class AdminService {
         // CHI CHO PHEP CAP NHAT GIA TRI/CO HIEU LUC, KHONG CHO DOI VALUE_TYPE TRANH VO HOP DONG DU LIEU.
         if (value != null && !value.isBlank()) setting.setSettingValue(value);
         if (isActive != null) setting.setIsActive(isActive);
-        setting.setUpdatedByRoleId(accessService.currentAccount().getRole().getRoleId());
-        return systemSettingRepository.save(setting);
+        AccountEntity actor = accessService.currentAccount();
+        setting.setUpdatedByRoleId(actor.getRole().getRoleId());
+        SystemSettingEntity saved = systemSettingRepository.save(setting);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", key, actor.getAccountId());
+        return saved;
     }
 
     // Note: Hàm `listStaffs` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -122,6 +134,7 @@ public class AdminService {
             throw new AppException("ACCOUNT PHAI CO ROLE STAFF");
         }
         StaffEntity staff = ensureStaffProfile(account.getAccountId(), input.getSpecialization());
+        auditLogService.record(AuditLogService.ACTION_CREATE_STAFF_PROFILE, "staffs", String.valueOf(staff.getStaffId()), accessService.currentAccount().getAccountId());
         return toStaffResponse(staff);
     }
 
@@ -133,7 +146,9 @@ public class AdminService {
         StaffEntity staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY STAFF"));
         staff.setSpecialization(normalizeStaffSpecialization(input == null ? null : input.getSpecialization()));
-        return toStaffResponse(staffRepository.save(staff));
+        StaffEntity saved = staffRepository.save(staff);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_STAFF_PROFILE, "staffs", String.valueOf(staffId), accessService.currentAccount().getAccountId());
+        return toStaffResponse(saved);
     }
 
     // Note: Hàm `analyticsOverview` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -200,6 +215,7 @@ public class AdminService {
         if (hasRole(role, "STAFF")) {
             ensureStaffProfile(saved.getAccountId(), request.getSpecialization());
         }
+        auditLogService.record(AuditLogService.ACTION_CREATE_ACCOUNT, "account", String.valueOf(saved.getAccountId()), accessService.currentAccount().getAccountId());
         return toAccountResponse(saved);
     }
 
@@ -241,6 +257,7 @@ public class AdminService {
         } else {
             staffRepository.findByAccountId(saved.getAccountId()).ifPresent(staffRepository::delete);
         }
+        auditLogService.record(AuditLogService.ACTION_UPDATE_ACCOUNT, "account", String.valueOf(saved.getAccountId()), accessService.currentAccount().getAccountId());
         return toAccountResponse(saved);
     }
 
@@ -257,7 +274,9 @@ public class AdminService {
         AccountEntity account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
         account.setStatus(normalizedStatus);
-        return toAccountResponse(accountRepository.save(account));
+        AccountEntity saved = accountRepository.save(account);
+        auditLogService.record(AuditLogService.ACTION_CHANGE_ACCOUNT_STATUS, "account", String.valueOf(accountId), actor.getAccountId());
+        return toAccountResponse(saved);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
