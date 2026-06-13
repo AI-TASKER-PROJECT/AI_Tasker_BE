@@ -206,7 +206,6 @@ public class ContractExecutionService {
         criteriaRepository.findByCriteriaCode(code).ifPresent(existing -> { throw new AppException("CRITERIA CODE DA TON TAI"); });
         input.setCriteriaId(null);
         input.setCriteriaCode(code);
-        input.setCategory(input.getCategory() == null || input.getCategory().isBlank() ? "GENERAL" : input.getCategory().trim());
         input.setIsActive(input.getIsActive() == null || input.getIsActive());
         input.setSortOrder(input.getSortOrder() == null ? 0 : input.getSortOrder());
         AcceptanceCriteriaEntity saved = criteriaRepository.save(input);

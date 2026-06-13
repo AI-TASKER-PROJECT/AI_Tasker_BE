@@ -438,7 +438,6 @@ Raw body:
 ```json
 {
   "criteriaCode": "DEMO_ACCEPTED",
-  "category": "Bàn giao",
   "description": "Demo nghiệm thu được thực hiện và doanh nghiệp xác nhận kết quả phù hợp.",
   "isActive": true,
   "sortOrder": 300
