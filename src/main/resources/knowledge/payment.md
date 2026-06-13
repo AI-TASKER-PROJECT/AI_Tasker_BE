@@ -1,1 +1,0 @@
-- FIN-01: Doanh nghiệp ký quỹ qua VNPay trước khi chuyên gia làm việc. Khi milestone hoàn thành, hệ thống giải ngân về ví chuyên gia.

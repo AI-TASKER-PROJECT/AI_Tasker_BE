@@ -14,8 +14,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 // Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
@@ -31,6 +35,7 @@ public class ContractExecutionService {
     private final ContractChangeRequestRepository changeRequestRepository;
     private final MilestoneRepository milestoneRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
+    private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     private final DeliverableRepository deliverableRepository;
     private final TransactionRepository transactionRepository;
     private final DisputeRepository disputeRepository;
@@ -178,6 +183,7 @@ public class ContractExecutionService {
         accessService.requireApprovedAccount();
         JobEntity job = requireBusinessOwnedJob(input.getJobId());
         if (!List.of("DRAFT", "OPEN").contains(job.getStatus())) throw new AppException("JOB KHONG CHO PHEP TAO MILESTONE");
+        if (input.getMilestoneName() == null || input.getMilestoneName().isBlank()) throw new AppException("MILESTONE NAME KHONG DUOC DE TRONG");
         if (input.getFundsAllocated() == null || input.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
         if (input.getOrderIndex() == null || input.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
         if (milestoneRepository.existsByJobIdAndOrderIndex(input.getJobId(), input.getOrderIndex())) {
@@ -186,19 +192,24 @@ public class ContractExecutionService {
         input.setContractId(null);
         if (input.getStatus() == null) input.setStatus("Pending");
         MilestoneEntity saved = milestoneRepository.save(input);
+        replaceMilestoneCriteria(saved.getMilestoneId(), input.getCriteriaIds());
         auditLogService.record(AuditLogService.ACTION_CREATE_MILESTONE, "milestones", String.valueOf(saved.getMilestoneId()), accessService.currentAccount().getAccountId());
-        return saved;
+        return attachCriteria(saved);
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public AcceptanceCriteriaEntity createCriteria(AcceptanceCriteriaEntity input) {
-        accessService.requireRole("BUSINESS");
-        accessService.requireApprovedAccount();
-        MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
-        requireBusinessOwnedJob(milestone.getJobId());
+        accessService.requireRole("ADMIN");
+        if (input.getCriteriaCode() == null || input.getCriteriaCode().isBlank()) throw new AppException("CRITERIA CODE KHONG DUOC DE TRONG");
         if (input.getDescription() == null || input.getDescription().isBlank()) throw new AppException("CRITERIA DESCRIPTION KHONG DUOC DE TRONG");
-        if (input.getIsPassed() == null) input.setIsPassed(false);
+        String code = input.getCriteriaCode().trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "").toUpperCase();
+        criteriaRepository.findByCriteriaCode(code).ifPresent(existing -> { throw new AppException("CRITERIA CODE DA TON TAI"); });
+        input.setCriteriaId(null);
+        input.setCriteriaCode(code);
+        input.setCategory(input.getCategory() == null || input.getCategory().isBlank() ? "GENERAL" : input.getCategory().trim());
+        input.setIsActive(input.getIsActive() == null || input.getIsActive());
+        input.setSortOrder(input.getSortOrder() == null ? 0 : input.getSortOrder());
         AcceptanceCriteriaEntity saved = criteriaRepository.save(input);
-        auditLogService.record(AuditLogService.ACTION_CREATE_ACCEPTANCE_CRITERIA, "milestones", String.valueOf(input.getMilestoneId()), accessService.currentAccount().getAccountId());
+        auditLogService.record(AuditLogService.ACTION_CREATE_ACCEPTANCE_CRITERIA, "acceptance_criteria", String.valueOf(saved.getCriteriaId()), accessService.currentAccount().getAccountId());
         return saved;
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -289,7 +300,7 @@ public class ContractExecutionService {
     // Note: Hàm `listMilestonesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> listMilestonesByContract(Integer contractId) {
         ContractEntity contract = requireContractParticipantOrOperator(contractId);
-        return milestoneRepository.findByJobIdOrderByOrderIndexAsc(contract.getJobId());
+        return attachCriteria(milestoneRepository.findByJobIdOrderByOrderIndexAsc(contract.getJobId()));
     }
     // Note: Hàm `listMilestonesByJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> listMilestonesByJob(Integer jobId) {
@@ -298,13 +309,13 @@ public class ContractExecutionService {
         if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
             requireJobParticipantOrOwner(jobId);
         }
-        return milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId);
+        return attachCriteria(milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId));
     }
     // Note: Hàm `listCriteriaByMilestone` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<AcceptanceCriteriaEntity> listCriteriaByMilestone(Integer milestoneId) {
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         requireJobParticipantOrOwner(milestone.getJobId());
-        return criteriaRepository.findByMilestoneId(milestoneId);
+        return attachCriteria(milestone).getCriteria();
     }
     // Note: Hàm `listDeliverablesByMilestone` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<DeliverableEntity> listDeliverablesByMilestone(Integer milestoneId) {
@@ -481,6 +492,45 @@ public class ContractExecutionService {
     }
 
     // Note: Hàm `requireBusinessOwnedContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    private List<MilestoneEntity> attachCriteria(List<MilestoneEntity> milestones) {
+        milestones.forEach(this::attachCriteria);
+        return milestones;
+    }
+
+    private MilestoneEntity attachCriteria(MilestoneEntity milestone) {
+        if (milestone == null || milestone.getMilestoneId() == null) return milestone;
+        List<Integer> criteriaIds = milestoneCriteriaRepository.findByIdMilestoneId(milestone.getMilestoneId()).stream()
+                .map(item -> item.getId().getCriteriaId())
+                .toList();
+        milestone.setCriteriaIds(criteriaIds);
+        if (criteriaIds.isEmpty()) {
+            milestone.setCriteria(List.of());
+            return milestone;
+        }
+        Map<Integer, AcceptanceCriteriaEntity> criteriaById = criteriaRepository.findAllById(criteriaIds).stream()
+                .collect(Collectors.toMap(AcceptanceCriteriaEntity::getCriteriaId, item -> item));
+        milestone.setCriteria(criteriaIds.stream()
+                .map(criteriaById::get)
+                .filter(Objects::nonNull)
+                .toList());
+        return milestone;
+    }
+
+    private void replaceMilestoneCriteria(Integer milestoneId, List<Integer> criteriaIds) {
+        milestoneCriteriaRepository.deleteByIdMilestoneId(milestoneId);
+        if (criteriaIds == null || criteriaIds.isEmpty()) return;
+        for (Integer criteriaId : new LinkedHashSet<>(criteriaIds)) {
+            AcceptanceCriteriaEntity criteria = criteriaRepository.findById(criteriaId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCEPTANCE CRITERIA " + criteriaId));
+            if (!Boolean.TRUE.equals(criteria.getIsActive())) {
+                throw new AppException("ACCEPTANCE CRITERIA KHONG CON HOAT DONG " + criteriaId);
+            }
+            milestoneCriteriaRepository.save(MilestoneAcceptanceCriteriaEntity.builder()
+                    .id(new MilestoneAcceptanceCriteriaId(milestoneId, criteriaId))
+                    .build());
+        }
+    }
+
     private ContractEntity requireBusinessOwnedContract(Integer contractId) {
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer businessId = businessProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())

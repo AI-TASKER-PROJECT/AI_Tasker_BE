@@ -9,7 +9,9 @@ import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.JobEntity;
+import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.RoleEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,7 +39,15 @@ class MarketplaceServiceTest {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private JobRepository jobRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+    @Mock private JobDomainRepository jobDomainRepository;
+    @Mock private JobSkillRepository jobSkillRepository;
+    @Mock private PortfolioRepository portfolioRepository;
     @Mock private ProposalRepository proposalRepository;
+    @Mock private SowRepository sowRepository;
+    @Mock private MilestoneRepository milestoneRepository;
+    @Mock private AcceptanceCriteriaRepository criteriaRepository;
+    @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
+    @Mock private AuditLogService auditLogService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private MarketplaceService marketplaceService;
@@ -99,5 +110,41 @@ class MarketplaceServiceTest {
     void reviewProposal_shouldThrowWhenStatusInvalid() {
         AppException ex = assertThrows(AppException.class, () -> marketplaceService.reviewProposal(1, "INVALID"));
         assertEquals("STATUS PROPOSAL KHONG HOP LE", ex.getMessage());
+    }
+    @Test
+    void createJobPayload_shouldAcceptGeneratedSowShapeWithSelectedCriteriaIds() throws Exception {
+        String payload = """
+                {
+                  "title": "Xay dung tro ly AI cham soc khach hang da kenh",
+                  "rawRequirements": "Can chatbot tra loi san pham",
+                  "budget": 180000000,
+                  "sow": {
+                    "title": "Xay dung tro ly AI cham soc khach hang da kenh",
+                    "overview": "Tong quan du an",
+                    "objectives": ["Phat trien chatbot"],
+                    "scopeOfWork": ["Phan tich yeu cau"],
+                    "deliverables": ["API chatbot"],
+                    "assumptions": ["Co san du lieu san pham"],
+                    "outOfScope": ["Khong bao gom mobile app"]
+                  },
+                  "milestones": [
+                    {
+                      "name": "Discovery & Solution Design",
+                      "description": "Phan tich yeu cau va thiet ke giai phap",
+                      "budget": 30000000,
+                      "criteriaIds": [1, 3, 10]
+                    }
+                  ]
+                }
+                """;
+
+        JobEntity request = new ObjectMapper().readValue(payload, JobEntity.class);
+        MilestoneEntity milestone = request.getMilestones().get(0);
+
+        assertEquals("[\"Phat trien chatbot\"]", request.getSow().getObjectives());
+        assertEquals("[\"API chatbot\"]", request.getSow().getDeliverable());
+        assertEquals("Discovery & Solution Design", milestone.getMilestoneName());
+        assertEquals(new BigDecimal("30000000"), milestone.getFundsAllocated());
+        assertEquals(List.of(1, 3, 10), milestone.getCriteriaIds());
     }
 }

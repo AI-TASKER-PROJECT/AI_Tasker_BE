@@ -3,7 +3,7 @@
 # Mục đích note: mô tả vai trò file cấu hình/script, không note rải vào từng khai báo.
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: aitasker-postgres
     restart: unless-stopped
     environment:

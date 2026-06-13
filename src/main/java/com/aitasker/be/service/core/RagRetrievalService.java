@@ -1,70 +1,64 @@
 package com.aitasker.be.service.core;
 
-import org.springframework.core.io.ClassPathResource;
+import com.aitasker.be.config.RagProperties;
+import com.aitasker.be.repository.KnowledgeChunkJdbcRepository;
+import com.aitasker.be.repository.KnowledgeChunkJdbcRepository.KnowledgeChunkSearchResult;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
-import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class RagRetrievalService {
-    private static final String KNOWLEDGE_PATH = "knowledge/";
+    private static final double MAX_DISTANCE_FROM_BEST_MATCH = 0.12;
+
+    private final EmbeddingService embeddingService;
+    private final KnowledgeChunkJdbcRepository knowledgeChunkRepository;
+    private final RagProperties ragProperties;
 
     public Map<String, String> retrieveRelevantContext(String question) {
-        String sourceFile = resolveSourceFile(question);
+        if (question == null || question.isBlank()) {
+            return Map.of();
+        }
+
+        String queryEmbedding = EmbeddingService.toPgVector(embeddingService.embed(question));
+        List<KnowledgeChunkSearchResult> chunks = knowledgeChunkRepository.search(
+                queryEmbedding,
+                Math.max(1, ragProperties.getTopK()),
+                ragProperties.getSearchThreshold()
+        );
+
         Map<String, String> contexts = new LinkedHashMap<>();
-        contexts.put(sourceFile, readMarkdown(sourceFile));
+        if (chunks.isEmpty()) {
+            return contexts;
+        }
+
+        double maxAcceptedDistance = chunks.get(0).distance() + MAX_DISTANCE_FROM_BEST_MATCH;
+        for (KnowledgeChunkSearchResult chunk : chunks) {
+            if (chunk.distance() > maxAcceptedDistance) {
+                continue;
+            }
+
+            log.info(
+                    "RAG chunk selected source_file={} section_title={} distance={}",
+                    chunk.sourceFile(),
+                    chunk.sectionTitle(),
+                    chunk.distance()
+            );
+            contexts.put(buildContextKey(chunk), chunk.content());
+        }
         return contexts;
     }
 
-    private String resolveSourceFile(String question) {
-        String normalizedQuestion = question == null ? "" : question.toLowerCase(Locale.ROOT);
-
-        if (containsAny(normalizedQuestion, "đăng ký", "mã số thuế", "kyb", "kyc")) {
-            return "registration.md";
+    private String buildContextKey(KnowledgeChunkSearchResult chunk) {
+        if (chunk.sectionTitle() == null || chunk.sectionTitle().isBlank()) {
+            return chunk.sourceFile();
         }
-
-        if (containsAny(normalizedQuestion, "đăng nhập", "token", "jwt", "phân quyền")) {
-            return "auth.md";
-        }
-
-        if (containsAny(normalizedQuestion, "job", "proposal", "đấu thầu", "chuyên gia")) {
-            return "job.md";
-        }
-
-        if (containsAny(normalizedQuestion, "hợp đồng", "nda", "milestone", "nghiệm thu")) {
-            return "contract.md";
-        }
-
-        if (containsAny(normalizedQuestion, "thanh toán", "ký quỹ", "vnpay", "escrow")) {
-            return "payment.md";
-        }
-
-        if (containsAny(normalizedQuestion, "tranh chấp", "khiếu nại", "hoàn tiền", "dispute")) {
-            return "dispute.md";
-        }
-
-        return "faq.md";
-    }
-
-    private boolean containsAny(String text, String... keywords) {
-        for (String keyword : keywords) {
-            if (text.contains(keyword)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String readMarkdown(String fileName) {
-        ClassPathResource resource = new ClassPathResource(KNOWLEDGE_PATH + fileName);
-        try {
-            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException ex) {
-            throw new IllegalStateException("Khong doc duoc tai lieu noi bo: " + fileName, ex);
-        }
+        return chunk.sourceFile() + " - " + chunk.sectionTitle();
     }
 }

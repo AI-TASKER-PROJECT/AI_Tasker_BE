@@ -55,6 +55,11 @@ public class CatalogController {
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
+    @GetMapping("/acceptance-criteria")
+    public ResponseEntity<ApiResponse<Object>> listAcceptanceCriteria(@RequestParam(defaultValue = "true") Boolean activeOnly) {
+        return ResponseEntity.ok(ApiResponse.success("LIST ACCEPTANCE CRITERIA SUCCESS", catalogService.listAcceptanceCriteria(activeOnly)));
+    }
+
     @PostMapping("/skills")
     // Note: Hàm `createSkill` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<SkillEntity>> createSkill(@RequestBody SkillRequest request) {
