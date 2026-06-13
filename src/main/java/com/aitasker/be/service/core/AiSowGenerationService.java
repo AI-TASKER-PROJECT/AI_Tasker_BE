@@ -90,7 +90,6 @@ public class AiSowGenerationService {
                 3. Neu du thong tin:
                    - Viet Statement of Work chuyen nghiep.
                    - Chia milestone.
-                   - Liet ke task cua tung milestone.
                    - Uoc luong thoi luong.
                    - Phan bo ngan sach theo milestone.
 
@@ -107,8 +106,7 @@ public class AiSowGenerationService {
                     "scopeOfWork": ["string"],
                     "deliverables": ["string"],
                     "assumptions": ["string"],
-                    "outOfScope": ["string"],
-                    "acceptanceCriteria": ["string"]
+                    "outOfScope": ["string"]
                   },
                   "milestones": [
                     {
@@ -116,14 +114,7 @@ public class AiSowGenerationService {
                       "description": "string",
                       "duration": 1,
                       "durationUnit": "tuan",
-                      "budget": 30000000,
-                      "tasks": [
-                        {
-                          "name": "string",
-                          "description": "string",
-                          "deliverable": "string"
-                        }
-                      ]
+                      "budget": 30000000
                     }
                   ]
                 }
@@ -177,7 +168,7 @@ public class AiSowGenerationService {
             normalizeArrayField(sow, "deliverables");
             normalizeArrayField(sow, "assumptions");
             normalizeArrayField(sow, "outOfScope");
-            normalizeArrayField(sow, "acceptanceCriteria");
+
         }
     }
 

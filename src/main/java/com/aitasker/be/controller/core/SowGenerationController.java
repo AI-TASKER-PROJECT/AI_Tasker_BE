@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SowGenerationController {
     private final AiSowGenerationService aiSowGenerationService;
 
-    @Operation(summary = "Generate SoW", description = "Generate structured SoW, milestones, tasks and milestone budgets from raw job requirements.")
+    @Operation(summary = "Generate SoW", description = "Generate structured SoW, milestones and milestone budgets from raw job requirements.")
     @PostMapping("/generate-sow")
     public GenerateSowResponse generateSow(@Valid @RequestBody GenerateSowRequest request) {
         return aiSowGenerationService.generateSow(request);
