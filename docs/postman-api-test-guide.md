@@ -1,47 +1,57 @@
 # Hướng Dẫn Test API Back-end Bằng Postman
 
-Tài liệu này liệt kê các API đang sử dụng được trong back-end hiện tại và hướng dẫn test bằng Postman theo luồng thực tế của dự án.
+Tài liệu này liệt kê các API back-end đang dùng được ở hiện tại và hướng dẫn test bằng Postman theo flow thực tế của dự án.
 
 ## 1. Chuẩn Bị
 
-Chạy database và back-end:
+Chạy hạ tầng và back-end:
 
 ```powershell
 docker compose up -d
 .\mvnw.cmd spring-boot:run
 ```
 
-Base URL mặc định:
+Base URL:
 
 ```text
 http://localhost:8080
 ```
 
-Header dùng cho các API cần đăng nhập:
+Header cho API cần đăng nhập:
 
 ```text
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{token}}
 Content-Type: application/json
 ```
 
-Với API upload file, không đặt `Content-Type` thủ công. Postman sẽ tự tạo `multipart/form-data`.
+Với API upload file, không tự set `Content-Type`; để Postman tự tạo `multipart/form-data`.
 
-## 2. Tài Khoản Seed Hiện Có
+Environment khuyến nghị:
 
-Các tài khoản seed trong database hiện tại đều có mật khẩu:
+| Key | Value |
+| --- | --- |
+| `baseUrl` | `http://localhost:8080` |
+| `businessToken` | Token BUSINESS |
+| `expertToken` | Token EXPERT |
+| `adminToken` | Token ADMIN |
+| `staffToken` | Token STAFF |
+
+## 2. Tài Khoản Seed
+
+Mật khẩu seed thường dùng:
 
 ```text
 12345678
 ```
 
-| Role | Email | Account ID | Ghi chú |
-| --- | --- | ---: | --- |
-| BUSINESS | `business@aitasker.local` | 1 | Có business profile `businessId=1`, trạng thái `Approved` |
-| EXPERT | `expert@aitasker.local` | 2 | Có expert profile `expertId=1`, trạng thái `Approved` |
-| ADMIN | `admin@aitasker.local` | 3 | Dùng để quản trị account, setting, audit log |
-| STAFF | `staff@aitasker.local` | 4 | Có staff profile `staffId=1`, dùng duyệt KYC/KYB |
+| Role | Email | Ghi chú |
+| --- | --- | --- |
+| BUSINESS | `business@aitasker.local` | Có business profile đã duyệt |
+| EXPERT | `expert@aitasker.local` | Có expert profile đã duyệt |
+| ADMIN | `admin@aitasker.local` | Quản trị account, setting, audit log |
+| STAFF | `staff@aitasker.local` | Duyệt KYC/KYB |
 
-ID seed hay dùng:
+ID seed thường dùng:
 
 | Loại dữ liệu | ID mẫu |
 | --- | --- |
@@ -51,14 +61,13 @@ ID seed hay dùng:
 | `proposalId` | `1`, `2`, `3` |
 | `contractId` | `1`, `2` |
 | `milestoneId` | `1`, `2`, `3`, `4` |
-| `transactionId` | `1`, `2`, `3`, `4` |
-| `disputeId` | `1`, `2` |
 | `domainId` | `2`, `3`, `4`, `8` |
 | `skillId` | `2`, `3`, `6`, `8`, `9`, `14`, `15` |
+| `criteriaId` | Lấy từ `GET /api/v1/acceptance-criteria?activeOnly=true` |
 
-## 3. Cách Lấy Token Trong Postman
+## 3. Auth API
 
-Gọi API login, sau đó copy token trả về trong `data.accessToken` hoặc field token tương ứng của response.
+### Đăng nhập
 
 ```http
 POST {{baseUrl}}/api/auth/login
@@ -73,27 +82,21 @@ Raw body:
 }
 ```
 
-Trong Postman tạo Environment:
+Copy `accessToken` từ response vào biến môi trường tương ứng.
 
-| Key | Value |
-| --- | --- |
-| `baseUrl` | `http://localhost:8080` |
-| `businessToken` | token của business |
-| `expertToken` | token của expert |
-| `adminToken` | token của admin |
-| `staffToken` | token của staff |
+### Kiểm tra phiên hiện tại
 
-Khi test API theo role nào thì dùng:
-
-```text
-Authorization: Bearer {{businessToken}}
+```http
+GET {{baseUrl}}/api/auth/me
 ```
 
-hoặc đổi sang token role tương ứng.
+Authorization:
 
-## 4. Auth API
+```text
+Bearer {{businessToken}}
+```
 
-### Register
+### Đăng ký
 
 ```http
 POST {{baseUrl}}/api/auth/register
@@ -111,32 +114,7 @@ Raw body:
 }
 ```
 
-Role hợp lệ thường dùng: `BUSINESS`, `EXPERT`, `ADMIN`, `STAFF`.
-
-### Login
-
-```http
-POST {{baseUrl}}/api/auth/login
-```
-
-Raw body:
-
-```json
-{
-  "email": "expert@aitasker.local",
-  "password": "12345678"
-}
-```
-
-### Lấy phiên đăng nhập hiện tại
-
-```http
-GET {{baseUrl}}/api/auth/me
-```
-
-Cần token.
-
-### Kiểm tra email đã tồn tại
+### Kiểm tra email tồn tại
 
 ```http
 GET {{baseUrl}}/api/auth/check-email?email=expert@aitasker.local
@@ -177,7 +155,7 @@ Raw body:
 GET {{baseUrl}}/api/auth/tax-check/0312345678
 ```
 
-## 5. Profile, Portfolio Và Firebase File API
+## 4. Profile, Portfolio Và Firebase File API
 
 ### Business tạo hoặc cập nhật hồ sơ KYB
 
@@ -193,12 +171,10 @@ Raw body:
 {
   "taxCode": "0312345678",
   "companyName": "Nova Retail",
-  "address": "Quan 1, TP. Ho Chi Minh",
+  "address": "Quận 1, TP. Hồ Chí Minh",
   "businessLicenseUrl": "business-licenses/accounts/1/license-demo.pdf"
 }
 ```
-
-Lưu ý: Khi submit lại hồ sơ, account và hồ sơ sẽ về `Pending` để staff duyệt.
 
 ### Upload giấy phép kinh doanh
 
@@ -208,15 +184,15 @@ Token: BUSINESS.
 POST {{baseUrl}}/api/v1/profiles/business/license-file
 ```
 
-Postman body:
+Body `form-data`:
 
-| Type | Key | Value |
+| Key | Type | Value |
 | --- | --- | --- |
-| form-data | `file` | chọn file PDF/JPG/PNG |
+| `file` | File | Chọn PDF/JPG/PNG |
 
-Response trả về path Firebase. Dùng path đó gán vào `businessLicenseUrl` khi gọi API business profile.
+Response trả về path Firebase. Dùng path đó gán vào `businessLicenseUrl`.
 
-### Lấy hồ sơ business của tài khoản hiện tại
+### Lấy hồ sơ business hiện tại
 
 Token: BUSINESS.
 
@@ -258,9 +234,7 @@ Raw body:
 }
 ```
 
-Lưu ý: `nationalId` là unique, nếu dùng lại số đã tồn tại sẽ lỗi.
-
-### Lấy hồ sơ expert của tài khoản hiện tại
+### Lấy hồ sơ expert hiện tại
 
 Token: EXPERT.
 
@@ -282,13 +256,8 @@ Token: STAFF.
 
 ```http
 POST {{baseUrl}}/api/v1/profiles/approve/BUSINESS/1?status=Approved
-```
-
-```http
 POST {{baseUrl}}/api/v1/profiles/approve/EXPERT/1?status=Rejected
 ```
-
-Giá trị `type`: `BUSINESS`, `EXPERT`.
 
 Giá trị `status`: `Approved`, `Rejected`.
 
@@ -300,7 +269,7 @@ Token: EXPERT.
 POST {{baseUrl}}/api/v1/profiles/portfolio
 ```
 
-Raw body dựa trên dữ liệu seed:
+Raw body:
 
 ```json
 {
@@ -320,11 +289,11 @@ Token: EXPERT.
 POST {{baseUrl}}/api/v1/profiles/portfolio/certificate-file
 ```
 
-Postman body:
+Body `form-data`:
 
-| Type | Key | Value |
+| Key | Type | Value |
 | --- | --- | --- |
-| form-data | `file` | chọn file PDF/JPG/PNG |
+| `file` | File | Chọn PDF/JPG/PNG |
 
 Response trả về path Firebase. Dùng path đó gán vào `certificates`.
 
@@ -352,9 +321,7 @@ Token: STAFF, ADMIN, BUSINESS hoặc EXPERT.
 GET {{baseUrl}}/api/v1/profiles/files/view-url?path=expert-certificates/accounts/2/certificate-demo.pdf
 ```
 
-Nếu `path` đã là URL `http/https`, API trả lại nguyên URL.
-
-## 6. Catalog API
+## 5. Catalog API
 
 ### Xem domains
 
@@ -448,9 +415,39 @@ Raw body:
 }
 ```
 
-### Xem domain của job
+### Xem tiêu chí nghiệm thu nền tảng
 
-Public nếu biết `jobId`.
+Public.
+
+```http
+GET {{baseUrl}}/api/v1/acceptance-criteria?activeOnly=true
+```
+
+Dùng các `criteriaId` trả về để gán vào `milestones[].criteriaIds` khi tạo job hoặc tạo milestone.
+
+### Admin tạo tiêu chí nghiệm thu nền tảng
+
+Token: ADMIN.
+
+```http
+POST {{baseUrl}}/api/v1/criteria
+```
+
+Raw body:
+
+```json
+{
+  "criteriaCode": "DEMO_ACCEPTED",
+  "category": "Bàn giao",
+  "description": "Demo nghiệm thu được thực hiện và doanh nghiệp xác nhận kết quả phù hợp.",
+  "isActive": true,
+  "sortOrder": 300
+}
+```
+
+Lưu ý: API này tạo dữ liệu danh mục trong bảng `acceptance_criteria`, không còn tạo criteria riêng trực tiếp theo `milestoneId`.
+
+### Xem domain của job
 
 ```http
 GET {{baseUrl}}/api/v1/jobs/1/domains
@@ -471,8 +468,6 @@ Raw body:
 ```
 
 ### Xem skill của job
-
-Public nếu biết `jobId`.
 
 ```http
 GET {{baseUrl}}/api/v1/jobs/1/skills
@@ -501,9 +496,33 @@ Raw body:
 ]
 ```
 
-## 7. Job Và Proposal API
+## 6. Job, SoW Và Proposal API
 
-### Business tạo job nháp
+### AI generate SoW
+
+Public theo controller hiện tại.
+
+```http
+POST {{baseUrl}}/api/jobs/generate-sow
+```
+
+Raw body:
+
+```json
+{
+  "projectTitle": "Tích hợp RAG chatbot cho chăm sóc khách hàng",
+  "rawRequirement": "Cần chatbot trả lời câu hỏi sản phẩm, lấy dữ liệu từ FAQ và chuyển lead cho nhân viên.",
+  "budget": 90000000,
+  "duration": 6,
+  "durationUnit": "WEEK",
+  "supportFields": ["E-commerce", "Customer Support"],
+  "requiredSkills": ["RAG Architecture", "React TypeScript", "Java Spring Boot"]
+}
+```
+
+Response có thể dùng để điền lại vào `sow` và `milestones` khi tạo job. Nếu chưa dùng AI, có thể tự nhập thủ công như body bên dưới.
+
+### Business tạo job nháp kèm SoW và milestone
 
 Token: BUSINESS.
 
@@ -511,7 +530,7 @@ Token: BUSINESS.
 POST {{baseUrl}}/api/v1/jobs
 ```
 
-Raw body:
+Raw body mới:
 
 ```json
 {
@@ -521,21 +540,111 @@ Raw body:
   "budget": 90000000,
   "plannedDurationValue": 6,
   "plannedDurationUnit": "WEEK",
-  "isHot": false
+  "isHot": false,
+  "sow": {
+    "title": "SoW RAG chatbot chăm sóc khách hàng",
+    "overview": "Xây dựng chatbot RAG trả lời câu hỏi sản phẩm từ dữ liệu FAQ và tài liệu nội bộ.",
+    "objectives": "[\"Tự động trả lời câu hỏi phổ biến\", \"Giảm tải cho nhân viên chăm sóc khách hàng\", \"Ghi nhận lead cần tư vấn\"]",
+    "scopeOfWork": "[\"Chuẩn hóa dữ liệu FAQ\", \"Xây dựng retrieval\", \"Tích hợp chatbot\", \"Báo cáo chất lượng câu trả lời\"]",
+    "deliverable": "[\"API chatbot\", \"Giao diện demo\", \"Tài liệu triển khai\", \"Báo cáo nghiệm thu\"]",
+    "assumptions": "[\"Doanh nghiệp cung cấp dữ liệu FAQ\", \"Có môi trường test để kiểm thử tích hợp\"]",
+    "outOfScope": "[\"Không tích hợp tổng đài thoại\", \"Không huấn luyện mô hình nền từ đầu\"]"
+  },
+  "milestones": [
+    {
+      "milestoneName": "Khảo sát dữ liệu và thiết kế kiến trúc",
+      "description": "Phân tích FAQ, xác định schema dữ liệu và thiết kế kiến trúc RAG.",
+      "fundsAllocated": 25000000,
+      "orderIndex": 1,
+      "criteriaIds": [1, 2, 3]
+    },
+    {
+      "milestoneName": "Triển khai chatbot RAG MVP",
+      "description": "Xây dựng retrieval, API chatbot và giao diện demo.",
+      "fundsAllocated": 40000000,
+      "orderIndex": 2,
+      "criteriaIds": [4, 5, 6]
+    },
+    {
+      "milestoneName": "Kiểm thử, tài liệu và bàn giao",
+      "description": "Chạy test nghiệm thu, hoàn thiện tài liệu kỹ thuật và hướng dẫn vận hành.",
+      "fundsAllocated": 25000000,
+      "orderIndex": 3,
+      "criteriaIds": [7, 8, 9]
+    }
+  ]
 }
 ```
 
-Lưu ý: Service luôn set `status` thành `DRAFT`, không cần gửi `businessId` hay `status`.
+Lưu ý:
 
-Sau khi tạo job, dùng thêm:
+- Service luôn set `status` thành `DRAFT`.
+- Không gửi `businessId` hoặc `status`.
+- `sow` và `milestones` là tùy chọn, nhưng nên gửi để test flow mới.
+- `criteriaIds` phải là id đang active trong `GET /api/v1/acceptance-criteria?activeOnly=true`.
+- Sau khi tạo job, vẫn cần gọi API gán domain và skill cho job.
+
+### Business gán domain cho job
+
+Token: BUSINESS.
 
 ```http
 PUT {{baseUrl}}/api/v1/jobs/{{jobId}}/domains
+```
+
+Raw body:
+
+```json
+[2, 3]
+```
+
+### Business gán skill cho job
+
+Token: BUSINESS.
+
+```http
 PUT {{baseUrl}}/api/v1/jobs/{{jobId}}/skills
+```
+
+Raw body:
+
+```json
+[
+  {
+    "skillId": 2,
+    "isMandatory": true
+  },
+  {
+    "skillId": 3,
+    "isMandatory": false
+  }
+]
+```
+
+### Business tạo milestone riêng cho job đã có
+
+Token: BUSINESS.
+
+```http
 POST {{baseUrl}}/api/v1/milestones
 ```
 
-để gán domain, skill và milestone cho job.
+Raw body:
+
+```json
+{
+  "jobId": 1,
+  "contractId": null,
+  "milestoneName": "Bổ sung bộ kiểm thử hội thoại",
+  "description": "Thiết kế thêm kịch bản test fallback, hallucination và kiểm tra chất lượng câu trả lời.",
+  "fundsAllocated": 15000000,
+  "orderIndex": 4,
+  "status": "Pending",
+  "criteriaIds": [10, 11, 12]
+}
+```
+
+Lưu ý: `orderIndex` không được trùng trong cùng một job.
 
 ### Xem job public
 
@@ -545,7 +654,20 @@ Public. API chỉ trả job `OPEN`.
 GET {{baseUrl}}/api/v1/jobs
 ```
 
-Response job có field `proposalsCount` để FE hiển thị tổng số proposal.
+Response job có các field quan trọng:
+
+```json
+{
+  "proposalsCount": 0,
+  "sow": {},
+  "milestones": [
+    {
+      "criteriaIds": [1, 2, 3],
+      "criteria": []
+    }
+  ]
+}
+```
 
 ### Business xem job của mình
 
@@ -555,7 +677,7 @@ Token: BUSINESS.
 GET {{baseUrl}}/api/v1/jobs/my
 ```
 
-API trả cả `DRAFT`, `OPEN`, `CLOSED`, `CANCELLED`.
+Trả cả `DRAFT`, `OPEN`, `CLOSED`, `CANCELLED`.
 
 ### Xem chi tiết job
 
@@ -587,7 +709,7 @@ Token: EXPERT.
 POST {{baseUrl}}/api/v1/proposals
 ```
 
-Raw body dựa trên seed `jobId=1`, portfolio `domainIds=2,3,5`, `skillIds=2,3,5,8`:
+Raw body:
 
 ```json
 {
@@ -606,7 +728,7 @@ Raw body dựa trên seed `jobId=1`, portfolio `domainIds=2,3,5`, `skillIds=2,3,
 - Expert phải có portfolio.
 - `domainId` phải thuộc job và portfolio của expert.
 - `skillId` phải thuộc job và portfolio của expert.
-- Một expert chỉ được gửi 1 proposal cho 1 job.
+- Một expert chỉ được gửi một proposal cho một job.
 
 ### Expert xem proposal của mình
 
@@ -638,7 +760,7 @@ Status hợp lệ:
 Accepted, Rejected
 ```
 
-## 8. Contract Và Execution API
+## 7. Contract Và Execution API
 
 ### Tạo contract draft từ proposal
 
@@ -654,15 +776,13 @@ Raw body:
 {
   "technologyUsed": "Spring Boot, PostgreSQL, React, Firebase Storage",
   "totalBudget": 78000000,
-  "timelineDays": 42,
-  "ndaSigned": false,
-  "status": "Draft"
+  "timelineDays": 42
 }
 ```
 
 ### Tạo yêu cầu thay đổi contract
 
-Token: BUSINESS hoặc EXPERT.
+Token: BUSINESS hoặc EXPERT thuộc contract.
 
 ```http
 POST {{baseUrl}}/api/v1/contracts/change-requests
@@ -673,18 +793,16 @@ Raw body:
 ```json
 {
   "contractId": 1,
-  "requestedByAccountId": 1,
   "changeType": "ScopeAdjustment",
   "changeSummary": "Bổ sung thêm bộ test tiếng Việt và báo cáo nghiệm thu.",
   "proposedBudget": 120000000,
-  "proposedTimelineDays": 60,
-  "status": "Pending"
+  "proposedTimelineDays": 60
 }
 ```
 
 ### Kích hoạt contract
 
-Token: BUSINESS hoặc role được service cho phép.
+Token: BUSINESS hoặc EXPERT thuộc contract.
 
 ```http
 POST {{baseUrl}}/api/v1/contracts/1/activate
@@ -692,7 +810,7 @@ POST {{baseUrl}}/api/v1/contracts/1/activate
 
 ### Ký NDA
 
-Token: BUSINESS hoặc EXPERT thuộc contract.
+Token: EXPERT thuộc contract.
 
 ```http
 POST {{baseUrl}}/api/v1/contracts/1/nda-sign
@@ -700,60 +818,10 @@ POST {{baseUrl}}/api/v1/contracts/1/nda-sign
 
 ### Chấm dứt contract
 
-Token: BUSINESS, EXPERT hoặc ADMIN tùy rule service.
+Token: BUSINESS sở hữu contract hoặc ADMIN.
 
 ```http
 POST {{baseUrl}}/api/v1/contracts/1/terminate?reason=Không tiếp tục triển khai
-```
-
-### Tạo milestone
-
-Token: BUSINESS.
-
-```http
-POST {{baseUrl}}/api/v1/milestones
-```
-
-Raw body:
-
-```json
-{
-  "jobId": 1,
-  "contractId": 1,
-  "milestoneName": "Bàn giao MVP chatbot",
-  "fundsAllocated": 52000000,
-  "orderIndex": 2,
-  "status": "Pending"
-}
-```
-
-Nếu milestone thuộc job nháp chưa có contract, có thể để `contractId` là `null`:
-
-```json
-{
-  "jobId": 1,
-  "contractId": null,
-  "milestoneName": "Khảo sát và chốt yêu cầu",
-  "fundsAllocated": 15000000,
-  "orderIndex": 1,
-  "status": "Pending"
-}
-```
-
-### Tạo acceptance criteria
-
-```http
-POST {{baseUrl}}/api/v1/criteria
-```
-
-Raw body:
-
-```json
-{
-  "milestoneId": 2,
-  "description": "Chatbot trả lời từ nguồn dữ liệu được duyệt và có trích dẫn.",
-  "isPassed": false
-}
 ```
 
 ### Expert nộp deliverable
@@ -777,6 +845,8 @@ Raw body:
 
 ### Tạo transaction
 
+Token: BUSINESS thuộc contract hoặc ADMIN.
+
 ```http
 POST {{baseUrl}}/api/v1/transactions
 ```
@@ -795,17 +865,23 @@ Raw body:
 
 ### Cập nhật trạng thái transaction
 
+Token: ADMIN.
+
 ```http
 PATCH {{baseUrl}}/api/v1/transactions/2/status?status=Success
 ```
 
 ### Payment webhook giả lập
 
+Token: ADMIN.
+
 ```http
 POST {{baseUrl}}/api/v1/transactions/2/webhook?paymentStatus=Success&bankTxCode=VNPAY-DEMO-001&receiptImgUrl=https://storage.aitasker.local/receipts/demo.png
 ```
 
 ### Tạo dispute
+
+Token: BUSINESS hoặc EXPERT thuộc contract.
 
 ```http
 POST {{baseUrl}}/api/v1/disputes
@@ -826,11 +902,15 @@ Raw body:
 
 ### Gán dispute cho staff
 
+Token: ADMIN.
+
 ```http
 PATCH {{baseUrl}}/api/v1/disputes/1/assign?staffId=1
 ```
 
 ### Resolve dispute
+
+Token: ADMIN.
 
 ```http
 PATCH {{baseUrl}}/api/v1/disputes/1/resolve?proposedAction=Release payout after correction accepted
@@ -838,17 +918,23 @@ PATCH {{baseUrl}}/api/v1/disputes/1/resolve?proposedAction=Release payout after 
 
 ### Staff ghi kết quả demo testing
 
+Token: STAFF được gán dispute.
+
 ```http
 POST {{baseUrl}}/api/v1/disputes/1/demo-testing?testResult=Passed 18/20 scenarios, cần bổ sung 2 case fallback
 ```
 
 ### Staff tạo technical report
 
+Token: STAFF được gán dispute.
+
 ```http
 POST {{baseUrl}}/api/v1/disputes/1/technical-report?reportContent=Kết quả kiểm thử đạt yêu cầu sau chỉnh sửa&proposedAction=Release escrow
 ```
 
 ### Chạy SLA auto approve
+
+Token: ADMIN.
 
 ```http
 POST {{baseUrl}}/api/v1/milestones/sla-auto-approve
@@ -872,7 +958,7 @@ GET {{baseUrl}}/api/v1/contracts/1/milestones
 GET {{baseUrl}}/api/v1/jobs/1/milestones
 ```
 
-### Criteria theo milestone
+### Criteria đã chọn theo milestone
 
 ```http
 GET {{baseUrl}}/api/v1/milestones/2/criteria
@@ -908,7 +994,7 @@ GET {{baseUrl}}/api/v1/disputes/1
 GET {{baseUrl}}/api/v1/jobs/1/matching
 ```
 
-## 9. Admin API
+## 8. Admin API
 
 ### Tạo review
 
@@ -927,8 +1013,6 @@ Raw body:
   "comment": "Hợp tác tốt, phản hồi nhanh và bàn giao đúng phạm vi."
 }
 ```
-
-Service tự set `reviewerId` và `revieweeId` theo token đang đăng nhập.
 
 ### Xem review theo contract
 
@@ -960,11 +1044,6 @@ Token: ADMIN.
 
 ```http
 GET {{baseUrl}}/api/v1/admin/audit-logs
-```
-
-Lọc theo nhóm role:
-
-```http
 GET {{baseUrl}}/api/v1/admin/audit-logs?actorGroup=INTERNAL
 GET {{baseUrl}}/api/v1/admin/audit-logs?actorGroup=EXTERNAL
 ```
@@ -1113,7 +1192,7 @@ Token: ADMIN.
 DELETE {{baseUrl}}/api/v1/admin/accounts/4
 ```
 
-## 10. Wallet API
+## 9. Wallet API
 
 ### Xem ví của tài khoản hiện tại
 
@@ -1122,6 +1201,156 @@ Token: BUSINESS, EXPERT, ADMIN hoặc STAFF.
 ```http
 GET {{baseUrl}}/api/v1/wallet/me
 ```
+
+## 10. Notification Và WebSocket API
+
+Notification có 2 phần:
+
+- REST API dùng để lấy danh sách, đếm số chưa đọc và đánh dấu đã đọc.
+- WebSocket/STOMP dùng để nhận thông báo realtime khi có hành động mới.
+
+Các trường `title` và `message` trong notification trả về bằng tiếng Việt để hiển thị trực tiếp trên giao diện.
+
+### Lấy danh sách thông báo của tài khoản hiện tại
+
+Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
+
+```http
+GET {{baseUrl}}/api/v1/notifications
+```
+
+Response mẫu:
+
+```json
+{
+  "success": true,
+  "message": "LAY DANH SACH THONG BAO THANH CONG",
+  "data": [
+    {
+      "notificationId": 1,
+      "type": "PROPOSAL_CREATED",
+      "title": "Có proposal mới",
+      "message": "Một chuyên gia vừa gửi proposal cho dự án \"OCR hóa đơn và phiếu bảo hành tiếng Việt\".",
+      "targetUrl": "/business/jobs/3/proposals",
+      "isRead": false,
+      "createdAt": "2026-06-13T16:05:00",
+      "readAt": null
+    }
+  ]
+}
+```
+
+### Đếm thông báo chưa đọc
+
+Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
+
+```http
+GET {{baseUrl}}/api/v1/notifications/unread-count
+```
+
+Response mẫu:
+
+```json
+{
+  "success": true,
+  "message": "DEM THONG BAO CHUA DOC THANH CONG",
+  "data": {
+    "unreadCount": 2
+  }
+}
+```
+
+### Đánh dấu một thông báo đã đọc
+
+Token: tài khoản nhận thông báo.
+
+```http
+PATCH {{baseUrl}}/api/v1/notifications/1/read
+```
+
+### Đánh dấu tất cả thông báo đã đọc
+
+Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
+
+```http
+PATCH {{baseUrl}}/api/v1/notifications/read-all
+```
+
+### Test realtime WebSocket bằng Postman
+
+Postman REST request không test được realtime trực tiếp; cần tạo WebSocket request.
+
+URL WebSocket:
+
+```text
+ws://localhost:8080/ws/000/postman/websocket
+```
+
+Lưu ý: `/ws` là endpoint SockJS. Khi test bằng Postman WebSocket, URL transport cần có dạng `/ws/{serverId}/{sessionId}/websocket`; ví dụ `000/postman` ở trên chỉ là giá trị test. Không gửi raw STOMP trực tiếp như client STOMP thuần; cần bọc STOMP frame trong mảng JSON của SockJS.
+
+Sau khi connect, Postman có thể nhận message mở kết nối là:
+
+```text
+o
+```
+
+Gửi CONNECT bằng dạng text sau. Ví dụ dùng token business để nghe thông báo của doanh nghiệp:
+
+```text
+["CONNECT\naccept-version:1.2\nheart-beat:10000,10000\nAuthorization:Bearer {{businessToken}}\n\n\u0000"]
+```
+
+Sau khi server trả message có `CONNECTED`, gửi SUBSCRIBE:
+
+```text
+["SUBSCRIBE\nid:sub-notifications\ndestination:/user/queue/notifications\n\n\u0000"]
+```
+
+Giữ tab WebSocket này mở, sau đó dùng tab REST khác để tạo hành động phát sinh thông báo.
+
+### Hành động tạo notification để test
+
+Thông báo cho BUSINESS khi EXPERT nộp proposal:
+
+```http
+POST {{baseUrl}}/api/v1/proposals
+```
+
+Token: EXPERT.
+
+Thông báo cho EXPERT khi BUSINESS duyệt proposal:
+
+```http
+PATCH {{baseUrl}}/api/v1/proposals/{proposalId}/status?status=Accepted
+```
+
+Token: BUSINESS.
+
+Thông báo cho BUSINESS/EXPERT khi STAFF duyệt hồ sơ:
+
+```http
+POST {{baseUrl}}/api/v1/profiles/approve/BUSINESS/{businessProfileId}?status=Approved
+POST {{baseUrl}}/api/v1/profiles/approve/EXPERT/{expertProfileId}?status=Rejected
+```
+
+Token: STAFF.
+
+Thông báo cho BUSINESS khi EXPERT nộp deliverable:
+
+```http
+POST {{baseUrl}}/api/v1/contracts/deliverables
+```
+
+Token: EXPERT.
+
+Thông báo cho STAFF khi tranh chấp được tạo hoặc được admin gán:
+
+```http
+POST {{baseUrl}}/api/v1/contracts/disputes
+POST {{baseUrl}}/api/v1/contracts/disputes/{disputeId}/assign?staffId=1
+```
+
+Token tương ứng: BUSINESS/EXPERT tạo dispute, ADMIN gán dispute.
 
 ## 11. Chatbot, Health Và Test API
 
@@ -1157,84 +1386,95 @@ Cần token.
 GET {{baseUrl}}/api/test/secure
 ```
 
-## 12. Luồng Test Khuyến Nghị Trong Postman
+## 12. Luồng Test Khuyến Nghị
 
 ### Luồng 1: Auth và profile
 
-1. Login `business@aitasker.local`.
-2. Login `expert@aitasker.local`.
-3. Login `staff@aitasker.local`.
-4. Gọi `GET /api/auth/me` với từng token để chắc chắn token đúng role.
-5. Business gọi `POST /api/v1/profiles/business`.
-6. Expert gọi `POST /api/v1/profiles/expert`.
-7. Staff gọi `POST /api/v1/profiles/approve/BUSINESS/{id}?status=Approved`.
-8. Staff gọi `POST /api/v1/profiles/approve/EXPERT/{id}?status=Approved`.
+1. Login BUSINESS, EXPERT, STAFF, ADMIN.
+2. Gọi `GET /api/auth/me` với từng token.
+3. Business gọi `POST /api/v1/profiles/business`.
+4. Expert gọi `POST /api/v1/profiles/expert`.
+5. Staff duyệt BUSINESS/EXPERT qua `POST /api/v1/profiles/approve/...`.
 
-### Luồng 2: Job posting và proposal
+### Luồng 2: Job posting, SoW, milestone criteria và proposal
 
-1. Business gọi `POST /api/v1/jobs`.
-2. Business gọi `PUT /api/v1/jobs/{jobId}/domains`.
-3. Business gọi `PUT /api/v1/jobs/{jobId}/skills`.
-4. Business gọi `POST /api/v1/milestones` để tạo milestone cho job.
-5. Business gọi `PATCH /api/v1/jobs/{jobId}/status?status=OPEN`.
-6. Expert gọi `GET /api/v1/jobs`.
-7. Expert gọi `POST /api/v1/proposals`.
-8. Business gọi `GET /api/v1/jobs/{jobId}/proposals`.
-9. Business gọi `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted`.
+1. Gọi `GET /api/v1/domains?activeOnly=true`.
+2. Gọi `GET /api/v1/skills?activeOnly=true`.
+3. Gọi `GET /api/v1/acceptance-criteria?activeOnly=true`.
+4. Business gọi `POST /api/v1/jobs` với `sow` và `milestones[].criteriaIds`.
+5. Business gọi `PUT /api/v1/jobs/{jobId}/domains`.
+6. Business gọi `PUT /api/v1/jobs/{jobId}/skills`.
+7. Business gọi `GET /api/v1/jobs/my` để kiểm tra job nháp có `sow`, `milestones`, `criteria`.
+8. Business gọi `PATCH /api/v1/jobs/{jobId}/status?status=OPEN`.
+9. Expert gọi `GET /api/v1/jobs`.
+10. Expert gọi `POST /api/v1/proposals`.
+11. Business gọi `GET /api/v1/jobs/{jobId}/proposals`.
+12. Business gọi `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted`.
 
 ### Luồng 3: Portfolio và file Firebase
 
 1. Expert upload file qua `POST /api/v1/profiles/portfolio/certificate-file`.
-2. Copy path trả về vào field `certificates`.
+2. Copy path trả về vào `certificates`.
 3. Expert gọi `POST /api/v1/profiles/portfolio`.
 4. Expert gọi `GET /api/v1/profiles/portfolio/me`.
-5. Business hoặc Staff gọi `GET /api/v1/profiles/files/view-url?path=...` để lấy link xem file.
+5. Business hoặc Staff gọi `GET /api/v1/profiles/files/view-url?path=...`.
 
 ### Luồng 4: Admin audit log
 
 1. Login admin.
 2. Gọi `GET /api/v1/admin/audit-logs`.
-3. Test thêm `actorGroup=INTERNAL`.
-4. Test thêm `actorGroup=EXTERNAL`.
-5. Thực hiện một hành động như business tạo job hoặc expert nộp proposal.
+3. Test `actorGroup=INTERNAL`.
+4. Test `actorGroup=EXTERNAL`.
+5. Thực hiện hành động như business tạo job hoặc expert nộp proposal.
 6. Gọi lại audit log để kiểm tra log mới.
+
+### Luồng 5: Notification realtime
+
+1. Login BUSINESS và EXPERT để lấy `businessToken`, `expertToken`.
+2. Mở WebSocket request tới `ws://localhost:8080/ws/000/postman/websocket`.
+3. Gửi frame `CONNECT` bằng `businessToken`.
+4. Gửi frame `SUBSCRIBE` tới `/user/queue/notifications`.
+5. Ở tab REST khác, dùng EXPERT nộp proposal cho job của BUSINESS.
+6. Kiểm tra tab WebSocket nhận message có `title`, `message` tiếng Việt.
+7. Gọi `GET /api/v1/notifications` bằng `businessToken` để kiểm tra notification đã được lưu database.
+8. Gọi `PATCH /api/v1/notifications/{notificationId}/read` rồi kiểm tra `GET /api/v1/notifications/unread-count`.
 
 ## 13. Lỗi Thường Gặp Khi Test
 
 ### 401 Unauthorized
 
-Nguyên nhân thường gặp:
-
-- Chưa thêm header `Authorization`.
+- Chưa thêm `Authorization`.
 - Token hết hạn.
-- Dán token sai role.
+- Dán sai token hoặc dùng sai biến môi trường.
 
 ### 403 Forbidden hoặc lỗi quyền
 
-Nguyên nhân thường gặp:
-
 - Dùng token EXPERT để tạo job.
-- Dùng token BUSINESS để tạo domain/skill admin.
+- Dùng token BUSINESS để tạo domain/skill/criteria admin.
 - Dùng token không phải STAFF để duyệt profile.
 - Business xem proposal của job không thuộc doanh nghiệp mình.
 
 ### 500 khi upload file Firebase
 
-Kiểm tra:
+- File service account Firebase sai path trong `.env`.
+- Firebase Storage bucket chưa bật.
+- Body không phải `form-data`.
+- Key file không đúng là `file`.
 
-- File service account Firebase có đúng đường dẫn trong `.env`.
-- Firebase Storage bucket đã bật.
-- API upload dùng `form-data`, key phải đúng là `file`.
+### Tạo job không lưu milestone criteria
+
+- Chưa gọi `GET /api/v1/acceptance-criteria?activeOnly=true` để lấy `criteriaId` đúng.
+- Gửi nhầm `criteria` thay vì `criteriaIds`.
+- `criteriaIds` chứa id không tồn tại hoặc inactive.
+- `orderIndex` milestone bị trùng.
 
 ### Proposal không nộp được
 
-Kiểm tra:
-
-- Job đã `OPEN`.
-- Expert đã `Approved`.
-- Expert đã có portfolio.
-- `domainId` và `skillId` thuộc cả job và portfolio.
-- Expert chưa từng nộp proposal cho job đó.
+- Job chưa `OPEN`.
+- Expert chưa `Approved`.
+- Expert chưa có portfolio.
+- `domainId` hoặc `skillId` không thuộc cả job và portfolio.
+- Expert đã từng nộp proposal cho job đó.
 
 ### Job public không hiện proposal count
 
@@ -1244,7 +1484,7 @@ Gọi:
 GET {{baseUrl}}/api/v1/jobs
 ```
 
-Kiểm tra response từng job có field:
+Kiểm tra response từng job có:
 
 ```json
 {

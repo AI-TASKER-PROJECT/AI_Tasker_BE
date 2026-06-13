@@ -43,6 +43,7 @@ public class ContractExecutionService {
     private final SystemSettingRepository systemSettingRepository;
     private final SystemWalletService systemWalletService;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -225,6 +226,13 @@ public class ContractExecutionService {
         milestone.setUpdatedAt(LocalDateTime.now());
         milestoneRepository.save(milestone);
         auditLogService.record(AuditLogService.ACTION_SUBMIT_DELIVERABLE, "milestones", String.valueOf(milestone.getMilestoneId()), accessService.currentAccount().getAccountId());
+        businessProfileRepository.findById(contract.getBusinessId())
+                .ifPresent(business -> notificationService.notifyDeliverableSubmitted(
+                        business.getAccountId(),
+                        accessService.currentAccount().getAccountId(),
+                        milestone.getMilestoneId(),
+                        milestone.getMilestoneName()
+                ));
         return saved;
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -266,6 +274,14 @@ public class ContractExecutionService {
         DisputeEntity saved = disputeRepository.save(input);
         systemWalletService.syncWallet();
         auditLogService.record(AuditLogService.ACTION_CREATE_DISPUTE, "disputes", String.valueOf(saved.getDisputeId()), accountId);
+        if (saved.getAssignedStaffId() != null) {
+            staffRepository.findById(saved.getAssignedStaffId())
+                    .ifPresent(staff -> notificationService.notifyDisputeCreated(
+                            staff.getAccountId(),
+                            accountId,
+                            saved.getDisputeId()
+                    ));
+        }
         return saved;
     }
 
@@ -385,6 +401,12 @@ public class ContractExecutionService {
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
         auditLogService.record(AuditLogService.ACTION_ASSIGN_DISPUTE, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
+        staffRepository.findById(staffId)
+                .ifPresent(staff -> notificationService.notifyDisputeAssigned(
+                        staff.getAccountId(),
+                        accessService.currentAccount().getAccountId(),
+                        disputeId
+                ));
         return saved;
     }
 

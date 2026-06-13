@@ -30,6 +30,7 @@ public class ProfileService {
     private final AuditLogService auditLogService;
     private final FirebaseStorageService firebaseStorageService;
     private final JobRepository jobRepository;
+    private final NotificationService notificationService;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -106,7 +107,9 @@ public class ProfileService {
             b.setApprovedBy(staffId);
             updateAccountStatus(b.getAccountId(), status);
             audit(approvalAction("BUSINESS", status), "business_profiles", String.valueOf(id), actor.getAccountId());
-            return businessProfileRepository.save(b);
+            BusinessProfileEntity saved = businessProfileRepository.save(b);
+            notificationService.notifyProfileReviewed(saved.getAccountId(), actor.getAccountId(), "BUSINESS", status);
+            return saved;
         }
         if (!"EXPERT".equalsIgnoreCase(type)) {
             throw new AppException("TYPE PROFILE KHONG HOP LE");
@@ -116,7 +119,9 @@ public class ProfileService {
         e.setApprovedBy(staffId);
         updateAccountStatus(e.getAccountId(), status);
         audit(approvalAction("EXPERT", status), "expert_profiles", String.valueOf(id), actor.getAccountId());
-        return expertProfileRepository.save(e);
+        ExpertProfileEntity saved = expertProfileRepository.save(e);
+        notificationService.notifyProfileReviewed(saved.getAccountId(), actor.getAccountId(), "EXPERT", status);
+        return saved;
     }
 
     // Note: Hàm `currentBusinessProfile` lấy hồ sơ KYB của chính doanh nghiệp đang đăng nhập để reload trang vẫn thấy status/file mới nhất.

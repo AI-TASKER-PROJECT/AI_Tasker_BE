@@ -41,6 +41,7 @@ public class MarketplaceService {
     private final AcceptanceCriteriaRepository criteriaRepository;
     private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -114,6 +115,13 @@ public class MarketplaceService {
         input.setStatus(input.getStatus() == null ? "Pending" : input.getStatus());
         ProposalEntity saved = proposalRepository.save(input);
         auditLogService.record(AuditLogService.ACTION_SUBMIT_PROPOSAL, "proposals", String.valueOf(saved.getProposalId()), accessService.currentAccount().getAccountId());
+        businessProfileRepository.findById(job.getBusinessId())
+                .ifPresent(business -> notificationService.notifyProposalCreated(
+                        business.getAccountId(),
+                        accessService.currentAccount().getAccountId(),
+                        job.getJobId(),
+                        job.getTitle()
+                ));
         return saved;
     }
 
@@ -173,6 +181,14 @@ public class MarketplaceService {
         proposal.setStatus(status);
         ProposalEntity saved = proposalRepository.save(proposal);
         auditLogService.record(AuditLogService.ACTION_REVIEW_PROPOSAL, "proposals", String.valueOf(proposalId), accountId);
+        expertProfileRepository.findById(proposal.getExpertId())
+                .ifPresent(expert -> notificationService.notifyProposalReviewed(
+                        expert.getAccountId(),
+                        accountId,
+                        job.getJobId(),
+                        job.getTitle(),
+                        status
+                ));
         return saved;
     }
 
