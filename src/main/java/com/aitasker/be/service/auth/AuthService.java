@@ -6,12 +6,14 @@
 package com.aitasker.be.service.auth;
 
 import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.GoogleRegisterRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 
 public interface AuthService {
     // Note: Hàm `register` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     AuthResponse register(RegisterRequest req);
+    AuthResponse googleRegister(GoogleRegisterRequest req);
     // Note: Hàm `login` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     AuthResponse login(LoginRequest req);
     // Note: Hàm `currentSession` lấy lại thông tin tài khoản hiện tại từ database để frontend cập nhật status sau khi reload.

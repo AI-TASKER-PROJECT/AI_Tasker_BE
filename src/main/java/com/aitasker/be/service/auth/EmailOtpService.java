@@ -1,6 +1,8 @@
 package com.aitasker.be.service.auth;
 
+import com.aitasker.be.common.exception.ResourceConflictException;
 import com.aitasker.be.dto.auth.SendOtpResponse;
+import com.aitasker.be.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
@@ -18,6 +20,7 @@ public class EmailOtpService {
 
     private final StringRedisTemplate redisTemplate;
     private final JavaMailSender mailSender;
+    private final AccountRepository accountRepository;
 
     @Value("${spring.mail.username:}")
     private String mailFrom;
@@ -29,6 +32,10 @@ public class EmailOtpService {
 
     public SendOtpResponse sendOtp(String email) {
         String normalizedEmail = normalizeEmail(email);
+        if (accountRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new ResourceConflictException("Email đã tồn tại");
+        }
+
         String otp = String.valueOf(
                 ThreadLocalRandom.current().nextInt(100000, 1000000)
         );

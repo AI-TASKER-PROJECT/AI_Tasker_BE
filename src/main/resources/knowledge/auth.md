@@ -1,0 +1,2 @@
+- AUTH-01: Đăng nhập thành công, hệ thống cấp JWT Token.
+- AUTH-02: Mọi request gọi API phải được kiểm tra quyền dựa trên JWT Role.

@@ -1,14 +1,10 @@
-/*
- * NOTE FILE: src/main/java/com/aitasker/be/service/auth/AuthServiceImpl.java
- * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
- * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
- */
 package com.aitasker.be.service.auth;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.ResourceConflictException;
 import com.aitasker.be.common.exception.UnauthorizedException;
 import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.GoogleRegisterRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.entity.AccountEntity;
@@ -17,14 +13,20 @@ import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.RoleRepository;
 import com.aitasker.be.security.SecurityUtils;
 import com.aitasker.be.security.jwt.JwtService;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
+import java.util.Collections;
+import java.util.UUID;
+
 @Service
-// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
@@ -34,11 +36,11 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final EmailOtpService emailOtpService;
 
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+    @Value("${google.client-id:}")
+    private String googleClientId;
+
     @Override
-    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
-    // Note: Hàm `register` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AuthResponse register(RegisterRequest req) {
         String email = normalizeEmail(req.getEmail());
         if (!emailOtpService.isEmailVerified(email)) {
@@ -73,11 +75,68 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Override
-    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
+    @Transactional
+    public AuthResponse googleRegister(GoogleRegisterRequest req) {
+        GoogleIdToken.Payload payload = verifyGoogleCredential(req.getCredential());
+        String email = normalizeEmail(payload.getEmail());
+        String googleName = (String) payload.get("name");
+        String fullName = req.getFullName() == null || req.getFullName().isBlank()
+                ? googleName
+                : req.getFullName().trim();
+
+        if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
+            throw new UnauthorizedException("Google email chua duoc xac thuc");
+        }
+        var existingAccount = accountRepository.findByEmailWithRole(email);
+        if (existingAccount.isPresent()) {
+            AccountEntity account = existingAccount.get();
+            if ("Lock".equalsIgnoreCase(account.getStatus())) {
+                throw new UnauthorizedException("Tai khoan da bi khoa");
+            }
+
+            String accessToken = jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName());
+            String refreshToken = jwtService.generateRefreshToken(account.getEmail());
+
+            return AuthResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .role(account.getRole().getRoleName())
+                    .accountStatus(account.getStatus())
+                    .email(account.getEmail())
+                    .fullName(account.getFullName())
+                    .build();
+        }
+
+        RoleEntity role = roleRepository.findByRoleName(req.getRole())
+                .orElseThrow(() -> new UnauthorizedException("Role khong hop le"));
+
+        AccountEntity account = AccountEntity.builder()
+                .email(email)
+                .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                .phone(req.getPhone())
+                .fullName(fullName == null || fullName.isBlank() ? email : fullName)
+                .role(role)
+                .status("Pending")
+                .emailVerified(true)
+                .build();
+
+        AccountEntity saved = accountRepository.save(account);
+        String accessToken = jwtService.generateAccessToken(saved.getEmail(), saved.getRole().getRoleName());
+        String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .role(saved.getRole().getRoleName())
+                .accountStatus(saved.getStatus())
+                .email(saved.getEmail())
+                .fullName(saved.getFullName())
+                .build();
+    }
+
+    @Override
     @Transactional(readOnly = true)
-    // Note: Hàm `login` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AuthResponse login(LoginRequest req) {
         AccountEntity account = accountRepository.findByEmailWithRole(normalizeEmail(req.getEmail()))
                 .orElseThrow(() -> new UnauthorizedException("Sai email hoac mat khau"));
@@ -105,7 +164,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean validateEmailNotExists(String email) {
-        return !accountRepository.existsByEmailIgnoreCase(email);
+        return accountRepository.existsByEmailIgnoreCase(email);
     }
 
     // Note: Hàm `normalizeEmail` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -125,5 +184,28 @@ public class AuthServiceImpl implements AuthService {
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private GoogleIdToken.Payload verifyGoogleCredential(String credential) {
+        if (googleClientId == null || googleClientId.isBlank()) {
+            throw new UnauthorizedException("Google client id chua duoc cau hinh");
+        }
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    GsonFactory.getDefaultInstance()
+            )
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+            GoogleIdToken idToken = verifier.verify(credential);
+            if (idToken == null) {
+                throw new UnauthorizedException("Google credential khong hop le");
+            }
+            return idToken.getPayload();
+        } catch (UnauthorizedException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new UnauthorizedException("Khong the xac thuc Google credential");
+        }
     }
 }
