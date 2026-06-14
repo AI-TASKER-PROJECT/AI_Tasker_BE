@@ -65,6 +65,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/api/chatbot/**"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/return").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/jobs", "/api/v1/jobs/*", "/api/v1/domains", "/api/v1/skills", "/api/v1/acceptance-criteria").permitAll()
                         .anyRequest().authenticated()
                 )

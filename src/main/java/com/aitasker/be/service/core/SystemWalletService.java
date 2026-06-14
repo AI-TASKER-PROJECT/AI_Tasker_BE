@@ -46,8 +46,8 @@ public class SystemWalletService {
     @Transactional
     // Note: Hàm `getCurrentWallet` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public SystemWalletEntity getCurrentWallet() {
-        syncWallet();
         AccountEntity actor = accessService.currentAccount();
+        ensureWallet(actor);
         return systemWalletRepository.findByAccountId(actor.getAccountId())
                 .orElseThrow(() -> new NotFoundException("CHUA CO VI CHO TAI KHOAN NAY"));
     }
@@ -103,17 +103,13 @@ public class SystemWalletService {
                 wallet.setCurrentBalance(totalRevenue.add(holdingBalance));
             } else if ("BUSINESS".equals(role)) {
                 BigDecimal deposited = calculateBusinessSuccessfulDeposits(account.getAccountId());
-                BigDecimal initialBalance = previousCurrentBalance.add(previousEscrowBalance);
-                if (initialBalance.signum() == 0) {
-                    initialBalance = BigDecimal.valueOf(200_000_000L);
-                }
                 wallet.setEscrowBalance(deposited);
-                wallet.setCurrentBalance(nonNegativeMoney(initialBalance.subtract(deposited)));
-                wallet.setAvailableBalance(wallet.getCurrentBalance());
+                wallet.setAvailableBalance(nonNegativeMoney(wallet.getAvailableBalance()));
+                wallet.setCurrentBalance(nonNegativeMoney(wallet.getAvailableBalance()).add(wallet.getEscrowBalance()));
             } else if ("EXPERT".equals(role)) {
-                BigDecimal payout = calculateExpertSuccessfulPayouts(account.getAccountId());
-                wallet.setCurrentBalance(payout);
-                wallet.setAvailableBalance(payout);
+                wallet.setEscrowBalance(BigDecimal.ZERO);
+                wallet.setAvailableBalance(nonNegativeMoney(wallet.getAvailableBalance()));
+                wallet.setCurrentBalance(wallet.getAvailableBalance());
             } else {
                 wallet.setCurrentBalance(nonNegativeMoney(wallet.getCurrentBalance()));
                 wallet.setAvailableBalance(nonNegativeMoney(wallet.getAvailableBalance()));
@@ -125,6 +121,26 @@ public class SystemWalletService {
 
         return systemWalletRepository.findByAccountId(admin.getAccountId())
                 .orElseThrow(() -> new NotFoundException("CHUA CO VI HE THONG"));
+    }
+
+    @Transactional
+    public SystemWalletEntity ensureWallet(AccountEntity account) {
+        return systemWalletRepository.findByAccountId(account.getAccountId())
+                .orElseGet(() -> systemWalletRepository.save(SystemWalletEntity.builder()
+                        .accountId(account.getAccountId())
+                        .roleId(account.getRole().getRoleId())
+                        .walletType(walletType(account.getRole().getRoleName()))
+                        .currency("VND")
+                        .currentBalance(BigDecimal.ZERO)
+                        .availableBalance(BigDecimal.ZERO)
+                        .escrowBalance(BigDecimal.ZERO)
+                        .totalRevenue(BigDecimal.ZERO)
+                        .holdingBalance(BigDecimal.ZERO)
+                        .disputedBalance(BigDecimal.ZERO)
+                        .depositedBusinessCount(0)
+                        .successfulDepositCount(0)
+                        .lastSyncedAt(LocalDateTime.now())
+                        .build()));
     }
 
     // Note: Hàm `resolveLatestTransactionId` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
