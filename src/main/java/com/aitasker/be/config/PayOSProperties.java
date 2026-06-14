@@ -6,10 +6,11 @@ import org.springframework.stereotype.Component;
 
 @Data
 @Component
-@ConfigurationProperties(prefix = "vnpay")
-public class VNPayProperties {
-    private String tmnCode;
-    private String hashSecret;
-    private String payUrl;
+@ConfigurationProperties(prefix = "payos")
+public class PayOSProperties {
+    private String clientId;
+    private String apiKey;
+    private String checksumKey;
     private String returnUrl;
+    private String cancelUrl;
 }

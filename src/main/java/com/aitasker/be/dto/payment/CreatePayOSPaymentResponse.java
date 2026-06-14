@@ -8,9 +8,9 @@ import java.math.BigDecimal;
 
 @Data
 @Builder
-public class CreateVNPayPaymentResponse {
-    private String paymentUrl;
-    private String vnpTxnRef;
+public class CreatePayOSPaymentResponse {
+    private String checkoutUrl;
+    private Long orderCode;
     private BigDecimal amount;
     private PaymentStatus status;
 }

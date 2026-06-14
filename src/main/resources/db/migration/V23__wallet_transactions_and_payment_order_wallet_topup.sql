@@ -1,22 +1,3 @@
-ALTER TABLE payment_order
-    ADD COLUMN IF NOT EXISTS account_id BIGINT,
-    ADD COLUMN IF NOT EXISTS purpose VARCHAR(50) NOT NULL DEFAULT 'WALLET_TOPUP';
-
-ALTER TABLE payment_order
-    ALTER COLUMN business_id DROP NOT NULL;
-
-UPDATE payment_order po
-SET account_id = bp.account_id
-FROM business_profiles bp
-WHERE po.account_id IS NULL
-  AND po.business_id = bp.business_id;
-
-CREATE INDEX IF NOT EXISTS idx_payment_order_account_id
-    ON payment_order(account_id);
-
-CREATE INDEX IF NOT EXISTS idx_payment_order_purpose
-    ON payment_order(purpose);
-
 CREATE TABLE IF NOT EXISTS wallet_transactions (
     id BIGSERIAL PRIMARY KEY,
     system_wallet_id BIGINT NOT NULL,

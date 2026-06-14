@@ -43,17 +43,32 @@ public class PaymentOrderEntity {
     @Column(name = "purpose", nullable = false, length = 50)
     private String purpose;
 
-    @Column(name = "vnp_txn_ref", nullable = false, unique = true, length = 100)
-    private String vnpTxnRef;
+    @Column(name = "provider_txn_ref", unique = true, length = 100)
+    private String providerTxnRef;
 
-    @Column(name = "vnp_transaction_no", length = 100)
-    private String vnpTransactionNo;
+    @Column(name = "provider_transaction_no", length = 100)
+    private String providerTransactionNo;
 
-    @Column(name = "vnp_response_code", length = 20)
-    private String vnpResponseCode;
+    @Column(name = "provider_response_code", length = 20)
+    private String providerResponseCode;
 
-    @Column(name = "vnp_secure_hash", columnDefinition = "TEXT")
-    private String vnpSecureHash;
+    @Column(name = "provider_secure_hash", columnDefinition = "TEXT")
+    private String providerSecureHash;
+
+    @Column(name = "provider_order_code")
+    private Long providerOrderCode;
+
+    @Column(name = "provider_payment_link_id", length = 100)
+    private String providerPaymentLinkId;
+
+    @Column(name = "checkout_url", columnDefinition = "TEXT")
+    private String checkoutUrl;
+
+    @Column(name = "cancel_url", columnDefinition = "TEXT")
+    private String cancelUrl;
+
+    @Column(name = "return_url", columnDefinition = "TEXT")
+    private String returnUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

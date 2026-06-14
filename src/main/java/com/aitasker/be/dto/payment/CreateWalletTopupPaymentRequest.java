@@ -5,11 +5,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class CreateVNPayPaymentRequest {
-    private Long accountId;
-    private Long businessId;
-    private Long jobId;
-    private Long milestoneId;
+public class CreateWalletTopupPaymentRequest {
     private BigDecimal amount;
     private String description;
 }

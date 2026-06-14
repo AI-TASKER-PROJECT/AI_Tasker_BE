@@ -143,6 +143,13 @@ public class SystemWalletService {
                         .build()));
     }
 
+    @Transactional
+    public SystemWalletEntity ensureWalletByAccountId(Integer accountId) {
+        AccountEntity account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY TAI KHOAN"));
+        return ensureWallet(account);
+    }
+
     // Note: Hàm `resolveLatestTransactionId` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private Long resolveLatestTransactionId() {
         Long latest = transactionRepository.latestTransactionId();
