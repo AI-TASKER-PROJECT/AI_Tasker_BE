@@ -6,12 +6,15 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.core.ProposalRequest;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.ProposalEntity;
 import com.aitasker.be.service.core.MarketplaceService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 // Note: Annotation này biến class thành REST controller để nhận request và trả JSON.
 @RestController
@@ -47,8 +50,15 @@ public class MarketplaceController {
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/proposals")
     // Note: Hàm `submitProposal` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<ProposalEntity>> submitProposal(@RequestBody ProposalEntity request) {
+    public ResponseEntity<ApiResponse<ProposalEntity>> submitProposal(@RequestBody ProposalRequest request) {
         return ResponseEntity.ok(ApiResponse.success("SUBMIT PROPOSAL SUCCESS", marketplaceService.submitProposal(request)));
+    }
+
+    // Note: Annotation này khai báo API upload file bằng multipart/form-data.
+    @PostMapping(value = "/proposals/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // Note: Hàm `uploadProposalFile` nhận file proposal của chuyên gia, upload Firebase và trả path để gửi kèm proposal.
+    public ResponseEntity<ApiResponse<String>> uploadProposalFile(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("UPLOAD PROPOSAL FILE SUCCESS", marketplaceService.uploadProposalFile(file)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
