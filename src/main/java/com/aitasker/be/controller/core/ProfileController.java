@@ -46,11 +46,16 @@ public class ProfileController {
         return ResponseEntity.ok(ApiResponse.success("UPSERT EXPERT PROFILE SUCCESS", profileService.upsertExpert(request)));
     }
 
+    @PostMapping(value = "/expert/portfolio-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<String>> uploadExpertPortfolio(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("UPLOAD EXPERT PORTFOLIO SUCCESS", profileService.uploadExpertPortfolio(file)));
+    }
+
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/approve/{type}/{id}")
     // Note: Hàm `approve` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<Object>> approve(@PathVariable String type, @PathVariable Integer id, @RequestParam String status) {
-        return ResponseEntity.ok(ApiResponse.success("APPROVE PROFILE SUCCESS", profileService.approveProfile(type, id, status)));
+    public ResponseEntity<ApiResponse<Object>> approve(@PathVariable String type, @PathVariable Integer id, @RequestParam String status, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("APPROVE PROFILE SUCCESS", profileService.approveProfile(type, id, status, reason)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
@@ -66,7 +71,6 @@ public class ProfileController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/business/by-job/{jobId}")
-    // Note: Hàm `businessByJob` trả hồ sơ doanh nghiệp theo job để chuyên gia xem thông tin bên đăng dự án.
     public ResponseEntity<ApiResponse<BusinessProfileEntity>> businessByJob(@PathVariable Integer jobId) {
         return ResponseEntity.ok(ApiResponse.success("GET BUSINESS PROFILE BY JOB SUCCESS", profileService.businessProfileByJob(jobId)));
     }

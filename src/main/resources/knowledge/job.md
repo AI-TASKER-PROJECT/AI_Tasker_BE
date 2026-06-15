@@ -1,0 +1,3 @@
+- JOB-01: Doanh nghiệp đăng yêu cầu job, hệ thống AI chuẩn hóa thành Statement of Work.
+- MATCH-01: Hệ thống đề xuất chuyên gia bằng keyword matching giữa SoW và Portfolio.
+- MATCH-02: Chuyên gia có thể nộp proposal và bid amount.

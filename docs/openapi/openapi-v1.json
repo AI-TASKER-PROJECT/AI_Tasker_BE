@@ -37,6 +37,9 @@
       "post": { "tags": ["Profile"], "summary": "Upsert expert profile", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
       "get": { "tags": ["Profile"], "summary": "List expert profiles", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
     },
+    "/api/v1/profiles/expert/portfolio-file": {
+      "post": { "tags": ["Profile"], "summary": "Upload expert portfolio file", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
+    },
     "/api/v1/profiles/portfolio": {
       "post": { "tags": ["Profile"], "summary": "Upsert portfolio", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
       "get": { "tags": ["Profile"], "summary": "List portfolios", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
@@ -49,7 +52,8 @@
         "parameters": [
           { "name": "type", "in": "path", "required": true, "schema": { "type": "string" } },
           { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "reason", "in": "query", "required": false, "schema": { "type": "string" } }
         ],
         "responses": { "200": { "description": "OK" } }
       }
