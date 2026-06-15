@@ -9,11 +9,15 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +36,7 @@ public class ContractExecutionService {
     private final ProposalRepository proposalRepository;
     private final JobRepository jobRepository;
     private final ContractRepository contractRepository;
+    private final ContractMilestoneRepository contractMilestoneRepository;
     private final ContractChangeRequestRepository changeRequestRepository;
     private final MilestoneRepository milestoneRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
@@ -43,6 +48,8 @@ public class ContractExecutionService {
     private final SystemSettingRepository systemSettingRepository;
     private final SystemWalletService systemWalletService;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -50,26 +57,41 @@ public class ContractExecutionService {
     public ContractEntity createDraftFromProposal(Integer proposalId, ContractEntity input) {
         accessService.requireRole("BUSINESS");
         accessService.requireApprovedAccount();
+        if (input == null) input = new ContractEntity();
         Integer accountId = accessService.currentAccount().getAccountId();
         Integer businessId = businessProfileRepository.findByAccountId(accountId).map(BusinessProfileEntity::getBusinessId).orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
         ProposalEntity proposal = proposalRepository.findById(proposalId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY PROPOSAL"));
         if (!"Accepted".equalsIgnoreCase(proposal.getStatus())) throw new AppException("CHI DUOC TAO CONTRACT TU PROPOSAL DA ACCEPTED");
+        if (contractRepository.existsByProposalId(proposalId)) throw new AppException("PROPOSAL DA DUOC TAO CONTRACT");
         JobEntity job = proposalRepository.findById(proposalId)
                 .flatMap(p -> Optional.ofNullable(p.getJobId()).flatMap(jobId -> jobRepository.findById(jobId)))
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA PROPOSAL"));
         // DAM BAO DOANH NGHIEP CHI DUOC TAO CONTRACT TU JOB CUA CHINH MINH.
         if (!businessId.equals(job.getBusinessId())) throw new AppException("BAN KHONG CO QUYEN TAO CONTRACT CHO JOB NAY");
-        if (input.getTotalBudget() == null || input.getTotalBudget().signum() <= 0) throw new AppException("TOTAL BUDGET PHAI LON HON 0");
-        if (input.getTimelineDays() == null || input.getTimelineDays() <= 0) throw new AppException("TIMELINE DAYS PHAI LON HON 0");
+        List<MilestoneEntity> jobMilestones = milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId());
+        if (jobMilestones.isEmpty()) throw new AppException("JOB CHUA CO MILESTONE DE TAO CONTRACT");
+        Map<Integer, java.math.BigDecimal> proposedBudgetByMilestone = parseProposalMilestoneBudget(proposal.getProposalMilestone());
+        java.math.BigDecimal totalBudget = calculateContractTotalBudget(jobMilestones, proposedBudgetByMilestone);
+        Integer timelineDays = input.getTimelineDays() != null && input.getTimelineDays() > 0
+                ? input.getTimelineDays()
+                : calculateTimelineDays(job);
         input.setContractId(null);
         input.setJobId(proposal.getJobId());
+        input.setProposalId(proposalId);
         input.setExpertId(proposal.getExpertId());
         input.setBusinessId(businessId);
-        input.setNdaSigned(Boolean.FALSE);
+        input.setContractTitle(input.getContractTitle() == null || input.getContractTitle().isBlank() ? job.getTitle() : input.getContractTitle().trim());
+        input.setTotalBudget(totalBudget);
+        input.setTimelineDays(timelineDays);
         input.setStatus("Draft");
         input.setBusinessAcceptedAt(null);
         input.setExpertAcceptedAt(null);
+        input.setBusinessNdaSignedAt(null);
+        input.setExpertNdaSignedAt(null);
+        input.setActivatedAt(null);
         ContractEntity saved = contractRepository.save(input);
+        createContractMilestones(saved.getContractId(), jobMilestones, proposedBudgetByMilestone);
+        saved.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(saved.getContractId()));
         auditLogService.record(AuditLogService.ACTION_CREATE_CONTRACT_DRAFT, "contracts", String.valueOf(saved.getContractId()), accountId);
         return saved;
     }
@@ -100,6 +122,9 @@ public class ContractExecutionService {
         contract.setStatus("Negotiating");
         contract.setBusinessAcceptedAt(null);
         contract.setExpertAcceptedAt(null);
+        contract.setBusinessNdaSignedAt(null);
+        contract.setExpertNdaSignedAt(null);
+        contract.setActivatedAt(null);
         contractRepository.save(contract);
         ContractChangeRequestEntity saved = changeRequestRepository.save(input);
         auditLogService.record(AuditLogService.ACTION_REQUEST_CONTRACT_CHANGE, "contracts", String.valueOf(contract.getContractId()), accountId);
@@ -108,8 +133,8 @@ public class ContractExecutionService {
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
-    // Note: Hàm `activateContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public ContractEntity activateContract(Integer contractId) {
+    // Note: Hàm `signContract` ghi nhận một bên đã ký/xác nhận điều khoản hợp đồng.
+    public ContractEntity signContract(Integer contractId) {
         requireApprovedForBusinessOrExpert();
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -119,34 +144,144 @@ public class ContractExecutionService {
                 || (expertId != null && expertId.equals(contract.getExpertId()));
         if (!isParticipant) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
         if ("Active".equals(contract.getStatus())) return contract;
-        if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI KICH HOAT");
+        if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP KY");
         LocalDateTime now = LocalDateTime.now();
         if (businessId != null && businessId.equals(contract.getBusinessId())) contract.setBusinessAcceptedAt(now);
         if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertAcceptedAt(now);
-        contract.setStatus(contract.getBusinessAcceptedAt() != null && contract.getExpertAcceptedAt() != null ? "Active" : "Negotiating");
-        contract.setUpdatedAt(LocalDateTime.now());
+        tryActivateContract(contract, now);
         ContractEntity saved = contractRepository.save(contract);
+        saved.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(saved.getContractId()));
         auditLogService.record(AuditLogService.ACTION_ACCEPT_CONTRACT, "contracts", String.valueOf(contractId), accountId);
         return saved;
+    }
+
+    // Note: Hàm `parseProposalMilestoneBudget` đọc JSON ngân sách milestone do expert đề xuất trong proposal.
+    private Map<Integer, BigDecimal> parseProposalMilestoneBudget(String proposalMilestone) {
+        Map<Integer, BigDecimal> result = new HashMap<>();
+        if (proposalMilestone == null || proposalMilestone.isBlank()) return result;
+        try {
+            JsonNode root = objectMapper.readTree(proposalMilestone);
+            if (!root.isArray()) throw new AppException("PROPOSAL MILESTONE KHONG HOP LE");
+            for (JsonNode item : root) {
+                JsonNode milestoneIdNode = item.get("milestoneId");
+                JsonNode proposedBudgetNode = item.get("proposedBudget");
+                if (milestoneIdNode == null || !milestoneIdNode.canConvertToInt() || proposedBudgetNode == null || !proposedBudgetNode.isNumber()) {
+                    throw new AppException("PROPOSAL MILESTONE KHONG HOP LE");
+                }
+                result.put(milestoneIdNode.asInt(), proposedBudgetNode.decimalValue());
+            }
+            return result;
+        } catch (Exception ex) {
+            if (ex instanceof AppException appException) throw appException;
+            throw new AppException("PROPOSAL MILESTONE KHONG PHAI JSON HOP LE");
+        }
+    }
+
+    // Note: Hàm `calculateContractTotalBudget` tính tổng ngân sách chốt của hợp đồng từ milestone job và đề xuất trong proposal.
+    private BigDecimal calculateContractTotalBudget(List<MilestoneEntity> jobMilestones, Map<Integer, BigDecimal> proposedBudgetByMilestone) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (MilestoneEntity milestone : jobMilestones) {
+            total = total.add(proposedBudgetByMilestone.getOrDefault(milestone.getMilestoneId(), milestone.getFundsAllocated()));
+        }
+        if (total.signum() <= 0) throw new AppException("TOTAL BUDGET PHAI LON HON 0");
+        return total;
+    }
+
+    // Note: Hàm `calculateTimelineDays` quy đổi thời lượng job sang ngày để lưu vào contract.
+    private Integer calculateTimelineDays(JobEntity job) {
+        Integer value = job.getPlannedDurationValue();
+        if (value == null || value <= 0) return 1;
+        String unit = job.getPlannedDurationUnit() == null ? "DAY" : job.getPlannedDurationUnit().trim().toUpperCase();
+        return switch (unit) {
+            case "WEEK", "WEEKS" -> value * 7;
+            case "MONTH", "MONTHS" -> value * 30;
+            default -> value;
+        };
+    }
+
+    // Note: Hàm `createContractMilestones` lưu từng milestone chốt của contract, gồm ngân sách gốc và ngân sách cuối.
+    private void createContractMilestones(Integer contractId, List<MilestoneEntity> jobMilestones, Map<Integer, BigDecimal> proposedBudgetByMilestone) {
+        contractMilestoneRepository.deleteByContractId(contractId);
+        for (MilestoneEntity milestone : jobMilestones) {
+            BigDecimal finalBudget = proposedBudgetByMilestone.getOrDefault(milestone.getMilestoneId(), milestone.getFundsAllocated());
+            contractMilestoneRepository.save(ContractMilestoneEntity.builder()
+                    .contractId(contractId)
+                    .jobMilestoneId(milestone.getMilestoneId())
+                    .milestoneName(milestone.getMilestoneName())
+                    .description(milestone.getDescription())
+                    .originalBudget(milestone.getFundsAllocated())
+                    .finalBudget(finalBudget)
+                    .orderIndex(milestone.getOrderIndex())
+                    .status("Pending")
+                    .build());
+        }
+    }
+
+    // Note: Hàm `applyContractMilestoneBudgets` cập nhật ngân sách chốt từ contract_milestones về milestone thật khi contract active.
+    private void applyContractMilestoneBudgets(ContractEntity contract) {
+        List<ContractMilestoneEntity> contractMilestones = contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId());
+        for (ContractMilestoneEntity contractMilestone : contractMilestones) {
+            MilestoneEntity milestone = milestoneRepository.findById(contractMilestone.getJobMilestoneId())
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE CUA CONTRACT"));
+            if (!contract.getJobId().equals(milestone.getJobId())) {
+                throw new AppException("MILESTONE KHONG THUOC JOB CUA CONTRACT");
+            }
+            milestone.setContractId(contract.getContractId());
+            milestone.setFundsAllocated(contractMilestone.getFinalBudget());
+            milestoneRepository.save(milestone);
+        }
+    }
+
+    // Note: Hàm `closeContractJob` đóng job sau khi hợp đồng đã được cả hai bên ký.
+    private void closeContractJob(ContractEntity contract) {
+        JobEntity job = jobRepository.findById(contract.getJobId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA CONTRACT"));
+        job.setBudget(contract.getTotalBudget());
+        job.setStatus("CLOSED");
+        jobRepository.save(job);
+    }
+
+    // Note: Hàm `tryActivateContract` chỉ active contract khi đủ chữ ký hợp đồng và NDA của cả hai bên.
+    private void tryActivateContract(ContractEntity contract, LocalDateTime now) {
+        boolean readyToActivate = contract.getBusinessAcceptedAt() != null
+                && contract.getExpertAcceptedAt() != null
+                && contract.getBusinessNdaSignedAt() != null
+                && contract.getExpertNdaSignedAt() != null;
+        if (readyToActivate) {
+            contract.setStatus("Active");
+            if (contract.getActivatedAt() == null) {
+                contract.setActivatedAt(now);
+                applyContractMilestoneBudgets(contract);
+                closeContractJob(contract);
+            }
+        } else {
+            contract.setStatus("Negotiating");
+        }
+        contract.setUpdatedAt(now);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `signNda` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ContractEntity signNda(Integer contractId) {
-        // CHI CHO BEN EXPERT KY NDA SAU KHI CONTRACT DA ACTIVE.
-        accessService.requireRole("EXPERT");
+        // BUSINESS VA EXPERT DEU PHAI XAC NHAN NDA TRUOC KHI CONTRACT ACTIVE.
+        accessService.requireRole("BUSINESS", "EXPERT");
         accessService.requireApprovedAccount();
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         Integer accountId = accessService.currentAccount().getAccountId();
-        Integer expertId = expertProfileRepository.findByAccountId(accountId)
-                .map(ExpertProfileEntity::getExpertId)
-                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
-        if (!expertId.equals(contract.getExpertId())) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
-        if (!"Active".equals(contract.getStatus())) throw new AppException("CHI DUOC KY NDA KHI CONTRACT DA ACTIVE");
-        contract.setNdaSigned(Boolean.TRUE);
-        contract.setUpdatedAt(LocalDateTime.now());
+        Integer businessId = businessProfileRepository.findByAccountId(accountId).map(BusinessProfileEntity::getBusinessId).orElse(null);
+        Integer expertId = expertProfileRepository.findByAccountId(accountId).map(ExpertProfileEntity::getExpertId).orElse(null);
+        boolean isParticipant = (businessId != null && businessId.equals(contract.getBusinessId()))
+                || (expertId != null && expertId.equals(contract.getExpertId()));
+        if (!isParticipant) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        if ("Active".equals(contract.getStatus())) return contract;
+        if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP KY NDA");
+        LocalDateTime now = LocalDateTime.now();
+        if (businessId != null && businessId.equals(contract.getBusinessId())) contract.setBusinessNdaSignedAt(now);
+        if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertNdaSignedAt(now);
+        tryActivateContract(contract, now);
         ContractEntity saved = contractRepository.save(contract);
+        saved.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(saved.getContractId()));
         auditLogService.record(AuditLogService.ACTION_SIGN_NDA, "contracts", String.valueOf(contractId), accountId);
         return saved;
     }
@@ -205,7 +340,6 @@ public class ContractExecutionService {
         criteriaRepository.findByCriteriaCode(code).ifPresent(existing -> { throw new AppException("CRITERIA CODE DA TON TAI"); });
         input.setCriteriaId(null);
         input.setCriteriaCode(code);
-        input.setCategory(input.getCategory() == null || input.getCategory().isBlank() ? "GENERAL" : input.getCategory().trim());
         input.setIsActive(input.getIsActive() == null || input.getIsActive());
         input.setSortOrder(input.getSortOrder() == null ? 0 : input.getSortOrder());
         AcceptanceCriteriaEntity saved = criteriaRepository.save(input);
@@ -219,12 +353,21 @@ public class ContractExecutionService {
         MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         ContractEntity contract = requireExpertOwnedContractByJob(milestone.getJobId());
         if (!"Active".equals(contract.getStatus())) throw new AppException("CHI DUOC SUBMIT DELIVERABLE KHI CONTRACT ACTIVE");
-        if (!Boolean.TRUE.equals(contract.getNdaSigned())) throw new AppException("EXPERT PHAI KY NDA TRUOC KHI BAN GIAO");
+        if (contract.getBusinessNdaSignedAt() == null || contract.getExpertNdaSignedAt() == null) {
+            throw new AppException("HAI BEN PHAI KY NDA TRUOC KHI BAN GIAO");
+        }
         DeliverableEntity saved = deliverableRepository.save(input);
         milestone.setStatus("Under Review");
         milestone.setUpdatedAt(LocalDateTime.now());
         milestoneRepository.save(milestone);
         auditLogService.record(AuditLogService.ACTION_SUBMIT_DELIVERABLE, "milestones", String.valueOf(milestone.getMilestoneId()), accessService.currentAccount().getAccountId());
+        businessProfileRepository.findById(contract.getBusinessId())
+                .ifPresent(business -> notificationService.notifyDeliverableSubmitted(
+                        business.getAccountId(),
+                        accessService.currentAccount().getAccountId(),
+                        milestone.getMilestoneId(),
+                        milestone.getMilestoneName()
+                ));
         return saved;
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -266,6 +409,14 @@ public class ContractExecutionService {
         DisputeEntity saved = disputeRepository.save(input);
         systemWalletService.syncWallet();
         auditLogService.record(AuditLogService.ACTION_CREATE_DISPUTE, "disputes", String.valueOf(saved.getDisputeId()), accountId);
+        if (saved.getAssignedStaffId() != null) {
+            staffRepository.findById(saved.getAssignedStaffId())
+                    .ifPresent(staff -> notificationService.notifyDisputeCreated(
+                            staff.getAccountId(),
+                            accountId,
+                            saved.getDisputeId()
+                    ));
+        }
         return saved;
     }
 
@@ -273,34 +424,48 @@ public class ContractExecutionService {
     public List<ContractEntity> listContracts() {
         AccountEntity actor = accessService.currentAccount();
         String role = actor.getRole().getRoleName();
-        if ("ADMIN".equals(role)) return contractRepository.findAll();
+        if ("ADMIN".equals(role)) return attachContractMilestones(contractRepository.findAll());
         if ("STAFF".equals(role)) {
             Integer staffId = staffRepository.findByAccountId(actor.getAccountId())
                     .map(StaffEntity::getStaffId)
                     .orElseThrow(() -> new NotFoundException("CHUA CO STAFF PROFILE"));
-            return disputeRepository.findByAssignedStaffId(staffId).stream()
+            return attachContractMilestones(disputeRepository.findByAssignedStaffId(staffId).stream()
                     .map(DisputeEntity::getContractId)
                     .distinct()
                     .map(contractRepository::findById)
                     .flatMap(Optional::stream)
-                    .toList();
+                    .toList());
         }
         if ("BUSINESS".equals(role)) {
             accessService.requireApprovedAccount();
             Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId()).map(BusinessProfileEntity::getBusinessId).orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
-            return contractRepository.findByBusinessId(businessId);
+            return attachContractMilestones(contractRepository.findByBusinessId(businessId));
         }
         if ("EXPERT".equals(role)) {
             accessService.requireApprovedAccount();
             Integer expertId = expertProfileRepository.findByAccountId(actor.getAccountId()).map(ExpertProfileEntity::getExpertId).orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
-            return contractRepository.findByExpertId(expertId);
+            return attachContractMilestones(contractRepository.findByExpertId(expertId));
         }
         throw new AppException("ROLE KHONG HOP LE");
     }
-    // Note: Hàm `listMilestonesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public List<MilestoneEntity> listMilestonesByContract(Integer contractId) {
+
+    // Note: Hàm `getContract` trả chi tiết contract kèm milestone đã chốt để hai bên xem trước khi ký.
+    public ContractEntity getContract(Integer contractId) {
         ContractEntity contract = requireContractParticipantOrOperator(contractId);
-        return attachCriteria(milestoneRepository.findByJobIdOrderByOrderIndexAsc(contract.getJobId()));
+        contract.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contractId));
+        return contract;
+    }
+
+    // Note: Hàm `listMilestonesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    public List<ContractMilestoneEntity> listMilestonesByContract(Integer contractId) {
+        ContractEntity contract = requireContractParticipantOrOperator(contractId);
+        return contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId());
+    }
+
+    // Note: Hàm `attachContractMilestones` gắn milestone chốt vào contract để API trả đủ dữ liệu hợp đồng.
+    private List<ContractEntity> attachContractMilestones(List<ContractEntity> contracts) {
+        contracts.forEach(contract -> contract.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId())));
+        return contracts;
     }
     // Note: Hàm `listMilestonesByJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<MilestoneEntity> listMilestonesByJob(Integer jobId) {
@@ -385,6 +550,12 @@ public class ContractExecutionService {
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
         auditLogService.record(AuditLogService.ACTION_ASSIGN_DISPUTE, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
+        staffRepository.findById(staffId)
+                .ifPresent(staff -> notificationService.notifyDisputeAssigned(
+                        staff.getAccountId(),
+                        accessService.currentAccount().getAccountId(),
+                        disputeId
+                ));
         return saved;
     }
 
@@ -478,7 +649,7 @@ public class ContractExecutionService {
     // Note: Hàm `processPaymentWebhook` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public TransactionEntity processPaymentWebhook(Long transactionId, String paymentStatus, String bankTxCode, String receiptImgUrl) {
         accessService.requireRole("ADMIN");
-        // VNPay sandbox webhook chi cap nhat transaction; du an khong con bang invoice noi bo.
+        // Payment webhook chi cap nhat transaction; du an khong con bang invoice noi bo.
         if (!List.of("Success", "Failed").contains(paymentStatus)) {
             throw new AppException("PAYMENT STATUS KHONG HOP LE");
         }

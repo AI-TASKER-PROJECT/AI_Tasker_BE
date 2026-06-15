@@ -47,6 +47,9 @@ public class PortfolioEntity {
     @Column(name = "skill_ids", nullable = false)
     private String skillIds;
 
+    @Column(name = "technology_ids", nullable = false)
+    private String technologyIds;
+
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "years_experience", nullable = false)
     private Integer yearsExperience;

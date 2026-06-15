@@ -98,9 +98,9 @@ class ContractExecutionServiceTest {
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
-    // Note: Hàm `signNda_shouldThrowWhenContractNotActive` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
+    // Note: Hàm `signNda_shouldThrowWhenContractStatusInvalid` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void signNda_shouldThrowWhenContractNotActive() {
-        ContractEntity contract = ContractEntity.builder().contractId(1).expertId(5).status("Draft").build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).expertId(5).status("Completed").build();
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
@@ -109,7 +109,7 @@ class ContractExecutionServiceTest {
                 .thenReturn(Optional.of(com.aitasker.be.entity.ExpertProfileEntity.builder().expertId(5).build()));
 
         AppException ex = assertThrows(AppException.class, () -> contractExecutionService.signNda(1));
-        assertEquals("CHI DUOC KY NDA KHI CONTRACT DA ACTIVE", ex.getMessage());
+        assertEquals("CONTRACT KHONG O TRANG THAI CHO PHEP KY NDA", ex.getMessage());
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.

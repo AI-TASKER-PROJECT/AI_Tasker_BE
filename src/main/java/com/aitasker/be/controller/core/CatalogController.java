@@ -9,6 +9,7 @@ import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.catalog.DomainRequest;
 import com.aitasker.be.dto.catalog.JobSkillAssignmentRequest;
 import com.aitasker.be.dto.catalog.SkillRequest;
+import com.aitasker.be.dto.catalog.TechnologyRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.service.core.CatalogService;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,21 @@ public class CatalogController {
         return ResponseEntity.ok(ApiResponse.success("LIST ACCEPTANCE CRITERIA SUCCESS", catalogService.listAcceptanceCriteria(activeOnly)));
     }
 
+    @GetMapping("/technologies")
+    public ResponseEntity<ApiResponse<Object>> listTechnologies(@RequestParam(defaultValue = "false") Boolean activeOnly) {
+        return ResponseEntity.ok(ApiResponse.success("LIST TECHNOLOGIES SUCCESS", catalogService.listTechnologies(activeOnly)));
+    }
+
+    @PostMapping("/technologies")
+    public ResponseEntity<ApiResponse<TechnologyEntity>> createTechnology(@RequestBody TechnologyRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("CREATE TECHNOLOGY SUCCESS", catalogService.createTechnology(request)));
+    }
+
+    @PatchMapping("/technologies/{technologyId}")
+    public ResponseEntity<ApiResponse<TechnologyEntity>> updateTechnology(@PathVariable Integer technologyId, @RequestBody TechnologyRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("UPDATE TECHNOLOGY SUCCESS", catalogService.updateTechnology(technologyId, request)));
+    }
+
     @PostMapping("/skills")
     // Note: Hàm `createSkill` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<SkillEntity>> createSkill(@RequestBody SkillRequest request) {
@@ -99,5 +115,15 @@ public class CatalogController {
     // Note: Hàm `replaceJobSkills` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<Object>> replaceJobSkills(@PathVariable Integer jobId, @RequestBody List<JobSkillAssignmentRequest> assignments) {
         return ResponseEntity.ok(ApiResponse.success("REPLACE JOB SKILLS SUCCESS", catalogService.replaceJobSkills(jobId, assignments)));
+    }
+
+    @GetMapping("/jobs/{jobId}/technologies")
+    public ResponseEntity<ApiResponse<Object>> listJobTechnologies(@PathVariable Integer jobId) {
+        return ResponseEntity.ok(ApiResponse.success("LIST JOB TECHNOLOGIES SUCCESS", catalogService.listJobTechnologies(jobId)));
+    }
+
+    @PutMapping("/jobs/{jobId}/technologies")
+    public ResponseEntity<ApiResponse<Object>> replaceJobTechnologies(@PathVariable Integer jobId, @RequestBody List<Integer> technologyIds) {
+        return ResponseEntity.ok(ApiResponse.success("REPLACE JOB TECHNOLOGIES SUCCESS", catalogService.replaceJobTechnologies(jobId, technologyIds)));
     }
 }

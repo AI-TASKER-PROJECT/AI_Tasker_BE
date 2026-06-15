@@ -11,6 +11,7 @@ import com.aitasker.be.common.exception.ResourceConflictException;
 import com.aitasker.be.dto.catalog.DomainRequest;
 import com.aitasker.be.dto.catalog.JobSkillAssignmentRequest;
 import com.aitasker.be.dto.catalog.SkillRequest;
+import com.aitasker.be.dto.catalog.TechnologyRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +30,12 @@ public class CatalogService {
     private final AccessService accessService;
     private final DomainRepository domainRepository;
     private final SkillRepository skillRepository;
+    private final TechnologyRepository technologyRepository;
     private final JobRepository jobRepository;
     private final BusinessProfileRepository businessProfileRepository;
     private final JobDomainRepository jobDomainRepository;
     private final JobSkillRepository jobSkillRepository;
+    private final JobTechnologyRepository jobTechnologyRepository;
     private final AcceptanceCriteriaRepository acceptanceCriteriaRepository;
 
     // Note: Hàm `listDomains` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -48,7 +51,13 @@ public class CatalogService {
         return skillRepository.findAll();
     }
 
-    // Note: HÃ m `listAcceptanceCriteria` tráº£ danh má»¥c tiÃªu chÃ­ nghiá»‡m thu do ná»n táº£ng cung cáº¥p Ä‘á»ƒ business chá»n cho milestone.
+    // Note: Hàm `listTechnologies` trả danh mục công nghệ để business chọn khi đăng job và expert chọn khi khai báo portfolio.
+    public List<TechnologyEntity> listTechnologies(Boolean activeOnly) {
+        if (Boolean.TRUE.equals(activeOnly)) return technologyRepository.findByIsActiveTrueOrderBySortOrderAscTechnologyNameAsc();
+        return technologyRepository.findAll();
+    }
+
+    // Note: Hàm `listAcceptanceCriteria` trả danh mục tiêu chí nghiệm thu do nền tảng cung cấp để business chọn cho milestone.
     public List<AcceptanceCriteriaEntity> listAcceptanceCriteria(Boolean activeOnly) {
         if (Boolean.TRUE.equals(activeOnly)) return acceptanceCriteriaRepository.findByIsActiveTrueOrderBySortOrderAscCriteriaIdAsc();
         return acceptanceCriteriaRepository.findAllByOrderBySortOrderAscCriteriaIdAsc();
@@ -134,6 +143,42 @@ public class CatalogService {
         return skillRepository.save(entity);
     }
 
+    // Note: Hàm `createTechnology` cho admin thêm công nghệ mới vào danh mục hệ thống.
+    @Transactional
+    public TechnologyEntity createTechnology(TechnologyRequest request) {
+        accessService.requireRole("ADMIN");
+        validateTechnologyRequest(request, true);
+        String code = normalizeCode(request.getTechnologyCode());
+        if (technologyRepository.existsByTechnologyCode(code)) throw new ResourceConflictException("TECHNOLOGY CODE DA TON TAI");
+        TechnologyEntity entity = TechnologyEntity.builder()
+                .technologyCode(code)
+                .technologyName(request.getTechnologyName().trim())
+                .description(request.getDescription())
+                .isActive(request.getIsActive() == null || request.getIsActive())
+                .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
+                .build();
+        return technologyRepository.save(entity);
+    }
+
+    // Note: Hàm `updateTechnology` cho admin cập nhật thông tin công nghệ trong danh mục.
+    @Transactional
+    public TechnologyEntity updateTechnology(Integer technologyId, TechnologyRequest request) {
+        accessService.requireRole("ADMIN");
+        TechnologyEntity entity = technologyRepository.findById(technologyId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY TECHNOLOGY"));
+        if (request.getTechnologyCode() != null && !request.getTechnologyCode().isBlank()) {
+            String code = normalizeCode(request.getTechnologyCode());
+            technologyRepository.findByTechnologyCode(code)
+                    .filter(existing -> !existing.getTechnologyId().equals(technologyId))
+                    .ifPresent(existing -> { throw new ResourceConflictException("TECHNOLOGY CODE DA TON TAI"); });
+            entity.setTechnologyCode(code);
+        }
+        if (request.getTechnologyName() != null && !request.getTechnologyName().isBlank()) entity.setTechnologyName(request.getTechnologyName().trim());
+        if (request.getDescription() != null) entity.setDescription(request.getDescription());
+        if (request.getIsActive() != null) entity.setIsActive(request.getIsActive());
+        if (request.getSortOrder() != null) entity.setSortOrder(request.getSortOrder());
+        return technologyRepository.save(entity);
+    }
+
     // Note: Hàm `listJobDomains` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<JobDomainEntity> listJobDomains(Integer jobId) {
         jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
@@ -144,6 +189,12 @@ public class CatalogService {
     public List<JobSkillEntity> listJobSkills(Integer jobId) {
         jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         return jobSkillRepository.findByIdJobId(jobId);
+    }
+
+    // Note: Hàm `listJobTechnologies` lấy các công nghệ đã gán cho job.
+    public List<JobTechnologyEntity> listJobTechnologies(Integer jobId) {
+        jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        return jobTechnologyRepository.findByIdJobId(jobId);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -183,13 +234,28 @@ public class CatalogService {
         return jobSkillRepository.findByIdJobId(jobId);
     }
 
+    // Note: Hàm `replaceJobTechnologies` thay toàn bộ danh sách công nghệ của job theo lựa chọn mới.
+    @Transactional
+    public List<JobTechnologyEntity> replaceJobTechnologies(Integer jobId, List<Integer> technologyIds) {
+        requireJobOwnerOrAdmin(jobId);
+        Set<Integer> ids = new LinkedHashSet<>(technologyIds == null ? List.of() : technologyIds);
+        for (Integer technologyId : ids) {
+            technologyRepository.findById(technologyId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY TECHNOLOGY " + technologyId));
+        }
+        jobTechnologyRepository.deleteByIdJobId(jobId);
+        ids.forEach(technologyId -> jobTechnologyRepository.save(JobTechnologyEntity.builder()
+                .id(new JobTechnologyId(jobId, technologyId))
+                .build()));
+        return jobTechnologyRepository.findByIdJobId(jobId);
+    }
+
     // Note: Hàm `requireJobOwnerOrAdmin` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private void requireJobOwnerOrAdmin(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         AccountEntity actor = accessService.currentAccount();
         String role = actor.getRole().getRoleName();
         if ("ADMIN".equals(role)) return;
-        if (!"BUSINESS".equals(role)) throw new AppException("CHI BUSINESS HOAC ADMIN DUOC GAN DOMAIN/SKILL CHO JOB");
+        if (!"BUSINESS".equals(role)) throw new AppException("CHI BUSINESS HOAC ADMIN DUOC GAN DOMAIN/SKILL/TECHNOLOGY CHO JOB");
         accessService.requireApprovedAccount();
         Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId())
                 .map(BusinessProfileEntity::getBusinessId)
@@ -213,6 +279,13 @@ public class CatalogService {
             throw new AppException("SKILL CODE KHONG DUOC DE TRONG");
         if (requireAll && (request.getSkillName() == null || request.getSkillName().isBlank()))
             throw new AppException("SKILL NAME KHONG DUOC DE TRONG");
+    }
+
+    // Note: Hàm `validateTechnologyRequest` kiểm tra dữ liệu danh mục công nghệ trước khi lưu.
+    private void validateTechnologyRequest(TechnologyRequest request, boolean requireAll) {
+        if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
+        if (requireAll && (request.getTechnologyCode() == null || request.getTechnologyCode().isBlank())) throw new AppException("TECHNOLOGY CODE KHONG DUOC DE TRONG");
+        if (requireAll && (request.getTechnologyName() == null || request.getTechnologyName().isBlank())) throw new AppException("TECHNOLOGY NAME KHONG DUOC DE TRONG");
     }
 
     // Note: Hàm `normalizeCode` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.

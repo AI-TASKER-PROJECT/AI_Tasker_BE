@@ -30,6 +30,7 @@ public class ProfileService {
     private final AuditLogService auditLogService;
     private final FirebaseStorageService firebaseStorageService;
     private final JobRepository jobRepository;
+    private final NotificationService notificationService;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -131,7 +132,9 @@ public class ProfileService {
             b.setRejectionReason(normalizedReason);
             updateAccountStatus(b.getAccountId(), status);
             audit(approvalAction("BUSINESS", status), "business_profiles", String.valueOf(id), actor.getAccountId());
-            return businessProfileRepository.save(b);
+            BusinessProfileEntity saved = businessProfileRepository.save(b);
+            notificationService.notifyProfileReviewed(saved.getAccountId(), actor.getAccountId(), "BUSINESS", status);
+            return saved;
         }
         if (!"EXPERT".equalsIgnoreCase(type)) {
             throw new AppException("TYPE PROFILE KHONG HOP LE");
@@ -142,7 +145,9 @@ public class ProfileService {
         e.setRejectionReason(normalizedReason);
         updateAccountStatus(e.getAccountId(), status);
         audit(approvalAction("EXPERT", status), "expert_profiles", String.valueOf(id), actor.getAccountId());
-        return expertProfileRepository.save(e);
+        ExpertProfileEntity saved = expertProfileRepository.save(e);
+        notificationService.notifyProfileReviewed(saved.getAccountId(), actor.getAccountId(), "EXPERT", status);
+        return saved;
     }
 
     // Note: Hàm `currentBusinessProfile` lấy hồ sơ KYB của chính doanh nghiệp đang đăng nhập để reload trang vẫn thấy status/file mới nhất.
@@ -241,6 +246,7 @@ public class ProfileService {
         // KIEM TRA CAC TRUONG PORTFOLIO MOI DE PHUC VU BUSINESS XEM CHI TIET CHUYEN GIA.
         if (input.getDomainIds() == null || input.getDomainIds().isBlank()) throw new AppException("DOMAIN IDS KHONG DUOC DE TRONG");
         if (input.getSkillIds() == null || input.getSkillIds().isBlank()) throw new AppException("SKILL IDS KHONG DUOC DE TRONG");
+        if (input.getTechnologyIds() == null || input.getTechnologyIds().isBlank()) throw new AppException("TECHNOLOGY IDS KHONG DUOC DE TRONG");
         if (input.getYearsExperience() == null || input.getYearsExperience() < 0) throw new AppException("YEARS EXPERIENCE KHONG HOP LE");
         if (input.getSelfDescription() == null || input.getSelfDescription().isBlank()) throw new AppException("SELF DESCRIPTION KHONG DUOC DE TRONG");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -251,6 +257,7 @@ public class ProfileService {
         entity.setExpertId(expertId);
         entity.setDomainIds(input.getDomainIds());
         entity.setSkillIds(input.getSkillIds());
+        entity.setTechnologyIds(input.getTechnologyIds());
         entity.setYearsExperience(input.getYearsExperience());
         entity.setCertificates(input.getCertificates());
         entity.setSelfDescription(input.getSelfDescription());
