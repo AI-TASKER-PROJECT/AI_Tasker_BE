@@ -214,6 +214,7 @@ public class ProfileService {
         // KIEM TRA CAC TRUONG PORTFOLIO MOI DE PHUC VU BUSINESS XEM CHI TIET CHUYEN GIA.
         if (input.getDomainIds() == null || input.getDomainIds().isBlank()) throw new AppException("DOMAIN IDS KHONG DUOC DE TRONG");
         if (input.getSkillIds() == null || input.getSkillIds().isBlank()) throw new AppException("SKILL IDS KHONG DUOC DE TRONG");
+        if (input.getTechnologyIds() == null || input.getTechnologyIds().isBlank()) throw new AppException("TECHNOLOGY IDS KHONG DUOC DE TRONG");
         if (input.getYearsExperience() == null || input.getYearsExperience() < 0) throw new AppException("YEARS EXPERIENCE KHONG HOP LE");
         if (input.getSelfDescription() == null || input.getSelfDescription().isBlank()) throw new AppException("SELF DESCRIPTION KHONG DUOC DE TRONG");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -224,6 +225,7 @@ public class ProfileService {
         entity.setExpertId(expertId);
         entity.setDomainIds(input.getDomainIds());
         entity.setSkillIds(input.getSkillIds());
+        entity.setTechnologyIds(input.getTechnologyIds());
         entity.setYearsExperience(input.getYearsExperience());
         entity.setCertificates(input.getCertificates());
         entity.setSelfDescription(input.getSelfDescription());

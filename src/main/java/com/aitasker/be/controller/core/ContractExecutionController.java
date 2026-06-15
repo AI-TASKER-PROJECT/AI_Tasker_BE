@@ -36,10 +36,10 @@ public class ContractExecutionController {
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
-    @PostMapping("/contracts/{contractId}/activate")
-    // Note: Hàm `activate` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<ContractEntity>> activate(@PathVariable Integer contractId) {
-        return ResponseEntity.ok(ApiResponse.success("ACTIVATE CONTRACT SUCCESS", service.activateContract(contractId)));
+    @PostMapping("/contracts/{contractId}/sign")
+    // Note: Hàm `signContract` xử lý API ký xác nhận hợp đồng của business hoặc expert.
+    public ResponseEntity<ApiResponse<ContractEntity>> signContract(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("SIGN CONTRACT SUCCESS", service.signContract(contractId)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
@@ -156,6 +156,9 @@ public class ContractExecutionController {
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/contracts")
     public ResponseEntity<ApiResponse<Object>> listContracts() { return ResponseEntity.ok(ApiResponse.success("LIST CONTRACTS SUCCESS", service.listContracts())); }
+
+    @GetMapping("/contracts/{contractId}")
+    public ResponseEntity<ApiResponse<Object>> getContract(@PathVariable Integer contractId) { return ResponseEntity.ok(ApiResponse.success("GET CONTRACT SUCCESS", service.getContract(contractId))); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/contracts/{contractId}/milestones")

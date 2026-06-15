@@ -8,6 +8,7 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.ForbiddenException;
+import com.aitasker.be.dto.catalog.JobSkillAssignmentRequest;
 import com.aitasker.be.dto.core.ProposalRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
@@ -43,6 +44,12 @@ public class MarketplaceService {
     private final ProposalRepository proposalRepository;
     private final SowRepository sowRepository;
     private final MilestoneRepository milestoneRepository;
+    private final DomainRepository domainRepository;
+    private final SkillRepository skillRepository;
+    private final JobDomainRepository jobDomainRepository;
+    private final JobSkillRepository jobSkillRepository;
+    private final TechnologyRepository technologyRepository;
+    private final JobTechnologyRepository jobTechnologyRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
     private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     private final AuditLogService auditLogService;
@@ -69,6 +76,9 @@ public class MarketplaceService {
         JobEntity saved = jobRepository.save(input);
         saveSow(saved.getJobId(), sow);
         saveMilestones(saved, milestones);
+        saveJobDomains(saved.getJobId(), input.getDomainIds());
+        saveJobSkills(saved.getJobId(), input.getSkills());
+        saveJobTechnologies(saved.getJobId(), input.getTechnologyIds());
         auditLogService.record(AuditLogService.ACTION_CREATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
         return attachJobDetails(saved);
     }
@@ -269,6 +279,47 @@ public class MarketplaceService {
         }
     }
 
+    // Note: Hàm `saveJobDomains` lưu các lĩnh vực business chọn ngay lúc tạo job.
+    private void saveJobDomains(Integer jobId, List<Integer> domainIds) {
+        if (domainIds == null) return;
+        Set<Integer> ids = new LinkedHashSet<>(domainIds);
+        for (Integer domainId : ids) {
+            domainRepository.findById(domainId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DOMAIN " + domainId));
+            jobDomainRepository.save(JobDomainEntity.builder()
+                    .id(new JobDomainId(jobId, domainId))
+                    .build());
+        }
+    }
+
+    // Note: Hàm `saveJobSkills` lưu các kỹ năng và trạng thái bắt buộc/tùy chọn business chọn ngay lúc tạo job.
+    private void saveJobSkills(Integer jobId, List<JobSkillAssignmentRequest> assignments) {
+        if (assignments == null) return;
+        Set<Integer> seen = new LinkedHashSet<>();
+        for (JobSkillAssignmentRequest assignment : assignments) {
+            if (assignment == null || assignment.getSkillId() == null || !seen.add(assignment.getSkillId())) continue;
+            skillRepository.findById(assignment.getSkillId())
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SKILL " + assignment.getSkillId()));
+            jobSkillRepository.save(JobSkillEntity.builder()
+                    .id(new JobSkillId(jobId, assignment.getSkillId()))
+                    .isMandatory(assignment.getIsMandatory() == null || assignment.getIsMandatory())
+                    .build());
+        }
+    }
+
+    // Note: Hàm `saveJobTechnologies` lưu các công nghệ business chọn cho job vào bảng trung gian.
+    private void saveJobTechnologies(Integer jobId, List<Integer> technologyIds) {
+        if (technologyIds == null) return;
+        Set<Integer> ids = new LinkedHashSet<>(technologyIds);
+        for (Integer technologyId : ids) {
+            technologyRepository.findById(technologyId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY TECHNOLOGY " + technologyId));
+            jobTechnologyRepository.save(JobTechnologyEntity.builder()
+                    .id(new JobTechnologyId(jobId, technologyId))
+                    .build());
+        }
+    }
+
     private List<JobEntity> attachJobDetails(List<JobEntity> jobs) {
         jobs.forEach(this::attachJobDetails);
         return jobs;
@@ -279,6 +330,31 @@ public class MarketplaceService {
             job.setProposalsCount(proposalRepository.countByJobId(job.getJobId()));
             job.setSow(sowRepository.findByJobId(job.getJobId()).orElse(null));
             job.setMilestones(attachMilestoneCriteria(milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId())));
+            List<Integer> domainIds = jobDomainRepository.findByIdJobId(job.getJobId()).stream()
+                    .map(item -> item.getId().getDomainId())
+                    .toList();
+            job.setDomainIds(domainIds);
+            job.setDomains(domainIds.isEmpty() ? List.of() : domainRepository.findAllById(domainIds));
+            List<JobSkillEntity> jobSkills = jobSkillRepository.findByIdJobId(job.getJobId());
+            List<Integer> skillIds = jobSkills.stream()
+                    .map(item -> item.getId().getSkillId())
+                    .toList();
+            job.setJobSkills(jobSkills);
+            job.setSkillIds(skillIds);
+            job.setSkills(jobSkills.stream()
+                    .map(item -> {
+                        JobSkillAssignmentRequest assignment = new JobSkillAssignmentRequest();
+                        assignment.setSkillId(item.getId().getSkillId());
+                        assignment.setIsMandatory(item.getIsMandatory());
+                        return assignment;
+                    })
+                    .toList());
+            job.setSkillDetails(skillIds.isEmpty() ? List.of() : skillRepository.findAllById(skillIds));
+            List<Integer> technologyIds = jobTechnologyRepository.findByIdJobId(job.getJobId()).stream()
+                    .map(item -> item.getId().getTechnologyId())
+                    .toList();
+            job.setTechnologyIds(technologyIds);
+            job.setTechnologies(technologyIds.isEmpty() ? List.of() : technologyRepository.findAllById(technologyIds));
         }
         return job;
     }

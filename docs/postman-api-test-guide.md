@@ -63,6 +63,7 @@ ID seed thường dùng:
 | `milestoneId` | `1`, `2`, `3`, `4` |
 | `domainId` | `2`, `3`, `4`, `8` |
 | `skillId` | `2`, `3`, `6`, `8`, `9`, `14`, `15` |
+| `technologyId` | Lấy từ `GET /api/v1/technologies?activeOnly=true` |
 | `criteriaId` | Lấy từ `GET /api/v1/acceptance-criteria?activeOnly=true` |
 
 ## 3. Auth API
@@ -275,11 +276,14 @@ Raw body:
 {
   "domainIds": "2,3,5",
   "skillIds": "2,3,5,8",
+  "technologyIds": "1,2,3,6,8",
   "yearsExperience": 5,
   "certificates": "expert-certificates/accounts/2/certificate-demo.pdf",
   "selfDescription": "Chuyên gia AI có kinh nghiệm xây dựng RAG, xử lý dữ liệu, thiết kế API và triển khai giải pháp AI cho doanh nghiệp."
 }
 ```
+
+Lưu ý: `technologyIds` là bắt buộc trong logic hiện tại. Lấy id công nghệ từ `GET /api/v1/technologies?activeOnly=true`.
 
 ### Upload chứng chỉ expert
 
@@ -415,6 +419,53 @@ Raw body:
 }
 ```
 
+### Xem technologies
+
+Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
+
+```http
+GET {{baseUrl}}/api/v1/technologies?activeOnly=true
+```
+
+### Admin tạo technology
+
+Token: ADMIN.
+
+```http
+POST {{baseUrl}}/api/v1/technologies
+```
+
+Raw body:
+
+```json
+{
+  "technologyCode": "NEXTJS",
+  "technologyName": "Next.js",
+  "description": "Framework React dùng để xây dựng ứng dụng web full-stack.",
+  "isActive": true,
+  "sortOrder": 30
+}
+```
+
+### Admin cập nhật technology
+
+Token: ADMIN.
+
+```http
+PATCH {{baseUrl}}/api/v1/technologies/1
+```
+
+Raw body:
+
+```json
+{
+  "technologyName": "Python",
+  "description": "Ngôn ngữ lập trình phổ biến cho AI, dữ liệu và backend.",
+  "isActive": true,
+  "sortOrder": 1
+}
+```
+
 ### Xem tiêu chí nghiệm thu nền tảng
 
 Public.
@@ -495,6 +546,26 @@ Raw body:
 ]
 ```
 
+### Xem technology của job
+
+```http
+GET {{baseUrl}}/api/v1/jobs/1/technologies
+```
+
+### Business hoặc Admin thay technology của job
+
+Token: BUSINESS sở hữu job hoặc ADMIN.
+
+```http
+PUT {{baseUrl}}/api/v1/jobs/1/technologies
+```
+
+Raw body:
+
+```json
+[1, 2, 3, 6, 8]
+```
+
 ## 6. Job, SoW Và Proposal API
 
 ### AI generate SoW
@@ -540,6 +611,18 @@ Raw body mới:
   "plannedDurationValue": 6,
   "plannedDurationUnit": "WEEK",
   "isHot": false,
+  "domainIds": [2, 3],
+  "skills": [
+    {
+      "skillId": 2,
+      "isMandatory": true
+    },
+    {
+      "skillId": 3,
+      "isMandatory": false
+    }
+  ],
+  "technologyIds": [1, 2, 3, 6, 8],
   "sow": {
     "title": "SoW RAG chatbot chăm sóc khách hàng",
     "overview": "Xây dựng chatbot RAG trả lời câu hỏi sản phẩm từ dữ liệu FAQ và tài liệu nội bộ.",
@@ -581,7 +664,8 @@ Lưu ý:
 - Không gửi `businessId` hoặc `status`.
 - `sow` và `milestones` là tùy chọn, nhưng nên gửi để test flow mới.
 - `criteriaIds` phải là id đang active trong `GET /api/v1/acceptance-criteria?activeOnly=true`.
-- Sau khi tạo job, vẫn cần gọi API gán domain và skill cho job.
+- `domainIds`, `skills`, `technologyIds` có thể gửi ngay khi tạo job.
+- Sau khi tạo job, vẫn có thể dùng API riêng bên dưới để thay lại domain, skill hoặc technology.
 
 ### Business gán domain cho job
 
@@ -618,6 +702,20 @@ Raw body:
     "isMandatory": false
   }
 ]
+```
+
+### Business gán technology cho job
+
+Token: BUSINESS.
+
+```http
+PUT {{baseUrl}}/api/v1/jobs/{{jobId}}/technologies
+```
+
+Raw body:
+
+```json
+[1, 2, 3, 6, 8]
 ```
 
 ### Business tạo milestone riêng cho job đã có
@@ -658,6 +756,18 @@ Response job có các field quan trọng:
 ```json
 {
   "proposalsCount": 0,
+  "domainIds": [2, 3],
+  "domains": [],
+  "skillIds": [2, 3],
+  "skills": [
+    {
+      "skillId": 2,
+      "isMandatory": true
+    }
+  ],
+  "skillDetails": [],
+  "technologyIds": [1, 2, 3],
+  "technologies": [],
   "sow": {},
   "milestones": [
     {
@@ -704,6 +814,20 @@ DRAFT, OPEN, CLOSED, CANCELLED
 
 Token: EXPERT.
 
+Nếu có file proposal PDF/DOCX, upload trước để lấy path Firebase:
+
+```http
+POST {{baseUrl}}/api/v1/proposals/file
+```
+
+Body `form-data`:
+
+| Key | Type | Value |
+| --- | --- | --- |
+| `file` | File | Chọn PDF/DOCX |
+
+Copy path trả về vào `proposalFileUrl`.
+
 ```http
 POST {{baseUrl}}/api/v1/proposals
 ```
@@ -713,10 +837,24 @@ Raw body:
 ```json
 {
   "jobId": 1,
-  "domainId": 3,
-  "skillId": 2,
   "technicalSolution": "Triển khai RAG chatbot bằng PostgreSQL metadata, vector retrieval, reranking và CRM handoff.",
-  "bidAmount": 110000000
+  "proposalDescription": "Chuyên gia sẽ xây dựng pipeline dữ liệu FAQ, API chatbot, dashboard theo dõi chất lượng câu trả lời và tài liệu vận hành.",
+  "proposalFileUrl": "proposal-files/experts/1/rag-chatbot-proposal.pdf",
+  "bidAmount": 110000000,
+  "proposalMilestone": [
+    {
+      "milestoneId": 1,
+      "proposedBudget": 30000000
+    },
+    {
+      "milestoneId": 2,
+      "proposedBudget": 55000000
+    },
+    {
+      "milestoneId": 3,
+      "proposedBudget": 25000000
+    }
+  ]
 }
 ```
 
@@ -725,9 +863,13 @@ Raw body:
 - Job phải `OPEN`.
 - Expert phải `Approved`.
 - Expert phải có portfolio.
-- `domainId` phải thuộc job và portfolio của expert.
-- `skillId` phải thuộc job và portfolio của expert.
-- Một expert chỉ được gửi một proposal cho một job.
+- Không còn chọn `domainId` hoặc `skillId` khi gửi proposal.
+- Nếu không đề xuất ngân sách milestone mới, bỏ `proposalMilestone` hoặc gửi `null`.
+- `proposalMilestone` chỉ được sửa ngân sách của milestone đã có, không được thêm milestone mới.
+- Nếu gửi `proposalMilestone`, phải gửi đủ toàn bộ milestone của job, không được thiếu hoặc trùng `milestoneId`.
+- Tổng `proposedBudget` trong `proposalMilestone` phải bằng `bidAmount`.
+- Expert có thể gửi lại proposal nếu proposal cũ của job đó đã bị business `Rejected`.
+- Expert không thể gửi thêm nếu đã có proposal cùng job đang khác `Rejected`.
 
 ### Expert xem proposal của mình
 
@@ -773,9 +915,49 @@ Raw body:
 
 ```json
 {
-  "technologyUsed": "Spring Boot, PostgreSQL, React, Firebase Storage",
-  "totalBudget": 78000000,
+  "contractTitle": "Hợp đồng triển khai RAG chatbot cho chăm sóc khách hàng",
   "timelineDays": 42
+}
+```
+
+Lưu ý:
+
+- Chỉ tạo được từ proposal đã `Accepted`.
+- Không gửi `technologyUsed` vì cột này đã được bỏ khỏi `contracts`.
+- Không cần gửi `totalBudget`; backend tự tính từ milestone của job và `proposalMilestone` nếu proposal có đề xuất ngân sách.
+- Khi tạo draft, backend sinh `contractMilestones` gồm `originalBudget`, `finalBudget` và `difference`.
+
+### Xem chi tiết contract
+
+Token: BUSINESS hoặc EXPERT thuộc contract, STAFF/ADMIN theo quyền hiện có.
+
+```http
+GET {{baseUrl}}/api/v1/contracts/1
+```
+
+Response quan trọng:
+
+```json
+{
+  "contractId": 1,
+  "proposalId": 2,
+  "contractTitle": "Hợp đồng triển khai RAG chatbot cho chăm sóc khách hàng",
+  "totalBudget": 110000000,
+  "status": "Draft",
+  "businessAcceptedAt": null,
+  "expertAcceptedAt": null,
+  "businessNdaSignedAt": null,
+  "expertNdaSignedAt": null,
+  "activatedAt": null,
+  "contractMilestones": [
+    {
+      "jobMilestoneId": 1,
+      "milestoneName": "Khảo sát dữ liệu và thiết kế kiến trúc",
+      "originalBudget": 25000000,
+      "finalBudget": 30000000,
+      "difference": 5000000
+    }
+  ]
 }
 ```
 
@@ -799,21 +981,33 @@ Raw body:
 }
 ```
 
-### Kích hoạt contract
+### Ký xác nhận hợp đồng
 
 Token: BUSINESS hoặc EXPERT thuộc contract.
 
 ```http
-POST {{baseUrl}}/api/v1/contracts/1/activate
+POST {{baseUrl}}/api/v1/contracts/1/sign
 ```
+
+Lưu ý:
+
+- Business gọi một lần sẽ set `businessAcceptedAt`.
+- Expert gọi một lần sẽ set `expertAcceptedAt`.
+- API này chưa chắc làm contract `Active` ngay. Contract chỉ active khi đủ chữ ký hợp đồng và NDA của cả hai bên.
 
 ### Ký NDA
 
-Token: EXPERT thuộc contract.
+Token: BUSINESS hoặc EXPERT thuộc contract.
 
 ```http
 POST {{baseUrl}}/api/v1/contracts/1/nda-sign
 ```
+
+Lưu ý:
+
+- Business gọi một lần sẽ set `businessNdaSignedAt`.
+- Expert gọi một lần sẽ set `expertNdaSignedAt`.
+- Khi đủ `businessAcceptedAt`, `expertAcceptedAt`, `businessNdaSignedAt`, `expertNdaSignedAt`, backend chuyển contract sang `Active`, job sang `CLOSED`, và cập nhật ngân sách milestone theo `contract_milestones.finalBudget`.
 
 ### Chấm dứt contract
 
@@ -950,6 +1144,8 @@ GET {{baseUrl}}/api/v1/contracts
 ```http
 GET {{baseUrl}}/api/v1/contracts/1/milestones
 ```
+
+API này trả dữ liệu từ bảng `contract_milestones`, tức là milestone đã chốt cho hợp đồng, có `originalBudget`, `finalBudget` và `difference`.
 
 ### Milestone theo job
 
@@ -1399,24 +1595,40 @@ GET {{baseUrl}}/api/test/secure
 
 1. Gọi `GET /api/v1/domains?activeOnly=true`.
 2. Gọi `GET /api/v1/skills?activeOnly=true`.
-3. Gọi `GET /api/v1/acceptance-criteria?activeOnly=true`.
-4. Business gọi `POST /api/v1/jobs` với `sow` và `milestones[].criteriaIds`.
-5. Business gọi `PUT /api/v1/jobs/{jobId}/domains`.
-6. Business gọi `PUT /api/v1/jobs/{jobId}/skills`.
-7. Business gọi `GET /api/v1/jobs/my` để kiểm tra job nháp có `sow`, `milestones`, `criteria`.
-8. Business gọi `PATCH /api/v1/jobs/{jobId}/status?status=OPEN`.
-9. Expert gọi `GET /api/v1/jobs`.
-10. Expert gọi `POST /api/v1/proposals`.
-11. Business gọi `GET /api/v1/jobs/{jobId}/proposals`.
-12. Business gọi `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted`.
+3. Gọi `GET /api/v1/technologies?activeOnly=true`.
+4. Gọi `GET /api/v1/acceptance-criteria?activeOnly=true`.
+5. Business gọi `POST /api/v1/jobs` với `domainIds`, `skills`, `technologyIds`, `sow` và `milestones[].criteriaIds`.
+6. Nếu cần đổi domain sau khi tạo job, gọi `PUT /api/v1/jobs/{jobId}/domains`.
+7. Nếu cần đổi skill sau khi tạo job, gọi `PUT /api/v1/jobs/{jobId}/skills`.
+8. Nếu cần đổi technology sau khi tạo job, gọi `PUT /api/v1/jobs/{jobId}/technologies`.
+9. Business gọi `GET /api/v1/jobs/my` để kiểm tra job nháp có `sow`, `milestones`, `criteria`, `technologyIds`.
+10. Business gọi `PATCH /api/v1/jobs/{jobId}/status?status=OPEN`.
+11. Expert gọi `GET /api/v1/jobs`.
+12. Expert gọi `POST /api/v1/proposals`, có thể gửi `proposalMilestone` nếu muốn đề xuất ngân sách mới.
+13. Business gọi `GET /api/v1/jobs/{jobId}/proposals`.
+14. Business gọi `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted`.
+
+### Luồng 2.1: Contract draft và ký hợp đồng
+
+1. Business accept proposal qua `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted`.
+2. Business gọi `POST /api/v1/contracts/from-proposals/{proposalId}` để tạo contract draft.
+3. Business gọi `GET /api/v1/contracts/{contractId}` để kiểm tra `contractMilestones`.
+4. Business gọi `POST /api/v1/contracts/{contractId}/sign` để ký hợp đồng phía business.
+5. Business gọi `POST /api/v1/contracts/{contractId}/nda-sign` để đồng ý NDA phía business.
+6. Expert gọi `GET /api/v1/contracts/{contractId}` để xem draft.
+7. Expert gọi `POST /api/v1/contracts/{contractId}/sign` để ký hợp đồng phía expert.
+8. Expert gọi `POST /api/v1/contracts/{contractId}/nda-sign` để đồng ý NDA phía expert.
+9. Gọi lại `GET /api/v1/contracts/{contractId}` để kiểm tra `status = Active`.
+10. Gọi `GET /api/v1/jobs/{jobId}` hoặc `GET /api/v1/jobs/{jobId}/milestones` để kiểm tra job đã `CLOSED` và milestone đã cập nhật ngân sách chốt.
 
 ### Luồng 3: Portfolio và file Firebase
 
 1. Expert upload file qua `POST /api/v1/profiles/portfolio/certificate-file`.
 2. Copy path trả về vào `certificates`.
-3. Expert gọi `POST /api/v1/profiles/portfolio`.
-4. Expert gọi `GET /api/v1/profiles/portfolio/me`.
-5. Business hoặc Staff gọi `GET /api/v1/profiles/files/view-url?path=...`.
+3. Gọi `GET /api/v1/technologies?activeOnly=true` để lấy `technologyIds`.
+4. Expert gọi `POST /api/v1/profiles/portfolio` với `domainIds`, `skillIds`, `technologyIds`.
+5. Expert gọi `GET /api/v1/profiles/portfolio/me`.
+6. Business hoặc Staff gọi `GET /api/v1/profiles/files/view-url?path=...`.
 
 ### Luồng 4: Admin audit log
 
@@ -1472,8 +1684,17 @@ GET {{baseUrl}}/api/test/secure
 - Job chưa `OPEN`.
 - Expert chưa `Approved`.
 - Expert chưa có portfolio.
-- `domainId` hoặc `skillId` không thuộc cả job và portfolio.
-- Expert đã từng nộp proposal cho job đó.
+- Expert đã có proposal cùng job đang khác `Rejected`.
+- `proposalMilestone` không phải JSON array hợp lệ.
+- `proposalMilestone[].milestoneId` không thuộc job đang nộp.
+- Tổng `proposalMilestone[].proposedBudget` không khớp `bidAmount`.
+
+### Contract draft không tạo được
+
+- Proposal chưa được business duyệt `Accepted`.
+- Proposal đã có contract draft trước đó.
+- Job chưa có milestone.
+- `proposalMilestone` trong proposal chứa milestone không thuộc job.
 
 ### Job public không hiện proposal count
 

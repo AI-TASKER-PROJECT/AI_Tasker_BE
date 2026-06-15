@@ -45,7 +45,7 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Contracts
 - Mục đích: Hợp đồng giữa doanh nghiệp và chuyên gia.
-- Cột nổi bật: `total_budget`, `timeline_days`, `nda_signed`, `status`.
+- Cột nổi bật: `total_budget`, `timeline_days`, `business_accepted_at`, `expert_accepted_at`, `business_nda_signed_at`, `expert_nda_signed_at`, `status`.
 - Quan hệ chính: `job_id -> Jobs`; `business_id -> BusinessProfiles`; `expert_id -> ExpertProfiles`.
 
 ### ContractChangeRequests
