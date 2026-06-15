@@ -92,7 +92,7 @@ INSERT INTO skills (skill_id, skill_code, skill_name, description, is_active, cr
     (8, 'POSTGRESQL', 'PostgreSQL', 'Relational modeling, indexing, transactions, and query optimization.', TRUE, NOW(), NOW()),
     (9, 'DOCKER_DEVOPS', 'Docker & DevOps', 'Containerization, local parity, CI/CD, and deployment packaging.', TRUE, NOW(), NOW()),
     (10, 'FIREBASE_STORAGE', 'Firebase Storage', 'File upload, public/private assets, document storage, and access patterns.', TRUE, NOW(), NOW()),
-    (11, 'VNPAY_INTEGRATION', 'VNPay Integration', 'Sandbox payment flow, callback handling, reconciliation, and escrow deposits.', TRUE, NOW(), NOW()),
+    (11, 'PAYOS_INTEGRATION', 'PayOS Integration', 'Payment link flow, webhook handling, reconciliation, and wallet top-up deposits.', TRUE, NOW(), NOW()),
     (12, 'DATA_PIPELINE', 'Data Pipeline Design', 'ETL/ELT pipelines, orchestration, validation, and monitoring.', TRUE, NOW(), NOW()),
     (13, 'POWER_BI_DASHBOARD', 'BI Dashboarding', 'Metric modeling, visualization, drill-down, and stakeholder dashboards.', TRUE, NOW(), NOW()),
     (14, 'OCR_PIPELINE', 'OCR Pipeline', 'Document preprocessing, extraction, validation, and review workflows.', TRUE, NOW(), NOW()),
