@@ -12,5 +12,6 @@ public class PayOSProperties {
     private String apiKey;
     private String checksumKey;
     private String returnUrl;
+    private String appReturnUrl;
     private String cancelUrl;
 }
