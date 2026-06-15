@@ -179,7 +179,7 @@ public class PayOSPaymentService {
         if (request == null) {
             throw new AppException("THONG TIN THANH TOAN KHONG HOP LE");
         }
-        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 2000) {
             throw new AppException("SO TIEN THANH TOAN PHAI LON HON 0");
         }
     }
