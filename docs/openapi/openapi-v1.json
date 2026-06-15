@@ -113,10 +113,10 @@
     "/api/v1/contracts/change-requests": {
       "post": { "tags": ["ContractExecution"], "summary": "Create contract change request", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
     },
-    "/api/v1/contracts/{contractId}/activate": {
+    "/api/v1/contracts/{contractId}/sign": {
       "post": {
         "tags": ["ContractExecution"],
-        "summary": "Activate contract",
+        "summary": "Sign contract",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
         "responses": { "200": { "description": "OK" } }

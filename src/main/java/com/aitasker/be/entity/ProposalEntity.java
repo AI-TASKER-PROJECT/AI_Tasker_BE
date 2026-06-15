@@ -5,6 +5,9 @@
  */
 package com.aitasker.be.entity;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -27,11 +30,16 @@ public class ProposalEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "expert_id", nullable = false) private Integer expertId;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "domain_id") private Integer domainId;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "skill_id") private Integer skillId;
-    // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "technical_solution", nullable = false) private String technicalSolution;
+    // Note: Annotation này cấu hình cột database tương ứng với field entity.
+    @JsonAlias({"projectDescription", "expertProjectDescription"})
+    @Column(name = "proposal_description", columnDefinition = "text") private String proposalDescription;
+    // Note: Annotation này cấu hình cột database tương ứng với field entity.
+    @JsonAlias({"proposalFile", "proposal_file_url"})
+    @Column(name = "proposal_file_url", length = 1024) private String proposalFileUrl;
+    // Note: Annotation này cấu hình cột database tương ứng với field entity.
+    @Setter(AccessLevel.NONE)
+    @Column(name = "proposal_milestone", columnDefinition = "text") private String proposalMilestone;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "bid_amount", nullable = false) private BigDecimal bidAmount;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
@@ -40,4 +48,20 @@ public class ProposalEntity {
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
+
+    // Note: Hàm `setProposalMilestone` nhận cả chuỗi JSON hoặc JSON array/object từ request và lưu xuống DB dưới dạng text.
+    @JsonProperty("proposalMilestone")
+    @JsonAlias("proposal_milestone")
+    public void setProposalMilestone(JsonNode value) {
+        if (value == null || value.isNull()) {
+            this.proposalMilestone = null;
+            return;
+        }
+        this.proposalMilestone = value.isTextual() ? value.asText() : value.toString();
+    }
+
+    // Note: Hàm `assignProposalMilestone` cho service nội bộ gán lại JSON đã được validate và chuẩn hóa.
+    public void assignProposalMilestone(String value) {
+        this.proposalMilestone = value;
+    }
 }

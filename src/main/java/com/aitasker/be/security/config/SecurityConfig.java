@@ -63,7 +63,8 @@ public class SecurityConfig {
                                 "/v3/api-docs.yaml",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/api/chatbot/**"
+                                "/api/chatbot/**",
+                                "/ws/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/payos/return").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/payos/webhook").permitAll()

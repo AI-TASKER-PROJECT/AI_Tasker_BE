@@ -27,8 +27,6 @@ public class AcceptanceCriteriaEntity {
     @Column(name = "criteria_code", nullable = false, unique = true, length = 100) private String criteriaCode;
 
     // Note: Nhóm tiêu chí để giao diện có thể phân loại khi business chọn cho milestone.
-    @Column(name = "category", length = 100) private String category;
-
     // Note: Nội dung tiêu chí nghiệm thu hiển thị cho business và expert.
     @Column(name = "description", nullable = false) private String description;
 
