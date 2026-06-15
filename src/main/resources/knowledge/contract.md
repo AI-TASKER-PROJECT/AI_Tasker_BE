@@ -1,0 +1,4 @@
+- CON-01: Khi Doanh nghiệp chọn chuyên gia, hệ thống tạo hợp đồng nháp. Hợp đồng active khi hai bên cùng Accept.
+- CON-02: Khi hợp đồng active, hệ thống sinh NDA và yêu cầu hai bên xác nhận.
+- EXEC-01: Doanh nghiệp thiết lập milestone và acceptance criteria.
+- EXEC-02: Chuyên gia bàn giao sản phẩm, Doanh nghiệp nghiệm thu. Nếu quá 3 ngày im lặng, hệ thống tự động duyệt.

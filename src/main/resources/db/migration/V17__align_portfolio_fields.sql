@@ -20,6 +20,11 @@ WHERE p.expert_id = e.expert_id;
 
 INSERT INTO portfolios (
     expert_id,
+    context,
+    data_processing,
+    model_architecture,
+    performance_metrics,
+    poc_url,
     domain_ids,
     skill_ids,
     years_experience,
@@ -30,6 +35,11 @@ INSERT INTO portfolios (
 )
 SELECT
     e.expert_id,
+    'Chuyen gia AI co kinh nghiem phan tich yeu cau, xu ly du lieu, xay dung backend va trien khai giai phap AI cho doanh nghiep.',
+    'Du lieu demo duoc chuan hoa tu ho so portfolio hien co de dam bao migrate an toan.',
+    'Tam thoi giu noi dung mo ta quy trinh cu truoc khi drop cac cot legacy.',
+    'Ket qua hieu nang duoc chuyen sang truong self_description o schema moi.',
+    '',
     '2,3,5',
     '2,3,5,8',
     COALESCE(e.years_of_experience, 0),
