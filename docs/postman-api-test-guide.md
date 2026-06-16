@@ -1533,7 +1533,7 @@ Token: STAFF.
 Thông báo cho BUSINESS khi EXPERT nộp deliverable:
 
 ```http
-POST {{baseUrl}}/api/v1/contracts/deliverables
+POST {{baseUrl}}/api/v1/deliverables
 ```
 
 Token: EXPERT.
@@ -1541,8 +1541,8 @@ Token: EXPERT.
 Thông báo cho STAFF khi tranh chấp được tạo hoặc được admin gán:
 
 ```http
-POST {{baseUrl}}/api/v1/contracts/disputes
-POST {{baseUrl}}/api/v1/contracts/disputes/{disputeId}/assign?staffId=1
+POST {{baseUrl}}/api/v1/disputes
+PATCH {{baseUrl}}/api/v1/disputes/{disputeId}/assign?staffId=1
 ```
 
 Token tương ứng: BUSINESS/EXPERT tạo dispute, ADMIN gán dispute.
