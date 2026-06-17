@@ -38,12 +38,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || authHeader.isBlank()) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7);
+        String[] authParts = authHeader.trim().split("\\s+", 2);
+        if (authParts.length != 2 || !"bearer".equalsIgnoreCase(authParts[0])) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String token = authParts[1];
         String username;
         try {
             username = jwtService.extractUsername(token);

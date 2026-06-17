@@ -1,6 +1,3 @@
--- NOTE FILE: src/main/resources/db/migration/V7__seed_demo_account.sql
--- Đây là file gì: Migration seed tài khoản demo để kiểm thử trạng thái account bị khóa.
--- Nhiệm vụ: Thêm account expert mẫu test@mail.com nếu chưa tồn tại, phục vụ test đăng nhập và kiểm tra khóa tài khoản.
 -- Seed demo account: test@mail.com
 -- Password plaintext tương ứng: 12345678
 -- is_active = false theo dữ liệu bạn đang dùng để test case account bị khóa

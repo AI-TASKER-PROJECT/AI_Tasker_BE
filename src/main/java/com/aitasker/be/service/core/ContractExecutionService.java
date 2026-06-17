@@ -332,6 +332,7 @@ public class ContractExecutionService {
         return attachCriteria(saved);
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public AcceptanceCriteriaEntity createCriteria(AcceptanceCriteriaEntity input) {
         accessService.requireRole("ADMIN");
         if (input.getCriteriaCode() == null || input.getCriteriaCode().isBlank()) throw new AppException("CRITERIA CODE KHONG DUOC DE TRONG");
