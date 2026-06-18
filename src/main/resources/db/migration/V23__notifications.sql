@@ -1,4 +1,4 @@
--- NOTE FILE: src/main/resources/db/migration/V22__notifications.sql
+-- NOTE FILE: src/main/resources/db/migration/V23__notifications.sql
 -- Đây là file gì: Migration tạo bảng thông báo để lưu notification realtime và lịch sử thông báo của từng tài khoản.
 -- Mục đích note: mô tả vai trò migration, không note rải vào từng câu SQL.
 

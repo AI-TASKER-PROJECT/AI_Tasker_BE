@@ -1,4 +1,4 @@
--- NOTE FILE: src/main/resources/db/migration/V23__remove_acceptance_criteria_category.sql
+-- NOTE FILE: src/main/resources/db/migration/V28__remove_acceptance_criteria_category.sql
 -- Đây là file gì: Migration xóa cột category khỏi bảng acceptance_criteria vì hệ thống không còn cần phân nhóm tiêu chí nghiệm thu.
 -- Mục đích note: mô tả vai trò migration, không note rải vào từng câu SQL.
 

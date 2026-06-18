@@ -650,7 +650,7 @@ public class ContractExecutionService {
     // Note: Hàm `processPaymentWebhook` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public TransactionEntity processPaymentWebhook(Long transactionId, String paymentStatus, String bankTxCode, String receiptImgUrl) {
         accessService.requireRole("ADMIN");
-        // VNPay sandbox webhook chi cap nhat transaction; du an khong con bang invoice noi bo.
+        // Payment webhook chi cap nhat transaction; du an khong con bang invoice noi bo.
         if (!List.of("Success", "Failed").contains(paymentStatus)) {
             throw new AppException("PAYMENT STATUS KHONG HOP LE");
         }
