@@ -118,6 +118,18 @@ class MarketplaceServiceTest {
                   "title": "Xay dung tro ly AI cham soc khach hang da kenh",
                   "rawRequirements": "Can chatbot tra loi san pham",
                   "budget": 180000000,
+                  "domainIds": [2, 3],
+                  "skills": [
+                    {
+                      "skillId": 2,
+                      "isMandatory": true
+                    },
+                    {
+                      "skillId": 3,
+                      "isMandatory": false
+                    }
+                  ],
+                  "technologyIds": [1, 2, 3],
                   "sow": {
                     "title": "Xay dung tro ly AI cham soc khach hang da kenh",
                     "overview": "Tong quan du an",
@@ -143,6 +155,13 @@ class MarketplaceServiceTest {
 
         assertEquals("[\"Phat trien chatbot\"]", request.getSow().getObjectives());
         assertEquals("[\"API chatbot\"]", request.getSow().getDeliverable());
+        assertEquals(List.of(2, 3), request.getDomainIds());
+        assertEquals(2, request.getSkills().size());
+        assertEquals(2, request.getSkills().get(0).getSkillId());
+        assertTrue(request.getSkills().get(0).getIsMandatory());
+        assertEquals(3, request.getSkills().get(1).getSkillId());
+        assertFalse(request.getSkills().get(1).getIsMandatory());
+        assertEquals(List.of(1, 2, 3), request.getTechnologyIds());
         assertEquals("Discovery & Solution Design", milestone.getMilestoneName());
         assertEquals(new BigDecimal("30000000"), milestone.getFundsAllocated());
         assertEquals(List.of(1, 3, 10), milestone.getCriteriaIds());

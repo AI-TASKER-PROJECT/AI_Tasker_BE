@@ -5,6 +5,8 @@
  */
 package com.aitasker.be.entity;
 
+import com.aitasker.be.dto.catalog.JobSkillAssignmentRequest;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -53,4 +55,13 @@ public class JobEntity {
     @Transient private Long proposalsCount;
     @Transient private SowEntity sow;
     @Transient private List<MilestoneEntity> milestones;
+    @Transient private List<Integer> domainIds;
+    @Transient private List<DomainEntity> domains;
+    @JsonAlias({"jobSkills", "skillAssignments"})
+    @Transient private List<JobSkillAssignmentRequest> skills;
+    @Transient private List<Integer> skillIds;
+    @Transient private List<JobSkillEntity> jobSkills;
+    @Transient private List<SkillEntity> skillDetails;
+    @Transient private List<Integer> technologyIds;
+    @Transient private List<TechnologyEntity> technologies;
 }

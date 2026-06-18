@@ -57,6 +57,7 @@ class AdminServiceTest {
     @Mock private RoleRepository roleRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AuditLogService auditLogService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private AdminService adminService;
@@ -97,6 +98,7 @@ class AdminServiceTest {
         });
         when(staffRepository.findByAccountId(99)).thenReturn(Optional.empty());
         when(staffRepository.save(any(StaffEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
 
         adminService.createAccount(request);
 

@@ -62,15 +62,17 @@ Luu y:
 `ContractExecutionService` hien enforce:
 
 - Tao contract chi tu proposal da `Accepted`.
-- Contract activation dung rule hai ben cung accept:
-  - Business goi `/activate` thi set `business_accepted_at`.
-  - Expert goi `/activate` thi set `expert_accepted_at`.
-  - Chi khi ca hai cot co gia tri thi status moi thanh `Active`.
-  - Neu moi mot ben accept thi status la `Negotiating`.
-- Change request reset acceptance cua hai ben va dua contract ve `Negotiating`.
-- Expert chi ky NDA khi contract da `Active`.
+- Contract sign dung rule hai ben cung ky hop dong va cung ky NDA:
+  - Business goi `/sign` thi set `business_accepted_at`.
+  - Expert goi `/sign` thi set `expert_accepted_at`.
+  - Business goi `/nda-sign` thi set `business_nda_signed_at`.
+  - Expert goi `/nda-sign` thi set `expert_nda_signed_at`.
+  - Chi khi du 4 timestamp tren thi status moi thanh `Active`.
+  - Neu chua du 4 timestamp thi status la `Negotiating`.
+- Change request reset acceptance/NDA cua hai ben va dua contract ve `Negotiating`.
+- Business va expert deu phai ky NDA truoc khi contract active.
 - Business chi tao milestone/criteria cho contract cua minh.
-- Expert chi submit deliverable cho contract cua minh, contract phai `Active` va `nda_signed = true`.
+- Expert chi submit deliverable cho contract cua minh, contract phai `Active` va co du NDA cua business/expert.
 - Khi submit deliverable, milestone duoc chuyen sang `Under Review`.
 - Business chi tao transaction loai `Deposit`; `Payout`/`Refund` danh cho `ADMIN`/`STAFF`.
 - Tao invoice truc tiep chi cho `ADMIN`/`STAFF`.

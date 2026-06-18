@@ -8,13 +8,22 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.ForbiddenException;
+import com.aitasker.be.dto.catalog.JobSkillAssignmentRequest;
+import com.aitasker.be.dto.core.ProposalRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import com.aitasker.be.security.SecurityUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,15 +41,21 @@ public class MarketplaceService {
     private final BusinessProfileRepository businessProfileRepository;
     private final ExpertProfileRepository expertProfileRepository;
     private final JobRepository jobRepository;
-    private final JobDomainRepository jobDomainRepository;
-    private final JobSkillRepository jobSkillRepository;
-    private final PortfolioRepository portfolioRepository;
     private final ProposalRepository proposalRepository;
     private final SowRepository sowRepository;
     private final MilestoneRepository milestoneRepository;
+    private final DomainRepository domainRepository;
+    private final SkillRepository skillRepository;
+    private final JobDomainRepository jobDomainRepository;
+    private final JobSkillRepository jobSkillRepository;
+    private final TechnologyRepository technologyRepository;
+    private final JobTechnologyRepository jobTechnologyRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
     private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
+    private final FirebaseStorageService firebaseStorageService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -61,6 +76,9 @@ public class MarketplaceService {
         JobEntity saved = jobRepository.save(input);
         saveSow(saved.getJobId(), sow);
         saveMilestones(saved, milestones);
+        saveJobDomains(saved.getJobId(), input.getDomainIds());
+        saveJobSkills(saved.getJobId(), input.getSkills());
+        saveJobTechnologies(saved.getJobId(), input.getTechnologyIds());
         auditLogService.record(AuditLogService.ACTION_CREATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
         return attachJobDetails(saved);
     }
@@ -94,27 +112,51 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `submitProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public ProposalEntity submitProposal(ProposalEntity input) {
+    public ProposalEntity submitProposal(ProposalRequest request) {
         accessService.requireRole("EXPERT");
         // CHI CHO EXPERT DA KYC APPROVED NOP PROPOSAL CHO JOB DA MO CONG KHAI.
-        if (input.getJobId() == null) throw new AppException("JOB ID KHONG DUOC DE TRONG");
-        JobEntity job = jobRepository.findById(input.getJobId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        if (request.getJobId() == null) throw new AppException("JOB ID KHONG DUOC DE TRONG");
+        JobEntity job = jobRepository.findById(request.getJobId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
             throw new AppException("JOB KHONG O TRANG THAI CHO PHEP NOP PROPOSAL");
         }
-        if (input.getTechnicalSolution() == null || input.getTechnicalSolution().isBlank()) throw new AppException("TECHNICAL SOLUTION KHONG DUOC DE TRONG");
-        if (input.getBidAmount() == null || input.getBidAmount().signum() <= 0) throw new AppException("BID AMOUNT PHAI LON HON 0");
+        if (request.getTechnicalSolution() == null || request.getTechnicalSolution().isBlank()) throw new AppException("TECHNICAL SOLUTION KHONG DUOC DE TRONG");
+        if (request.getBidAmount() == null || request.getBidAmount().signum() <= 0) throw new AppException("BID AMOUNT PHAI LON HON 0");
+        if (request.getProposalDescription() == null || request.getProposalDescription().isBlank()) {
+            throw new AppException("PROPOSAL DESCRIPTION KHONG DUOC DE TRONG");
+        }
         ExpertProfileEntity expert = currentApprovedExpert();
         Integer expertId = expert.getExpertId();
-        validateProposalFocus(input, expertId);
-        if (proposalRepository.existsByJobIdAndExpertId(input.getJobId(), expertId)) {
+        if (proposalRepository.existsByJobIdAndExpertIdAndStatusNotIgnoreCase(request.getJobId(), expertId, "Rejected")) {
             throw new com.aitasker.be.common.exception.ResourceConflictException("DA TON TAI PROPOSAL CHO JOB NAY");
         }
+        ProposalEntity input = ProposalEntity.builder()
+                .jobId(request.getJobId())
+                .technicalSolution(request.getTechnicalSolution())
+                .proposalDescription(request.getProposalDescription())
+                .proposalFileUrl(request.getProposalFileUrl())
+                .bidAmount(request.getBidAmount())
+                .build();
+        input.assignProposalMilestone(normalizeProposalMilestone(request.proposalMilestoneText(), job, request.getBidAmount()));
         input.setExpertId(expertId);
-        input.setStatus(input.getStatus() == null ? "Pending" : input.getStatus());
+        input.setStatus("Pending");
         ProposalEntity saved = proposalRepository.save(input);
         auditLogService.record(AuditLogService.ACTION_SUBMIT_PROPOSAL, "proposals", String.valueOf(saved.getProposalId()), accessService.currentAccount().getAccountId());
+        businessProfileRepository.findById(job.getBusinessId())
+                .ifPresent(business -> notificationService.notifyProposalCreated(
+                        business.getAccountId(),
+                        accessService.currentAccount().getAccountId(),
+                        job.getJobId(),
+                        job.getTitle()
+                ));
         return saved;
+    }
+
+    // Note: Hàm `uploadProposalFile` upload file proposal của chuyên gia lên Firebase và trả path để gán vào proposal.
+    public String uploadProposalFile(MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        ExpertProfileEntity expert = currentApprovedExpert();
+        return firebaseStorageService.upload(file, "proposal-files/experts/" + expert.getExpertId());
     }
 
     // Note: Hàm `listProposalsByJob` lấy proposal theo job và chỉ cho doanh nghiệp sở hữu job xem danh sách này.
@@ -173,6 +215,14 @@ public class MarketplaceService {
         proposal.setStatus(status);
         ProposalEntity saved = proposalRepository.save(proposal);
         auditLogService.record(AuditLogService.ACTION_REVIEW_PROPOSAL, "proposals", String.valueOf(proposalId), accountId);
+        expertProfileRepository.findById(proposal.getExpertId())
+                .ifPresent(expert -> notificationService.notifyProposalReviewed(
+                        expert.getAccountId(),
+                        accountId,
+                        job.getJobId(),
+                        job.getTitle(),
+                        status
+                ));
         return saved;
     }
 
@@ -229,6 +279,47 @@ public class MarketplaceService {
         }
     }
 
+    // Note: Hàm `saveJobDomains` lưu các lĩnh vực business chọn ngay lúc tạo job.
+    private void saveJobDomains(Integer jobId, List<Integer> domainIds) {
+        if (domainIds == null) return;
+        Set<Integer> ids = new LinkedHashSet<>(domainIds);
+        for (Integer domainId : ids) {
+            domainRepository.findById(domainId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DOMAIN " + domainId));
+            jobDomainRepository.save(JobDomainEntity.builder()
+                    .id(new JobDomainId(jobId, domainId))
+                    .build());
+        }
+    }
+
+    // Note: Hàm `saveJobSkills` lưu các kỹ năng và trạng thái bắt buộc/tùy chọn business chọn ngay lúc tạo job.
+    private void saveJobSkills(Integer jobId, List<JobSkillAssignmentRequest> assignments) {
+        if (assignments == null) return;
+        Set<Integer> seen = new LinkedHashSet<>();
+        for (JobSkillAssignmentRequest assignment : assignments) {
+            if (assignment == null || assignment.getSkillId() == null || !seen.add(assignment.getSkillId())) continue;
+            skillRepository.findById(assignment.getSkillId())
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SKILL " + assignment.getSkillId()));
+            jobSkillRepository.save(JobSkillEntity.builder()
+                    .id(new JobSkillId(jobId, assignment.getSkillId()))
+                    .isMandatory(assignment.getIsMandatory() == null || assignment.getIsMandatory())
+                    .build());
+        }
+    }
+
+    // Note: Hàm `saveJobTechnologies` lưu các công nghệ business chọn cho job vào bảng trung gian.
+    private void saveJobTechnologies(Integer jobId, List<Integer> technologyIds) {
+        if (technologyIds == null) return;
+        Set<Integer> ids = new LinkedHashSet<>(technologyIds);
+        for (Integer technologyId : ids) {
+            technologyRepository.findById(technologyId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY TECHNOLOGY " + technologyId));
+            jobTechnologyRepository.save(JobTechnologyEntity.builder()
+                    .id(new JobTechnologyId(jobId, technologyId))
+                    .build());
+        }
+    }
+
     private List<JobEntity> attachJobDetails(List<JobEntity> jobs) {
         jobs.forEach(this::attachJobDetails);
         return jobs;
@@ -239,6 +330,31 @@ public class MarketplaceService {
             job.setProposalsCount(proposalRepository.countByJobId(job.getJobId()));
             job.setSow(sowRepository.findByJobId(job.getJobId()).orElse(null));
             job.setMilestones(attachMilestoneCriteria(milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId())));
+            List<Integer> domainIds = jobDomainRepository.findByIdJobId(job.getJobId()).stream()
+                    .map(item -> item.getId().getDomainId())
+                    .toList();
+            job.setDomainIds(domainIds);
+            job.setDomains(domainIds.isEmpty() ? List.of() : domainRepository.findAllById(domainIds));
+            List<JobSkillEntity> jobSkills = jobSkillRepository.findByIdJobId(job.getJobId());
+            List<Integer> skillIds = jobSkills.stream()
+                    .map(item -> item.getId().getSkillId())
+                    .toList();
+            job.setJobSkills(jobSkills);
+            job.setSkillIds(skillIds);
+            job.setSkills(jobSkills.stream()
+                    .map(item -> {
+                        JobSkillAssignmentRequest assignment = new JobSkillAssignmentRequest();
+                        assignment.setSkillId(item.getId().getSkillId());
+                        assignment.setIsMandatory(item.getIsMandatory());
+                        return assignment;
+                    })
+                    .toList());
+            job.setSkillDetails(skillIds.isEmpty() ? List.of() : skillRepository.findAllById(skillIds));
+            List<Integer> technologyIds = jobTechnologyRepository.findByIdJobId(job.getJobId()).stream()
+                    .map(item -> item.getId().getTechnologyId())
+                    .toList();
+            job.setTechnologyIds(technologyIds);
+            job.setTechnologies(technologyIds.isEmpty() ? List.of() : technologyRepository.findAllById(technologyIds));
         }
         return job;
     }
@@ -279,6 +395,82 @@ public class MarketplaceService {
         }
     }
 
+    private String normalizeProposalMilestone(String proposalMilestone, JobEntity job, BigDecimal bidAmount) {
+        if (proposalMilestone == null || proposalMilestone.isBlank()) {
+            return null;
+        }
+
+        List<MilestoneEntity> jobMilestones = milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId());
+        if (jobMilestones.isEmpty()) {
+            throw new AppException("JOB CHUA CO MILESTONE DE DE XUAT NGAN SACH");
+        }
+
+        Map<Integer, MilestoneEntity> milestonesById = jobMilestones.stream()
+                .collect(Collectors.toMap(MilestoneEntity::getMilestoneId, item -> item));
+        ArrayNode normalized = objectMapper.createArrayNode();
+        Set<Integer> seenMilestones = new LinkedHashSet<>();
+        BigDecimal total = BigDecimal.ZERO;
+
+        try {
+            JsonNode root = objectMapper.readTree(proposalMilestone);
+            if (!root.isArray()) {
+                throw new AppException("PROPOSAL MILESTONE PHAI LA JSON ARRAY");
+            }
+
+            for (JsonNode item : root) {
+                Integer milestoneId = readRequiredInteger(item, "milestoneId");
+                BigDecimal proposedBudget = readRequiredBudget(item, "proposedBudget");
+                if (!milestonesById.containsKey(milestoneId)) {
+                    throw new AppException("MILESTONE DE XUAT KHONG THUOC JOB NAY " + milestoneId);
+                }
+                if (!seenMilestones.add(milestoneId)) {
+                    throw new AppException("MILESTONE DE XUAT BI TRUNG " + milestoneId);
+                }
+
+                ObjectNode normalizedItem = objectMapper.createObjectNode();
+                normalizedItem.put("milestoneId", milestoneId);
+                normalizedItem.put("proposedBudget", proposedBudget);
+                normalized.add(normalizedItem);
+                total = total.add(proposedBudget);
+            }
+        } catch (JsonProcessingException ex) {
+            throw new AppException("PROPOSAL MILESTONE KHONG PHAI JSON HOP LE");
+        }
+
+        if (seenMilestones.size() != jobMilestones.size()) {
+            throw new AppException("PROPOSAL MILESTONE PHAI GIU NGUYEN SO LUONG MILESTONE CUA JOB");
+        }
+        if (bidAmount != null && total.compareTo(bidAmount) != 0) {
+            throw new AppException("TONG NGAN SACH MILESTONE DE XUAT PHAI BANG BID AMOUNT");
+        }
+
+        try {
+            return objectMapper.writeValueAsString(normalized);
+        } catch (JsonProcessingException ex) {
+            throw new AppException("KHONG CHUAN HOA DUOC PROPOSAL MILESTONE");
+        }
+    }
+
+    private Integer readRequiredInteger(JsonNode node, String fieldName) {
+        JsonNode value = node == null ? null : node.get(fieldName);
+        if (value == null || !value.canConvertToInt()) {
+            throw new AppException(fieldName.toUpperCase() + " KHONG HOP LE");
+        }
+        return value.asInt();
+    }
+
+    private BigDecimal readRequiredBudget(JsonNode node, String fieldName) {
+        JsonNode value = node == null ? null : node.get(fieldName);
+        if (value == null || !value.isNumber()) {
+            throw new AppException(fieldName.toUpperCase() + " KHONG HOP LE");
+        }
+        BigDecimal budget = value.decimalValue();
+        if (budget.signum() <= 0) {
+            throw new AppException(fieldName.toUpperCase() + " PHAI LON HON 0");
+        }
+        return budget;
+    }
+
     private BusinessProfileEntity currentApprovedBusiness() {
         accessService.requireApprovedAccount();
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -302,38 +494,4 @@ public class MarketplaceService {
         return expert;
     }
 
-    // Note: Hàm `validateProposalFocus` đảm bảo domain/skill chuyên gia chọn khi nộp proposal thuộc cả job đang mở và portfolio của chính chuyên gia.
-    private void validateProposalFocus(ProposalEntity input, Integer expertId) {
-        if (input.getDomainId() == null) throw new AppException("DOMAIN CUA PROPOSAL KHONG DUOC DE TRONG");
-        if (input.getSkillId() == null) throw new AppException("SKILL CUA PROPOSAL KHONG DUOC DE TRONG");
-
-        boolean jobHasDomain = jobDomainRepository.findByIdJobId(input.getJobId()).stream()
-                .anyMatch(item -> input.getDomainId().equals(item.getId().getDomainId()));
-        if (!jobHasDomain) throw new AppException("DOMAIN PROPOSAL KHONG THUOC JOB NAY");
-
-        boolean jobHasSkill = jobSkillRepository.findByIdJobId(input.getJobId()).stream()
-                .anyMatch(item -> input.getSkillId().equals(item.getId().getSkillId()));
-        if (!jobHasSkill) throw new AppException("SKILL PROPOSAL KHONG THUOC JOB NAY");
-
-        PortfolioEntity portfolio = portfolioRepository.findByExpertId(expertId)
-                .orElseThrow(() -> new NotFoundException("CHUA CO PORTFOLIO DE NOP PROPOSAL"));
-        Set<Integer> portfolioDomains = parseCatalogIds(portfolio.getDomainIds());
-        Set<Integer> portfolioSkills = parseCatalogIds(portfolio.getSkillIds());
-        if (!portfolioDomains.contains(input.getDomainId())) {
-            throw new AppException("DOMAIN PROPOSAL KHONG NAM TRONG PORTFOLIO CUA CHUYEN GIA");
-        }
-        if (!portfolioSkills.contains(input.getSkillId())) {
-            throw new AppException("SKILL PROPOSAL KHONG NAM TRONG PORTFOLIO CUA CHUYEN GIA");
-        }
-    }
-
-    // Note: Hàm `parseCatalogIds` chuyển chuỗi id trong portfolio thành tập số để kiểm tra domain/skill nhanh và tránh trùng.
-    private Set<Integer> parseCatalogIds(String value) {
-        if (value == null || value.isBlank()) return Set.of();
-        return java.util.Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(item -> !item.isBlank())
-                .map(Integer::valueOf)
-                .collect(Collectors.toSet());
-    }
 }
