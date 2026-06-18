@@ -29,3 +29,4 @@ A: Hiện tại mỗi tài khoản chỉ được đăng ký một vai trò duy 
 
 Q: Tôi có thể dùng một email cho cả Business và Expert không?
 A: Không. Mỗi email chỉ được sử dụng cho một tài khoản và một vai trò.
+
