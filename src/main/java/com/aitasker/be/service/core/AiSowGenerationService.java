@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/AiSowGenerationService.java
+ * Đây là file gì: File service xử lý luồng AI generate Statement of Work cho job.
+ * Nhiệm vụ: Lấy ngữ cảnh RAG, tạo prompt, gọi OpenAI, parse JSON trả về và chuẩn hóa milestone/ngân sách.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
@@ -33,7 +38,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+// Note: Annotation này cho Spring quản lý class như một service nghiệp vụ.
 @Service
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class AiSowGenerationService {
     private static final String SYSTEM_MESSAGE = "Ban la Senior AI Solution Architect. Bat buoc tra ve JSON hop le, khong markdown, khong giai thich ngoai JSON.";
@@ -44,6 +51,7 @@ public class AiSowGenerationService {
     private final ObjectMapper objectMapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
+    // Note: Hàm chính của luồng generate SoW; kiểm tra cấu hình AI, lấy RAG context, gọi AI và chuẩn hóa kết quả.
     public GenerateSowResponse generateSow(GenerateSowRequest request) {
         if (openAiProperties.getApiKey() == null || openAiProperties.getApiKey().isBlank()) {
             throw new BadGatewayException("Chua cau hinh OPENAI_API_KEY");
@@ -74,6 +82,7 @@ public class AiSowGenerationService {
         return response;
     }
 
+    // Note: Hàm dựng prompt đầy đủ từ yêu cầu dự án và RAG context để AI trả về JSON đúng cấu trúc hệ thống.
     public String buildPrompt(GenerateSowRequest request, String ragContext) {
         return """
                 Ban la Senior AI Solution Architect.
@@ -139,6 +148,7 @@ public class AiSowGenerationService {
         );
     }
 
+    // Note: Hàm parse nội dung AI trả về, làm sạch các field dễ sai kiểu rồi map sang response DTO.
     public GenerateSowResponse parseAiResponse(String aiResponse) {
         if (aiResponse == null || aiResponse.isBlank()) {
             throw new BadGatewayException("AI khong tra ve noi dung");
@@ -156,6 +166,7 @@ public class AiSowGenerationService {
         }
     }
 
+    // Note: Hàm chuẩn hóa các field dạng danh sách để nếu AI trả chuỗi đơn thì hệ thống vẫn đọc được.
     private void normalizeStringListFields(JsonNode responseNode) {
         if (!(responseNode instanceof ObjectNode response)) {
             return;
@@ -174,6 +185,7 @@ public class AiSowGenerationService {
         }
     }
 
+    // Note: Hàm chuyển một field không phải array thành array một phần tử để đúng schema response.
     private void normalizeArrayField(ObjectNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
         if (field == null || field.isNull() || field.isArray()) {
@@ -189,6 +201,7 @@ public class AiSowGenerationService {
         node.set(fieldName, values);
     }
 
+    // Note: Hàm chuẩn hóa budget milestone khi AI trả tiền dạng text như "30 triệu" hoặc có ký tự phân cách.
     private void normalizeBudgetFields(JsonNode responseNode) {
         JsonNode milestonesNode = responseNode.get("milestones");
         if (!(milestonesNode instanceof ArrayNode milestones)) {
@@ -249,6 +262,7 @@ public class AiSowGenerationService {
         return digits;
     }
 
+    // Note: Hàm tách phần JSON thật từ response AI, kể cả khi AI bọc trong markdown code block.
     private String extractJsonPayload(String aiResponse) {
         String content = aiResponse.trim();
 
@@ -273,6 +287,7 @@ public class AiSowGenerationService {
         return content;
     }
 
+    // Note: Hàm điều chỉnh tổng ngân sách các milestone khớp với ngân sách doanh nghiệp nhập.
     public void normalizeMilestoneBudget(GenerateSowResponse response, BigDecimal totalBudget) {
         List<MilestoneDto> milestones = response.getMilestones();
         if (milestones == null || milestones.isEmpty()) {
@@ -385,6 +400,7 @@ public class AiSowGenerationService {
         }
     }
 
+    // Note: Hàm gọi OpenAI có retry ngắn với lỗi 5xx để giảm lỗi tạm thời từ phía AI.
     private ResponseEntity<Map> callOpenAi(HttpEntity<Map<String, Object>> request) {
         RestClientResponseException lastException = null;
 
@@ -402,10 +418,12 @@ public class AiSowGenerationService {
         throw lastException;
     }
 
+    // Note: Hàm xác định loại HTTP status nào nên thử gọi lại.
     private boolean shouldRetry(HttpStatusCode statusCode) {
         return statusCode.is5xxServerError();
     }
 
+    // Note: Hàm dựng body request theo Chat Completions API và ép AI trả JSON object.
     private Map<String, Object> buildRequestBody(String prompt) {
         Map<String, Object> systemMessage = new LinkedHashMap<>();
         systemMessage.put("role", "system");
@@ -426,6 +444,7 @@ public class AiSowGenerationService {
         return requestBody;
     }
 
+    // Note: Hàm dựng header gọi AI, bao gồm Content-Type JSON và Bearer API key.
     private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -433,6 +452,7 @@ public class AiSowGenerationService {
         return headers;
     }
 
+    // Note: Hàm lấy phần content text từ response Chat Completions của AI.
     private String extractContent(Map<?, ?> responseBody) {
         if (responseBody == null || responseBody.isEmpty()) {
             throw new BadGatewayException("AI khong tra ve response hop le");
@@ -461,6 +481,7 @@ public class AiSowGenerationService {
         return text;
     }
 
+    // Note: Hàm chia đều ngân sách khi AI không trả budget hợp lệ cho milestone.
     private void distributeEqually(List<MilestoneDto> milestones, BigDecimal totalBudget) {
         BigDecimal baseBudget = totalBudget.divide(BigDecimal.valueOf(milestones.size()), 0, RoundingMode.DOWN);
         BigDecimal allocated = BigDecimal.ZERO;
@@ -523,6 +544,7 @@ public class AiSowGenerationService {
         return values == null ? new ArrayList<>() : values;
     }
 
+    // Note: Hàm rút gọn lỗi OpenAI để trả message đủ thông tin nhưng không quá dài.
     private String buildOpenAiErrorMessage(RestClientResponseException ex) {
         String responseBody = ex.getResponseBodyAsString();
         if (responseBody == null || responseBody.isBlank()) {
@@ -532,6 +554,7 @@ public class AiSowGenerationService {
         return "AI API loi: " + ex.getStatusCode() + " - " + truncate(responseBody, 500);
     }
 
+    // Note: Hàm cắt chuỗi dài, dùng cho thông báo lỗi từ AI hoặc JSON parser.
     private String truncate(String value, int maxLength) {
         if (value.length() <= maxLength) {
             return value;
