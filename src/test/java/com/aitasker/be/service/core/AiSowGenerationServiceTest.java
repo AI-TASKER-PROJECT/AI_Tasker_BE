@@ -21,6 +21,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -224,6 +225,76 @@ class AiSowGenerationServiceTest {
         assertEquals(BigDecimal.valueOf(33), response.getMilestones().get(0).getBudget());
         assertEquals(BigDecimal.valueOf(33), response.getMilestones().get(1).getBudget());
         assertEquals(BigDecimal.valueOf(34), response.getMilestones().get(2).getBudget());
+    }
+
+    @Test
+    void normalizeMilestoneDuration_whenTotalIsDifferent_shouldScaleAndMatchInputDuration() {
+        GenerateSowResponse response = GenerateSowResponse.builder()
+                .milestones(List.of(
+                        MilestoneDto.builder().duration(2).durationUnit("tuan").build(),
+                        MilestoneDto.builder().duration(3).durationUnit("tuần").build()
+                ))
+                .build();
+
+        service.normalizeMilestoneDuration(response, 10, "tuần");
+
+        assertEquals(4, response.getMilestones().get(0).getDuration());
+        assertEquals(6, response.getMilestones().get(1).getDuration());
+        assertEquals("tuần", response.getMilestones().get(0).getDurationUnit());
+        assertEquals("tuần", response.getMilestones().get(1).getDurationUnit());
+    }
+
+    @Test
+    void normalizeMilestoneDuration_whenDurationIsMissing_shouldDistributeEqually() {
+        GenerateSowResponse response = GenerateSowResponse.builder()
+                .milestones(List.of(
+                        MilestoneDto.builder().duration(null).build(),
+                        MilestoneDto.builder().duration(3).durationUnit("week").build(),
+                        MilestoneDto.builder().duration(3).durationUnit("week").build()
+                ))
+                .build();
+
+        service.normalizeMilestoneDuration(response, 10, "tuần");
+
+        assertEquals(3, response.getMilestones().get(0).getDuration());
+        assertEquals(3, response.getMilestones().get(1).getDuration());
+        assertEquals(4, response.getMilestones().get(2).getDuration());
+        assertEquals("tuần", response.getMilestones().get(2).getDurationUnit());
+    }
+
+    @Test
+    void generateSow_whenNeedMoreInfo_shouldClearSowAndMilestones() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
+                        {
+                          "needMoreInfo": true,
+                          "questions": ["Can bo sung API don hang?"],
+                          "sow": {
+                            "title": "AI support bot"
+                          },
+                          "milestones": [
+                            {
+                              "name": "Build",
+                              "description": "Develop bot",
+                              "duration": 3,
+                              "durationUnit": "tuan",
+                              "budget": 100
+                            }
+                          ]
+                        }
+                        """)));
+
+        GenerateSowResponse response = localService.generateSow(buildRequest());
+
+        assertTrue(response.getNeedMoreInfo());
+        assertEquals(1, response.getQuestions().size());
+        assertEquals(0, response.getMilestones().size());
+        assertNull(response.getSow());
     }
 
     @Test
