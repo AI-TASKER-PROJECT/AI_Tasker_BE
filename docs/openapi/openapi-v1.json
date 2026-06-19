@@ -1,341 +1,5785 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.1.0",
   "info": {
     "title": "AITASKER Backend API",
-    "version": "1.2.0"
+    "description": "Interactive API documentation for the AITASKER backend.",
+    "version": "v1"
   },
   "servers": [
-    { "url": "http://localhost:8080" }
+    {
+      "url": "http://127.0.0.1:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
   ],
   "tags": [
-    { "name": "Auth" },
-    { "name": "Profile" },
-    { "name": "Marketplace" },
-    { "name": "ContractExecution" },
-    { "name": "Admin" }
+    {
+      "name": "SoW Generation",
+      "description": "AI generate Statement of Work for jobs"
+    },
+    {
+      "name": "Expert Candidates",
+      "description": "Rank expert candidates for a job posting from saved SoW keywords"
+    },
+    {
+      "name": "Expert Recommendations",
+      "description": "Generate and read saved AI expert recommendations for jobs"
+    }
   ],
   "paths": {
-    "/api/auth/register": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Register",
-        "responses": { "200": { "description": "OK" }, "409": { "description": "Conflict" } }
-      }
-    },
-    "/api/auth/login": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Login",
-        "responses": { "200": { "description": "OK" }, "401": { "description": "Unauthorized" } }
-      }
-    },
-    "/api/v1/profiles/business": {
-      "post": { "tags": ["Profile"], "summary": "Upsert business profile", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
-      "get": { "tags": ["Profile"], "summary": "List business profiles", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/profiles/expert": {
-      "post": { "tags": ["Profile"], "summary": "Upsert expert profile", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
-      "get": { "tags": ["Profile"], "summary": "List expert profiles", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/profiles/portfolio": {
-      "post": { "tags": ["Profile"], "summary": "Upsert portfolio", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
-      "get": { "tags": ["Profile"], "summary": "List portfolios", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/profiles/approve/{type}/{id}": {
-      "post": {
-        "tags": ["Profile"],
-        "summary": "Approve profile",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "type", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/jobs": {
-      "post": { "tags": ["Marketplace"], "summary": "Create job", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
-      "get": { "tags": ["Marketplace"], "summary": "List jobs", "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/jobs/{jobId}": {
+    "/api/v1/jobs/{jobId}/technologies": {
       "get": {
-        "tags": ["Marketplace"],
-        "summary": "Get job detail",
-        "parameters": [{ "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" }, "404": { "description": "Not Found" } }
-      }
-    },
-    "/api/v1/jobs/{jobId}/status": {
-      "patch": {
-        "tags": ["Marketplace"],
-        "summary": "Update job status",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+        "tags": [
+          "catalog-controller"
         ],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/proposals": {
-      "post": { "tags": ["Marketplace"], "summary": "Submit proposal", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" }, "409": { "description": "Conflict" } } }
-    },
-    "/api/v1/proposals/{proposalId}/status": {
-      "patch": {
-        "tags": ["Marketplace"],
-        "summary": "Review proposal",
-        "security": [{ "bearerAuth": [] }],
+        "operationId": "listJobTechnologies",
         "parameters": [
-          { "name": "proposalId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
         ],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/jobs/{jobId}/proposals": {
-      "get": {
-        "tags": ["Marketplace"],
-        "summary": "List proposals by job",
-        "parameters": [{ "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/contracts/from-proposals/{proposalId}": {
-      "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Create draft contract from proposal",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "proposalId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/contracts/change-requests": {
-      "post": { "tags": ["ContractExecution"], "summary": "Create contract change request", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/contracts/{contractId}/sign": {
-      "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Sign contract",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/contracts/{contractId}/nda-sign": {
-      "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Sign NDA for active contract",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/contracts/{contractId}/terminate": {
-      "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Terminate contract",
-        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "replaceJobTechnologies",
         "parameters": [
-          { "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "reason", "in": "query", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
         ],
-        "responses": { "200": { "description": "OK" } }
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/v1/contracts": {
-      "get": { "tags": ["ContractExecution"], "summary": "List contracts", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/milestones": {
-      "post": { "tags": ["ContractExecution"], "summary": "Create milestone", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/contracts/{contractId}/milestones": {
+    "/api/v1/jobs/{jobId}/skills": {
       "get": {
-        "tags": ["ContractExecution"],
-        "summary": "List milestones by contract",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listJobSkills",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "replaceJobSkills",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/JobSkillAssignmentRequest"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/v1/criteria": {
-      "post": { "tags": ["ContractExecution"], "summary": "Create acceptance criteria", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/milestones/{milestoneId}/criteria": {
+    "/api/v1/jobs/{jobId}/domains": {
       "get": {
-        "tags": ["ContractExecution"],
-        "summary": "List criteria by milestone",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "milestoneId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listJobDomains",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "replaceJobDomains",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
       }
-    },
-    "/api/v1/deliverables": {
-      "post": { "tags": ["ContractExecution"], "summary": "Submit deliverable", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
     },
     "/api/v1/transactions": {
-      "post": { "tags": ["ContractExecution"], "summary": "Create transaction", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/transactions/{transactionId}/status": {
-      "patch": {
-        "tags": ["ContractExecution"],
-        "summary": "Update transaction status",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "transactionId", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } },
-          { "name": "status", "in": "query", "required": true, "schema": { "type": "string" } }
+      "post": {
+        "tags": [
+          "contract-execution-controller"
         ],
-        "responses": { "200": { "description": "OK" } }
+        "operationId": "createTransaction",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTransactionEntity"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/transactions/{transactionId}/webhook": {
       "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Process payment webhook",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "transactionId", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } },
-          { "name": "paymentStatus", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "bankTxCode", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "receiptImgUrl", "in": "query", "required": false, "schema": { "type": "string" } }
+        "tags": [
+          "contract-execution-controller"
         ],
-        "responses": { "200": { "description": "OK" } }
+        "operationId": "processPaymentWebhook",
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bankTxCode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "receiptImgUrl",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTransactionEntity"
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/v1/invoices": {
-      "post": { "tags": ["ContractExecution"], "summary": "Create invoice", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/disputes": {
-      "post": { "tags": ["ContractExecution"], "summary": "Create dispute", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } }
-    },
-    "/api/v1/disputes/{disputeId}/assign": {
-      "patch": {
-        "tags": ["ContractExecution"],
-        "summary": "Assign dispute",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "staffId", "in": "query", "required": true, "schema": { "type": "integer" } }
+    "/api/v1/technologies": {
+      "get": {
+        "tags": [
+          "catalog-controller"
         ],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/disputes/{disputeId}/resolve": {
-      "patch": {
-        "tags": ["ContractExecution"],
-        "summary": "Resolve dispute",
-        "security": [{ "bearerAuth": [] }],
+        "operationId": "listTechnologies",
         "parameters": [
-          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "proposedAction", "in": "query", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
         ],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/disputes/{disputeId}/demo-testing": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Record demo testing result",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "testResult", "in": "query", "required": true, "schema": { "type": "string" } }
+        "tags": [
+          "catalog-controller"
         ],
-        "responses": { "200": { "description": "OK" } }
+        "operationId": "createTechnology",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TechnologyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTechnologyEntity"
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/v1/disputes/{disputeId}/technical-report": {
-      "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Issue technical report",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "disputeId", "in": "path", "required": true, "schema": { "type": "integer" } },
-          { "name": "reportContent", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "proposedAction", "in": "query", "required": false, "schema": { "type": "string" } }
+    "/api/v1/skills": {
+      "get": {
+        "tags": [
+          "catalog-controller"
         ],
-        "responses": { "200": { "description": "OK" } }
+        "operationId": "listSkills",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "createSkill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSkillEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/proposals": {
+      "post": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "submitProposal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProposalEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/proposals/file": {
+      "post": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "uploadProposalFile",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/portfolio": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "listPortfolio",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "upsertPortfolio",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePortfolioEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/portfolio/certificate-file": {
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "uploadExpertCertificate",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/expert": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "listExpert",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "upsertExpert",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpertProfileEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/business": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "listBusiness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "upsertBusiness",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusinessProfileEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/business/license-file": {
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "uploadBusinessLicense",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/approve/{type}/{id}": {
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "approve",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/milestones": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createMilestone",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MilestoneEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMilestoneEntity"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/milestones/sla-auto-approve": {
       "post": {
-        "tags": ["ContractExecution"],
-        "summary": "Run SLA auto approve milestones",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/jobs/{jobId}/matching": {
-      "get": {
-        "tags": ["ContractExecution"],
-        "summary": "Matching by keyword",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "jobId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/admin/reviews": {
-      "post": {
-        "tags": ["Admin"],
-        "summary": "Create review",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/admin/reviews/contracts/{contractId}": {
-      "get": {
-        "tags": ["Admin"],
-        "summary": "List reviews by contract",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "contractId", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/admin/settings": {
-      "get": {
-        "tags": ["Admin"],
-        "summary": "List system settings",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "OK" } }
-      }
-    },
-    "/api/v1/admin/settings/{key}": {
-      "patch": {
-        "tags": ["Admin"],
-        "summary": "Update system setting",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "key", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "value", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "isActive", "in": "query", "required": false, "schema": { "type": "boolean" } }
+        "tags": [
+          "contract-execution-controller"
         ],
-        "responses": { "200": { "description": "OK" } }
+        "operationId": "runSlaAutoApprove",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "listJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "createJob",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/domains": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listDomains",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "createDomain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDomainEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/disputes": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createDispute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/disputes/{disputeId}/technical-report": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "issueTechnicalReport",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "reportContent",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposedAction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/disputes/{disputeId}/demo-testing": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "recordDemoTesting",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "testResult",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deliverables": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "submitDeliverable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverableEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliverableEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/criteria": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createCriteria",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptanceCriteriaEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAcceptanceCriteriaEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/{contractId}/terminate": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "terminate",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/{contractId}/sign": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "signContract",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/{contractId}/nda-sign": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "signNda",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/from-proposals/{proposalId}": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createDraft",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/change-requests": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "requestChange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractChangeRequestEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractChangeRequestEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/wallet/sync": {
+      "post": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "syncSystemWallet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/staffs": {
       "get": {
-        "tags": ["Admin"],
-        "summary": "List staffs",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "OK" } }
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listStaffs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
       },
       "post": {
-        "tags": ["Admin"],
-        "summary": "Create staff",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "OK" } }
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "createStaff",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStaffResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/reviews": {
+      "post": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "createReview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/accounts": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listAccounts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "createAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/payos/{orderCode}/sync": {
+      "post": {
+        "tags": [
+          "pay-os-payment-controller"
+        ],
+        "operationId": "syncPaymentStatus",
+        "parameters": [
+          {
+            "name": "orderCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/payos/webhook": {
+      "post": {
+        "tags": [
+          "pay-os-payment-controller"
+        ],
+        "operationId": "handleWebhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Webhook"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/payos/create": {
+      "post": {
+        "tags": [
+          "pay-os-payment-controller"
+        ],
+        "operationId": "createPayment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWalletTopupPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCreatePayOSPaymentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{jobPostingId}/expert-recommendations": {
+      "get": {
+        "tags": [
+          "Expert Recommendations"
+        ],
+        "summary": "Get saved expert recommendations",
+        "description": "Read saved expert recommendations without calling AI.",
+        "operationId": "getRecommendations",
+        "parameters": [
+          {
+            "name": "jobPostingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertRecommendationListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Expert Recommendations"
+        ],
+        "summary": "Generate expert recommendations",
+        "description": "Generate and persist Top 5 expert recommendations for a job.",
+        "operationId": "generateRecommendations",
+        "parameters": [
+          {
+            "name": "jobPostingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertRecommendationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/generate-sow": {
+      "post": {
+        "tags": [
+          "SoW Generation"
+        ],
+        "summary": "Generate SoW",
+        "description": "Generate structured SoW, milestones and milestone budgets from raw job requirements.",
+        "operationId": "generateSow",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateSowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateSowResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chatbot/ask": {
+      "post": {
+        "tags": [
+          "chatbot-controller"
+        ],
+        "operationId": "ask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/email/verify-otp": {
+      "post": {
+        "tags": [
+          "email-otp-controller"
+        ],
+        "operationId": "verifyOtp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/email/send-otp": {
+      "post": {
+        "tags": [
+          "email-otp-controller"
+        ],
+        "operationId": "sendOtp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSendOtpResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transactions/{transactionId}/status": {
+      "patch": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "updateTransactionStatus",
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTransactionEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/technologies/{technologyId}": {
+      "patch": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "updateTechnology",
+        "parameters": [
+          {
+            "name": "technologyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TechnologyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTechnologyEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skills/{skillId}": {
+      "patch": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "updateSkill",
+        "parameters": [
+          {
+            "name": "skillId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSkillEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/proposals/{proposalId}/status": {
+      "patch": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "reviewProposal",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProposalEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read": {
+      "patch": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "markAsRead",
+        "parameters": [
+          {
+            "name": "notificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "patch": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "markAllAsRead",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{jobId}/status": {
+      "patch": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "updateJobStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/domains/{domainId}": {
+      "patch": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "updateDomain",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDomainEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/disputes/{disputeId}/resolve": {
+      "patch": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "resolveDispute",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "proposedAction",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/disputes/{disputeId}/assign": {
+      "patch": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "assignDispute",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "staffId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/staffs/{staffId}": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "updateStaff",
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStaffResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/settings/{key}": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "updateSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "value",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemSettingEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/accounts/{accountId}": {
+      "delete": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "deactivateAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "updateAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/accounts/{accountId}/status": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "setAccountStatus",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/accounts/{accountId}/active": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "setAccountActive",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wallet/me": {
+      "get": {
+        "tags": [
+          "wallet-controller"
+        ],
+        "operationId": "currentWallet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/proposals/my": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "listMyProposals",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/portfolio/me": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "myPortfolio",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePortfolioEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/files/view-url": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "fileViewUrl",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/expert/me": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "myExpert",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/business/me": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "myBusiness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/business/by-job/{jobId}": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "businessByJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "listMine",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "countUnreadMine",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUnreadNotificationCountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/milestones/{milestoneId}/transactions": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listTransactions",
+        "parameters": [
+          {
+            "name": "milestoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/milestones/{milestoneId}/deliverables": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listDeliverables",
+        "parameters": [
+          {
+            "name": "milestoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/milestones/{milestoneId}/criteria": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listCriteria",
+        "parameters": [
+          {
+            "name": "milestoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "jobDetail",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{jobId}/proposals": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "listProposals",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{jobId}/milestones": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listJobMilestones",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{jobId}/matching": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "matching",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/my": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "listMyJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/disputes/{disputeId}": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "getDispute",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listContracts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/{contractId}": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "getContract",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/{contractId}/milestones": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listMilestones",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contracts/{contractId}/disputes": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listDisputes",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/wallet": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "systemWallet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/reviews/contracts/{contractId}": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listReviewsByContract",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listAuditLogs",
+        "parameters": [
+          {
+            "name": "actorGroup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/analytics/overview": {
       "get": {
-        "tags": ["Admin"],
-        "summary": "Analytics overview",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "OK" } }
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "analyticsOverview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/acceptance-criteria": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listAcceptanceCriteria",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/test/secure": {
+      "get": {
+        "tags": [
+          "test-controller"
+        ],
+        "operationId": "secure",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/payos/return": {
+      "get": {
+        "tags": [
+          "pay-os-payment-controller"
+        ],
+        "operationId": "handleReturn",
+        "parameters": [
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{jobPostingId}/expert-candidates": {
+      "get": {
+        "tags": [
+          "Expert Candidates"
+        ],
+        "summary": "Find top expert candidates",
+        "description": "Extract SoW keywords and rank matching expert portfolios.",
+        "operationId": "findTopCandidates",
+        "parameters": [
+          {
+            "name": "jobPostingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpertCandidateSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health-controller"
+        ],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/tax-check/{mst}": {
+      "get": {
+        "tags": [
+          "tax-check-controller"
+        ],
+        "operationId": "checkTaxCode",
+        "parameters": [
+          {
+            "name": "mst",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/check-email": {
+      "get": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "checkEmail",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "security": []
       }
     }
   },
   "components": {
+    "schemas": {
+      "ApiResponseObject": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {},
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "JobSkillAssignmentRequest": {
+        "type": "object",
+        "properties": {
+          "skillId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isMandatory": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TransactionEntity": {
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "milestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "commissionFee": {
+            "type": "number"
+          },
+          "transactionType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseTransactionEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TransactionEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TechnologyRequest": {
+        "type": "object",
+        "properties": {
+          "technologyCode": {
+            "type": "string"
+          },
+          "technologyName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApiResponseTechnologyEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TechnologyEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TechnologyEntity": {
+        "type": "object",
+        "properties": {
+          "technologyId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "technologyCode": {
+            "type": "string"
+          },
+          "technologyName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SkillRequest": {
+        "type": "object",
+        "properties": {
+          "skillCode": {
+            "type": "string"
+          },
+          "skillName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseSkillEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SkillEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SkillEntity": {
+        "type": "object",
+        "properties": {
+          "skillId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skillCode": {
+            "type": "string"
+          },
+          "skillName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProposalRequest": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "technicalSolution": {
+            "type": "string"
+          },
+          "proposalDescription": {
+            "type": "string"
+          },
+          "proposalFileUrl": {
+            "type": "string"
+          },
+          "bidAmount": {
+            "type": "number"
+          },
+          "proposalMilestone": {}
+        }
+      },
+      "ApiResponseProposalEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProposalEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProposalEntity": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expertId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "technicalSolution": {
+            "type": "string"
+          },
+          "proposalDescription": {
+            "type": "string"
+          },
+          "proposalFileUrl": {
+            "type": "string"
+          },
+          "bidAmount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposalMilestone": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseString": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PortfolioEntity": {
+        "type": "object",
+        "properties": {
+          "portfolioId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expertId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "domainIds": {
+            "type": "string"
+          },
+          "skillIds": {
+            "type": "string"
+          },
+          "technologyIds": {
+            "type": "string"
+          },
+          "yearsExperience": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "certificates": {
+            "type": "string"
+          },
+          "selfDescription": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponsePortfolioEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PortfolioEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpertProfileEntity": {
+        "type": "object",
+        "properties": {
+          "expertId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nationalId": {
+            "type": "string"
+          },
+          "portfolioUrl": {
+            "type": "string"
+          },
+          "yearsOfExperience": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kycStatus": {
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseExpertProfileEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExpertProfileEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BusinessProfileEntity": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "taxCode": {
+            "type": "string"
+          },
+          "companyName": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "businessLicenseUrl": {
+            "type": "string"
+          },
+          "kybStatus": {
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseBusinessProfileEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BusinessProfileEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AcceptanceCriteriaEntity": {
+        "type": "object",
+        "properties": {
+          "criteriaId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "criteriaCode": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MilestoneEntity": {
+        "type": "object",
+        "properties": {
+          "milestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "milestoneName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "fundsAllocated": {
+            "type": "number"
+          },
+          "orderIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "criteriaIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcceptanceCriteriaEntity"
+            }
+          }
+        }
+      },
+      "ApiResponseMilestoneEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MilestoneEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DomainEntity": {
+        "type": "object",
+        "properties": {
+          "domainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "domainCode": {
+            "type": "string"
+          },
+          "domainName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "JobEntity": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "businessId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "rawRequirements": {
+            "type": "string"
+          },
+          "structuredSow": {
+            "type": "string"
+          },
+          "budget": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "plannedDurationValue": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "plannedDurationUnit": {
+            "type": "string"
+          },
+          "isHot": {
+            "type": "boolean"
+          },
+          "hotUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposalsCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sow": {
+            "$ref": "#/components/schemas/SowEntity"
+          },
+          "milestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MilestoneEntity"
+            }
+          },
+          "domainIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DomainEntity"
+            }
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSkillAssignmentRequest"
+            }
+          },
+          "skillIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "jobSkills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSkillEntity"
+            }
+          },
+          "skillDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillEntity"
+            }
+          },
+          "technologyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "technologies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TechnologyEntity"
+            }
+          }
+        }
+      },
+      "JobSkillEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/JobSkillId"
+          },
+          "isMandatory": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "JobSkillId": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skillId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SowEntity": {
+        "type": "object",
+        "properties": {
+          "sowId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "overview": {
+            "type": "string"
+          },
+          "objectives": {
+            "type": "string"
+          },
+          "scopeOfWork": {
+            "type": "string"
+          },
+          "deliverable": {
+            "type": "string"
+          },
+          "assumptions": {
+            "type": "string"
+          },
+          "outOfScope": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseJobEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/JobEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DomainRequest": {
+        "type": "object",
+        "properties": {
+          "domainCode": {
+            "type": "string"
+          },
+          "domainName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApiResponseDomainEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DomainEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DisputeEntity": {
+        "type": "object",
+        "properties": {
+          "disputeId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "milestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assignedStaffId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evidenceReport": {
+            "type": "string"
+          },
+          "proposedAction": {
+            "type": "string"
+          },
+          "adminApprovedBy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseDisputeEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DisputeEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliverableEntity": {
+        "type": "object",
+        "properties": {
+          "deliverableId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "milestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceCodeUrl": {
+            "type": "string"
+          },
+          "demoLink": {
+            "type": "string"
+          },
+          "submissionNotes": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseDeliverableEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeliverableEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseAcceptanceCriteriaEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AcceptanceCriteriaEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseContractEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ContractEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ContractEntity": {
+        "type": "object",
+        "properties": {
+          "contractId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "businessId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expertId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "proposalId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractTitle": {
+            "type": "string"
+          },
+          "totalBudget": {
+            "type": "number"
+          },
+          "timelineDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "businessAcceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expertAcceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "businessNdaSignedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expertNdaSignedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contractMilestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractMilestoneEntity"
+            }
+          }
+        }
+      },
+      "ContractMilestoneEntity": {
+        "type": "object",
+        "properties": {
+          "contractMilestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobMilestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "milestoneName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "originalBudget": {
+            "type": "number"
+          },
+          "finalBudget": {
+            "type": "number"
+          },
+          "orderIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "difference": {
+            "type": "number"
+          }
+        }
+      },
+      "ContractChangeRequestEntity": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestedByAccountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "changeType": {
+            "type": "string"
+          },
+          "changeSummary": {
+            "type": "string"
+          },
+          "proposedBudget": {
+            "type": "number"
+          },
+          "proposedTimelineDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reviewedByAccountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseContractChangeRequestEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ContractChangeRequestEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseSystemWalletEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SystemWalletEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SystemWalletEntity": {
+        "type": "object",
+        "properties": {
+          "systemWalletId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roleId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "walletType": {
+            "type": "string"
+          },
+          "transactionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "depositedBusinessCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "successfulDepositCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentBalance": {
+            "type": "number"
+          },
+          "availableBalance": {
+            "type": "number"
+          },
+          "escrowBalance": {
+            "type": "number"
+          },
+          "totalRevenue": {
+            "type": "number"
+          },
+          "holdingBalance": {
+            "type": "number"
+          },
+          "disputedBalance": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "lastSyncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StaffEntity": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "specialization": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseStaffResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StaffResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StaffResponse": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "specialization": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReviewEntity": {
+        "type": "object",
+        "properties": {
+          "reviewId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reviewerId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revieweeId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseReviewEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AccountRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "specialization": {
+            "type": "string"
+          }
+        }
+      },
+      "AccountResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "specialization": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseAccountResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AccountResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponsePaymentOrderEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaymentOrderEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PaymentOrderEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "businessId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "jobId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "milestoneId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "PAYOS"
+            ]
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "providerTxnRef": {
+            "type": "string"
+          },
+          "providerTransactionNo": {
+            "type": "string"
+          },
+          "providerResponseCode": {
+            "type": "string"
+          },
+          "providerSecureHash": {
+            "type": "string"
+          },
+          "providerOrderCode": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "providerPaymentLinkId": {
+            "type": "string"
+          },
+          "checkoutUrl": {
+            "type": "string"
+          },
+          "cancelUrl": {
+            "type": "string"
+          },
+          "returnUrl": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "FAILED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebhookData"
+          },
+          "signature": {
+            "type": "string"
+          }
+        }
+      },
+      "WebhookData": {
+        "type": "object",
+        "properties": {
+          "orderCode": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "transactionDateTime": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "paymentLinkId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "counterAccountBankId": {
+            "type": "string"
+          },
+          "counterAccountBankName": {
+            "type": "string"
+          },
+          "counterAccountName": {
+            "type": "string"
+          },
+          "counterAccountNumber": {
+            "type": "string"
+          },
+          "virtualAccountName": {
+            "type": "string"
+          },
+          "virtualAccountNumber": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateWalletTopupPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseCreatePayOSPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreatePayOSPaymentResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreatePayOSPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "checkoutUrl": {
+            "type": "string"
+          },
+          "qrCode": {
+            "type": "string"
+          },
+          "bin": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "expiredAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderCode": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "FAILED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          }
+        }
+      },
+      "ApiResponseExpertRecommendationListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExpertRecommendationListResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpertRecommendationListResponse": {
+        "type": "object",
+        "properties": {
+          "jobPostingId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpertRecommendationResponse"
+            }
+          },
+          "generatedByAi": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ExpertRecommendationResponse": {
+        "type": "object",
+        "properties": {
+          "expertId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "portfolioId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rankPosition": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "matchScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "matchedSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matchedDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "GenerateSowRequest": {
+        "type": "object",
+        "properties": {
+          "projectTitle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rawRequirement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "budget": {
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "durationUnit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supportFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiredSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "budget",
+          "duration",
+          "durationUnit",
+          "projectTitle",
+          "rawRequirement"
+        ]
+      },
+      "GenerateSowResponse": {
+        "type": "object",
+        "properties": {
+          "needMoreInfo": {
+            "type": "boolean"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sow": {
+            "$ref": "#/components/schemas/SowDto"
+          },
+          "milestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MilestoneDto"
+            }
+          }
+        }
+      },
+      "MilestoneDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "durationUnit": {
+            "type": "string"
+          },
+          "budget": {
+            "type": "number"
+          }
+        }
+      },
+      "SowDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "overview": {
+            "type": "string"
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scopeOfWork": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deliverables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outOfScope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ChatRequest": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatResponse": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 2147483647,
+            "minLength": 8
+          },
+          "fullName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email",
+          "fullName",
+          "password",
+          "phone",
+          "role"
+        ]
+      },
+      "ApiResponseAuthResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AuthResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "accountStatus": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 2147483647,
+            "minLength": 8
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "VerifyOtpRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "otp": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\d{6}"
+          }
+        },
+        "required": [
+          "email",
+          "otp"
+        ]
+      },
+      "SendOtpRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ApiResponseSendOtpResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SendOtpResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SendOtpResponse": {
+        "type": "object",
+        "properties": {
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ApiResponseNotificationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "notificationId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "targetUrl": {
+            "type": "string"
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListNotificationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            }
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseSystemSettingEntity": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SystemSettingEntity"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SystemSettingEntity": {
+        "type": "object",
+        "properties": {
+          "settingKey": {
+            "type": "string"
+          },
+          "settingValue": {
+            "type": "string"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedByRoleId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseUnreadNotificationCountResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UnreadNotificationCountResponse"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UnreadNotificationCountResponse": {
+        "type": "object",
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ExpertCandidateResponse": {
+        "type": "object",
+        "properties": {
+          "expertId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "portfolioId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "matchScore": {
+            "type": "number",
+            "format": "double"
+          },
+          "matchedSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matchedDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "yearsExperience": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "certificates": {
+            "type": "string"
+          },
+          "selfDescription": {
+            "type": "string"
+          }
+        }
+      },
+      "ExpertCandidateSearchResponse": {
+        "type": "object",
+        "properties": {
+          "jobPostingId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "keywords": {
+            "$ref": "#/components/schemas/SowKeywordExtractionResult"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpertCandidateResponse"
+            }
+          }
+        }
+      },
+      "SowKeywordExtractionResult": {
+        "type": "object",
+        "properties": {
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TaxCheckResponse": {
+        "type": "object",
+        "properties": {
+          "taxCode": {
+            "type": "string"
+          },
+          "companyName": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "representative": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
