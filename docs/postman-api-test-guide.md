@@ -1,31 +1,18 @@
 # Hướng Dẫn Test API Back-end Bằng Postman
 
-Tài liệu này liệt kê các API back-end đang dùng được ở hiện tại và hướng dẫn test bằng Postman theo flow thực tế của dự án.
+Tài liệu này liệt kê các API back-end hiện có và hướng dẫn test bằng Postman. Danh sách API được đồng bộ từ `/v3/api-docs` hiện tại.
 
 ## 1. Chuẩn Bị
 
 Chạy hạ tầng và back-end:
-
 ```powershell
 docker compose up -d
 .\mvnw.cmd spring-boot:run
 ```
-
 Base URL:
-
 ```text
 http://localhost:8080
 ```
-
-Header cho API cần đăng nhập:
-
-```text
-Authorization: Bearer {{token}}
-Content-Type: application/json
-```
-
-Với API upload file, không tự set `Content-Type`; để Postman tự tạo `multipart/form-data`.
-
 Environment khuyến nghị:
 
 | Key | Value |
@@ -36,337 +23,447 @@ Environment khuyến nghị:
 | `adminToken` | Token ADMIN |
 | `staffToken` | Token STAFF |
 
-## 2. Tài Khoản Seed
-
-Mật khẩu seed thường dùng:
-
+Header cho API cần đăng nhập:
 ```text
-12345678
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
 ```
+Với upload file, chọn `Body -> form-data`, key là `file`, type là `File`; không tự set `Content-Type`.
 
-| Role | Email | Ghi chú |
-| --- | --- | --- |
-| BUSINESS | `business@aitasker.local` | Có business profile đã duyệt |
-| EXPERT | `expert@aitasker.local` | Có expert profile đã duyệt |
-| ADMIN | `admin@aitasker.local` | Quản trị account, setting, audit log |
-| STAFF | `staff@aitasker.local` | Duyệt KYC/KYB |
+## 2. Tài Khoản Seed Thường Dùng
 
-ID seed thường dùng:
+| Role | Email | Mật khẩu | Token env gợi ý |
+| --- | --- | --- | --- |
+| BUSINESS | `business@aitasker.local` | `12345678` | `businessToken` |
+| EXPERT | `expert@aitasker.local` | `12345678` | `expertToken` |
+| ADMIN | `admin@aitasker.local` | `12345678` | `adminToken` |
+| STAFF | `staff@aitasker.local` | `12345678` | `staffToken` |
 
-| Loại dữ liệu | ID mẫu |
-| --- | --- |
-| `businessId` | `1` |
-| `expertId` | `1` |
-| `jobId` | `1`, `2`, `3` |
-| `proposalId` | `1`, `2`, `3` |
-| `contractId` | `1`, `2` |
-| `milestoneId` | `1`, `2`, `3`, `4` |
-| `domainId` | `2`, `3`, `4`, `8` |
-| `skillId` | `2`, `3`, `6`, `8`, `9`, `14`, `15` |
-| `technologyId` | Lấy từ `GET /api/v1/technologies?activeOnly=true` |
-| `criteriaId` | Lấy từ `GET /api/v1/acceptance-criteria?activeOnly=true` |
+## 3. Danh Sách API Theo Swagger
 
-## 3. Auth API
+### admin-controller
 
-### Đăng nhập
+#### 1. DELETE /api/v1/admin/accounts/{accountId}
 
 ```http
-POST {{baseUrl}}/api/auth/login
+DELETE {{baseUrl}}/api/v1/admin/accounts/{accountId}
 ```
 
-Raw body:
+- Mục đích: Xóa, khóa hoặc vô hiệu hóa dữ liệu theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
+#### 2. GET /api/v1/admin/staffs
+
+```http
+GET {{baseUrl}}/api/v1/admin/staffs
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 3. GET /api/v1/admin/accounts
+
+```http
+GET {{baseUrl}}/api/v1/admin/accounts
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 4. GET /api/v1/admin/wallet
+
+```http
+GET {{baseUrl}}/api/v1/admin/wallet
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 5. GET /api/v1/admin/settings
+
+```http
+GET {{baseUrl}}/api/v1/admin/settings
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 6. GET /api/v1/admin/reviews/contracts/{contractId}
+
+```http
+GET {{baseUrl}}/api/v1/admin/reviews/contracts/{contractId}
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 7. GET /api/v1/admin/audit-logs
+
+```http
+GET {{baseUrl}}/api/v1/admin/audit-logs
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 8. GET /api/v1/admin/analytics/overview
+
+```http
+GET {{baseUrl}}/api/v1/admin/analytics/overview
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 9. PATCH /api/v1/admin/staffs/{staffId}
+
+```http
+PATCH {{baseUrl}}/api/v1/admin/staffs/{staffId}
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
-  "email": "business@aitasker.local",
-  "password": "12345678"
+  "accountId": 4,
+  "specialization": "KYB"
 }
 ```
 
-Copy `accessToken` từ response vào biến môi trường tương ứng.
+#### 10. PATCH /api/v1/admin/settings/{key}
 
-### Kiểm tra phiên hiện tại
+```http
+PATCH {{baseUrl}}/api/v1/admin/settings/{key}
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 11. PATCH /api/v1/admin/accounts/{accountId}
+
+```http
+PATCH {{baseUrl}}/api/v1/admin/accounts/{accountId}
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "email": "staff2@aitasker.local",
+  "phone": "0900000003",
+  "fullName": "Staff Two Updated",
+  "role": "STAFF",
+  "status": "Approved",
+  "specialization": "KYB"
+}
+```
+
+#### 12. PATCH /api/v1/admin/accounts/{accountId}/status
+
+```http
+PATCH {{baseUrl}}/api/v1/admin/accounts/{accountId}/status
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 13. PATCH /api/v1/admin/accounts/{accountId}/active
+
+```http
+PATCH {{baseUrl}}/api/v1/admin/accounts/{accountId}/active
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 14. POST /api/v1/admin/wallet/sync
+
+```http
+POST {{baseUrl}}/api/v1/admin/wallet/sync
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 15. POST /api/v1/admin/staffs
+
+```http
+POST {{baseUrl}}/api/v1/admin/staffs
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "accountId": 4,
+  "specialization": "KYC"
+}
+```
+
+#### 16. POST /api/v1/admin/reviews
+
+```http
+POST {{baseUrl}}/api/v1/admin/reviews
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "contractId": 1,
+  "reviewerId": 1,
+  "revieweeId": 2,
+  "rating": 4.5,
+  "comment": "Hoàn thành đúng phạm vi."
+}
+```
+
+#### 17. POST /api/v1/admin/accounts
+
+```http
+POST {{baseUrl}}/api/v1/admin/accounts
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "email": "staff2@aitasker.local",
+  "password": "12345678",
+  "phone": "0900000002",
+  "fullName": "Staff Two",
+  "role": "STAFF",
+  "status": "Approved",
+  "specialization": "KYC"
+}
+```
+
+### auth-controller
+
+#### 18. GET /api/auth/me
 
 ```http
 GET {{baseUrl}}/api/auth/me
 ```
 
-Authorization:
+- Mục đích: Lấy thông tin của account đang đăng nhập.
+- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-```text
-Bearer {{businessToken}}
+#### 19. GET /api/auth/check-email
+
+```http
+GET {{baseUrl}}/api/auth/check-email
 ```
 
-### Đăng ký
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
+- Token: Không cần token.
+- Body: Không có.
+
+#### 20. POST /api/auth/register
 
 ```http
 POST {{baseUrl}}/api/auth/register
 ```
 
-Raw body:
-
+- Mục đích: Đăng ký tài khoản sau khi email đã xác thực OTP.
+- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
+- Token: Không cần token.
+- Body raw mẫu:
 ```json
 {
-  "email": "new.business@aitasker.local",
+  "email": "expert.manual@example.com",
   "password": "12345678",
-  "fullName": "New Business",
-  "phone": "0909000001",
-  "role": "BUSINESS"
+  "fullName": "Expert Manual",
+  "phone": "0900000001",
+  "role": "EXPERT"
 }
 ```
 
-### Kiểm tra email tồn tại
+#### 21. POST /api/auth/login
 
 ```http
-GET {{baseUrl}}/api/auth/check-email?email=expert@aitasker.local
+POST {{baseUrl}}/api/auth/login
 ```
 
-### Gửi OTP email
-
-```http
-POST {{baseUrl}}/api/auth/email/send-otp
-```
-
-Raw body:
-
+- Mục đích: Đăng nhập và nhận accessToken/refreshToken.
+- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
+- Token: Không cần token.
+- Body raw mẫu:
 ```json
 {
-  "email": "expert@aitasker.local"
+  "email": "admin@aitasker.local",
+  "password": "12345678"
 }
 ```
 
-### Xác minh OTP email
+### catalog-controller
+
+#### 22. GET /api/v1/jobs/{jobId}/technologies
 
 ```http
-POST {{baseUrl}}/api/auth/email/verify-otp
+GET {{baseUrl}}/api/v1/jobs/{jobId}/technologies
 ```
 
-Raw body:
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
+#### 23. GET /api/v1/jobs/{jobId}/skills
+
+```http
+GET {{baseUrl}}/api/v1/jobs/{jobId}/skills
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 24. GET /api/v1/jobs/{jobId}/domains
+
+```http
+GET {{baseUrl}}/api/v1/jobs/{jobId}/domains
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 25. GET /api/v1/technologies
+
+```http
+GET {{baseUrl}}/api/v1/technologies
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 26. GET /api/v1/skills
+
+```http
+GET {{baseUrl}}/api/v1/skills
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 27. GET /api/v1/domains
+
+```http
+GET {{baseUrl}}/api/v1/domains
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 28. GET /api/v1/acceptance-criteria
+
+```http
+GET {{baseUrl}}/api/v1/acceptance-criteria
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 29. PATCH /api/v1/technologies/{technologyId}
+
+```http
+PATCH {{baseUrl}}/api/v1/technologies/{technologyId}
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
-  "email": "expert@aitasker.local",
-  "otp": "123456"
-}
-```
-
-### Kiểm tra mã số thuế
-
-```http
-GET {{baseUrl}}/api/auth/tax-check/0312345678
-```
-
-## 4. Profile, Portfolio Và Firebase File API
-
-### Business tạo hoặc cập nhật hồ sơ KYB
-
-Token: BUSINESS.
-
-```http
-POST {{baseUrl}}/api/v1/profiles/business
-```
-
-Raw body:
-
-```json
-{
-  "taxCode": "0312345678",
-  "companyName": "Nova Retail",
-  "address": "Quận 1, TP. Hồ Chí Minh",
-  "businessLicenseUrl": "business-licenses/accounts/1/license-demo.pdf"
-}
-```
-
-### Upload giấy phép kinh doanh
-
-Token: BUSINESS.
-
-```http
-POST {{baseUrl}}/api/v1/profiles/business/license-file
-```
-
-Body `form-data`:
-
-| Key | Type | Value |
-| --- | --- | --- |
-| `file` | File | Chọn PDF/JPG/PNG |
-
-Response trả về path Firebase. Dùng path đó gán vào `businessLicenseUrl`.
-
-### Lấy hồ sơ business hiện tại
-
-Token: BUSINESS.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/business/me
-```
-
-### Lấy business profile theo job
-
-Public nếu job đang `OPEN`.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/business/by-job/1
-```
-
-### Staff xem danh sách business profile
-
-Token: STAFF.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/business
-```
-
-### Expert tạo hoặc cập nhật hồ sơ KYC
-
-Token: EXPERT.
-
-```http
-POST {{baseUrl}}/api/v1/profiles/expert
-```
-
-Raw body:
-
-```json
-{
-  "nationalId": "079203009999",
-  "portfolioUrl": "https://portfolio.aitasker.local/expert-demo",
-  "yearsOfExperience": 5
-}
-```
-
-### Lấy hồ sơ expert hiện tại
-
-Token: EXPERT.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/expert/me
-```
-
-### Staff hoặc Business xem danh sách expert profile
-
-Token: STAFF hoặc BUSINESS.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/expert
-```
-
-### Staff duyệt hoặc từ chối hồ sơ
-
-Token: STAFF.
-
-```http
-POST {{baseUrl}}/api/v1/profiles/approve/BUSINESS/1?status=Approved
-POST {{baseUrl}}/api/v1/profiles/approve/EXPERT/1?status=Rejected
-```
-
-Giá trị `status`: `Approved`, `Rejected`.
-
-### Expert tạo hoặc cập nhật portfolio
-
-Token: EXPERT.
-
-```http
-POST {{baseUrl}}/api/v1/profiles/portfolio
-```
-
-Raw body:
-
-```json
-{
-  "domainIds": "2,3,5",
-  "skillIds": "2,3,5,8",
-  "technologyIds": "1,2,3,6,8",
-  "yearsExperience": 5,
-  "certificates": "expert-certificates/accounts/2/certificate-demo.pdf",
-  "selfDescription": "Chuyên gia AI có kinh nghiệm xây dựng RAG, xử lý dữ liệu, thiết kế API và triển khai giải pháp AI cho doanh nghiệp."
-}
-```
-
-Lưu ý: `technologyIds` là bắt buộc trong logic hiện tại. Lấy id công nghệ từ `GET /api/v1/technologies?activeOnly=true`.
-
-### Upload chứng chỉ expert
-
-Token: EXPERT.
-
-```http
-POST {{baseUrl}}/api/v1/profiles/portfolio/certificate-file
-```
-
-Body `form-data`:
-
-| Key | Type | Value |
-| --- | --- | --- |
-| `file` | File | Chọn PDF/JPG/PNG |
-
-Response trả về path Firebase. Dùng path đó gán vào `certificates`.
-
-### Lấy portfolio của expert hiện tại
-
-Token: EXPERT.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/portfolio/me
-```
-
-### Staff hoặc Business xem danh sách portfolio
-
-Token: STAFF hoặc BUSINESS.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/portfolio
-```
-
-### Tạo link xem file Firebase
-
-Token: STAFF, ADMIN, BUSINESS hoặc EXPERT.
-
-```http
-GET {{baseUrl}}/api/v1/profiles/files/view-url?path=expert-certificates/accounts/2/certificate-demo.pdf
-```
-
-## 5. Catalog API
-
-### Xem domains
-
-Public.
-
-```http
-GET {{baseUrl}}/api/v1/domains?activeOnly=true
-```
-
-### Admin tạo domain
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/domains
-```
-
-Raw body:
-
-```json
-{
-  "domainCode": "AI_TESTING",
-  "domainName": "AI Testing",
-  "description": "Kiểm thử và đánh giá hệ thống AI.",
+  "technologyCode": "REACT_TS",
+  "technologyName": "React TypeScript",
+  "description": "Công nghệ frontend dùng React và TypeScript.",
   "isActive": true,
-  "sortOrder": 21
+  "sortOrder": 1
 }
 ```
 
-### Admin cập nhật domain
-
-Token: ADMIN.
+#### 30. PATCH /api/v1/skills/{skillId}
 
 ```http
-PATCH {{baseUrl}}/api/v1/domains/1
+PATCH {{baseUrl}}/api/v1/skills/{skillId}
 ```
 
-Raw body:
-
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
+  "skillCode": "RAG_ARCH",
+  "skillName": "RAG Architecture",
+  "description": "Thiết kế retrieval, chunking, embedding và evaluation cho RAG.",
+  "isActive": true
+}
+```
+
+#### 31. PATCH /api/v1/domains/{domainId}
+
+```http
+PATCH {{baseUrl}}/api/v1/domains/{domainId}
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "domainCode": "AI_PRODUCT",
   "domainName": "AI Product Strategy",
   "description": "Discovery, feasibility, roadmap và outcome sản phẩm AI.",
   "isActive": true,
@@ -374,165 +471,93 @@ Raw body:
 }
 ```
 
-### Xem skills
-
-Public.
-
-```http
-GET {{baseUrl}}/api/v1/skills?activeOnly=true
-```
-
-### Admin tạo skill
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/skills
-```
-
-Raw body:
-
-```json
-{
-  "skillCode": "AI_TEST_CASE_DESIGN",
-  "skillName": "AI Test Case Design",
-  "description": "Thiết kế bộ test case cho hệ thống AI.",
-  "isActive": true
-}
-```
-
-### Admin cập nhật skill
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/skills/2
-```
-
-Raw body:
-
-```json
-{
-  "skillName": "RAG Architecture",
-  "description": "Retrieval, reranking, grounding và knowledge-base design.",
-  "isActive": true
-}
-```
-
-### Xem technologies
-
-Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
-
-```http
-GET {{baseUrl}}/api/v1/technologies?activeOnly=true
-```
-
-### Admin tạo technology
-
-Token: ADMIN.
+#### 32. POST /api/v1/technologies
 
 ```http
 POST {{baseUrl}}/api/v1/technologies
 ```
 
-Raw body:
-
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
-  "technologyCode": "NEXTJS",
-  "technologyName": "Next.js",
-  "description": "Framework React dùng để xây dựng ứng dụng web full-stack.",
-  "isActive": true,
-  "sortOrder": 30
-}
-```
-
-### Admin cập nhật technology
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/technologies/1
-```
-
-Raw body:
-
-```json
-{
-  "technologyName": "Python",
-  "description": "Ngôn ngữ lập trình phổ biến cho AI, dữ liệu và backend.",
+  "technologyCode": "REACT_TS",
+  "technologyName": "React TypeScript",
+  "description": "Công nghệ frontend dùng React và TypeScript.",
   "isActive": true,
   "sortOrder": 1
 }
 ```
 
-### Xem tiêu chí nghiệm thu nền tảng
-
-Public.
+#### 33. POST /api/v1/skills
 
 ```http
-GET {{baseUrl}}/api/v1/acceptance-criteria?activeOnly=true
+POST {{baseUrl}}/api/v1/skills
 ```
 
-Dùng các `criteriaId` trả về để gán vào `milestones[].criteriaIds` khi tạo job hoặc tạo milestone.
-
-### Admin tạo tiêu chí nghiệm thu nền tảng
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/criteria
-```
-
-Raw body:
-
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
-  "criteriaCode": "DEMO_ACCEPTED",
-  "description": "Demo nghiệm thu được thực hiện và doanh nghiệp xác nhận kết quả phù hợp.",
-  "isActive": true,
-  "sortOrder": 300
+  "skillCode": "RAG_ARCH",
+  "skillName": "RAG Architecture",
+  "description": "Thiết kế retrieval, chunking, embedding và evaluation cho RAG.",
+  "isActive": true
 }
 ```
 
-Lưu ý: API này tạo dữ liệu danh mục trong bảng `acceptance_criteria`, không còn tạo criteria riêng trực tiếp theo `milestoneId`.
-
-### Xem domain của job
+#### 34. POST /api/v1/domains
 
 ```http
-GET {{baseUrl}}/api/v1/jobs/1/domains
+POST {{baseUrl}}/api/v1/domains
 ```
 
-### Business hoặc Admin thay domain của job
-
-Token: BUSINESS sở hữu job hoặc ADMIN.
-
-```http
-PUT {{baseUrl}}/api/v1/jobs/1/domains
-```
-
-Raw body:
-
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
-[2, 3]
+{
+  "domainCode": "AI_PRODUCT",
+  "domainName": "AI Product Strategy",
+  "description": "Discovery, feasibility, roadmap và outcome sản phẩm AI.",
+  "isActive": true,
+  "sortOrder": 1
+}
 ```
 
-### Xem skill của job
+#### 35. PUT /api/v1/jobs/{jobId}/technologies
 
 ```http
-GET {{baseUrl}}/api/v1/jobs/1/skills
+PUT {{baseUrl}}/api/v1/jobs/{jobId}/technologies
 ```
 
-### Business hoặc Admin thay skill của job
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+[
+  1,
+  2,
+  3
+]
+```
 
-Token: BUSINESS sở hữu job hoặc ADMIN.
+#### 36. PUT /api/v1/jobs/{jobId}/skills
 
 ```http
-PUT {{baseUrl}}/api/v1/jobs/1/skills
+PUT {{baseUrl}}/api/v1/jobs/{jobId}/skills
 ```
 
-Raw body:
-
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 [
   {
@@ -546,72 +571,632 @@ Raw body:
 ]
 ```
 
-### Xem technology của job
+#### 37. PUT /api/v1/jobs/{jobId}/domains
 
 ```http
-GET {{baseUrl}}/api/v1/jobs/1/technologies
+PUT {{baseUrl}}/api/v1/jobs/{jobId}/domains
 ```
 
-### Business hoặc Admin thay technology của job
-
-Token: BUSINESS sở hữu job hoặc ADMIN.
-
-```http
-PUT {{baseUrl}}/api/v1/jobs/1/technologies
-```
-
-Raw body:
-
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
-[1, 2, 3, 6, 8]
+[
+  2,
+  3
+]
 ```
 
-## 6. Job, SoW Và Proposal API
+### chatbot-controller
 
-### AI generate SoW
-
-Public theo controller hiện tại.
+#### 38. POST /api/chatbot/ask
 
 ```http
-POST {{baseUrl}}/api/jobs/generate-sow
+POST {{baseUrl}}/api/chatbot/ask
 ```
 
-Raw body:
-
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Chatbot hỗ trợ người dùng.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
-  "projectTitle": "Tích hợp RAG chatbot cho chăm sóc khách hàng",
-  "rawRequirement": "Cần chatbot trả lời câu hỏi sản phẩm, lấy dữ liệu từ FAQ và chuyển lead cho nhân viên.",
-  "budget": 90000000,
-  "duration": 6,
-  "durationUnit": "WEEK",
-  "supportFields": ["E-commerce", "Customer Support"],
-  "requiredSkills": ["RAG Architecture", "React TypeScript", "Java Spring Boot"]
+  "question": "Tôi cần hướng dẫn tạo hồ sơ doanh nghiệp"
 }
 ```
 
-Response có thể dùng để điền lại vào `sow` và `milestones` khi tạo job. Nếu chưa dùng AI, có thể tự nhập thủ công như body bên dưới.
+### contract-execution-controller
 
-### Business tạo job nháp kèm SoW và milestone
+#### 39. GET /api/v1/milestones/{milestoneId}/transactions
 
-Token: BUSINESS.
+```http
+GET {{baseUrl}}/api/v1/milestones/{milestoneId}/transactions
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 40. GET /api/v1/milestones/{milestoneId}/deliverables
+
+```http
+GET {{baseUrl}}/api/v1/milestones/{milestoneId}/deliverables
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 41. GET /api/v1/milestones/{milestoneId}/criteria
+
+```http
+GET {{baseUrl}}/api/v1/milestones/{milestoneId}/criteria
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 42. GET /api/v1/jobs/{jobId}/milestones
+
+```http
+GET {{baseUrl}}/api/v1/jobs/{jobId}/milestones
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 43. GET /api/v1/jobs/{jobId}/matching
+
+```http
+GET {{baseUrl}}/api/v1/jobs/{jobId}/matching
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 44. GET /api/v1/disputes/{disputeId}
+
+```http
+GET {{baseUrl}}/api/v1/disputes/{disputeId}
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 45. GET /api/v1/contracts
+
+```http
+GET {{baseUrl}}/api/v1/contracts
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 46. GET /api/v1/contracts/{contractId}
+
+```http
+GET {{baseUrl}}/api/v1/contracts/{contractId}
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 47. GET /api/v1/contracts/{contractId}/milestones
+
+```http
+GET {{baseUrl}}/api/v1/contracts/{contractId}/milestones
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 48. GET /api/v1/contracts/{contractId}/disputes
+
+```http
+GET {{baseUrl}}/api/v1/contracts/{contractId}/disputes
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 49. PATCH /api/v1/transactions/{transactionId}/status
+
+```http
+PATCH {{baseUrl}}/api/v1/transactions/{transactionId}/status
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 50. PATCH /api/v1/disputes/{disputeId}/resolve
+
+```http
+PATCH {{baseUrl}}/api/v1/disputes/{disputeId}/resolve
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 51. PATCH /api/v1/disputes/{disputeId}/assign
+
+```http
+PATCH {{baseUrl}}/api/v1/disputes/{disputeId}/assign
+```
+
+- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 52. POST /api/v1/transactions
+
+```http
+POST {{baseUrl}}/api/v1/transactions
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "milestoneId": 1,
+  "amount": 30000000,
+  "commissionFee": 3000000,
+  "transactionType": "ESCROW",
+  "status": "Pending"
+}
+```
+
+#### 53. POST /api/v1/transactions/{transactionId}/webhook
+
+```http
+POST {{baseUrl}}/api/v1/transactions/{transactionId}/webhook
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 54. POST /api/v1/milestones
+
+```http
+POST {{baseUrl}}/api/v1/milestones
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "jobId": 1,
+  "milestoneName": "Kiểm thử nghiệm thu",
+  "description": "Kiểm thử UAT và hoàn thiện tài liệu.",
+  "fundsAllocated": 20000000,
+  "orderIndex": 3,
+  "status": "Pending",
+  "criteriaIds": [
+    1,
+    2
+  ]
+}
+```
+
+#### 55. POST /api/v1/milestones/sla-auto-approve
+
+```http
+POST {{baseUrl}}/api/v1/milestones/sla-auto-approve
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 56. POST /api/v1/disputes
+
+```http
+POST {{baseUrl}}/api/v1/disputes
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "contractId": 1,
+  "milestoneId": 1,
+  "evidenceReport": "Deliverable chưa đạt tiêu chí nghiệm thu.",
+  "proposedAction": "Yêu cầu chỉnh sửa trong 3 ngày.",
+  "status": "Open"
+}
+```
+
+#### 57. POST /api/v1/disputes/{disputeId}/technical-report
+
+```http
+POST {{baseUrl}}/api/v1/disputes/{disputeId}/technical-report
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 58. POST /api/v1/disputes/{disputeId}/demo-testing
+
+```http
+POST {{baseUrl}}/api/v1/disputes/{disputeId}/demo-testing
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 59. POST /api/v1/deliverables
+
+```http
+POST {{baseUrl}}/api/v1/deliverables
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "milestoneId": 1,
+  "sourceCodeUrl": "https://github.com/example/repo",
+  "demoLink": "https://demo.example.com",
+  "submissionNotes": "Đã nộp source code, demo và tài liệu cài đặt."
+}
+```
+
+#### 60. POST /api/v1/criteria
+
+```http
+POST {{baseUrl}}/api/v1/criteria
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "criteriaCode": "RAG_ANSWER_QUALITY",
+  "description": "Chatbot trả lời đúng tối thiểu 80% bộ câu hỏi kiểm thử.",
+  "isActive": true,
+  "sortOrder": 1
+}
+```
+
+#### 61. POST /api/v1/contracts/{contractId}/terminate
+
+```http
+POST {{baseUrl}}/api/v1/contracts/{contractId}/terminate
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 62. POST /api/v1/contracts/{contractId}/sign
+
+```http
+POST {{baseUrl}}/api/v1/contracts/{contractId}/sign
+```
+
+- Mục đích: Ký xác nhận hợp đồng hoặc NDA.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 63. POST /api/v1/contracts/{contractId}/nda-sign
+
+```http
+POST {{baseUrl}}/api/v1/contracts/{contractId}/nda-sign
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 64. POST /api/v1/contracts/from-proposals/{proposalId}
+
+```http
+POST {{baseUrl}}/api/v1/contracts/from-proposals/{proposalId}
+```
+
+- Mục đích: Tạo hợp đồng nháp từ proposal đã được chấp nhận.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "contractTitle": "Hợp đồng triển khai RAG chatbot",
+  "timelineDays": 45
+}
+```
+
+#### 65. POST /api/v1/contracts/change-requests
+
+```http
+POST {{baseUrl}}/api/v1/contracts/change-requests
+```
+
+- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "contractId": 1,
+  "requestedByAccountId": 1,
+  "changeType": "Điều chỉnh phạm vi",
+  "changeSummary": "Bổ sung báo cáo đánh giá chất lượng câu trả lời.",
+  "proposedBudget": 10000000,
+  "proposedTimelineDays": 7,
+  "status": "Pending"
+}
+```
+
+### email-otp-controller
+
+#### 66. POST /api/auth/email/verify-otp
+
+```http
+POST {{baseUrl}}/api/auth/email/verify-otp
+```
+
+- Mục đích: Xác thực OTP email.
+- Phục vụ: Gửi và xác thực OTP email.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "email": "expert.manual@example.com",
+  "otp": "123456"
+}
+```
+
+#### 67. POST /api/auth/email/send-otp
+
+```http
+POST {{baseUrl}}/api/auth/email/send-otp
+```
+
+- Mục đích: Gửi OTP xác thực email.
+- Phục vụ: Gửi và xác thực OTP email.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "email": "expert.manual@example.com"
+}
+```
+
+### Expert Candidates
+
+#### 68. GET /api/jobs/{jobPostingId}/expert-candidates
+
+```http
+GET {{baseUrl}}/api/jobs/{jobPostingId}/expert-candidates
+```
+
+- Mục đích: Lấy danh sách ứng viên chuyên gia phù hợp với job.
+- Phục vụ: AI đề xuất và lọc chuyên gia phù hợp với job.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+### Expert Recommendations
+
+#### 69. GET /api/jobs/{jobPostingId}/expert-recommendations
+
+```http
+GET {{baseUrl}}/api/jobs/{jobPostingId}/expert-recommendations
+```
+
+- Mục đích: Sinh hoặc xem danh sách chuyên gia AI đề xuất cho job.
+- Phục vụ: AI đề xuất và lọc chuyên gia phù hợp với job.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 70. POST /api/jobs/{jobPostingId}/expert-recommendations
+
+```http
+POST {{baseUrl}}/api/jobs/{jobPostingId}/expert-recommendations
+```
+
+- Mục đích: Sinh hoặc xem danh sách chuyên gia AI đề xuất cho job.
+- Phục vụ: AI đề xuất và lọc chuyên gia phù hợp với job.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+### health-controller
+
+#### 71. GET /api/health
+
+```http
+GET {{baseUrl}}/api/health
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Kiểm tra trạng thái backend.
+- Token: Không cần token.
+- Body: Không có.
+
+### marketplace-controller
+
+#### 72. GET /api/v1/jobs
+
+```http
+GET {{baseUrl}}/api/v1/jobs
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 73. GET /api/v1/proposals/my
+
+```http
+GET {{baseUrl}}/api/v1/proposals/my
+```
+
+- Mục đích: Gửi, xem hoặc duyệt proposal.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 74. GET /api/v1/jobs/{jobId}
+
+```http
+GET {{baseUrl}}/api/v1/jobs/{jobId}
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 75. GET /api/v1/jobs/{jobId}/proposals
+
+```http
+GET {{baseUrl}}/api/v1/jobs/{jobId}/proposals
+```
+
+- Mục đích: Gửi, xem hoặc duyệt proposal.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 76. GET /api/v1/jobs/my
+
+```http
+GET {{baseUrl}}/api/v1/jobs/my
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 77. PATCH /api/v1/proposals/{proposalId}/status
+
+```http
+PATCH {{baseUrl}}/api/v1/proposals/{proposalId}/status
+```
+
+- Mục đích: Gửi, xem hoặc duyệt proposal.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 78. PATCH /api/v1/jobs/{jobId}/status
+
+```http
+PATCH {{baseUrl}}/api/v1/jobs/{jobId}/status
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 79. POST /api/v1/proposals
+
+```http
+POST {{baseUrl}}/api/v1/proposals
+```
+
+- Mục đích: Gửi, xem hoặc duyệt proposal.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "jobId": 1,
+  "technicalSolution": "Triển khai RAG với embedding, vector search, backend Spring Boot và frontend React.",
+  "proposalDescription": "Chia dự án thành 2 giai đoạn, ưu tiên dữ liệu FAQ và đánh giá chất lượng câu trả lời.",
+  "proposalFileUrl": "proposal-files/experts/1/example.pdf",
+  "bidAmount": 90000000,
+  "proposalMilestone": [
+    {
+      "milestoneId": 1,
+      "proposedBudget": 30000000
+    },
+    {
+      "milestoneId": 2,
+      "proposedBudget": 60000000
+    }
+  ]
+}
+```
+
+#### 80. POST /api/v1/proposals/file
+
+```http
+POST {{baseUrl}}/api/v1/proposals/file
+```
+
+- Mục đích: Upload file hoặc lấy URL xem file.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body form-data: key `file`, type `File`, chọn file cần upload.
+
+#### 81. POST /api/v1/jobs
 
 ```http
 POST {{baseUrl}}/api/v1/jobs
 ```
 
-Raw body mới:
-
+- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
+- Phục vụ: Luồng job posting, job public, proposal và review proposal.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
   "title": "Tích hợp RAG chatbot cho chăm sóc khách hàng",
   "rawRequirements": "Cần chatbot trả lời câu hỏi sản phẩm, lấy dữ liệu từ FAQ và chuyển lead cho nhân viên.",
-  "structuredSow": "Scope: ingestion FAQ, RAG chatbot, handoff CRM, analytics dashboard.",
+  "structuredSow": "Triển khai RAG chatbot, dashboard quản trị nội dung và API tích hợp CRM.",
   "budget": 90000000,
   "plannedDurationValue": 6,
   "plannedDurationUnit": "WEEK",
-  "isHot": false,
-  "domainIds": [2, 3],
+  "domainIds": [
+    2,
+    3
+  ],
   "skills": [
     {
       "skillId": 2,
@@ -622,1092 +1207,401 @@ Raw body mới:
       "isMandatory": false
     }
   ],
-  "technologyIds": [1, 2, 3, 6, 8],
-  "sow": {
-    "title": "SoW RAG chatbot chăm sóc khách hàng",
-    "overview": "Xây dựng chatbot RAG trả lời câu hỏi sản phẩm từ dữ liệu FAQ và tài liệu nội bộ.",
-    "objectives": "[\"Tự động trả lời câu hỏi phổ biến\", \"Giảm tải cho nhân viên chăm sóc khách hàng\", \"Ghi nhận lead cần tư vấn\"]",
-    "scopeOfWork": "[\"Chuẩn hóa dữ liệu FAQ\", \"Xây dựng retrieval\", \"Tích hợp chatbot\", \"Báo cáo chất lượng câu trả lời\"]",
-    "deliverable": "[\"API chatbot\", \"Giao diện demo\", \"Tài liệu triển khai\", \"Báo cáo nghiệm thu\"]",
-    "assumptions": "[\"Doanh nghiệp cung cấp dữ liệu FAQ\", \"Có môi trường test để kiểm thử tích hợp\"]",
-    "outOfScope": "[\"Không tích hợp tổng đài thoại\", \"Không huấn luyện mô hình nền từ đầu\"]"
-  },
-  "milestones": [
-    {
-      "milestoneName": "Khảo sát dữ liệu và thiết kế kiến trúc",
-      "description": "Phân tích FAQ, xác định schema dữ liệu và thiết kế kiến trúc RAG.",
-      "fundsAllocated": 25000000,
-      "orderIndex": 1,
-      "criteriaIds": [1, 2, 3]
-    },
-    {
-      "milestoneName": "Triển khai chatbot RAG MVP",
-      "description": "Xây dựng retrieval, API chatbot và giao diện demo.",
-      "fundsAllocated": 40000000,
-      "orderIndex": 2,
-      "criteriaIds": [4, 5, 6]
-    },
-    {
-      "milestoneName": "Kiểm thử, tài liệu và bàn giao",
-      "description": "Chạy test nghiệm thu, hoàn thiện tài liệu kỹ thuật và hướng dẫn vận hành.",
-      "fundsAllocated": 25000000,
-      "orderIndex": 3,
-      "criteriaIds": [7, 8, 9]
-    }
-  ]
-}
-```
-
-Lưu ý:
-
-- Service luôn set `status` thành `DRAFT`.
-- Không gửi `businessId` hoặc `status`.
-- `sow` và `milestones` là tùy chọn, nhưng nên gửi để test flow mới.
-- `criteriaIds` phải là id đang active trong `GET /api/v1/acceptance-criteria?activeOnly=true`.
-- `domainIds`, `skills`, `technologyIds` có thể gửi ngay khi tạo job.
-- Sau khi tạo job, vẫn có thể dùng API riêng bên dưới để thay lại domain, skill hoặc technology.
-
-### Business gán domain cho job
-
-Token: BUSINESS.
-
-```http
-PUT {{baseUrl}}/api/v1/jobs/{{jobId}}/domains
-```
-
-Raw body:
-
-```json
-[2, 3]
-```
-
-### Business gán skill cho job
-
-Token: BUSINESS.
-
-```http
-PUT {{baseUrl}}/api/v1/jobs/{{jobId}}/skills
-```
-
-Raw body:
-
-```json
-[
-  {
-    "skillId": 2,
-    "isMandatory": true
-  },
-  {
-    "skillId": 3,
-    "isMandatory": false
-  }
-]
-```
-
-### Business gán technology cho job
-
-Token: BUSINESS.
-
-```http
-PUT {{baseUrl}}/api/v1/jobs/{{jobId}}/technologies
-```
-
-Raw body:
-
-```json
-[1, 2, 3, 6, 8]
-```
-
-### Business tạo milestone riêng cho job đã có
-
-Token: BUSINESS.
-
-```http
-POST {{baseUrl}}/api/v1/milestones
-```
-
-Raw body:
-
-```json
-{
-  "jobId": 1,
-  "contractId": null,
-  "milestoneName": "Bổ sung bộ kiểm thử hội thoại",
-  "description": "Thiết kế thêm kịch bản test fallback, hallucination và kiểm tra chất lượng câu trả lời.",
-  "fundsAllocated": 15000000,
-  "orderIndex": 4,
-  "status": "Pending",
-  "criteriaIds": [10, 11, 12]
-}
-```
-
-Lưu ý: `orderIndex` không được trùng trong cùng một job.
-
-### Xem job public
-
-Public. API chỉ trả job `OPEN`.
-
-```http
-GET {{baseUrl}}/api/v1/jobs
-```
-
-Response job có các field quan trọng:
-
-```json
-{
-  "proposalsCount": 0,
-  "domainIds": [2, 3],
-  "domains": [],
-  "skillIds": [2, 3],
-  "skills": [
-    {
-      "skillId": 2,
-      "isMandatory": true
-    }
+  "technologyIds": [
+    1,
+    2
   ],
-  "skillDetails": [],
-  "technologyIds": [1, 2, 3],
-  "technologies": [],
-  "sow": {},
   "milestones": [
     {
-      "criteriaIds": [1, 2, 3],
-      "criteria": []
-    }
-  ]
-}
-```
-
-### Business xem job của mình
-
-Token: BUSINESS.
-
-```http
-GET {{baseUrl}}/api/v1/jobs/my
-```
-
-Trả cả `DRAFT`, `OPEN`, `CLOSED`, `CANCELLED`.
-
-### Xem chi tiết job
-
-Public với job `OPEN`. Job nháp chỉ business sở hữu được xem.
-
-```http
-GET {{baseUrl}}/api/v1/jobs/1
-```
-
-### Business mở job
-
-Token: BUSINESS.
-
-```http
-PATCH {{baseUrl}}/api/v1/jobs/1/status?status=OPEN
-```
-
-Status hợp lệ:
-
-```text
-DRAFT, OPEN, CLOSED, CANCELLED
-```
-
-### Expert gửi proposal
-
-Token: EXPERT.
-
-Nếu có file proposal PDF/DOCX, upload trước để lấy path Firebase:
-
-```http
-POST {{baseUrl}}/api/v1/proposals/file
-```
-
-Body `form-data`:
-
-| Key | Type | Value |
-| --- | --- | --- |
-| `file` | File | Chọn PDF/DOCX |
-
-Copy path trả về vào `proposalFileUrl`.
-
-```http
-POST {{baseUrl}}/api/v1/proposals
-```
-
-Raw body:
-
-```json
-{
-  "jobId": 1,
-  "technicalSolution": "Triển khai RAG chatbot bằng PostgreSQL metadata, vector retrieval, reranking và CRM handoff.",
-  "proposalDescription": "Chuyên gia sẽ xây dựng pipeline dữ liệu FAQ, API chatbot, dashboard theo dõi chất lượng câu trả lời và tài liệu vận hành.",
-  "proposalFileUrl": "proposal-files/experts/1/rag-chatbot-proposal.pdf",
-  "bidAmount": 110000000,
-  "proposalMilestone": [
-    {
-      "milestoneId": 1,
-      "proposedBudget": 30000000
+      "milestoneName": "Phân tích yêu cầu và thiết kế RAG",
+      "description": "Khảo sát FAQ, thiết kế luồng dữ liệu và kiến trúc retrieval.",
+      "fundsAllocated": 30000000,
+      "orderIndex": 1,
+      "criteriaIds": [
+        1,
+        2
+      ]
     },
     {
-      "milestoneId": 2,
-      "proposedBudget": 55000000
-    },
-    {
-      "milestoneId": 3,
-      "proposedBudget": 25000000
+      "milestoneName": "Triển khai chatbot và bàn giao",
+      "description": "Xây dựng API, giao diện chat, kiểm thử và tài liệu bàn giao.",
+      "fundsAllocated": 60000000,
+      "orderIndex": 2,
+      "criteriaIds": [
+        3,
+        4
+      ]
     }
   ]
 }
 ```
 
-Điều kiện:
+### notification-controller
 
-- Job phải `OPEN`.
-- Expert phải `Approved`.
-- Expert phải có portfolio.
-- Không còn chọn `domainId` hoặc `skillId` khi gửi proposal.
-- Nếu không đề xuất ngân sách milestone mới, bỏ `proposalMilestone` hoặc gửi `null`.
-- `proposalMilestone` chỉ được sửa ngân sách của milestone đã có, không được thêm milestone mới.
-- Nếu gửi `proposalMilestone`, phải gửi đủ toàn bộ milestone của job, không được thiếu hoặc trùng `milestoneId`.
-- Tổng `proposedBudget` trong `proposalMilestone` phải bằng `bidAmount`.
-- Expert có thể gửi lại proposal nếu proposal cũ của job đó đã bị business `Rejected`.
-- Expert không thể gửi thêm nếu đã có proposal cùng job đang khác `Rejected`.
-
-### Expert xem proposal của mình
-
-Token: EXPERT.
-
-```http
-GET {{baseUrl}}/api/v1/proposals/my
-```
-
-### Business xem proposal theo job
-
-Token: BUSINESS sở hữu job.
-
-```http
-GET {{baseUrl}}/api/v1/jobs/1/proposals
-```
-
-### Business duyệt hoặc từ chối proposal
-
-Token: BUSINESS sở hữu job.
-
-```http
-PATCH {{baseUrl}}/api/v1/proposals/2/status?status=Accepted
-```
-
-Status hợp lệ:
-
-```text
-Accepted, Rejected
-```
-
-## 7. Contract Và Execution API
-
-### Tạo contract draft từ proposal
-
-Token: BUSINESS.
-
-```http
-POST {{baseUrl}}/api/v1/contracts/from-proposals/2
-```
-
-Raw body:
-
-```json
-{
-  "contractTitle": "Hợp đồng triển khai RAG chatbot cho chăm sóc khách hàng",
-  "timelineDays": 42
-}
-```
-
-Lưu ý:
-
-- Chỉ tạo được từ proposal đã `Accepted`.
-- Không gửi `technologyUsed` vì cột này đã được bỏ khỏi `contracts`.
-- Không cần gửi `totalBudget`; backend tự tính từ milestone của job và `proposalMilestone` nếu proposal có đề xuất ngân sách.
-- Khi tạo draft, backend sinh `contractMilestones` gồm `originalBudget`, `finalBudget` và `difference`.
-
-### Xem chi tiết contract
-
-Token: BUSINESS hoặc EXPERT thuộc contract, STAFF/ADMIN theo quyền hiện có.
-
-```http
-GET {{baseUrl}}/api/v1/contracts/1
-```
-
-Response quan trọng:
-
-```json
-{
-  "contractId": 1,
-  "proposalId": 2,
-  "contractTitle": "Hợp đồng triển khai RAG chatbot cho chăm sóc khách hàng",
-  "totalBudget": 110000000,
-  "status": "Draft",
-  "businessAcceptedAt": null,
-  "expertAcceptedAt": null,
-  "businessNdaSignedAt": null,
-  "expertNdaSignedAt": null,
-  "activatedAt": null,
-  "contractMilestones": [
-    {
-      "jobMilestoneId": 1,
-      "milestoneName": "Khảo sát dữ liệu và thiết kế kiến trúc",
-      "originalBudget": 25000000,
-      "finalBudget": 30000000,
-      "difference": 5000000
-    }
-  ]
-}
-```
-
-### Tạo yêu cầu thay đổi contract
-
-Token: BUSINESS hoặc EXPERT thuộc contract.
-
-```http
-POST {{baseUrl}}/api/v1/contracts/change-requests
-```
-
-Raw body:
-
-```json
-{
-  "contractId": 1,
-  "changeType": "ScopeAdjustment",
-  "changeSummary": "Bổ sung thêm bộ test tiếng Việt và báo cáo nghiệm thu.",
-  "proposedBudget": 120000000,
-  "proposedTimelineDays": 60
-}
-```
-
-### Ký xác nhận hợp đồng
-
-Token: BUSINESS hoặc EXPERT thuộc contract.
-
-```http
-POST {{baseUrl}}/api/v1/contracts/1/sign
-```
-
-Lưu ý:
-
-- Business gọi một lần sẽ set `businessAcceptedAt`.
-- Expert gọi một lần sẽ set `expertAcceptedAt`.
-- API này chưa chắc làm contract `Active` ngay. Contract chỉ active khi đủ chữ ký hợp đồng và NDA của cả hai bên.
-
-### Ký NDA
-
-Token: BUSINESS hoặc EXPERT thuộc contract.
-
-```http
-POST {{baseUrl}}/api/v1/contracts/1/nda-sign
-```
-
-Lưu ý:
-
-- Business gọi một lần sẽ set `businessNdaSignedAt`.
-- Expert gọi một lần sẽ set `expertNdaSignedAt`.
-- Khi đủ `businessAcceptedAt`, `expertAcceptedAt`, `businessNdaSignedAt`, `expertNdaSignedAt`, backend chuyển contract sang `Active`, job sang `CLOSED`, và cập nhật ngân sách milestone theo `contract_milestones.finalBudget`.
-
-### Chấm dứt contract
-
-Token: BUSINESS sở hữu contract hoặc ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/contracts/1/terminate?reason=Không tiếp tục triển khai
-```
-
-### Expert nộp deliverable
-
-Token: EXPERT.
-
-```http
-POST {{baseUrl}}/api/v1/deliverables
-```
-
-Raw body:
-
-```json
-{
-  "milestoneId": 2,
-  "sourceCodeUrl": "https://github.com/demo/aitasker-rag-chatbot",
-  "demoLink": "https://demo.aitasker.local/rag-chatbot",
-  "submissionNotes": "Đã nộp MVP kèm tài liệu cài đặt và bộ test mẫu."
-}
-```
-
-### Tạo transaction
-
-Token: BUSINESS thuộc contract hoặc ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/transactions
-```
-
-Raw body:
-
-```json
-{
-  "milestoneId": 2,
-  "amount": 52000000,
-  "commissionFee": 5200000,
-  "transactionType": "Deposit",
-  "status": "Pending"
-}
-```
-
-### Cập nhật trạng thái transaction
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/transactions/2/status?status=Success
-```
-
-### Payment webhook giả lập
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/transactions/2/webhook?paymentStatus=Success&bankTxCode=VNPAY-DEMO-001&receiptImgUrl=https://storage.aitasker.local/receipts/demo.png
-```
-
-### Tạo dispute
-
-Token: BUSINESS hoặc EXPERT thuộc contract.
-
-```http
-POST {{baseUrl}}/api/v1/disputes
-```
-
-Raw body:
-
-```json
-{
-  "contractId": 1,
-  "milestoneId": 2,
-  "assignedStaffId": 1,
-  "evidenceReport": "Business yêu cầu kiểm tra thêm bộ test hallucination trước khi nghiệm thu.",
-  "proposedAction": "Hold escrow",
-  "status": "UnderReview"
-}
-```
-
-### Gán dispute cho staff
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/disputes/1/assign?staffId=1
-```
-
-### Resolve dispute
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/disputes/1/resolve?proposedAction=Release payout after correction accepted
-```
-
-### Staff ghi kết quả demo testing
-
-Token: STAFF được gán dispute.
-
-```http
-POST {{baseUrl}}/api/v1/disputes/1/demo-testing?testResult=Passed 18/20 scenarios, cần bổ sung 2 case fallback
-```
-
-### Staff tạo technical report
-
-Token: STAFF được gán dispute.
-
-```http
-POST {{baseUrl}}/api/v1/disputes/1/technical-report?reportContent=Kết quả kiểm thử đạt yêu cầu sau chỉnh sửa&proposedAction=Release escrow
-```
-
-### Chạy SLA auto approve
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/milestones/sla-auto-approve
-```
-
-### Danh sách contract
-
-```http
-GET {{baseUrl}}/api/v1/contracts
-```
-
-### Milestone theo contract
-
-```http
-GET {{baseUrl}}/api/v1/contracts/1/milestones
-```
-
-API này trả dữ liệu từ bảng `contract_milestones`, tức là milestone đã chốt cho hợp đồng, có `originalBudget`, `finalBudget` và `difference`.
-
-### Milestone theo job
-
-```http
-GET {{baseUrl}}/api/v1/jobs/1/milestones
-```
-
-### Criteria đã chọn theo milestone
-
-```http
-GET {{baseUrl}}/api/v1/milestones/2/criteria
-```
-
-### Deliverable theo milestone
-
-```http
-GET {{baseUrl}}/api/v1/milestones/2/deliverables
-```
-
-### Transaction theo milestone
-
-```http
-GET {{baseUrl}}/api/v1/milestones/2/transactions
-```
-
-### Dispute theo contract
-
-```http
-GET {{baseUrl}}/api/v1/contracts/1/disputes
-```
-
-### Chi tiết dispute
-
-```http
-GET {{baseUrl}}/api/v1/disputes/1
-```
-
-### Matching theo job
-
-```http
-GET {{baseUrl}}/api/v1/jobs/1/matching
-```
-
-## 8. Admin API
-
-### Tạo review
-
-Token: BUSINESS hoặc EXPERT thuộc contract đã kết thúc.
-
-```http
-POST {{baseUrl}}/api/v1/admin/reviews
-```
-
-Raw body:
-
-```json
-{
-  "contractId": 2,
-  "rating": 4.9,
-  "comment": "Hợp tác tốt, phản hồi nhanh và bàn giao đúng phạm vi."
-}
-```
-
-### Xem review theo contract
-
-Token: ADMIN, STAFF, BUSINESS hoặc EXPERT.
-
-```http
-GET {{baseUrl}}/api/v1/admin/reviews/contracts/2
-```
-
-### Admin xem system settings
-
-Token: ADMIN.
-
-```http
-GET {{baseUrl}}/api/v1/admin/settings
-```
-
-### Admin cập nhật setting
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/admin/settings/platform_fee_percent?value=12&isActive=true
-```
-
-### Admin xem audit log
-
-Token: ADMIN.
-
-```http
-GET {{baseUrl}}/api/v1/admin/audit-logs
-GET {{baseUrl}}/api/v1/admin/audit-logs?actorGroup=INTERNAL
-GET {{baseUrl}}/api/v1/admin/audit-logs?actorGroup=EXTERNAL
-```
-
-### Admin xem staff
-
-Token: ADMIN.
-
-```http
-GET {{baseUrl}}/api/v1/admin/staffs
-```
-
-### Admin tạo staff profile
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/admin/staffs
-```
-
-Raw body:
-
-```json
-{
-  "accountId": 4,
-  "specialization": "KYB/KYC profile verification and AI dispute review"
-}
-```
-
-### Admin cập nhật staff profile
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/admin/staffs/1
-```
-
-Raw body:
-
-```json
-{
-  "specialization": "KYB/KYC verification, dispute testing and technical report"
-}
-```
-
-### Admin xem analytics overview
-
-Token: ADMIN.
-
-```http
-GET {{baseUrl}}/api/v1/admin/analytics/overview
-```
-
-### Admin xem ví hệ thống
-
-Token: ADMIN.
-
-```http
-GET {{baseUrl}}/api/v1/admin/wallet
-```
-
-### Admin sync ví hệ thống
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/admin/wallet/sync
-```
-
-### Admin xem account
-
-Token: ADMIN.
-
-```http
-GET {{baseUrl}}/api/v1/admin/accounts
-```
-
-### Admin tạo account
-
-Token: ADMIN.
-
-```http
-POST {{baseUrl}}/api/v1/admin/accounts
-```
-
-Raw body:
-
-```json
-{
-  "email": "staff.new@aitasker.local",
-  "password": "12345678",
-  "phone": "0909000004",
-  "fullName": "Staff New",
-  "role": "STAFF",
-  "status": "Approved",
-  "specialization": "KYB/KYC verification"
-}
-```
-
-### Admin cập nhật account
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/admin/accounts/4
-```
-
-Raw body:
-
-```json
-{
-  "phone": "0901000999",
-  "fullName": "Pham Quoc Huy",
-  "status": "Approved",
-  "specialization": "KYB/KYC profile verification"
-}
-```
-
-### Admin bật hoặc khóa account
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/admin/accounts/4/active?active=true
-```
-
-### Admin đổi status account
-
-Token: ADMIN.
-
-```http
-PATCH {{baseUrl}}/api/v1/admin/accounts/4/status?status=Approved
-```
-
-Status hợp lệ:
-
-```text
-Pending, Approved, Rejected, Lock
-```
-
-### Admin khóa account bằng DELETE mềm
-
-Token: ADMIN.
-
-```http
-DELETE {{baseUrl}}/api/v1/admin/accounts/4
-```
-
-## 9. Wallet API
-
-### Xem ví của tài khoản hiện tại
-
-Token: BUSINESS, EXPERT, ADMIN hoặc STAFF.
-
-```http
-GET {{baseUrl}}/api/v1/wallet/me
-```
-
-## 10. Notification Và WebSocket API
-
-Notification có 2 phần:
-
-- REST API dùng để lấy danh sách, đếm số chưa đọc và đánh dấu đã đọc.
-- WebSocket/STOMP dùng để nhận thông báo realtime khi có hành động mới.
-
-Các trường `title` và `message` trong notification trả về bằng tiếng Việt để hiển thị trực tiếp trên giao diện.
-
-### Lấy danh sách thông báo của tài khoản hiện tại
-
-Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
+#### 82. GET /api/v1/notifications
 
 ```http
 GET {{baseUrl}}/api/v1/notifications
 ```
 
-Response mẫu:
+- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
+- Phục vụ: Thông báo realtime và trạng thái đã đọc.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-```json
-{
-  "success": true,
-  "message": "LAY DANH SACH THONG BAO THANH CONG",
-  "data": [
-    {
-      "notificationId": 1,
-      "type": "PROPOSAL_CREATED",
-      "title": "Có proposal mới",
-      "message": "Một chuyên gia vừa gửi proposal cho dự án \"OCR hóa đơn và phiếu bảo hành tiếng Việt\".",
-      "targetUrl": "/business/jobs/3/proposals",
-      "isRead": false,
-      "createdAt": "2026-06-13T16:05:00",
-      "readAt": null
-    }
-  ]
-}
-```
-
-### Đếm thông báo chưa đọc
-
-Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
+#### 83. GET /api/v1/notifications/unread-count
 
 ```http
 GET {{baseUrl}}/api/v1/notifications/unread-count
 ```
 
-Response mẫu:
+- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
+- Phục vụ: Thông báo realtime và trạng thái đã đọc.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-```json
-{
-  "success": true,
-  "message": "DEM THONG BAO CHUA DOC THANH CONG",
-  "data": {
-    "unreadCount": 2
-  }
-}
-```
-
-### Đánh dấu một thông báo đã đọc
-
-Token: tài khoản nhận thông báo.
+#### 84. PATCH /api/v1/notifications/{notificationId}/read
 
 ```http
-PATCH {{baseUrl}}/api/v1/notifications/1/read
+PATCH {{baseUrl}}/api/v1/notifications/{notificationId}/read
 ```
 
-### Đánh dấu tất cả thông báo đã đọc
+- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
+- Phục vụ: Thông báo realtime và trạng thái đã đọc.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-Token: BUSINESS, EXPERT, STAFF hoặc ADMIN.
+#### 85. PATCH /api/v1/notifications/read-all
 
 ```http
 PATCH {{baseUrl}}/api/v1/notifications/read-all
 ```
 
-### Test realtime WebSocket bằng Postman
+- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
+- Phục vụ: Thông báo realtime và trạng thái đã đọc.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-Postman REST request không test được realtime trực tiếp; cần tạo WebSocket request.
+### pay-os-payment-controller
 
-URL WebSocket:
-
-```text
-ws://localhost:8080/ws/000/postman/websocket
-```
-
-Lưu ý: `/ws` là endpoint SockJS. Khi test bằng Postman WebSocket, URL transport cần có dạng `/ws/{serverId}/{sessionId}/websocket`; ví dụ `000/postman` ở trên chỉ là giá trị test. Không gửi raw STOMP trực tiếp như client STOMP thuần; cần bọc STOMP frame trong mảng JSON của SockJS.
-
-Sau khi connect, Postman có thể nhận message mở kết nối là:
-
-```text
-o
-```
-
-Gửi CONNECT bằng dạng text sau. Ví dụ dùng token business để nghe thông báo của doanh nghiệp:
-
-```text
-["CONNECT\naccept-version:1.2\nheart-beat:10000,10000\nAuthorization:Bearer {{businessToken}}\n\n\u0000"]
-```
-
-Sau khi server trả message có `CONNECTED`, gửi SUBSCRIBE:
-
-```text
-["SUBSCRIBE\nid:sub-notifications\ndestination:/user/queue/notifications\n\n\u0000"]
-```
-
-Giữ tab WebSocket này mở, sau đó dùng tab REST khác để tạo hành động phát sinh thông báo.
-
-### Hành động tạo notification để test
-
-Thông báo cho BUSINESS khi EXPERT nộp proposal:
+#### 86. GET /api/payments/payos/return
 
 ```http
-POST {{baseUrl}}/api/v1/proposals
+GET {{baseUrl}}/api/payments/payos/return
 ```
 
-Token: EXPERT.
+- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
+- Phục vụ: Thanh toán PayOS và nạp ví.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-Thông báo cho EXPERT khi BUSINESS duyệt proposal:
+#### 87. POST /api/payments/payos/{orderCode}/sync
 
 ```http
-PATCH {{baseUrl}}/api/v1/proposals/{proposalId}/status?status=Accepted
+POST {{baseUrl}}/api/payments/payos/{orderCode}/sync
 ```
 
-Token: BUSINESS.
+- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
+- Phục vụ: Thanh toán PayOS và nạp ví.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-Thông báo cho BUSINESS/EXPERT khi STAFF duyệt hồ sơ:
+#### 88. POST /api/payments/payos/webhook
 
 ```http
-POST {{baseUrl}}/api/v1/profiles/approve/BUSINESS/{businessProfileId}?status=Approved
-POST {{baseUrl}}/api/v1/profiles/approve/EXPERT/{expertProfileId}?status=Rejected
+POST {{baseUrl}}/api/payments/payos/webhook
 ```
 
-Token: STAFF.
-
-Thông báo cho BUSINESS khi EXPERT nộp deliverable:
-
-```http
-POST {{baseUrl}}/api/v1/deliverables
-```
-
-Token: EXPERT.
-
-Thông báo cho STAFF khi tranh chấp được tạo hoặc được admin gán:
-
-```http
-POST {{baseUrl}}/api/v1/disputes
-PATCH {{baseUrl}}/api/v1/disputes/{disputeId}/assign?staffId=1
-```
-
-Token tương ứng: BUSINESS/EXPERT tạo dispute, ADMIN gán dispute.
-
-## 11. Chatbot, Health Và Test API
-
-### Health check
-
-Public.
-
-```http
-GET {{baseUrl}}/api/health
-```
-
-### Chatbot ask
-
-Public.
-
-```http
-POST {{baseUrl}}/api/chatbot/ask
-```
-
-Raw body:
-
+- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
+- Phục vụ: Thanh toán PayOS và nạp ví.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
 ```json
 {
-  "question": "AITasker hỗ trợ doanh nghiệp tìm chuyên gia AI như thế nào?"
+  "code": "00",
+  "desc": "success",
+  "success": true,
+  "data": {
+    "orderCode": 123456,
+    "amount": 50000,
+    "description": "Nạp ví AITASKER",
+    "accountNumber": "123456789",
+    "reference": "PAYOS_REF",
+    "transactionDateTime": "2026-06-18 10:00:00",
+    "currency": "VND",
+    "paymentLinkId": "link-id",
+    "code": "00",
+    "desc": "success"
+  },
+  "signature": "test-signature"
 }
 ```
 
-### Test secure endpoint
+#### 89. POST /api/payments/payos/create
 
-Cần token.
+```http
+POST {{baseUrl}}/api/payments/payos/create
+```
+
+- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
+- Phục vụ: Thanh toán PayOS và nạp ví.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "amount": 50000,
+  "description": "Nạp ví AITASKER"
+}
+```
+
+### profile-controller
+
+#### 90. GET /api/v1/profiles/portfolio
+
+```http
+GET {{baseUrl}}/api/v1/profiles/portfolio
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 91. GET /api/v1/profiles/expert
+
+```http
+GET {{baseUrl}}/api/v1/profiles/expert
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 92. GET /api/v1/profiles/business
+
+```http
+GET {{baseUrl}}/api/v1/profiles/business
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 93. GET /api/v1/profiles/portfolio/me
+
+```http
+GET {{baseUrl}}/api/v1/profiles/portfolio/me
+```
+
+- Mục đích: Lấy thông tin của account đang đăng nhập.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 94. GET /api/v1/profiles/files/view-url
+
+```http
+GET {{baseUrl}}/api/v1/profiles/files/view-url
+```
+
+- Mục đích: Upload file hoặc lấy URL xem file.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 95. GET /api/v1/profiles/expert/me
+
+```http
+GET {{baseUrl}}/api/v1/profiles/expert/me
+```
+
+- Mục đích: Lấy thông tin của account đang đăng nhập.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 96. GET /api/v1/profiles/business/me
+
+```http
+GET {{baseUrl}}/api/v1/profiles/business/me
+```
+
+- Mục đích: Lấy thông tin của account đang đăng nhập.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 97. GET /api/v1/profiles/business/by-job/{jobId}
+
+```http
+GET {{baseUrl}}/api/v1/profiles/business/by-job/{jobId}
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 98. POST /api/v1/profiles/portfolio
+
+```http
+POST {{baseUrl}}/api/v1/profiles/portfolio
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "domainIds": "2,3",
+  "skillIds": "2,3,6",
+  "technologyIds": "1,2,3",
+  "yearsExperience": 5,
+  "certificates": "expert-certificates/accounts/2/certificate-demo.pdf",
+  "selfDescription": "Tôi có kinh nghiệm triển khai RAG, backend Spring Boot và frontend React."
+}
+```
+
+#### 99. POST /api/v1/profiles/portfolio/certificate-file
+
+```http
+POST {{baseUrl}}/api/v1/profiles/portfolio/certificate-file
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body form-data: key `file`, type `File`, chọn file cần upload.
+
+#### 100. POST /api/v1/profiles/expert
+
+```http
+POST {{baseUrl}}/api/v1/profiles/expert
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "nationalId": "079201000001",
+  "portfolioUrl": "https://portfolio.example.com/expert-ai",
+  "yearsOfExperience": 5,
+  "title": "AI Engineer"
+}
+```
+
+#### 101. POST /api/v1/profiles/business
+
+```http
+POST {{baseUrl}}/api/v1/profiles/business
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "taxCode": "0312345678",
+  "companyName": "Nova Retail",
+  "address": "Quận 1, TP. Hồ Chí Minh",
+  "businessLicenseUrl": "business-licenses/accounts/1/license-demo.pdf"
+}
+```
+
+#### 102. POST /api/v1/profiles/business/license-file
+
+```http
+POST {{baseUrl}}/api/v1/profiles/business/license-file
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body form-data: key `file`, type `File`, chọn file cần upload.
+
+#### 103. POST /api/v1/profiles/approve/{type}/{id}
+
+```http
+POST {{baseUrl}}/api/v1/profiles/approve/{type}/{id}
+```
+
+- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+### SoW Generation
+
+#### 104. POST /api/jobs/generate-sow
+
+```http
+POST {{baseUrl}}/api/jobs/generate-sow
+```
+
+- Mục đích: AI sinh SoW, milestone gợi ý và cấu trúc dự án.
+- Phục vụ: AI generate SoW, milestone gợi ý và cấu trúc dự án.
+- Token: Cần Bearer token theo role phù hợp.
+- Body raw mẫu:
+```json
+{
+  "projectTitle": "Tích hợp RAG chatbot cho chăm sóc khách hàng",
+  "rawRequirement": "Cần chatbot trả lời câu hỏi sản phẩm, lấy dữ liệu từ FAQ và chuyển lead cho nhân viên.",
+  "budget": 90000000,
+  "duration": 6,
+  "durationUnit": "WEEK",
+  "supportFields": [
+    "E-commerce",
+    "Customer Support"
+  ],
+  "requiredSkills": [
+    "RAG Architecture",
+    "React TypeScript",
+    "Java Spring Boot"
+  ]
+}
+```
+
+### tax-check-controller
+
+#### 105. GET /api/auth/tax-check/{mst}
+
+```http
+GET {{baseUrl}}/api/auth/tax-check/{mst}
+```
+
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: Kiểm tra mã số thuế.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+### test-controller
+
+#### 106. GET /api/test/secure
 
 ```http
 GET {{baseUrl}}/api/test/secure
 ```
 
-## 12. Luồng Test Khuyến Nghị
+- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Phục vụ: API kiểm thử bảo mật trong môi trường dev.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
 
-### Luồng 1: Auth và profile
+### wallet-controller
 
-1. Login BUSINESS, EXPERT, STAFF, ADMIN.
-2. Gọi `GET /api/auth/me` với từng token.
-3. Business gọi `POST /api/v1/profiles/business`.
-4. Expert gọi `POST /api/v1/profiles/expert`.
-5. Staff duyệt BUSINESS/EXPERT qua `POST /api/v1/profiles/approve/...`.
-
-### Luồng 2: Job posting, SoW, milestone criteria và proposal
-
-1. Gọi `GET /api/v1/domains?activeOnly=true`.
-2. Gọi `GET /api/v1/skills?activeOnly=true`.
-3. Gọi `GET /api/v1/technologies?activeOnly=true`.
-4. Gọi `GET /api/v1/acceptance-criteria?activeOnly=true`.
-5. Business gọi `POST /api/v1/jobs` với `domainIds`, `skills`, `technologyIds`, `sow` và `milestones[].criteriaIds`.
-6. Nếu cần đổi domain sau khi tạo job, gọi `PUT /api/v1/jobs/{jobId}/domains`.
-7. Nếu cần đổi skill sau khi tạo job, gọi `PUT /api/v1/jobs/{jobId}/skills`.
-8. Nếu cần đổi technology sau khi tạo job, gọi `PUT /api/v1/jobs/{jobId}/technologies`.
-9. Business gọi `GET /api/v1/jobs/my` để kiểm tra job nháp có `sow`, `milestones`, `criteria`, `technologyIds`.
-10. Business gọi `PATCH /api/v1/jobs/{jobId}/status?status=OPEN`.
-11. Expert gọi `GET /api/v1/jobs`.
-12. Expert gọi `POST /api/v1/proposals`, có thể gửi `proposalMilestone` nếu muốn đề xuất ngân sách mới.
-13. Business gọi `GET /api/v1/jobs/{jobId}/proposals`.
-14. Business gọi `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted`.
-
-### Luồng 2.1: Contract draft và ký hợp đồng
-
-1. Business accept proposal qua `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted`.
-2. Business gọi `POST /api/v1/contracts/from-proposals/{proposalId}` để tạo contract draft.
-3. Business gọi `GET /api/v1/contracts/{contractId}` để kiểm tra `contractMilestones`.
-4. Business gọi `POST /api/v1/contracts/{contractId}/sign` để ký hợp đồng phía business.
-5. Business gọi `POST /api/v1/contracts/{contractId}/nda-sign` để đồng ý NDA phía business.
-6. Expert gọi `GET /api/v1/contracts/{contractId}` để xem draft.
-7. Expert gọi `POST /api/v1/contracts/{contractId}/sign` để ký hợp đồng phía expert.
-8. Expert gọi `POST /api/v1/contracts/{contractId}/nda-sign` để đồng ý NDA phía expert.
-9. Gọi lại `GET /api/v1/contracts/{contractId}` để kiểm tra `status = Active`.
-10. Gọi `GET /api/v1/jobs/{jobId}` hoặc `GET /api/v1/jobs/{jobId}/milestones` để kiểm tra job đã `CLOSED` và milestone đã cập nhật ngân sách chốt.
-
-### Luồng 3: Portfolio và file Firebase
-
-1. Expert upload file qua `POST /api/v1/profiles/portfolio/certificate-file`.
-2. Copy path trả về vào `certificates`.
-3. Gọi `GET /api/v1/technologies?activeOnly=true` để lấy `technologyIds`.
-4. Expert gọi `POST /api/v1/profiles/portfolio` với `domainIds`, `skillIds`, `technologyIds`.
-5. Expert gọi `GET /api/v1/profiles/portfolio/me`.
-6. Business hoặc Staff gọi `GET /api/v1/profiles/files/view-url?path=...`.
-
-### Luồng 4: Admin audit log
-
-1. Login admin.
-2. Gọi `GET /api/v1/admin/audit-logs`.
-3. Test `actorGroup=INTERNAL`.
-4. Test `actorGroup=EXTERNAL`.
-5. Thực hiện hành động như business tạo job hoặc expert nộp proposal.
-6. Gọi lại audit log để kiểm tra log mới.
-
-### Luồng 5: Notification realtime
-
-1. Login BUSINESS và EXPERT để lấy `businessToken`, `expertToken`.
-2. Mở WebSocket request tới `ws://localhost:8080/ws/000/postman/websocket`.
-3. Gửi frame `CONNECT` bằng `businessToken`.
-4. Gửi frame `SUBSCRIBE` tới `/user/queue/notifications`.
-5. Ở tab REST khác, dùng EXPERT nộp proposal cho job của BUSINESS.
-6. Kiểm tra tab WebSocket nhận message có `title`, `message` tiếng Việt.
-7. Gọi `GET /api/v1/notifications` bằng `businessToken` để kiểm tra notification đã được lưu database.
-8. Gọi `PATCH /api/v1/notifications/{notificationId}/read` rồi kiểm tra `GET /api/v1/notifications/unread-count`.
-
-## 13. Lỗi Thường Gặp Khi Test
-
-### 401 Unauthorized
-
-- Chưa thêm `Authorization`.
-- Token hết hạn.
-- Dán sai token hoặc dùng sai biến môi trường.
-
-### 403 Forbidden hoặc lỗi quyền
-
-- Dùng token EXPERT để tạo job.
-- Dùng token BUSINESS để tạo domain/skill/criteria admin.
-- Dùng token không phải STAFF để duyệt profile.
-- Business xem proposal của job không thuộc doanh nghiệp mình.
-
-### 500 khi upload file Firebase
-
-- File service account Firebase sai path trong `.env`.
-- Firebase Storage bucket chưa bật.
-- Body không phải `form-data`.
-- Key file không đúng là `file`.
-
-### Tạo job không lưu milestone criteria
-
-- Chưa gọi `GET /api/v1/acceptance-criteria?activeOnly=true` để lấy `criteriaId` đúng.
-- Gửi nhầm `criteria` thay vì `criteriaIds`.
-- `criteriaIds` chứa id không tồn tại hoặc inactive.
-- `orderIndex` milestone bị trùng.
-
-### Proposal không nộp được
-
-- Job chưa `OPEN`.
-- Expert chưa `Approved`.
-- Expert chưa có portfolio.
-- Expert đã có proposal cùng job đang khác `Rejected`.
-- `proposalMilestone` không phải JSON array hợp lệ.
-- `proposalMilestone[].milestoneId` không thuộc job đang nộp.
-- Tổng `proposalMilestone[].proposedBudget` không khớp `bidAmount`.
-
-### Contract draft không tạo được
-
-- Proposal chưa được business duyệt `Accepted`.
-- Proposal đã có contract draft trước đó.
-- Job chưa có milestone.
-- `proposalMilestone` trong proposal chứa milestone không thuộc job.
-
-### Job public không hiện proposal count
-
-Gọi:
+#### 107. GET /api/v1/wallet/me
 
 ```http
-GET {{baseUrl}}/api/v1/jobs
+GET {{baseUrl}}/api/v1/wallet/me
 ```
 
-Kiểm tra response từng job có:
-
-```json
-{
-  "proposalsCount": 1
-}
-```
+- Mục đích: Lấy thông tin của account đang đăng nhập.
+- Phục vụ: Ví của người dùng.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
