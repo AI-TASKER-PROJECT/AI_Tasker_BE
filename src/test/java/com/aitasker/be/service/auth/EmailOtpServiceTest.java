@@ -34,7 +34,7 @@ class EmailOtpServiceTest {
         ResourceConflictException ex = assertThrows(ResourceConflictException.class,
                 () -> emailOtpService.sendOtp(" User@Mail.Com "));
 
-        assertEquals("Email đã tồn tại", ex.getMessage());
+        assertEquals("Email da ton tai", ex.getMessage());
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }
 }

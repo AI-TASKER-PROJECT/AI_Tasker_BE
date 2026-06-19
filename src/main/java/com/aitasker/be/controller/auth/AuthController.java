@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.config.OpenApiConfig;
 import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.GoogleAuthRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.service.auth.AuthService;
@@ -43,13 +44,22 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Register success", authService.register(req)));
     }
 
+    @PostMapping("/google/login")
+    @SecurityRequirements
+    public ResponseEntity<ApiResponse<AuthResponse>> googleLogin(@Valid @RequestBody GoogleAuthRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Google login success", authService.googleLogin(req)));
+    }
+
+    @PostMapping("/google/register")
+    @SecurityRequirements
+    public ResponseEntity<ApiResponse<AuthResponse>> googleRegister(@Valid @RequestBody GoogleAuthRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Google register success", authService.googleLogin(req)));
+    }
+
     @GetMapping("/check-email")
     @SecurityRequirements
     public ResponseEntity<Boolean> checkEmail(@RequestParam String email) {
-
-        boolean exists = authService.validateEmailNotExists(email);
-
-        return ResponseEntity.ok(exists);
+        return ResponseEntity.ok(authService.emailExists(email));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

@@ -1,14 +1,10 @@
-/*
- * NOTE FILE: src/main/java/com/aitasker/be/service/auth/AuthServiceImpl.java
- * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
- * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
- */
 package com.aitasker.be.service.auth;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.ResourceConflictException;
 import com.aitasker.be.common.exception.UnauthorizedException;
 import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.GoogleAuthRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.entity.AccountEntity;
@@ -17,14 +13,20 @@ import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.RoleRepository;
 import com.aitasker.be.security.SecurityUtils;
 import com.aitasker.be.security.jwt.JwtService;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
+import java.util.Collections;
+import java.util.UUID;
+
 @Service
-// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
@@ -34,15 +36,18 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final EmailOtpService emailOtpService;
 
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+    @Value("${google.client-id:}")
+    private String googleClientId;
+
     @Override
-    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
-    // Note: Hàm `register` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AuthResponse register(RegisterRequest req) {
         String email = normalizeEmail(req.getEmail());
         if (!emailOtpService.isEmailVerified(email)) {
-            throw new AppException("Email chưa xác thực OTP");
+            throw new AppException("Email chua xac thuc OTP");
+        }
+        if (accountRepository.existsByEmailIgnoreCase(email)) {
+            throw new ResourceConflictException("Email da ton tai");
         }
 
         RoleEntity role = roleRepository.findByRoleName(req.getRole())
@@ -55,39 +60,87 @@ public class AuthServiceImpl implements AuthService {
                 .fullName(req.getFullName())
                 .role(role)
                 .status("Pending")
+                .emailVerified(true)
                 .build();
 
         AccountEntity saved = accountRepository.save(account);
         emailOtpService.clearVerifiedEmail(email);
-
-        String accessToken = jwtService.generateAccessToken(saved.getEmail(), saved.getRole().getRoleName());
-        String refreshToken = jwtService.generateRefreshToken(saved.getEmail());
-
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .role(saved.getRole().getRoleName())
-                .accountStatus(saved.getStatus())
-                .email(saved.getEmail())
-                .fullName(saved.getFullName())
-                .build();
+        return buildAuthResponse(saved);
     }
 
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Override
-    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
+    @Transactional
+    public AuthResponse googleLogin(GoogleAuthRequest req) {
+        GoogleIdToken.Payload payload = verifyGoogleCredential(req.getCredential());
+        if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
+            throw new UnauthorizedException("Google email chua duoc xac thuc");
+        }
+
+        String email = normalizeEmail(payload.getEmail());
+        return accountRepository.findByEmailWithRole(email)
+                .map(this::buildAuthResponse)
+                .orElseGet(() -> createGoogleAccount(req, email, payload));
+    }
+
+    @Override
     @Transactional(readOnly = true)
-    // Note: Hàm `login` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AuthResponse login(LoginRequest req) {
         AccountEntity account = accountRepository.findByEmailWithRole(normalizeEmail(req.getEmail()))
                 .orElseThrow(() -> new UnauthorizedException("Sai email hoac mat khau"));
 
-        if ("Lock".equalsIgnoreCase(account.getStatus())) {
-            throw new UnauthorizedException("Tai khoan da bi khoa");
-        }
-
         if (!passwordEncoder.matches(req.getPassword(), account.getPassword())) {
             throw new UnauthorizedException("Sai email hoac mat khau");
+        }
+
+        return buildAuthResponse(account);
+    }
+
+    @Override
+    public boolean emailExists(String email) {
+        return accountRepository.existsByEmailIgnoreCase(normalizeEmail(email));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse currentSession() {
+        AccountEntity account = accountRepository.findByEmailWithRole(SecurityUtils.getCurrentEmail())
+                .orElseThrow(() -> new UnauthorizedException("Tai khoan khong hop le"));
+        return AuthResponse.builder()
+                .role(account.getRole().getRoleName())
+                .accountStatus(account.getStatus())
+                .email(account.getEmail())
+                .fullName(account.getFullName())
+                .build();
+    }
+
+    private AuthResponse createGoogleAccount(GoogleAuthRequest req, String email, GoogleIdToken.Payload payload) {
+        if (req.getRole() == null || req.getRole().isBlank()) {
+            throw new AppException("Role khong duoc de trong khi tao tai khoan Google moi");
+        }
+
+        RoleEntity role = roleRepository.findByRoleName(req.getRole())
+                .orElseThrow(() -> new UnauthorizedException("Role khong hop le"));
+        String googleName = payload.get("name") instanceof String name ? name : null;
+        String fullName = req.getFullName() == null || req.getFullName().isBlank()
+                ? googleName
+                : req.getFullName().trim();
+
+        AccountEntity account = AccountEntity.builder()
+                .email(email)
+                .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                .phone(req.getPhone())
+                .fullName(fullName == null || fullName.isBlank() ? email : fullName)
+                .role(role)
+                .status("Pending")
+                .emailVerified(true)
+                .build();
+
+        return buildAuthResponse(accountRepository.save(account));
+    }
+
+    private AuthResponse buildAuthResponse(AccountEntity account) {
+        if ("Lock".equalsIgnoreCase(account.getStatus())) {
+            throw new UnauthorizedException("Tai khoan da bi khoa");
         }
 
         String accessToken = jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName());
@@ -103,24 +156,27 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    @Override
-    public boolean validateEmailNotExists(String email) {
-        return !accountRepository.existsByEmailIgnoreCase(email);
-    }
-
-    // Note: Hàm `normalizeEmail` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    // Note: Hàm `currentSession` đọc account mới nhất theo JWT hiện tại để frontend không cần đăng xuất rồi đăng nhập lại khi status đổi.
-    @Override
-    @Transactional(readOnly = true)
-    public AuthResponse currentSession() {
-        AccountEntity account = accountRepository.findByEmailWithRole(SecurityUtils.getCurrentEmail())
-                .orElseThrow(() -> new UnauthorizedException("Tai khoan khong hop le"));
-        return AuthResponse.builder()
-                .role(account.getRole().getRoleName())
-                .accountStatus(account.getStatus())
-                .email(account.getEmail())
-                .fullName(account.getFullName())
-                .build();
+    private GoogleIdToken.Payload verifyGoogleCredential(String credential) {
+        if (googleClientId == null || googleClientId.isBlank()) {
+            throw new UnauthorizedException("Google client id chua duoc cau hinh");
+        }
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    GsonFactory.getDefaultInstance()
+            )
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+            GoogleIdToken idToken = verifier.verify(credential);
+            if (idToken == null) {
+                throw new UnauthorizedException("Google credential khong hop le");
+            }
+            return idToken.getPayload();
+        } catch (UnauthorizedException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new UnauthorizedException("Khong the xac thuc Google credential");
+        }
     }
 
     private String normalizeEmail(String email) {

@@ -56,7 +56,7 @@ public class AccountEntity {
 
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
 
-    @Column(name = "emailVerified", nullable = false)
+    @Column(name = "email_verified", nullable = false)
     private boolean emailVerified;
 
     @Column(name = "full_name", nullable = false, length = 255)
