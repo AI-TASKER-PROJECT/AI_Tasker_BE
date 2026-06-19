@@ -94,6 +94,9 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 64 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | Tạo hợp đồng nháp từ proposal đã được chấp nhận. | Hợp đồng, milestone, deliverable, tranh chấp và giao dịch. |
 | 65 | POST | `/api/v1/contracts/change-requests` | Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này. | Hợp đồng, milestone, deliverable, tranh chấp và giao dịch. |
 
+| 66 | POST | `/api/v1/contracts/{contractId}/reject` | Expert tu choi contract Draft/Negotiating. | Huy contract va dua job ve proposal review. |
+| 67 | POST | `/api/v1/milestones/{milestoneId}/complete` | Business hoan tat milestone dang review. | Nghiem thu milestone, tu hoan tat contract khi du dieu kien. |
+
 ## email-otp-controller
 
 | STT | Method | API | API dùng để làm gì | Phục vụ chức năng |

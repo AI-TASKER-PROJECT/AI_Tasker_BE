@@ -67,10 +67,12 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
 - Contract/Execution/Finance/Dispute:
   - `POST /api/v1/contracts/from-proposals/{proposalId}`
   - `POST /api/v1/contracts/change-requests`
-  - `POST /api/v1/contracts/{contractId}/activate`
+  - `POST /api/v1/contracts/{contractId}/sign`
   - `POST /api/v1/contracts/{contractId}/nda-sign`
+  - `POST /api/v1/contracts/{contractId}/reject`
   - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
   - `POST /api/v1/milestones`
+  - `POST /api/v1/milestones/{milestoneId}/complete`
   - `POST /api/v1/criteria`
   - `POST /api/v1/deliverables`
   - `POST /api/v1/transactions`

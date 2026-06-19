@@ -128,6 +128,17 @@ public class NotificationService {
         );
     }
 
+    public void notifyContractEvent(Integer receiverAccountId, Integer actorAccountId, String type, String title, String message, Integer contractId) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                type,
+                title,
+                message,
+                "/contracts/" + contractId
+        );
+    }
+
     // Note: Hàm `notifyDisputeCreated` tạo thông báo tiếng Việt khi có tranh chấp mới được gán cho staff.
     public void notifyDisputeCreated(Integer receiverAccountId, Integer actorAccountId, Integer disputeId) {
         createAndPush(

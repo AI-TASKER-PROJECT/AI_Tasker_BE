@@ -93,6 +93,15 @@ public class ContractExecutionService {
         createContractMilestones(saved.getContractId(), jobMilestones, proposedBudgetByMilestone);
         saved.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(saved.getContractId()));
         auditLogService.record(AuditLogService.ACTION_CREATE_CONTRACT_DRAFT, "contracts", String.valueOf(saved.getContractId()), accountId);
+        expertProfileRepository.findById(saved.getExpertId())
+                .ifPresent(expert -> notificationService.notifyContractEvent(
+                        expert.getAccountId(),
+                        accountId,
+                        "CONTRACT_CREATED",
+                        "Hop dong nhap moi",
+                        "Doanh nghiep da tao hop dong nhap de ban xem xet.",
+                        saved.getContractId()
+                ));
         return saved;
     }
 
@@ -146,12 +155,23 @@ public class ContractExecutionService {
         if ("Active".equals(contract.getStatus())) return contract;
         if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP KY");
         LocalDateTime now = LocalDateTime.now();
+        boolean wasActive = "Active".equals(contract.getStatus());
         if (businessId != null && businessId.equals(contract.getBusinessId())) contract.setBusinessAcceptedAt(now);
         if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertAcceptedAt(now);
         tryActivateContract(contract, now);
         ContractEntity saved = contractRepository.save(contract);
         saved.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(saved.getContractId()));
         auditLogService.record(AuditLogService.ACTION_ACCEPT_CONTRACT, "contracts", String.valueOf(contractId), accountId);
+        notifyCounterpartyContractEvent(saved, accountId,
+                businessId != null && businessId.equals(saved.getBusinessId()) ? saved.getExpertId() : null,
+                expertId != null && expertId.equals(saved.getExpertId()) ? saved.getBusinessId() : null,
+                "CONTRACT_ACCEPTED",
+                "Hop dong da duoc xac nhan",
+                "Ben con lai da ky xac nhan hop dong.");
+        if (!wasActive && "Active".equals(saved.getStatus())) {
+            auditLogService.record(AuditLogService.ACTION_ACTIVATE_CONTRACT, "contracts", String.valueOf(contractId), accountId);
+            notifyBothParticipants(saved, accountId, "CONTRACT_ACTIVATED", "Hop dong da kich hoat", "Hop dong da du chu ky Contract va NDA, du an bat dau thuc hien.");
+        }
         return saved;
     }
 
@@ -232,11 +252,17 @@ public class ContractExecutionService {
         }
     }
 
-    // Note: Hàm `closeContractJob` đóng job sau khi hợp đồng đã được cả hai bên ký.
-    private void closeContractJob(ContractEntity contract) {
+    private void markContractJobInProgress(ContractEntity contract) {
         JobEntity job = jobRepository.findById(contract.getJobId())
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA CONTRACT"));
         job.setBudget(contract.getTotalBudget());
+        job.setStatus("IN_PROGRESS");
+        jobRepository.save(job);
+    }
+
+    private void closeCompletedContractJob(ContractEntity contract) {
+        JobEntity job = jobRepository.findById(contract.getJobId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA CONTRACT"));
         job.setStatus("CLOSED");
         jobRepository.save(job);
     }
@@ -252,7 +278,7 @@ public class ContractExecutionService {
             if (contract.getActivatedAt() == null) {
                 contract.setActivatedAt(now);
                 applyContractMilestoneBudgets(contract);
-                closeContractJob(contract);
+                markContractJobInProgress(contract);
             }
         } else {
             contract.setStatus("Negotiating");
@@ -277,12 +303,52 @@ public class ContractExecutionService {
         if ("Active".equals(contract.getStatus())) return contract;
         if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP KY NDA");
         LocalDateTime now = LocalDateTime.now();
+        boolean wasActive = "Active".equals(contract.getStatus());
         if (businessId != null && businessId.equals(contract.getBusinessId())) contract.setBusinessNdaSignedAt(now);
         if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertNdaSignedAt(now);
         tryActivateContract(contract, now);
         ContractEntity saved = contractRepository.save(contract);
         saved.setContractMilestones(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(saved.getContractId()));
         auditLogService.record(AuditLogService.ACTION_SIGN_NDA, "contracts", String.valueOf(contractId), accountId);
+        notifyCounterpartyContractEvent(saved, accountId,
+                businessId != null && businessId.equals(saved.getBusinessId()) ? saved.getExpertId() : null,
+                expertId != null && expertId.equals(saved.getExpertId()) ? saved.getBusinessId() : null,
+                "NDA_SIGNED",
+                "NDA da duoc ky",
+                "Ben con lai da ky NDA cho hop dong.");
+        if (!wasActive && "Active".equals(saved.getStatus())) {
+            auditLogService.record(AuditLogService.ACTION_ACTIVATE_CONTRACT, "contracts", String.valueOf(contractId), accountId);
+            notifyBothParticipants(saved, accountId, "CONTRACT_ACTIVATED", "Hop dong da kich hoat", "Hop dong da du chu ky Contract va NDA, du an bat dau thuc hien.");
+        }
+        return saved;
+    }
+
+    @Transactional
+    public ContractEntity rejectContract(Integer contractId) {
+        accessService.requireRole("EXPERT");
+        accessService.requireApprovedAccount();
+        ContractEntity contract = requireExpertOwnedContract(contractId);
+        if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) {
+            throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP TU CHOI");
+        }
+        contract.setStatus("Cancelled");
+        contract.setUpdatedAt(LocalDateTime.now());
+        JobEntity job = jobRepository.findById(contract.getJobId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA CONTRACT"));
+        job.setStatus("PROPOSAL_REVIEW");
+        jobRepository.save(job);
+        ContractEntity saved = contractRepository.save(contract);
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        auditLogService.record(AuditLogService.ACTION_REJECT_CONTRACT, "contracts", String.valueOf(contractId), actorAccountId);
+        businessProfileRepository.findById(saved.getBusinessId())
+                .ifPresent(business -> notificationService.notifyContractEvent(
+                        business.getAccountId(),
+                        actorAccountId,
+                        "CONTRACT_REJECTED",
+                        "Hop dong bi tu choi",
+                        "Chuyen gia da tu choi hop dong nhap. Job duoc chuyen ve buoc review proposal.",
+                        saved.getContractId()
+                ));
         return saved;
     }
 
@@ -370,6 +436,59 @@ public class ContractExecutionService {
                         milestone.getMilestoneName()
                 ));
         return saved;
+    }
+
+    @Transactional
+    public MilestoneEntity completeMilestone(Integer milestoneId) {
+        accessService.requireRole("BUSINESS");
+        accessService.requireApprovedAccount();
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        ContractEntity contract = requireBusinessOwnedContract(
+                Optional.ofNullable(milestone.getContractId())
+                        .orElseGet(() -> contractRepository.findByJobId(milestone.getJobId())
+                                .map(ContractEntity::getContractId)
+                                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA MILESTONE")))
+        );
+        if (!"Active".equals(contract.getStatus())) throw new AppException("CHI DUOC HOAN TAT MILESTONE KHI CONTRACT ACTIVE");
+        if (!"Under Review".equals(milestone.getStatus())) throw new AppException("MILESTONE CHUA O TRANG THAI CHO DUYET");
+        milestone.setStatus("Completed");
+        milestone.setUpdatedAt(LocalDateTime.now());
+        MilestoneEntity saved = milestoneRepository.save(milestone);
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        auditLogService.record(AuditLogService.ACTION_COMPLETE_MILESTONE, "milestones", String.valueOf(milestoneId), actorAccountId);
+        tryCompleteContract(contract, actorAccountId);
+        return saved;
+    }
+
+    private void tryCompleteContract(ContractEntity contract, Integer actorAccountId) {
+        List<MilestoneEntity> milestones = milestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId());
+        if (milestones.isEmpty()) return;
+        boolean allCompleted = milestones.stream().allMatch(milestone -> "Completed".equals(milestone.getStatus()));
+        if (!allCompleted) return;
+        contract.setStatus("Completed");
+        contract.setUpdatedAt(LocalDateTime.now());
+        ContractEntity saved = contractRepository.save(contract);
+        closeCompletedContractJob(saved);
+        auditLogService.record(AuditLogService.ACTION_COMPLETE_CONTRACT, "contracts", String.valueOf(saved.getContractId()), actorAccountId);
+        notifyBothParticipants(saved, actorAccountId, "CONTRACT_COMPLETED", "Hop dong da hoan tat", "Tat ca milestone cua hop dong da hoan thanh.");
+    }
+
+    private void notifyCounterpartyContractEvent(ContractEntity contract, Integer actorAccountId, Integer expertId, Integer businessId, String type, String title, String message) {
+        if (expertId != null) {
+            expertProfileRepository.findById(expertId)
+                    .ifPresent(expert -> notificationService.notifyContractEvent(expert.getAccountId(), actorAccountId, type, title, message, contract.getContractId()));
+        }
+        if (businessId != null) {
+            businessProfileRepository.findById(businessId)
+                    .ifPresent(business -> notificationService.notifyContractEvent(business.getAccountId(), actorAccountId, type, title, message, contract.getContractId()));
+        }
+    }
+
+    private void notifyBothParticipants(ContractEntity contract, Integer actorAccountId, String type, String title, String message) {
+        businessProfileRepository.findById(contract.getBusinessId())
+                .ifPresent(business -> notificationService.notifyContractEvent(business.getAccountId(), actorAccountId, type, title, message, contract.getContractId()));
+        expertProfileRepository.findById(contract.getExpertId())
+                .ifPresent(expert -> notificationService.notifyContractEvent(expert.getAccountId(), actorAccountId, type, title, message, contract.getContractId()));
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public TransactionEntity createTransaction(TransactionEntity input) {
