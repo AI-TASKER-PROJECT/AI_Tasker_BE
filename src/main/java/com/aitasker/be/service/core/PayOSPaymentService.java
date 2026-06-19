@@ -19,8 +19,6 @@ import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.v2.paymentRequests.PaymentLink;
 import vn.payos.model.v2.paymentRequests.PaymentLinkStatus;
 import vn.payos.model.v2.paymentRequests.Transaction;
-import vn.payos.model.webhooks.Webhook;
-import vn.payos.model.webhooks.WebhookData;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -97,26 +95,6 @@ public class PayOSPaymentService {
     }
 
     @Transactional
-    public PaymentOrderEntity handleWebhook(Webhook webhook) {
-        validateConfig();
-
-        WebhookData data;
-        try {
-            data = payOS.webhooks().verify(webhook);
-        } catch (Exception ex) {
-            throw new AppException("WEBHOOK PAYOS KHONG HOP LE");
-        }
-
-        if (data == null || data.getOrderCode() == null) {
-            throw new AppException("WEBHOOK PAYOS THIEU ORDER CODE");
-        }
-
-        return paymentOrderRepository.findByProviderOrderCode(data.getOrderCode())
-                .map(paymentOrder -> updatePaymentOrderFromWebhook(paymentOrder, data))
-                .orElse(null);
-    }
-
-    @Transactional
     public PaymentOrderEntity syncPaymentStatus(Long orderCode) {
         validateConfig();
 
@@ -129,28 +107,6 @@ public class PayOSPaymentService {
         } catch (Exception ex) {
             throw new AppException("KHONG DONG BO DUOC TRANG THAI PAYOS: " + ex.getMessage());
         }
-    }
-
-    private PaymentOrderEntity updatePaymentOrderFromWebhook(PaymentOrderEntity paymentOrder, WebhookData data) {
-        PaymentStatus previousStatus = paymentOrder.getStatus();
-        paymentOrder.setProviderPaymentLinkId(data.getPaymentLinkId());
-        paymentOrder.setProviderResponseCode(data.getCode());
-        paymentOrder.setProviderTransactionNo(data.getReference());
-
-        if ("00".equals(data.getCode())) {
-            paymentOrder.setStatus(PaymentStatus.PAID);
-            if (paymentOrder.getPaidAt() == null) {
-                paymentOrder.setPaidAt(LocalDateTime.now());
-            }
-            if (previousStatus != PaymentStatus.PAID) {
-                validateWebhookAmount(paymentOrder, data);
-                walletLedgerService.postWalletTopup(paymentOrder);
-            }
-        } else {
-            paymentOrder.setStatus(PaymentStatus.FAILED);
-        }
-
-        return paymentOrderRepository.save(paymentOrder);
     }
 
     private PaymentOrderEntity updatePaymentOrderFromProvider(PaymentOrderEntity paymentOrder, PaymentLink paymentLink) {
@@ -181,12 +137,6 @@ public class PayOSPaymentService {
         }
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.valueOf(2000)) < 0) {
             throw new AppException("SO TIEN THANH TOAN PHAI IT NHAT LA 2000");
-        }
-    }
-
-    private void validateWebhookAmount(PaymentOrderEntity paymentOrder, WebhookData data) {
-        if (data.getAmount() == null || paymentOrder.getAmount().compareTo(BigDecimal.valueOf(data.getAmount())) != 0) {
-            throw new AppException("SO TIEN WEBHOOK PAYOS KHONG KHOP PAYMENT ORDER");
         }
     }
 

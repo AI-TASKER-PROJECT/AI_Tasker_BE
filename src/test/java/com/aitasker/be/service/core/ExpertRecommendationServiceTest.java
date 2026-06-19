@@ -44,6 +44,7 @@ class ExpertRecommendationServiceTest {
     @Mock private SowRepository sowRepository;
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private RestTemplate restTemplate;
+    @Mock private PaymentWalletService paymentWalletService;
 
     private OpenAiProperties openAiProperties;
     private ExpertRecommendationService service;
@@ -58,7 +59,8 @@ class ExpertRecommendationServiceTest {
                 sowRepository,
                 milestoneRepository,
                 restTemplate,
-                openAiProperties
+                openAiProperties,
+                paymentWalletService
         );
     }
 
@@ -86,6 +88,7 @@ class ExpertRecommendationServiceTest {
         ArgumentCaptor<Iterable<ExpertRecommendationEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
         verify(expertRecommendationRepository).deleteByJobPostingId(1L);
         verify(expertRecommendationRepository).saveAll(captor.capture());
+        verify(paymentWalletService).requirePremiumRecommendationAccess(1L);
         assertEquals(5, toList(captor.getValue()).size());
     }
 
@@ -143,6 +146,7 @@ class ExpertRecommendationServiceTest {
 
         ArgumentCaptor<Iterable<ExpertRecommendationEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
         verify(expertRecommendationRepository).saveAll(captor.capture());
+        verify(paymentWalletService).requirePremiumRecommendationAccess(1L);
         List<ExpertRecommendationEntity> saved = toList(captor.getValue());
         assertEquals(1, saved.size());
         assertEquals(2L, saved.get(0).getExpertId());

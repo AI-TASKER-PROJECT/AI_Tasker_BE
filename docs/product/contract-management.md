@@ -21,8 +21,10 @@ Spring service/controller code, Flyway migrations, and tests.
 Accepted Proposal
   -> Draft Contract
   -> Negotiating
+  -> PendingDeposit
   -> Active
   -> Completed
+  -> Closed
 ```
 
 Alternate exits:
@@ -45,11 +47,13 @@ Alternate exits:
   or `Negotiating`.
 - A change request resets both contract signatures, both NDA signatures, and
   `activated_at`, then moves the contract to `Negotiating`.
-- The contract auto-activates after business signature, expert signature,
-  business NDA, and expert NDA are all present.
-- Activation sets the contract to `Active`, applies final contract milestone
-  budgets back to job milestones, attaches the contract id to those milestones,
-  and moves the job to `IN_PROGRESS`.
+- The contract moves to `PendingDeposit` after business signature, expert
+  signature, business NDA, and expert NDA are all present.
+- The owning business must pay the 20% wallet security deposit before execution
+  starts.
+- Deposit payment sets the contract to `Active`, applies final contract
+  milestone budgets back to job milestones, attaches the contract id to those
+  milestones, and moves the job to `IN_PROGRESS`.
 - Expert rejection is allowed only from `Draft` or `Negotiating`; it moves the
   contract to `Cancelled` and the job to `PROPOSAL_REVIEW`.
 - Deliverables can be submitted only by the contract expert while the contract
@@ -58,6 +62,7 @@ Alternate exits:
 - The owning business can complete a milestone only from `Under Review`.
 - When every contract milestone is `Completed`, the system moves the contract
   to `Completed` and the job to `CLOSED`.
+- Admin deposit refund/resolution closes the contract as `Closed`.
 - Completed, terminated, and cancelled contracts cannot be terminated again.
 
 ## API
@@ -66,6 +71,8 @@ Alternate exits:
 - `POST /api/v1/contracts/change-requests`
 - `POST /api/v1/contracts/{contractId}/sign`
 - `POST /api/v1/contracts/{contractId}/nda-sign`
+- `POST /api/v1/contracts/{contractId}/deposit/pay`
+- `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
 - `POST /api/v1/contracts/{contractId}/reject`
 - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
 - `POST /api/v1/deliverables`

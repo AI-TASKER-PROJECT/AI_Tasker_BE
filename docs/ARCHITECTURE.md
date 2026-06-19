@@ -38,8 +38,9 @@ Current product domains:
 - Expert candidate recommendation and matching.
 - Contract negotiation, signatures, NDA signatures, milestones, acceptance
   criteria, deliverables, and termination.
-- Finance, wallet, payment order, PayOS payment, wallet ledger, system wallet,
-  and legacy transaction flows.
+- Finance, wallet, payment order, PayOS payment, wallet ledger, membership,
+  credit, quota, contract deposit, withdrawal, system wallet, and legacy
+  transaction flows.
 - Dispute assignment, demo testing, technical report, and resolution.
 - Reviews, admin settings, account/staff management, analytics, and audit logs.
 - Notifications over REST and WebSocket/STOMP.
@@ -130,8 +131,9 @@ The following service boundaries are established and should be preserved:
   `RagRetrievalService`, and `ChatbotService`: SoW, keyword extraction, RAG, and
   assistant flows.
 - `service/core/FirebaseStorageService`: Firebase-backed upload/view-url flows.
-- `service/core/PayOSPaymentService`, `WalletLedgerService`, and
-  `SystemWalletService`: payment order and wallet/system-wallet behavior.
+- `service/core/PayOSPaymentService`, `PaymentWalletService`,
+  `WalletLedgerService`, and `SystemWalletService`: payment order, wallet,
+  membership, credit, quota, deposit, withdrawal, and system-wallet behavior.
 - `service/core/NotificationService`: notification records and unread state.
 
 ## API Surface
@@ -153,6 +155,10 @@ Controller groups currently include:
 - `marketplace-controller`
 - `notification-controller`
 - `payos-payment-controller`
+- `membership-controller`
+- `credit-controller`
+- `user-quota-controller`
+- `withdrawal-controller`
 - `profile-controller`
 - `SoW Generation`
 - `tax-check-controller`
@@ -198,7 +204,9 @@ Core data concepts include:
 - `sows`, `acceptance_criteria`, `milestone_acceptance_criteria`
 - `contracts`, `contract_change_requests`, `milestones`,
   `contract_milestones`, `deliverables`
-- `transactions`, `payment_orders`, `wallet_transactions`, `system_wallets`
+- `transactions`, `payment_orders`, `wallet_transactions`, `system_wallets`,
+  `membership_packages`, `membership_purchases`, `user_quotas`,
+  `quota_usage_logs`, `contract_deposits`, `withdrawal_requests`
 - `reviews`, `disputes`, `audit_logs`, `system_settings`
 - `notifications`, `expert_recommendations`, `knowledge_chunks`
 
@@ -261,9 +269,12 @@ Contract execution enforces a multi-step agreement model:
 - Expert signature sets `expert_accepted_at`.
 - Business NDA signature sets `business_nda_signed_at`.
 - Expert NDA signature sets `expert_nda_signed_at`.
-- Contract becomes `Active` only after both parties have signed both the
+- Contract becomes `PendingDeposit` after both parties have signed both the
   contract and NDA.
-- When a contract becomes `Active`, the job becomes `IN_PROGRESS`.
+- Business pays a 20% security deposit from wallet available balance before
+  work can start.
+- When the deposit is held, the contract becomes `Active` and the job becomes
+  `IN_PROGRESS`.
 - If any required signature/NDA is missing, the contract remains or returns to
   `Negotiating`.
 - A change request resets both parties' acceptance/NDA timestamps and returns
@@ -277,6 +288,8 @@ Contract execution enforces a multi-step agreement model:
 - Submitting a deliverable moves the milestone into review.
 - Business completion of all reviewed milestones moves the contract to
   `Completed` and the job to `CLOSED`.
+- Admin deposit refund/resolution moves a completed, cancelled, or already
+  closed contract to `Closed` after final deposit handling.
 - SLA auto-approve is currently a manual API simulation, not a scheduler.
 
 ## Finance And Payment Rules
@@ -284,18 +297,31 @@ Contract execution enforces a multi-step agreement model:
 Finance is partially MVP and partially integrated:
 
 - PayOS payment-order support exists through `PayOSPaymentService` and related
-  controller/config classes.
+  controller/config classes. PayOS is only used for wallet top-up.
 - Wallet and system-wallet services exist.
+- Membership package purchase and credit purchase use wallet available balance
+  and create wallet/quota ledger records.
+- Business job publishing consumes one job-post credit only when publish to
+  `OPEN` succeeds and the job has a saved SoW.
+- Expert proposal submission consumes one proposal credit only when the
+  proposal save succeeds.
+- Active Business Premium quota is required to view AI expert recommendations.
+- Contract security deposit moves Business available balance to escrow.
+- Withdrawal requests move available balance to holding; admin approval removes
+  holding and admin rejection returns holding to available.
 - Legacy transaction endpoints still model deposit, payout, refund, webhook,
   and status updates for contract/milestone flows.
 - Legacy invoice storage no longer exists in the active schema.
-- Payment webhooks and refund/payout behavior must be treated as sensitive
-  external-system boundaries.
+- Payment status confirmation for PayOS wallet top-up uses active provider
+  sync by order code (`/api/payments/payos/{orderCode}/sync`) instead of a
+  public PayOS webhook endpoint. Refund/payout behavior remains a sensitive
+  external-system boundary.
 
 Current known limitations:
 
 - Full escrow ledger behavior is not production-complete.
-- Payment webhook behavior still has mocked or simplified paths.
+- Legacy transaction webhook behavior is still an admin simulation; PayOS
+  wallet top-up status is synced from the provider by order code.
 - Refund/payout reconciliation needs stronger provider-backed verification.
 - Disputes do not yet fully lock funds, snapshot evidence, or enforce penalties.
 
@@ -405,7 +431,7 @@ the relevant guides, Swagger overview, and product docs.
 The following areas are intentionally not yet production-complete:
 
 - AI Job Assistant and matching quality.
-- Provider-backed payment, IPN/webhook, refund, payout, and escrow ledger.
+- Provider-backed payment, refund, payout, and escrow ledger.
 - Full Firebase/file coverage for all evidence and deliverable flows.
 - NDA PDF generation and storage.
 - Scheduled SLA auto-approval.

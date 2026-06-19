@@ -152,10 +152,9 @@ public class ContractExecutionService {
         boolean isParticipant = (businessId != null && businessId.equals(contract.getBusinessId()))
                 || (expertId != null && expertId.equals(contract.getExpertId()));
         if (!isParticipant) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
-        if ("Active".equals(contract.getStatus())) return contract;
+        if (List.of("PendingDeposit", "Active").contains(contract.getStatus())) return contract;
         if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP KY");
         LocalDateTime now = LocalDateTime.now();
-        boolean wasActive = "Active".equals(contract.getStatus());
         if (businessId != null && businessId.equals(contract.getBusinessId())) contract.setBusinessAcceptedAt(now);
         if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertAcceptedAt(now);
         tryActivateContract(contract, now);
@@ -168,9 +167,8 @@ public class ContractExecutionService {
                 "CONTRACT_ACCEPTED",
                 "Hop dong da duoc xac nhan",
                 "Ben con lai da ky xac nhan hop dong.");
-        if (!wasActive && "Active".equals(saved.getStatus())) {
-            auditLogService.record(AuditLogService.ACTION_ACTIVATE_CONTRACT, "contracts", String.valueOf(contractId), accountId);
-            notifyBothParticipants(saved, accountId, "CONTRACT_ACTIVATED", "Hop dong da kich hoat", "Hop dong da du chu ky Contract va NDA, du an bat dau thuc hien.");
+        if ("PendingDeposit".equals(saved.getStatus())) {
+            notifyBothParticipants(saved, accountId, "CONTRACT_PENDING_DEPOSIT", "Hop dong cho ky quy", "Hop dong da du chu ky Contract va NDA, doanh nghiep can thanh toan ky quy de bat dau du an.");
         }
         return saved;
     }
@@ -267,19 +265,14 @@ public class ContractExecutionService {
         jobRepository.save(job);
     }
 
-    // Note: Hàm `tryActivateContract` chỉ active contract khi đủ chữ ký hợp đồng và NDA của cả hai bên.
+    // Note: Hàm `tryActivateContract` dua contract sang PendingDeposit khi du chu ky va NDA.
     private void tryActivateContract(ContractEntity contract, LocalDateTime now) {
         boolean readyToActivate = contract.getBusinessAcceptedAt() != null
                 && contract.getExpertAcceptedAt() != null
                 && contract.getBusinessNdaSignedAt() != null
                 && contract.getExpertNdaSignedAt() != null;
         if (readyToActivate) {
-            contract.setStatus("Active");
-            if (contract.getActivatedAt() == null) {
-                contract.setActivatedAt(now);
-                applyContractMilestoneBudgets(contract);
-                markContractJobInProgress(contract);
-            }
+            contract.setStatus("PendingDeposit");
         } else {
             contract.setStatus("Negotiating");
         }
@@ -300,10 +293,9 @@ public class ContractExecutionService {
         boolean isParticipant = (businessId != null && businessId.equals(contract.getBusinessId()))
                 || (expertId != null && expertId.equals(contract.getExpertId()));
         if (!isParticipant) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
-        if ("Active".equals(contract.getStatus())) return contract;
+        if (List.of("PendingDeposit", "Active").contains(contract.getStatus())) return contract;
         if (!List.of("Draft", "Negotiating").contains(contract.getStatus())) throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP KY NDA");
         LocalDateTime now = LocalDateTime.now();
-        boolean wasActive = "Active".equals(contract.getStatus());
         if (businessId != null && businessId.equals(contract.getBusinessId())) contract.setBusinessNdaSignedAt(now);
         if (expertId != null && expertId.equals(contract.getExpertId())) contract.setExpertNdaSignedAt(now);
         tryActivateContract(contract, now);
@@ -316,9 +308,8 @@ public class ContractExecutionService {
                 "NDA_SIGNED",
                 "NDA da duoc ky",
                 "Ben con lai da ky NDA cho hop dong.");
-        if (!wasActive && "Active".equals(saved.getStatus())) {
-            auditLogService.record(AuditLogService.ACTION_ACTIVATE_CONTRACT, "contracts", String.valueOf(contractId), accountId);
-            notifyBothParticipants(saved, accountId, "CONTRACT_ACTIVATED", "Hop dong da kich hoat", "Hop dong da du chu ky Contract va NDA, du an bat dau thuc hien.");
+        if ("PendingDeposit".equals(saved.getStatus())) {
+            notifyBothParticipants(saved, accountId, "CONTRACT_PENDING_DEPOSIT", "Hop dong cho ky quy", "Hop dong da du chu ky Contract va NDA, doanh nghiep can thanh toan ky quy de bat dau du an.");
         }
         return saved;
     }

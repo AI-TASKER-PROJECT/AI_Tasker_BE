@@ -85,6 +85,21 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/milestones/sla-auto-approve`
   - `POST /api/v1/disputes/{disputeId}/demo-testing?testResult=...`
   - `POST /api/v1/disputes/{disputeId}/technical-report?reportContent=...&proposedAction=...`
+  - `GET /api/wallet/current`
+  - `GET /api/wallet/transactions`
+  - `GET /api/membership/packages`
+  - `POST /api/membership/packages/{packageId}/purchase`
+  - `POST /api/credits/job-post/purchase`
+  - `POST /api/credits/proposal/purchase`
+  - `GET /api/users/me/quota`
+  - `POST /api/v1/jobs/{jobId}/publish`
+  - `POST /api/v1/contracts/{contractId}/deposit/pay`
+  - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
+  - `POST /api/v1/withdrawal-requests`
+  - `GET /api/v1/withdrawal-requests`
+  - `GET /api/v1/admin/withdrawal-requests`
+  - `POST /api/v1/admin/withdrawal-requests/{withdrawalId}/approve`
+  - `POST /api/v1/admin/withdrawal-requests/{withdrawalId}/reject`
 - Admin/Review/Settings:
   - `POST /api/v1/admin/reviews`
   - `GET /api/v1/admin/reviews/contracts/{contractId}`

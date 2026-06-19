@@ -73,6 +73,17 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 - Mục đích: Hóa đơn/chứng từ giao dịch.
 - Quan hệ chính: `transaction_id -> Transactions.transaction_id`.
 
+### Payment Wallet Tables
+- `payment_order`: PayOS wallet top-up orders and provider metadata.
+- `system_wallet`: wallet balance snapshot per account/role.
+- `wallet_transactions`: real wallet ledger movements.
+- `membership_packages`: configurable Business/Expert packages.
+- `membership_purchases`: membership purchase history and badge range.
+- `user_quotas`: job-post/proposal credit balances and badge expiration.
+- `quota_usage_logs`: grant, purchase, consume, and adjust quota history.
+- `contract_deposits`: 20% contract security deposit hold/refund lifecycle.
+- `withdrawal_requests`: manual withdrawal requests and admin review.
+
 ### Reviews
 - Mục đích: Đánh giá chéo sau khi hợp đồng hoàn tất.
 - Cột nổi bật: `rating` (1-5), `comment`.
@@ -96,7 +107,7 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 ## 3) Quy ước trạng thái (gợi ý)
 - KYB/KYC: `Pending`, `Approved`, `Rejected`.
 - Proposal: `Submitted`, `Shortlisted`, `Accepted`, `Rejected`, `Withdrawn`.
-- Contract: `Draft`, `Negotiating`, `Active`, `Completed`, `Terminated`, `Cancelled`.
+- Contract: `Draft`, `Negotiating`, `PendingDeposit`, `Active`, `Completed`, `Closed`, `Terminated`, `Cancelled`.
 - Milestone: `Pending`, `InProgress`, `Submitted`, `Approved`, `Rejected`, `AutoApproved`.
 - Transaction: `Pending`, `Processing`, `Success`, `Failed`, `Cancelled`.
 - Dispute: `Open`, `UnderReview`, `Resolved`, `Rejected`, `Escalated`.

@@ -102,6 +102,38 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 
 | 66 | POST | `/api/v1/contracts/{contractId}/reject` | Expert tu choi contract Draft/Negotiating. | Huy contract va dua job ve proposal review. |
 | 67 | POST | `/api/v1/milestones/{milestoneId}/complete` | Business hoan tat milestone dang review. | Nghiem thu milestone, tu hoan tat contract khi du dieu kien. |
+| 68 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | Business tra 20% ky quy hop dong tu wallet. | Contract deposit, bat dau execution. |
+| 69 | POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | Admin xu ly hoan/resolution ky quy hop dong. | Contract deposit refund, close contract. |
+
+## credit-controller
+
+| STT | Method | API | API dung de lam gi | Phuc vu chuc nang |
+| --- | --- | --- | --- | --- |
+| 70 | POST | `/api/credits/job-post/purchase` | Business mua job-post credits bang wallet. | Job publishing quota. |
+| 71 | POST | `/api/credits/proposal/purchase` | Expert mua proposal credits bang wallet. | Proposal quota. |
+
+## membership-controller
+
+| STT | Method | API | API dung de lam gi | Phuc vu chuc nang |
+| --- | --- | --- | --- | --- |
+| 72 | GET | `/api/membership/packages` | Business/Expert xem package phu hop role. | Membership package. |
+| 73 | POST | `/api/membership/packages/{packageId}/purchase` | Business/Expert mua package bang wallet. | Membership, badge, quota. |
+
+## user-quota-controller
+
+| STT | Method | API | API dung de lam gi | Phuc vu chuc nang |
+| --- | --- | --- | --- | --- |
+| 74 | GET | `/api/users/me/quota` | Business/Expert xem quota hien tai. | Job/proposal quota. |
+
+## withdrawal-controller
+
+| STT | Method | API | API dung de lam gi | Phuc vu chuc nang |
+| --- | --- | --- | --- | --- |
+| 75 | GET | `/api/v1/withdrawal-requests` | User xem withdrawal requests cua minh. | Withdrawal. |
+| 76 | GET | `/api/v1/admin/withdrawal-requests` | Admin xem withdrawal requests. | Withdrawal review. |
+| 77 | POST | `/api/v1/withdrawal-requests` | User tao withdrawal request va move available sang holding. | Withdrawal. |
+| 78 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Admin approve sau khi chuyen khoan thu cong. | Withdrawal review. |
+| 79 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Admin reject va tra holding ve available. | Withdrawal review. |
 
 ## email-otp-controller
 
@@ -130,6 +162,8 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 76 | POST | `/api/v1/proposals` | Expert gửi proposal cho job đang mở. | Proposal, ứng tuyển dự án. |
 | 77 | POST | `/api/v1/proposals/file` | Upload file proposal lên Firebase Storage. | Lưu file proposal PDF/DOCX của expert. |
 | 78 | POST | `/api/v1/jobs` | Business tạo job draft, kèm SoW, domain, skill, technology, milestone. | Job posting. |
+
+| 78a | POST | `/api/v1/jobs/{jobId}/publish` | Business publish job co SoW va consume 1 job-post credit. | Job publishing quota. |
 
 ## notification-controller
 
@@ -182,11 +216,13 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | STT | Method | API | API dùng để làm gì | Phục vụ chức năng |
 | --- | --- | --- | --- | --- |
 | 100 | GET | `/api/v1/wallet/me` | Người dùng xem ví của mình. | Finance, user wallet. |
+| 101 | GET | `/api/wallet/current` | User xem wallet hien tai theo spec payment. | Finance, user wallet. |
+| 102 | GET | `/api/wallet/transactions` | User xem wallet transaction history. | Wallet ledger. |
 
 ## Nhận xét kiểm tra Swagger
 
 - Các REST API trong các flow chính hiện đều có trong Swagger vì Springdoc tự quét controller.
 - API upload file Firebase có trong Swagger: `business/license-file`, `portfolio/certificate-file`, `proposals/file`.
 - API contract mới `/api/v1/contracts/{contractId}/sign` đã có trong Swagger; endpoint cũ `/activate` không còn trong Swagger runtime.
-- Khi đủ chữ ký Contract và NDA, backend chuyển contract sang `Active` và job sang `IN_PROGRESS`; job chỉ `CLOSED` khi contract `Completed`.
+- Khi đủ chữ ký Contract và NDA, backend chuyển contract sang `PendingDeposit`; business trả 20% deposit thì contract mới `Active` và job sang `IN_PROGRESS`.
 - WebSocket realtime notification không nằm trong Swagger, cần test bằng WebSocket/STOMP riêng.

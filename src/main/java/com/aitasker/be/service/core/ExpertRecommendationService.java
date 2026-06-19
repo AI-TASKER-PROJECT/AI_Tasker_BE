@@ -60,10 +60,12 @@ public class ExpertRecommendationService {
     private final MilestoneRepository milestoneRepository;
     private final RestTemplate restTemplate;
     private final OpenAiProperties openAiProperties;
+    private final PaymentWalletService paymentWalletService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
     public ExpertRecommendationListResponse generateRecommendations(Long jobPostingId) {
+        paymentWalletService.requirePremiumRecommendationAccess(jobPostingId);
         Integer jobId = toIntegerJobId(jobPostingId);
         JobEntity job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
@@ -114,6 +116,7 @@ public class ExpertRecommendationService {
 
     @Transactional(readOnly = true)
     public ExpertRecommendationListResponse getRecommendations(Long jobPostingId) {
+        paymentWalletService.requirePremiumRecommendationAccess(jobPostingId);
         List<ExpertRecommendationResponse> recommendations = expertRecommendationRepository
                 .findByJobPostingIdOrderByRankPositionAsc(jobPostingId).stream()
                 .map(this::toResponse)

@@ -8,7 +8,6 @@ import com.aitasker.be.service.core.PayOSPaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import vn.payos.model.webhooks.Webhook;
 
 import java.util.Map;
 
@@ -25,14 +24,6 @@ public class PayOSPaymentController {
         return ResponseEntity.ok(ApiResponse.success(
                 "CREATE PAYOS PAYMENT SUCCESS",
                 payOSPaymentService.createPayment(request)
-        ));
-    }
-
-    @PostMapping("/webhook")
-    public ResponseEntity<ApiResponse<PaymentOrderEntity>> handleWebhook(@RequestBody Webhook webhook) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "HANDLE PAYOS WEBHOOK SUCCESS",
-                payOSPaymentService.handleWebhook(webhook)
         ));
     }
 

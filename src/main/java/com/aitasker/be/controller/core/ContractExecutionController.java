@@ -6,8 +6,11 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.payment.DepositRefundRequest;
+import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.service.core.ContractExecutionService;
+import com.aitasker.be.service.core.PaymentWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ContractExecutionController {
     private final ContractExecutionService service;
+    private final PaymentWalletService paymentWalletService;
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/contracts/from-proposals/{proposalId}")
@@ -55,6 +59,21 @@ public class ContractExecutionController {
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
+    @PostMapping("/contracts/{contractId}/deposit/pay")
+    public ResponseEntity<ApiResponse<PaymentActionResponse<ContractDepositEntity>>> payContractDeposit(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("PAY CONTRACT DEPOSIT SUCCESS",
+                paymentWalletService.payContractDeposit(contractId)));
+    }
+
+    @PostMapping("/admin/contracts/{contractId}/deposit/refund")
+    public ResponseEntity<ApiResponse<ContractDepositEntity>> refundContractDeposit(
+            @PathVariable Integer contractId,
+            @RequestBody DepositRefundRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("REFUND CONTRACT DEPOSIT SUCCESS",
+                paymentWalletService.refundContractDeposit(contractId, request)));
+    }
+
     @PostMapping("/contracts/{contractId}/terminate")
     // Note: Hàm `terminate` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<ContractEntity>> terminate(@PathVariable Integer contractId, @RequestParam String reason) {

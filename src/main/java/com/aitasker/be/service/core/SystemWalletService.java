@@ -79,18 +79,16 @@ public class SystemWalletService {
                             .build());
 
             String role = account.getRole().getRoleName();
-            BigDecimal previousCurrentBalance = nonNegativeMoney(wallet.getCurrentBalance());
+            BigDecimal previousAvailableBalance = nonNegativeMoney(wallet.getAvailableBalance());
             BigDecimal previousEscrowBalance = nonNegativeMoney(wallet.getEscrowBalance());
+            BigDecimal previousHoldingBalance = nonNegativeMoney(wallet.getHoldingBalance());
+            BigDecimal previousDisputedBalance = nonNegativeMoney(wallet.getDisputedBalance());
             wallet.setRoleId(account.getRole().getRoleId());
             wallet.setWalletType(walletType(role));
             wallet.setTransactionId(latestTransactionId);
             wallet.setCurrency(wallet.getCurrency() == null || wallet.getCurrency().isBlank() ? "VND" : wallet.getCurrency());
             wallet.setDepositedBusinessCount(0);
             wallet.setSuccessfulDepositCount(0);
-            wallet.setTotalRevenue(BigDecimal.ZERO);
-            wallet.setHoldingBalance(BigDecimal.ZERO);
-            wallet.setDisputedBalance(BigDecimal.ZERO);
-            wallet.setEscrowBalance(BigDecimal.ZERO);
 
             if ("ADMIN".equals(role)) {
                 wallet.setDepositedBusinessCount(Math.toIntExact(transactionRepository.countDepositedBusinesses()));
@@ -102,17 +100,26 @@ public class SystemWalletService {
                 wallet.setAvailableBalance(totalRevenue);
                 wallet.setCurrentBalance(totalRevenue.add(holdingBalance));
             } else if ("BUSINESS".equals(role)) {
-                BigDecimal deposited = calculateBusinessSuccessfulDeposits(account.getAccountId());
-                wallet.setEscrowBalance(deposited);
-                wallet.setAvailableBalance(nonNegativeMoney(wallet.getAvailableBalance()));
-                wallet.setCurrentBalance(nonNegativeMoney(wallet.getAvailableBalance()).add(wallet.getEscrowBalance()));
+                wallet.setTotalRevenue(BigDecimal.ZERO);
+                wallet.setAvailableBalance(previousAvailableBalance);
+                wallet.setEscrowBalance(previousEscrowBalance);
+                wallet.setHoldingBalance(previousHoldingBalance);
+                wallet.setDisputedBalance(previousDisputedBalance);
+                wallet.setCurrentBalance(previousAvailableBalance.add(previousEscrowBalance).add(previousHoldingBalance).add(previousDisputedBalance));
             } else if ("EXPERT".equals(role)) {
-                wallet.setEscrowBalance(BigDecimal.ZERO);
-                wallet.setAvailableBalance(nonNegativeMoney(wallet.getAvailableBalance()));
-                wallet.setCurrentBalance(wallet.getAvailableBalance());
+                wallet.setTotalRevenue(BigDecimal.ZERO);
+                wallet.setAvailableBalance(previousAvailableBalance);
+                wallet.setEscrowBalance(previousEscrowBalance);
+                wallet.setHoldingBalance(previousHoldingBalance);
+                wallet.setDisputedBalance(previousDisputedBalance);
+                wallet.setCurrentBalance(previousAvailableBalance.add(previousEscrowBalance).add(previousHoldingBalance).add(previousDisputedBalance));
             } else {
-                wallet.setCurrentBalance(nonNegativeMoney(wallet.getCurrentBalance()));
-                wallet.setAvailableBalance(nonNegativeMoney(wallet.getAvailableBalance()));
+                wallet.setTotalRevenue(BigDecimal.ZERO);
+                wallet.setAvailableBalance(previousAvailableBalance);
+                wallet.setEscrowBalance(previousEscrowBalance);
+                wallet.setHoldingBalance(previousHoldingBalance);
+                wallet.setDisputedBalance(previousDisputedBalance);
+                wallet.setCurrentBalance(previousAvailableBalance.add(previousEscrowBalance).add(previousHoldingBalance).add(previousDisputedBalance));
             }
 
             wallet.setLastSyncedAt(LocalDateTime.now());

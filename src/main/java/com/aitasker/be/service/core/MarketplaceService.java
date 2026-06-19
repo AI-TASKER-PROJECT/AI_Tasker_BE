@@ -52,6 +52,7 @@ public class MarketplaceService {
     private final JobTechnologyRepository jobTechnologyRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
     private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
+    private final PaymentWalletService paymentWalletService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
     private final FirebaseStorageService firebaseStorageService;
@@ -126,6 +127,7 @@ public class MarketplaceService {
             throw new AppException("PROPOSAL DESCRIPTION KHONG DUOC DE TRONG");
         }
         ExpertProfileEntity expert = currentApprovedExpert();
+        AccountEntity actor = accessService.currentAccount();
         Integer expertId = expert.getExpertId();
         if (proposalRepository.existsByJobIdAndExpertIdAndStatusNotIgnoreCase(request.getJobId(), expertId, "Rejected")) {
             throw new com.aitasker.be.common.exception.ResourceConflictException("DA TON TAI PROPOSAL CHO JOB NAY");
@@ -141,11 +143,12 @@ public class MarketplaceService {
         input.setExpertId(expertId);
         input.setStatus("Pending");
         ProposalEntity saved = proposalRepository.save(input);
-        auditLogService.record(AuditLogService.ACTION_SUBMIT_PROPOSAL, "proposals", String.valueOf(saved.getProposalId()), accessService.currentAccount().getAccountId());
+        paymentWalletService.consumeProposalCredit(actor, saved.getProposalId().longValue());
+        auditLogService.record(AuditLogService.ACTION_SUBMIT_PROPOSAL, "proposals", String.valueOf(saved.getProposalId()), actor.getAccountId());
         businessProfileRepository.findById(job.getBusinessId())
                 .ifPresent(business -> notificationService.notifyProposalCreated(
                         business.getAccountId(),
-                        accessService.currentAccount().getAccountId(),
+                        actor.getAccountId(),
                         job.getJobId(),
                         job.getTitle()
                 ));
@@ -178,19 +181,28 @@ public class MarketplaceService {
     // Note: Hàm `updateJobStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public JobEntity updateJobStatus(Integer jobId, String status) {
         accessService.requireRole("BUSINESS");
+        AccountEntity actor = accessService.currentAccount();
         // KIEM TRA STATUS JOB DE DAM BAO DUNG VOI VONG DOI TUYEN DUNG.
         if (!List.of("DRAFT", "OPEN", "PROPOSAL_REVIEW", "IN_PROGRESS", "CLOSED", "CANCELLED").contains(status)) {
             throw new AppException("STATUS JOB KHONG HOP LE");
         }
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        String previousStatus = job.getStatus();
         BusinessProfileEntity business = currentApprovedBusiness();
         if (!business.getBusinessId().equals(job.getBusinessId())) {
             throw new AppException("BAN KHONG CO QUYEN CAP NHAT JOB NAY");
         }
+        boolean publishing = "OPEN".equals(status) && !"OPEN".equalsIgnoreCase(previousStatus);
+        if (publishing && sowRepository.findByJobId(jobId).isEmpty()) {
+            throw new AppException("JOB_MUST_HAVE_AI_SOW");
+        }
         job.setStatus(status);
         if ("OPEN".equals(status) && job.getPublishedAt() == null) job.setPublishedAt(LocalDateTime.now());
         JobEntity saved = jobRepository.save(job);
-        auditLogService.record(AuditLogService.ACTION_CHANGE_JOB_STATUS, "jobs", String.valueOf(jobId), accessService.currentAccount().getAccountId());
+        if (publishing) {
+            paymentWalletService.consumeJobPostCredit(actor, Long.valueOf(jobId));
+        }
+        auditLogService.record(AuditLogService.ACTION_CHANGE_JOB_STATUS, "jobs", String.valueOf(jobId), actor.getAccountId());
         return attachJobDetails(saved);
     }
 

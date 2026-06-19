@@ -83,6 +83,11 @@ public class MarketplaceController {
     }
 
     // Note: Annotation này khai báo API cập nhật một phần dữ liệu bằng HTTP PATCH.
+    @PostMapping("/jobs/{jobId}/publish")
+    public ResponseEntity<ApiResponse<JobEntity>> publishJob(@PathVariable Integer jobId) {
+        return ResponseEntity.ok(ApiResponse.success("PUBLISH JOB SUCCESS", marketplaceService.updateJobStatus(jobId, "OPEN")));
+    }
+
     @PatchMapping("/proposals/{proposalId}/status")
     // Note: Hàm `reviewProposal` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<ProposalEntity>> reviewProposal(@PathVariable Integer proposalId, @RequestParam String status) {

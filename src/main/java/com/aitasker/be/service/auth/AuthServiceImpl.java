@@ -13,6 +13,7 @@ import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.RoleRepository;
 import com.aitasker.be.security.SecurityUtils;
 import com.aitasker.be.security.jwt.JwtService;
+import com.aitasker.be.service.core.PaymentWalletService;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -35,6 +36,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailOtpService emailOtpService;
+    private final PaymentWalletService paymentWalletService;
 
     @Value("${google.client-id:}")
     private String googleClientId;
@@ -64,6 +66,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         AccountEntity saved = accountRepository.save(account);
+        paymentWalletService.ensureQuotaForAccount(saved);
         emailOtpService.clearVerifiedEmail(email);
         return buildAuthResponse(saved);
     }
@@ -135,7 +138,9 @@ public class AuthServiceImpl implements AuthService {
                 .emailVerified(true)
                 .build();
 
-        return buildAuthResponse(accountRepository.save(account));
+        AccountEntity saved = accountRepository.save(account);
+        paymentWalletService.ensureQuotaForAccount(saved);
+        return buildAuthResponse(saved);
     }
 
     private AuthResponse buildAuthResponse(AccountEntity account) {

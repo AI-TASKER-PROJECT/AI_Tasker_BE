@@ -75,7 +75,7 @@ class ContractExecutionServiceTest {
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
-    void signNda_shouldActivateContractAndMoveJobInProgressWhenAllSignaturesExist() {
+    void signNda_shouldMoveContractToPendingDepositWhenAllSignaturesExist() {
         ContractEntity contract = ContractEntity.builder()
                 .contractId(1)
                 .jobId(2)
@@ -87,33 +87,19 @@ class ContractExecutionServiceTest {
                 .expertAcceptedAt(LocalDateTime.now().minusDays(1))
                 .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
                 .build();
-        JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("PROPOSAL_REVIEW").budget(BigDecimal.valueOf(1000)).build();
-        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(7).jobId(2).fundsAllocated(BigDecimal.valueOf(1000)).build();
-        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder()
-                .jobMilestoneId(7)
-                .finalBudget(BigDecimal.valueOf(1500))
-                .orderIndex(1)
-                .build();
 
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
         );
         when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
-        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(contractMilestone));
-        when(milestoneRepository.findById(7)).thenReturn(Optional.of(milestone));
-        when(jobRepository.findById(2)).thenReturn(Optional.of(job));
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ContractEntity saved = contractExecutionService.signNda(1);
 
-        assertEquals("Active", saved.getStatus());
+        assertEquals("PendingDeposit", saved.getStatus());
         assertNotNull(saved.getExpertNdaSignedAt());
-        assertNotNull(saved.getActivatedAt());
-        assertEquals("IN_PROGRESS", job.getStatus());
-        assertEquals(BigDecimal.valueOf(1500), job.getBudget());
-        assertEquals(Integer.valueOf(1), milestone.getContractId());
-        assertEquals(BigDecimal.valueOf(1500), milestone.getFundsAllocated());
+        assertNull(saved.getActivatedAt());
     }
 
     @Test
