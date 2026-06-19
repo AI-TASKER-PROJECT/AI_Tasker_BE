@@ -49,6 +49,11 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("SIGN NDA SUCCESS", service.signNda(contractId)));
     }
 
+    @PostMapping("/contracts/{contractId}/reject")
+    public ResponseEntity<ApiResponse<ContractEntity>> rejectContract(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("REJECT CONTRACT SUCCESS", service.rejectContract(contractId)));
+    }
+
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/contracts/{contractId}/terminate")
     // Note: Hàm `terminate` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
@@ -75,6 +80,11 @@ public class ContractExecutionController {
     // Note: Hàm `submitDeliverable` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<DeliverableEntity>> submitDeliverable(@RequestBody DeliverableEntity request) {
         return ResponseEntity.ok(ApiResponse.success("SUBMIT DELIVERABLE SUCCESS", service.submitDeliverable(request)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/complete")
+    public ResponseEntity<ApiResponse<MilestoneEntity>> completeMilestone(@PathVariable Integer milestoneId) {
+        return ResponseEntity.ok(ApiResponse.success("COMPLETE MILESTONE SUCCESS", service.completeMilestone(milestoneId)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

@@ -100,6 +100,9 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 64 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | Business tạo contract draft từ proposal đã accepted. | Contract draft từ job và proposal. |
 | 65 | POST | `/api/v1/contracts/change-requests` | Business/Expert gửi yêu cầu thay đổi contract. | Đàm phán/sửa hợp đồng nháp. |
 
+| 66 | POST | `/api/v1/contracts/{contractId}/reject` | Expert tu choi contract Draft/Negotiating. | Huy contract va dua job ve proposal review. |
+| 67 | POST | `/api/v1/milestones/{milestoneId}/complete` | Business hoan tat milestone dang review. | Nghiem thu milestone, tu hoan tat contract khi du dieu kien. |
+
 ## email-otp-controller
 
 | STT | Method | API | API dùng để làm gì | Phục vụ chức năng |
@@ -185,4 +188,5 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 - Các REST API trong các flow chính hiện đều có trong Swagger vì Springdoc tự quét controller.
 - API upload file Firebase có trong Swagger: `business/license-file`, `portfolio/certificate-file`, `proposals/file`.
 - API contract mới `/api/v1/contracts/{contractId}/sign` đã có trong Swagger; endpoint cũ `/activate` không còn trong Swagger runtime.
+- Khi đủ chữ ký Contract và NDA, backend chuyển contract sang `Active` và job sang `IN_PROGRESS`; job chỉ `CLOSED` khi contract `Completed`.
 - WebSocket realtime notification không nằm trong Swagger, cần test bằng WebSocket/STOMP riêng.

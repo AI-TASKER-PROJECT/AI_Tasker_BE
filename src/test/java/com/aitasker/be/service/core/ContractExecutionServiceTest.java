@@ -10,6 +10,10 @@ import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ContractChangeRequestEntity;
 import com.aitasker.be.entity.ContractEntity;
+import com.aitasker.be.entity.ContractMilestoneEntity;
+import com.aitasker.be.entity.ExpertProfileEntity;
+import com.aitasker.be.entity.JobEntity;
+import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
@@ -18,9 +22,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -39,10 +48,12 @@ class ContractExecutionServiceTest {
     @Mock private JobRepository jobRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ContractRepository contractRepository;
+    @Mock private ContractMilestoneRepository contractMilestoneRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ContractChangeRequestRepository changeRequestRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private MilestoneRepository milestoneRepository;
+    @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private AcceptanceCriteriaRepository criteriaRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -55,11 +66,115 @@ class ContractExecutionServiceTest {
     @Mock private StaffRepository staffRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private SystemSettingRepository systemSettingRepository;
+    @Mock private SystemWalletService systemWalletService;
+    @Mock private AuditLogService auditLogService;
+    @Mock private NotificationService notificationService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ContractExecutionService contractExecutionService;
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
+    @Test
+    void signNda_shouldActivateContractAndMoveJobInProgressWhenAllSignaturesExist() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1)
+                .jobId(2)
+                .businessId(10)
+                .expertId(5)
+                .totalBudget(BigDecimal.valueOf(1500))
+                .status("Negotiating")
+                .businessAcceptedAt(LocalDateTime.now().minusDays(1))
+                .expertAcceptedAt(LocalDateTime.now().minusDays(1))
+                .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .build();
+        JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("PROPOSAL_REVIEW").budget(BigDecimal.valueOf(1000)).build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(7).jobId(2).fundsAllocated(BigDecimal.valueOf(1000)).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder()
+                .jobMilestoneId(7)
+                .finalBudget(BigDecimal.valueOf(1500))
+                .orderIndex(1)
+                .build();
+
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
+        );
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(contractMilestone));
+        when(milestoneRepository.findById(7)).thenReturn(Optional.of(milestone));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(job));
+        when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ContractEntity saved = contractExecutionService.signNda(1);
+
+        assertEquals("Active", saved.getStatus());
+        assertNotNull(saved.getExpertNdaSignedAt());
+        assertNotNull(saved.getActivatedAt());
+        assertEquals("IN_PROGRESS", job.getStatus());
+        assertEquals(BigDecimal.valueOf(1500), job.getBudget());
+        assertEquals(Integer.valueOf(1), milestone.getContractId());
+        assertEquals(BigDecimal.valueOf(1500), milestone.getFundsAllocated());
+    }
+
+    @Test
+    void rejectContract_shouldCancelContractAndReturnJobToProposalReview() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1)
+                .jobId(2)
+                .businessId(10)
+                .expertId(5)
+                .status("Draft")
+                .build();
+        JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("OPEN").build();
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
+        );
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(job));
+        when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ContractEntity saved = contractExecutionService.rejectContract(1);
+
+        assertEquals("Cancelled", saved.getStatus());
+        assertEquals("PROPOSAL_REVIEW", job.getStatus());
+        verify(jobRepository).save(job);
+    }
+
+    @Test
+    void completeMilestone_shouldCompleteContractAndCloseJobWhenAllMilestonesCompleted() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1)
+                .jobId(2)
+                .businessId(10)
+                .expertId(5)
+                .status("Active")
+                .build();
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(7)
+                .jobId(2)
+                .contractId(1)
+                .status("Under Review")
+                .build();
+        JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("IN_PROGRESS").build();
+        when(milestoneRepository.findById(7)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("BUSINESS").build()).build()
+        );
+        when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(milestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
+        when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(job));
+
+        MilestoneEntity saved = contractExecutionService.completeMilestone(7);
+
+        assertEquals("Completed", saved.getStatus());
+        assertEquals("Completed", contract.getStatus());
+        assertEquals("CLOSED", job.getStatus());
+    }
+
     @Test
     // Note: Hàm `requestChange_shouldThrowWhenContractNotNegotiable` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void requestChange_shouldThrowWhenContractNotNegotiable() {

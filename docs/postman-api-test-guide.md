@@ -786,7 +786,7 @@ Token: BUSINESS.
 GET {{baseUrl}}/api/v1/jobs/my
 ```
 
-Trả cả `DRAFT`, `OPEN`, `CLOSED`, `CANCELLED`.
+Trả cả `DRAFT`, `OPEN`, `PROPOSAL_REVIEW`, `IN_PROGRESS`, `CLOSED`, `CANCELLED`.
 
 ### Xem chi tiết job
 
@@ -807,7 +807,7 @@ PATCH {{baseUrl}}/api/v1/jobs/1/status?status=OPEN
 Status hợp lệ:
 
 ```text
-DRAFT, OPEN, CLOSED, CANCELLED
+DRAFT, OPEN, PROPOSAL_REVIEW, IN_PROGRESS, CLOSED, CANCELLED
 ```
 
 ### Expert gửi proposal
@@ -1007,7 +1007,20 @@ Lưu ý:
 
 - Business gọi một lần sẽ set `businessNdaSignedAt`.
 - Expert gọi một lần sẽ set `expertNdaSignedAt`.
-- Khi đủ `businessAcceptedAt`, `expertAcceptedAt`, `businessNdaSignedAt`, `expertNdaSignedAt`, backend chuyển contract sang `Active`, job sang `CLOSED`, và cập nhật ngân sách milestone theo `contract_milestones.finalBudget`.
+- Khi đủ `businessAcceptedAt`, `expertAcceptedAt`, `businessNdaSignedAt`, `expertNdaSignedAt`, backend chuyển contract sang `Active`, job sang `IN_PROGRESS`, và cập nhật ngân sách milestone theo `contract_milestones.finalBudget`.
+
+### Expert từ chối contract
+
+Token: EXPERT thuộc contract.
+
+```http
+POST {{baseUrl}}/api/v1/contracts/1/reject
+```
+
+Lưu ý:
+
+- Chỉ reject khi contract đang `Draft` hoặc `Negotiating`.
+- Sau reject, contract chuyển `Cancelled`, job chuyển `PROPOSAL_REVIEW`.
 
 ### Chấm dứt contract
 
@@ -1619,7 +1632,8 @@ GET {{baseUrl}}/api/test/secure
 7. Expert gọi `POST /api/v1/contracts/{contractId}/sign` để ký hợp đồng phía expert.
 8. Expert gọi `POST /api/v1/contracts/{contractId}/nda-sign` để đồng ý NDA phía expert.
 9. Gọi lại `GET /api/v1/contracts/{contractId}` để kiểm tra `status = Active`.
-10. Gọi `GET /api/v1/jobs/{jobId}` hoặc `GET /api/v1/jobs/{jobId}/milestones` để kiểm tra job đã `CLOSED` và milestone đã cập nhật ngân sách chốt.
+10. Gọi `GET /api/v1/jobs/{jobId}` hoặc `GET /api/v1/jobs/{jobId}/milestones` để kiểm tra job đã `IN_PROGRESS` và milestone đã cập nhật ngân sách chốt.
+11. Expert nộp deliverable, Business gọi `POST /api/v1/milestones/{milestoneId}/complete`; khi toàn bộ milestone completed, contract thành `Completed` và job thành `CLOSED`.
 
 ### Luồng 3: Portfolio và file Firebase
 

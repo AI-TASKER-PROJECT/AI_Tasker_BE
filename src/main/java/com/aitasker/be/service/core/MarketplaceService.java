@@ -179,7 +179,7 @@ public class MarketplaceService {
     public JobEntity updateJobStatus(Integer jobId, String status) {
         accessService.requireRole("BUSINESS");
         // KIEM TRA STATUS JOB DE DAM BAO DUNG VOI VONG DOI TUYEN DUNG.
-        if (!List.of("DRAFT", "OPEN", "CLOSED", "CANCELLED").contains(status)) {
+        if (!List.of("DRAFT", "OPEN", "PROPOSAL_REVIEW", "IN_PROGRESS", "CLOSED", "CANCELLED").contains(status)) {
             throw new AppException("STATUS JOB KHONG HOP LE");
         }
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));

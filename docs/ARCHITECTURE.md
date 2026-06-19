@@ -10,6 +10,7 @@ Primary sources for this document:
 - `docs/backend-logic-notes.md`
 - `docs/swagger-api-overview.md`
 - `docs/data-dictionary.md`
+- `docs/product/contract-management.md`
 - `src/main/resources/application.properties`
 - `pom.xml`
 
@@ -171,6 +172,8 @@ Important runtime notes:
 - Contract activation is now signature-driven through
   `/api/v1/contracts/{contractId}/sign`; older `/activate` references in legacy
   guides should not be reintroduced.
+- Contract activation moves the job to `IN_PROGRESS`; completion after all
+  milestones are completed moves the job to `CLOSED`.
 - The legacy `invoices` table was removed by `V13`; older invoice endpoint
   references are stale unless a new migration and controller intentionally bring
   invoice behavior back.
@@ -260,15 +263,20 @@ Contract execution enforces a multi-step agreement model:
 - Expert NDA signature sets `expert_nda_signed_at`.
 - Contract becomes `Active` only after both parties have signed both the
   contract and NDA.
+- When a contract becomes `Active`, the job becomes `IN_PROGRESS`.
 - If any required signature/NDA is missing, the contract remains or returns to
   `Negotiating`.
 - A change request resets both parties' acceptance/NDA timestamps and returns
   the contract to `Negotiating`.
+- Expert rejection is allowed only from `Draft` or `Negotiating`; it cancels the
+  contract and moves the job back to `PROPOSAL_REVIEW`.
 - Business can create milestones and acceptance criteria only for eligible
   contracts they own.
 - Expert can submit deliverables only for their own active contract, after both
   NDA signatures exist.
 - Submitting a deliverable moves the milestone into review.
+- Business completion of all reviewed milestones moves the contract to
+  `Completed` and the job to `CLOSED`.
 - SLA auto-approve is currently a manual API simulation, not a scheduler.
 
 ## Finance And Payment Rules
