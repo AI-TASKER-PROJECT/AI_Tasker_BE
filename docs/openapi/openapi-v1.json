@@ -1265,36 +1265,6 @@
         }
       }
     },
-    "/api/v1/contracts/change-requests": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "requestChange",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ContractChangeRequestEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseContractChangeRequestEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/admin/wallet/sync": {
       "post": {
         "tags": [
@@ -4500,76 +4470,6 @@
           },
           "difference": {
             "type": "number"
-          }
-        }
-      },
-      "ContractChangeRequestEntity": {
-        "type": "object",
-        "properties": {
-          "requestId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "contractId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "requestedByAccountId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "changeType": {
-            "type": "string"
-          },
-          "changeSummary": {
-            "type": "string"
-          },
-          "proposedBudget": {
-            "type": "number"
-          },
-          "proposedTimelineDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "status": {
-            "type": "string"
-          },
-          "reviewedByAccountId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "reviewedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ApiResponseContractChangeRequestEntity": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/ContractChangeRequestEntity"
-          },
-          "requestId": {
-            "type": "string"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },

@@ -50,7 +50,8 @@ Alternate exits:
   to the contract.
 - Signing is allowed only while the contract is `DRAFT`.
 - The negotiation/change-request lifecycle is disabled and must not move
-  contracts out of `DRAFT`.
+  contracts out of `DRAFT`. The endpoint has been removed.
+
 - The contract moves to `PENDING` after business signature, expert signature,
   business NDA, and expert NDA are all present.
 - The owning business must pay the 20% wallet security deposit before execution
@@ -76,7 +77,6 @@ Alternate exits:
 ## API
 
 - `POST /api/v1/contracts/from-proposals/{proposalId}`
-- `POST /api/v1/contracts/change-requests` (disabled)
 - `POST /api/v1/contracts/{contractId}/sign`
 - `POST /api/v1/contracts/{contractId}/nda-sign`
 - `POST /api/v1/contracts/{contractId}/deposit/pay`

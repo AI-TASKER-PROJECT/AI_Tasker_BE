@@ -159,18 +159,6 @@ docker compose up -d
 ```
 - EXPECT: `200`, LAY `contractId` -> ENV `contract_id`
 
-2. REQUEST CHANGE  
-- `POST {{base_url}}/api/v1/contracts/change-requests`  
-- AUTH: `{{expert_token}}`  
-- BODY:
-```json
-{
-  "contractId": {{contract_id}},
-  "changeType": "Timeline",
-  "changeSummary": "DE XUAT 35 NGAY"
-}
-```
-
 3. ACTIVATE CONTRACT  
 - `POST {{base_url}}/api/v1/contracts/{{contract_id}}/activate`  
 - AUTH: `{{business_token}}`

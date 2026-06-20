@@ -8,7 +8,6 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
-import com.aitasker.be.entity.ContractChangeRequestEntity;
 import com.aitasker.be.entity.ContractEntity;
 import com.aitasker.be.entity.ContractMilestoneEntity;
 import com.aitasker.be.entity.DeliverableEntity;
@@ -50,8 +49,6 @@ class ContractExecutionServiceTest {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ContractRepository contractRepository;
     @Mock private ContractMilestoneRepository contractMilestoneRepository;
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
-    @Mock private ContractChangeRequestRepository changeRequestRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
@@ -202,19 +199,6 @@ class ContractExecutionServiceTest {
         assertEquals("COMPLETED", milestone.getStatus());
         assertEquals("COMPLETED", contract.getStatus());
         assertEquals("CLOSED", job.getStatus());
-    }
-
-    @Test
-    // Note: Hàm `requestChange_shouldThrowWhenContractNotNegotiable` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
-    void requestChange_shouldThrowBecauseFlowIsDisabled() {
-        ContractChangeRequestEntity input = ContractChangeRequestEntity.builder()
-                .contractId(1)
-                .changeType("BUDGET")
-                .changeSummary("TANG NGAN SACH")
-                .build();
-
-        AppException ex = assertThrows(AppException.class, () -> contractExecutionService.requestChange(input));
-        assertEquals("CONTRACT CHANGE REQUEST FLOW DA BI TAT", ex.getMessage());
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.

@@ -33,13 +33,6 @@ public class ContractExecutionController {
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
-    @PostMapping("/contracts/change-requests")
-    // Note: Hàm `requestChange` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<ContractChangeRequestEntity>> requestChange(@RequestBody ContractChangeRequestEntity request) {
-        return ResponseEntity.ok(ApiResponse.success("REQUEST CONTRACT CHANGE SUCCESS", service.requestChange(request)));
-    }
-
-    // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/contracts/{contractId}/sign")
     // Note: Hàm `signContract` xử lý API ký xác nhận hợp đồng của business hoặc expert.
     public ResponseEntity<ApiResponse<ContractEntity>> signContract(@PathVariable Integer contractId) {

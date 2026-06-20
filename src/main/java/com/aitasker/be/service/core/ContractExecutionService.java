@@ -37,7 +37,6 @@ public class ContractExecutionService {
     private final JobRepository jobRepository;
     private final ContractRepository contractRepository;
     private final ContractMilestoneRepository contractMilestoneRepository;
-    private final ContractChangeRequestRepository changeRequestRepository;
     private final MilestoneRepository milestoneRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
     private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
@@ -103,13 +102,6 @@ public class ContractExecutionService {
                         saved.getContractId()
                 ));
         return saved;
-    }
-
-    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
-    @Transactional
-    // Note: Hàm `requestChange` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public ContractChangeRequestEntity requestChange(ContractChangeRequestEntity input) {
-        throw new AppException("CONTRACT CHANGE REQUEST FLOW DA BI TAT");
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.

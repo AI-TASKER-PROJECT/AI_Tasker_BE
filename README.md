@@ -69,7 +69,6 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted|Rejected`
 - Contract/Execution/Finance/Dispute:
   - `POST /api/v1/contracts/from-proposals/{proposalId}`
-  - `POST /api/v1/contracts/change-requests` (disabled; negotiation lifecycle removed)
   - `POST /api/v1/contracts/{contractId}/sign`
   - `POST /api/v1/contracts/{contractId}/nda-sign`
   - `POST /api/v1/contracts/{contractId}/reject`
