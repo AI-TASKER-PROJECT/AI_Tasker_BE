@@ -11,6 +11,7 @@ import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ContractChangeRequestEntity;
 import com.aitasker.be.entity.ContractEntity;
 import com.aitasker.be.entity.ContractMilestoneEntity;
+import com.aitasker.be.entity.DeliverableEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MilestoneEntity;
@@ -157,6 +158,48 @@ class ContractExecutionServiceTest {
         MilestoneEntity saved = contractExecutionService.completeMilestone(7);
 
         assertEquals("COMPLETED", saved.getStatus());
+        assertEquals("COMPLETED", contract.getStatus());
+        assertEquals("CLOSED", job.getStatus());
+    }
+
+    @Test
+    void runSlaAutoApprove_shouldCompleteContractAndCloseJobWhenFinalMilestoneApproved() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1)
+                .jobId(2)
+                .businessId(10)
+                .expertId(5)
+                .status("ACTIVE")
+                .build();
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(7)
+                .jobId(2)
+                .contractId(1)
+                .status("UNDER_REVIEW")
+                .build();
+        DeliverableEntity deliverable = DeliverableEntity.builder()
+                .deliverableId(20)
+                .milestoneId(7)
+                .createdAt(LocalDateTime.now().minusDays(8))
+                .build();
+        JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("IN_PROGRESS").build();
+
+        when(systemSettingRepository.findById("default_sla_days")).thenReturn(Optional.empty());
+        when(milestoneRepository.findAll()).thenReturn(List.of(milestone));
+        when(deliverableRepository.findByMilestoneId(7)).thenReturn(List.of(deliverable));
+        when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(milestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
+        when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(job));
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("ADMIN").build()).build()
+        );
+
+        List<MilestoneEntity> updated = contractExecutionService.runSlaAutoApprove();
+
+        assertEquals(1, updated.size());
+        assertEquals("COMPLETED", milestone.getStatus());
         assertEquals("COMPLETED", contract.getStatus());
         assertEquals("CLOSED", job.getStatus());
     }

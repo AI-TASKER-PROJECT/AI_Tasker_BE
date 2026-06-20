@@ -66,6 +66,9 @@ Alternate exits:
 - The owning business can complete a milestone only from `UNDER_REVIEW`.
 - When every contract milestone is `COMPLETED`, the system moves the contract
   to `COMPLETED` and the job to `CLOSED`.
+- SLA auto-approval of an overdue reviewed milestone uses the same finalization
+  rule: if the auto-approved milestone completes the last remaining contract
+  milestone, the contract becomes `COMPLETED` and the job becomes `CLOSED`.
 - Admin deposit refund/resolution leaves completed contracts `COMPLETED`;
   cancelled contracts remain `CANCELLED`.
 - `COMPLETED` and `CANCELLED` contracts cannot be terminated again.
@@ -82,6 +85,7 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
 - `POST /api/v1/deliverables`
 - `POST /api/v1/milestones/{milestoneId}/complete`
+- `POST /api/v1/milestones/sla-auto-approve`
 
 ## Notifications And Audit
 
