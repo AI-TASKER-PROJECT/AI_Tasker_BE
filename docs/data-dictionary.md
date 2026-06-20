@@ -107,8 +107,10 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 ## 3) Quy ước trạng thái (gợi ý)
 - KYB/KYC: `Pending`, `Approved`, `Rejected`.
 - Proposal: `Submitted`, `Shortlisted`, `Accepted`, `Rejected`, `Withdrawn`.
-- Contract: `Draft`, `Negotiating`, `PendingDeposit`, `Active`, `Completed`, `Closed`, `Terminated`, `Cancelled`.
-- Milestone: `Pending`, `InProgress`, `Submitted`, `Approved`, `Rejected`, `AutoApproved`.
+- Job: `DRAFT`, `OPEN`, `IN_PROGRESS`, `CLOSED`.
+- Contract: `DRAFT`, `PENDING`, `ACTIVE`, `COMPLETED`, `CANCELLED`.
+- Milestone: `PENDING`, `DEPOSITED`, `IN_PROGRESS`, `UNDER_REVIEW`, `DISPUTED`, `COMPLETED`.
+- Wallet transaction: `POSTED`.
 - Transaction: `Pending`, `Processing`, `Success`, `Failed`, `Cancelled`.
 - Dispute: `Open`, `UnderReview`, `Resolved`, `Rejected`, `Escalated`.
 

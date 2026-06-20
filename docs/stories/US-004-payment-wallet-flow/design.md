@@ -24,7 +24,7 @@ New domain records:
    after successful status change to `OPEN`.
 5. Submitting a proposal requires one proposal credit, consumed only after the
    proposal is saved.
-6. Fully signed/NDA-signed contracts move to `PendingDeposit`.
+6. Fully signed/NDA-signed contracts move to `PENDING`.
 7. Paying the security deposit moves Business available balance to escrow,
    creates/updates `contract_deposits`, and activates contract execution.
 8. Admin deposit finalization optionally returns part of held escrow to Business

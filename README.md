@@ -40,6 +40,9 @@ Swagger/OpenAPI:
   - `skills`
   - `job_domains`
   - `job_skills`
+- Da bo sung migration `V31__status_enum_constraint_alignment.sql` de chuan hoa
+  status uppercase cho contract/job/milestone va gioi han `wallet_transactions`
+  ve `POSTED`.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.
@@ -62,11 +65,11 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `GET /api/v1/jobs/{jobId}`
   - `POST /api/v1/proposals`
   - `GET /api/v1/jobs/{jobId}/proposals`
-  - `PATCH /api/v1/jobs/{jobId}/status?status=...`
+  - `PATCH /api/v1/jobs/{jobId}/status?status=DRAFT|OPEN|IN_PROGRESS|CLOSED`
   - `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted|Rejected`
 - Contract/Execution/Finance/Dispute:
   - `POST /api/v1/contracts/from-proposals/{proposalId}`
-  - `POST /api/v1/contracts/change-requests`
+  - `POST /api/v1/contracts/change-requests` (disabled; negotiation lifecycle removed)
   - `POST /api/v1/contracts/{contractId}/sign`
   - `POST /api/v1/contracts/{contractId}/nda-sign`
   - `POST /api/v1/contracts/{contractId}/reject`

@@ -36,7 +36,7 @@ Current product domains:
 - Domain, skill, technology, and acceptance-criteria catalogs.
 - AI SoW generation and job assistant support.
 - Expert candidate recommendation and matching.
-- Contract negotiation, signatures, NDA signatures, milestones, acceptance
+- Contract draft, signatures, NDA signatures, milestones, acceptance
   criteria, deliverables, and termination.
 - Finance, wallet, payment order, PayOS payment, wallet ledger, membership,
   credit, quota, contract deposit, withdrawal, system wallet, and legacy
@@ -120,7 +120,7 @@ The following service boundaries are established and should be preserved:
   proposal review.
 - `service/core/CatalogService`: domain, skill, technology, acceptance criteria,
   and job metadata mappings.
-- `service/core/ContractExecutionService`: contract negotiation, signatures,
+- `service/core/ContractExecutionService`: contract draft/signature,
   NDA, milestones, criteria, deliverables, finance-adjacent legacy
   transactions, disputes, and SLA simulation.
 - `service/core/AdminService`: reviews, settings, staff, account management,
@@ -264,32 +264,31 @@ Marketplace behavior is not just CRUD. Preserve these state rules:
 
 Contract execution enforces a multi-step agreement model:
 
-- Contracts are created from accepted proposals.
+- Contracts are created from accepted proposals as `DRAFT`.
 - Business signature sets `business_accepted_at`.
 - Expert signature sets `expert_accepted_at`.
 - Business NDA signature sets `business_nda_signed_at`.
 - Expert NDA signature sets `expert_nda_signed_at`.
-- Contract becomes `PendingDeposit` after both parties have signed both the
+- Contract becomes `PENDING` after both parties have signed both the
   contract and NDA.
 - Business pays a 20% security deposit from wallet available balance before
   work can start.
-- When the deposit is held, the contract becomes `Active` and the job becomes
+- When the deposit is held, the contract becomes `ACTIVE` and the job becomes
   `IN_PROGRESS`.
-- If any required signature/NDA is missing, the contract remains or returns to
-  `Negotiating`.
-- A change request resets both parties' acceptance/NDA timestamps and returns
-  the contract to `Negotiating`.
-- Expert rejection is allowed only from `Draft` or `Negotiating`; it cancels the
-  contract and moves the job back to `PROPOSAL_REVIEW`.
+- If any required signature/NDA is missing, the contract remains `DRAFT`.
+- The negotiation/change-request lifecycle is disabled and must not reset
+  signatures or move contracts into an intermediate negotiation state.
+- Expert rejection is allowed only from `DRAFT` or `PENDING`; it cancels the
+  contract and moves the job back to `OPEN`.
 - Business can create milestones and acceptance criteria only for eligible
   contracts they own.
 - Expert can submit deliverables only for their own active contract, after both
   NDA signatures exist.
 - Submitting a deliverable moves the milestone into review.
 - Business completion of all reviewed milestones moves the contract to
-  `Completed` and the job to `CLOSED`.
-- Admin deposit refund/resolution moves a completed, cancelled, or already
-  closed contract to `Closed` after final deposit handling.
+  `COMPLETED` and the job to `CLOSED`.
+- Admin deposit refund/resolution keeps completed contracts `COMPLETED` and
+  cancelled contracts `CANCELLED` after final deposit handling.
 - SLA auto-approve is currently a manual API simulation, not a scheduler.
 
 ## Finance And Payment Rules

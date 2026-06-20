@@ -98,9 +98,9 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 62 | POST | `/api/v1/contracts/{contractId}/sign` | Business/Expert ký xác nhận hợp đồng. | Ký hợp đồng, kích hoạt khi đủ điều kiện. |
 | 63 | POST | `/api/v1/contracts/{contractId}/nda-sign` | Business/Expert đồng ý NDA. | Ký thỏa thuận bảo mật. |
 | 64 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | Business tạo contract draft từ proposal đã accepted. | Contract draft từ job và proposal. |
-| 65 | POST | `/api/v1/contracts/change-requests` | Business/Expert gửi yêu cầu thay đổi contract. | Đàm phán/sửa hợp đồng nháp. |
+| 65 | POST | `/api/v1/contracts/change-requests` | Flow change request da tat va tra loi nghiep vu. | Khong con negotiation contract. |
 
-| 66 | POST | `/api/v1/contracts/{contractId}/reject` | Expert tu choi contract Draft/Negotiating. | Huy contract va dua job ve proposal review. |
+| 66 | POST | `/api/v1/contracts/{contractId}/reject` | Expert tu choi contract DRAFT/PENDING. | Huy contract va dua job ve OPEN. |
 | 67 | POST | `/api/v1/milestones/{milestoneId}/complete` | Business hoan tat milestone dang review. | Nghiem thu milestone, tu hoan tat contract khi du dieu kien. |
 | 68 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | Business tra 20% ky quy hop dong tu wallet. | Contract deposit, bat dau execution. |
 | 69 | POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | Admin xu ly hoan/resolution ky quy hop dong. | Contract deposit refund, close contract. |
@@ -224,5 +224,5 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 - Các REST API trong các flow chính hiện đều có trong Swagger vì Springdoc tự quét controller.
 - API upload file Firebase có trong Swagger: `business/license-file`, `portfolio/certificate-file`, `proposals/file`.
 - API contract mới `/api/v1/contracts/{contractId}/sign` đã có trong Swagger; endpoint cũ `/activate` không còn trong Swagger runtime.
-- Khi đủ chữ ký Contract và NDA, backend chuyển contract sang `PendingDeposit`; business trả 20% deposit thì contract mới `Active` và job sang `IN_PROGRESS`.
+- Khi du chu ky Contract va NDA, backend chuyen contract sang `PENDING`; business tra 20% deposit thi contract moi `ACTIVE` va job sang `IN_PROGRESS`.
 - WebSocket realtime notification không nằm trong Swagger, cần test bằng WebSocket/STOMP riêng.

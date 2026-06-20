@@ -54,7 +54,7 @@ public class AdminService {
             throw new AppException("RATING PHAI NAM TRONG KHOANG 1 DEN 5");
         }
         ContractEntity contract = contractRepository.findById(input.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
-        if (!List.of("Completed", "Terminated", "Cancelled").contains(contract.getStatus())) {
+        if (!List.of("COMPLETED", "CANCELLED").contains(contract.getStatus())) {
             throw new AppException("CHI DUOC DANH GIA KHI CONTRACT DA KET THUC");
         }
         AccountEntity actor = accessService.currentAccount();
@@ -156,8 +156,8 @@ public class AdminService {
         accessService.requireRole("ADMIN");
         // TONG HOP CHI SO CO BAN DE HO TRO DASHBOARD QUAN TRI MVP.
         long totalContracts = contractRepository.count();
-        long completedContracts = contractRepository.findAll().stream().filter(c -> "Completed".equals(c.getStatus())).count();
-        long terminatedContracts = contractRepository.findAll().stream().filter(c -> "Terminated".equals(c.getStatus()) || "Cancelled".equals(c.getStatus())).count();
+        long completedContracts = contractRepository.findAll().stream().filter(c -> "COMPLETED".equals(c.getStatus())).count();
+        long terminatedContracts = contractRepository.findAll().stream().filter(c -> "CANCELLED".equals(c.getStatus())).count();
         long totalDisputes = disputeRepository.count();
         long openDisputes = disputeRepository.findAll().stream().filter(d -> "Open".equals(d.getStatus()) || "UnderReview".equals(d.getStatus())).count();
         long totalTransactions = transactionRepository.count();

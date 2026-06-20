@@ -124,7 +124,7 @@ class PaymentWalletServiceTest {
                 .businessId(20)
                 .expertId(40)
                 .jobId(50)
-                .status("PendingDeposit")
+                .status("PENDING")
                 .totalBudget(new BigDecimal("1000000"))
                 .build();
         ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder()
@@ -134,7 +134,7 @@ class PaymentWalletServiceTest {
         MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(60).jobId(50).build();
         com.aitasker.be.entity.JobEntity job = com.aitasker.be.entity.JobEntity.builder()
                 .jobId(50)
-                .status("PROPOSAL_REVIEW")
+                .status("OPEN")
                 .budget(new BigDecimal("800000"))
                 .build();
 
@@ -160,7 +160,7 @@ class PaymentWalletServiceTest {
         assertTrue(response.isCompleted());
         assertEquals("HELD", response.getData().getStatus());
         assertEquals(new BigDecimal("200000.00"), response.getData().getDepositAmount());
-        assertEquals("Active", contract.getStatus());
+        assertEquals("ACTIVE", contract.getStatus());
         assertNotNull(contract.getActivatedAt());
         assertEquals("IN_PROGRESS", job.getStatus());
         assertEquals(new BigDecimal("1000000"), job.getBudget());

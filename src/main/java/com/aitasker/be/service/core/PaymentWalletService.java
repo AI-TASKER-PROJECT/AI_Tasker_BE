@@ -251,7 +251,7 @@ public class PaymentWalletService {
         if (!business.getBusinessId().equals(contract.getBusinessId())) {
             throw new AppException("BAN KHONG THUOC CONTRACT NAY");
         }
-        if (!"PendingDeposit".equals(contract.getStatus())) {
+        if (!"PENDING".equals(contract.getStatus())) {
             throw new AppException("CONTRACT_INVALID_STATUS");
         }
         if (contractDepositRepository.findByContractId(contractId)
@@ -307,7 +307,7 @@ public class PaymentWalletService {
         accessService.requireRole("ADMIN");
         ContractEntity contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new NotFoundException("CONTRACT_NOT_FOUND"));
-        if (!List.of("Completed", "Closed", "Cancelled").contains(contract.getStatus())) {
+        if (!List.of("COMPLETED", "CANCELLED").contains(contract.getStatus())) {
             throw new AppException("CONTRACT_INVALID_STATUS");
         }
         ContractDepositEntity deposit = contractDepositRepository.findByContractId(contractId)
@@ -358,7 +358,7 @@ public class PaymentWalletService {
         deposit.setStatus(refundStatus(refundAmount, resolvedAmount));
         ContractDepositEntity saved = contractDepositRepository.save(deposit);
 
-        contract.setStatus("Closed");
+        contract.setStatus("COMPLETED");
         contractRepository.save(contract);
         auditLogService.record(ACTION_REFUND_CONTRACT_DEPOSIT, "contract_deposits",
                 String.valueOf(saved.getDepositId()), admin.getAccountId());
@@ -589,7 +589,7 @@ public class PaymentWalletService {
     }
 
     private void activateContractAfterDeposit(ContractEntity contract, LocalDateTime now) {
-        contract.setStatus("Active");
+        contract.setStatus("ACTIVE");
         if (contract.getActivatedAt() == null) {
             contract.setActivatedAt(now);
         }

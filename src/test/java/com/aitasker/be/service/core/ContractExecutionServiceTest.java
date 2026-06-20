@@ -75,14 +75,14 @@ class ContractExecutionServiceTest {
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
-    void signNda_shouldMoveContractToPendingDepositWhenAllSignaturesExist() {
+    void signNda_shouldMoveContractToPendingWhenAllSignaturesExist() {
         ContractEntity contract = ContractEntity.builder()
                 .contractId(1)
                 .jobId(2)
                 .businessId(10)
                 .expertId(5)
                 .totalBudget(BigDecimal.valueOf(1500))
-                .status("Negotiating")
+                .status("DRAFT")
                 .businessAcceptedAt(LocalDateTime.now().minusDays(1))
                 .expertAcceptedAt(LocalDateTime.now().minusDays(1))
                 .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
@@ -97,7 +97,7 @@ class ContractExecutionServiceTest {
 
         ContractEntity saved = contractExecutionService.signNda(1);
 
-        assertEquals("PendingDeposit", saved.getStatus());
+        assertEquals("PENDING", saved.getStatus());
         assertNotNull(saved.getExpertNdaSignedAt());
         assertNull(saved.getActivatedAt());
     }
@@ -109,7 +109,7 @@ class ContractExecutionServiceTest {
                 .jobId(2)
                 .businessId(10)
                 .expertId(5)
-                .status("Draft")
+                .status("DRAFT")
                 .build();
         JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("OPEN").build();
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
@@ -122,8 +122,8 @@ class ContractExecutionServiceTest {
 
         ContractEntity saved = contractExecutionService.rejectContract(1);
 
-        assertEquals("Cancelled", saved.getStatus());
-        assertEquals("PROPOSAL_REVIEW", job.getStatus());
+        assertEquals("CANCELLED", saved.getStatus());
+        assertEquals("OPEN", job.getStatus());
         verify(jobRepository).save(job);
     }
 
@@ -134,13 +134,13 @@ class ContractExecutionServiceTest {
                 .jobId(2)
                 .businessId(10)
                 .expertId(5)
-                .status("Active")
+                .status("ACTIVE")
                 .build();
         MilestoneEntity milestone = MilestoneEntity.builder()
                 .milestoneId(7)
                 .jobId(2)
                 .contractId(1)
-                .status("Under Review")
+                .status("UNDER_REVIEW")
                 .build();
         JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("IN_PROGRESS").build();
         when(milestoneRepository.findById(7)).thenReturn(Optional.of(milestone));
@@ -156,21 +156,14 @@ class ContractExecutionServiceTest {
 
         MilestoneEntity saved = contractExecutionService.completeMilestone(7);
 
-        assertEquals("Completed", saved.getStatus());
-        assertEquals("Completed", contract.getStatus());
+        assertEquals("COMPLETED", saved.getStatus());
+        assertEquals("COMPLETED", contract.getStatus());
         assertEquals("CLOSED", job.getStatus());
     }
 
     @Test
     // Note: Hàm `requestChange_shouldThrowWhenContractNotNegotiable` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
-    void requestChange_shouldThrowWhenContractNotNegotiable() {
-        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).status("Active").build();
-        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
-        when(accessService.currentAccount()).thenReturn(
-                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
-        );
-        when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
-
+    void requestChange_shouldThrowBecauseFlowIsDisabled() {
         ContractChangeRequestEntity input = ContractChangeRequestEntity.builder()
                 .contractId(1)
                 .changeType("BUDGET")
@@ -178,7 +171,7 @@ class ContractExecutionServiceTest {
                 .build();
 
         AppException ex = assertThrows(AppException.class, () -> contractExecutionService.requestChange(input));
-        assertEquals("CONTRACT KHONG O TRANG THAI CHO PHEP REQUEST CHANGE", ex.getMessage());
+        assertEquals("CONTRACT CHANGE REQUEST FLOW DA BI TAT", ex.getMessage());
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
@@ -201,7 +194,7 @@ class ContractExecutionServiceTest {
     @Test
     // Note: Hàm `signNda_shouldThrowWhenContractStatusInvalid` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void signNda_shouldThrowWhenContractNotActive() {
-        ContractEntity contract = ContractEntity.builder().contractId(1).expertId(5).status("Completed").build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).expertId(5).status("COMPLETED").build();
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
@@ -217,7 +210,7 @@ class ContractExecutionServiceTest {
     @Test
     // Note: Hàm `terminateContract_shouldThrowWhenReasonBlank` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void terminateContract_shouldThrowWhenReasonBlank() {
-        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).status("Active").build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).status("ACTIVE").build();
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
 
         AppException ex = assertThrows(AppException.class, () -> contractExecutionService.terminateContract(1, " "));

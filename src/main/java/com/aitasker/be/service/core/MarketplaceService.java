@@ -183,7 +183,7 @@ public class MarketplaceService {
         accessService.requireRole("BUSINESS");
         AccountEntity actor = accessService.currentAccount();
         // KIEM TRA STATUS JOB DE DAM BAO DUNG VOI VONG DOI TUYEN DUNG.
-        if (!List.of("DRAFT", "OPEN", "PROPOSAL_REVIEW", "IN_PROGRESS", "CLOSED", "CANCELLED").contains(status)) {
+        if (!List.of("DRAFT", "OPEN", "IN_PROGRESS", "CLOSED").contains(status)) {
             throw new AppException("STATUS JOB KHONG HOP LE");
         }
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
@@ -284,7 +284,7 @@ public class MarketplaceService {
             milestone.setMilestoneId(null);
             milestone.setJobId(job.getJobId());
             milestone.setContractId(null);
-            if (milestone.getStatus() == null) milestone.setStatus("Pending");
+            if (milestone.getStatus() == null) milestone.setStatus("PENDING");
             MilestoneEntity saved = milestoneRepository.save(milestone);
             replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getCriteriaIds());
             defaultOrderIndex++;
