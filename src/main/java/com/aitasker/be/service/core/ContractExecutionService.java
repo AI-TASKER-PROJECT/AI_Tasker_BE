@@ -37,7 +37,6 @@ public class ContractExecutionService {
     private final JobRepository jobRepository;
     private final ContractRepository contractRepository;
     private final ContractMilestoneRepository contractMilestoneRepository;
-    private final ContractChangeRequestRepository changeRequestRepository;
     private final MilestoneRepository milestoneRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
     private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
@@ -103,13 +102,6 @@ public class ContractExecutionService {
                         saved.getContractId()
                 ));
         return saved;
-    }
-
-    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
-    @Transactional
-    // Note: Hàm `requestChange` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public ContractChangeRequestEntity requestChange(ContractChangeRequestEntity input) {
-        throw new AppException("CONTRACT CHANGE REQUEST FLOW DA BI TAT");
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -424,6 +416,7 @@ public class ContractExecutionService {
     }
 
     private void tryCompleteContract(ContractEntity contract, Integer actorAccountId) {
+        if (!"ACTIVE".equals(contract.getStatus())) return;
         List<MilestoneEntity> milestones = milestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId());
         if (milestones.isEmpty()) return;
         boolean allCompleted = milestones.stream().allMatch(milestone -> "COMPLETED".equals(milestone.getStatus()));
@@ -672,6 +665,7 @@ public class ContractExecutionService {
                 }).orElse(7);
         LocalDateTime now = LocalDateTime.now();
         List<MilestoneEntity> updated = new java.util.ArrayList<>();
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
         for (MilestoneEntity milestone : milestoneRepository.findAll()) {
             if (!"UNDER_REVIEW".equals(milestone.getStatus()) && !"PENDING".equals(milestone.getStatus())) continue;
             List<DeliverableEntity> deliverables = deliverableRepository.findByMilestoneId(milestone.getMilestoneId());
@@ -685,11 +679,23 @@ public class ContractExecutionService {
             if (!lastSubmission.plusDays(slaDays).isAfter(now)) {
                 milestone.setStatus("COMPLETED");
                 milestone.setUpdatedAt(now);
-                updated.add(milestoneRepository.save(milestone));
+                MilestoneEntity saved = milestoneRepository.save(milestone);
+                updated.add(saved);
+                findContractForMilestone(saved).ifPresent(contract -> tryCompleteContract(contract, actorAccountId));
             }
         }
-        auditLogService.record(AuditLogService.ACTION_RUN_SLA_AUTO_APPROVE, "system_settings", "default_sla_days", accessService.currentAccount().getAccountId());
+        auditLogService.record(AuditLogService.ACTION_RUN_SLA_AUTO_APPROVE, "system_settings", "default_sla_days", actorAccountId);
         return updated;
+    }
+
+    private Optional<ContractEntity> findContractForMilestone(MilestoneEntity milestone) {
+        if (milestone.getContractId() != null) {
+            return contractRepository.findById(milestone.getContractId());
+        }
+        if (milestone.getJobId() != null) {
+            return contractRepository.findByJobId(milestone.getJobId());
+        }
+        return Optional.empty();
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.

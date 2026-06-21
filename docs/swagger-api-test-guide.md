@@ -678,23 +678,6 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 }
 ```
 
-#### 65. POST /api/v1/contracts/change-requests
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "contractId": 1,
-  "requestedByAccountId": 1,
-  "changeType": "Điều chỉnh phạm vi",
-  "changeSummary": "Bổ sung báo cáo đánh giá chất lượng câu trả lời.",
-  "proposedBudget": 10000000,
-  "proposedTimelineDays": 7,
-  "status": "Pending"
-}
-```
 
 ### email-otp-controller
 

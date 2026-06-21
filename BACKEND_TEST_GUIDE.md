@@ -57,8 +57,6 @@ docker compose up -d
 ### D. Contract + Execution
 1. BUSINESS tao contract draft tu proposal:
 - `POST /api/v1/contracts/from-proposals/{proposalId}`
-2. BUSINESS/EXPERT tao request change:
-- `POST /api/v1/contracts/change-requests`
 3. Kich hoat contract:
 - `POST /api/v1/contracts/{contractId}/activate`
 4. Tao milestone, criteria, deliverable:

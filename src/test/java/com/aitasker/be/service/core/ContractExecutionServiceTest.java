@@ -8,9 +8,9 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
-import com.aitasker.be.entity.ContractChangeRequestEntity;
 import com.aitasker.be.entity.ContractEntity;
 import com.aitasker.be.entity.ContractMilestoneEntity;
+import com.aitasker.be.entity.DeliverableEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MilestoneEntity;
@@ -49,8 +49,6 @@ class ContractExecutionServiceTest {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ContractRepository contractRepository;
     @Mock private ContractMilestoneRepository contractMilestoneRepository;
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
-    @Mock private ContractChangeRequestRepository changeRequestRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
@@ -162,16 +160,45 @@ class ContractExecutionServiceTest {
     }
 
     @Test
-    // Note: Hàm `requestChange_shouldThrowWhenContractNotNegotiable` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
-    void requestChange_shouldThrowBecauseFlowIsDisabled() {
-        ContractChangeRequestEntity input = ContractChangeRequestEntity.builder()
+    void runSlaAutoApprove_shouldCompleteContractAndCloseJobWhenFinalMilestoneApproved() {
+        ContractEntity contract = ContractEntity.builder()
                 .contractId(1)
-                .changeType("BUDGET")
-                .changeSummary("TANG NGAN SACH")
+                .jobId(2)
+                .businessId(10)
+                .expertId(5)
+                .status("ACTIVE")
                 .build();
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(7)
+                .jobId(2)
+                .contractId(1)
+                .status("UNDER_REVIEW")
+                .build();
+        DeliverableEntity deliverable = DeliverableEntity.builder()
+                .deliverableId(20)
+                .milestoneId(7)
+                .createdAt(LocalDateTime.now().minusDays(8))
+                .build();
+        JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("IN_PROGRESS").build();
 
-        AppException ex = assertThrows(AppException.class, () -> contractExecutionService.requestChange(input));
-        assertEquals("CONTRACT CHANGE REQUEST FLOW DA BI TAT", ex.getMessage());
+        when(systemSettingRepository.findById("default_sla_days")).thenReturn(Optional.empty());
+        when(milestoneRepository.findAll()).thenReturn(List.of(milestone));
+        when(deliverableRepository.findByMilestoneId(7)).thenReturn(List.of(deliverable));
+        when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(milestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
+        when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(job));
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("ADMIN").build()).build()
+        );
+
+        List<MilestoneEntity> updated = contractExecutionService.runSlaAutoApprove();
+
+        assertEquals(1, updated.size());
+        assertEquals("COMPLETED", milestone.getStatus());
+        assertEquals("COMPLETED", contract.getStatus());
+        assertEquals("CLOSED", job.getStatus());
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
