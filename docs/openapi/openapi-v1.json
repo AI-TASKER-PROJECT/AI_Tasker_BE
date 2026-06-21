@@ -657,6 +657,37 @@
         }
       }
     },
+    "/api/v1/profiles/expert/{expertId}": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "getExpertById",
+        "parameters": [
+          {
+            "name": "expertId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/profiles/business": {
       "get": {
         "tags": [
@@ -691,6 +722,37 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/business/{businessId}": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "getBusinessById",
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",

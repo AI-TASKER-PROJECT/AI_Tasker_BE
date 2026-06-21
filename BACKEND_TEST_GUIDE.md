@@ -41,7 +41,9 @@ docker compose up -d
 - `POST /api/v1/profiles/approve/EXPERT/{id}?status=Approved`
 4. Kiem tra list:
 - `GET /api/v1/profiles/business`
+- `GET /api/v1/profiles/business/{businessId}` — xem trang ca nhan doanh nghiep
 - `GET /api/v1/profiles/expert`
+- `GET /api/v1/profiles/expert/{expertId}` — xem trang ca nhan chuyen gia
 
 ### C. Marketplace
 1. BUSINESS tao job: `POST /api/v1/jobs`.

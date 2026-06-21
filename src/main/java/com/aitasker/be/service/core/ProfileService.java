@@ -132,6 +132,14 @@ public class ProfileService {
                 .orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
     }
 
+    // Note: Hàm `businessProfileById` lấy hồ sơ doanh nghiệp theo businessId để hiển thị trang cá nhân public cho expert xem.
+    public BusinessProfileEntity businessProfileById(Integer businessId) {
+        accessService.requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+        return businessProfileRepository.findById(businessId)
+                .map(this::attachBusinessAccountInfo)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
+    }
+
     // Note: Hàm `businessProfileByJob` lấy hồ sơ doanh nghiệp đăng một job để chuyên gia xem chi tiết khi job đã public.
     public BusinessProfileEntity businessProfileByJob(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId)
@@ -151,6 +159,14 @@ public class ProfileService {
         return expertProfileRepository.findByAccountId(accountId)
                 .map(this::attachExpertAccountInfo)
                 .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+    }
+
+    // Note: Hàm `expertProfileById` lấy hồ sơ chuyên gia theo expertId để hiển thị trang cá nhân public cho business xem.
+    public ExpertProfileEntity expertProfileById(Integer expertId) {
+        accessService.requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+        return expertProfileRepository.findById(expertId)
+                .map(this::attachExpertPublicAccountInfo)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
     }
 
     // Note: Hàm `currentPortfolio` lấy portfolio của chính chuyên gia đang đăng nhập để form không mất dữ liệu sau khi reload.
@@ -232,6 +248,22 @@ public class ProfileService {
         PortfolioEntity saved = portfolioRepository.save(entity);
         auditLogService.record(AuditLogService.ACTION_UPSERT_PORTFOLIO, "portfolios", String.valueOf(saved.getPortfolioId()), accountId);
         return saved;
+    }
+
+    // Note: Hàm `attachBusinessAccountInfo` gắn thông tin tài khoản đọc được vào response business để trang cá nhân hiển thị đầy đủ.
+    private BusinessProfileEntity attachBusinessAccountInfo(BusinessProfileEntity business) {
+        accountRepository.findById(business.getAccountId()).ifPresent(account ->
+                business.setFullName(account.getFullName()));
+        return business;
+    }
+
+    // Note: Hàm `attachExpertPublicAccountInfo` chỉ gắn thông tin public của tài khoản vào trang cá nhân expert.
+    private ExpertProfileEntity attachExpertPublicAccountInfo(ExpertProfileEntity expert) {
+        accountRepository.findById(expert.getAccountId()).ifPresent(account -> {
+            expert.setFullName(account.getFullName());
+            expert.setTitle("Chuyên gia AI");
+        });
+        return expert;
     }
 
     // Note: Hàm `attachExpertAccountInfo` gắn thông tin tài khoản đọc được vào response expert để BUSINESS xem chi tiết proposal.

@@ -39,4 +39,7 @@ public class BusinessProfileEntity {
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
+
+    // Note: Annotation này đánh dấu dữ liệu chỉ dùng để trả response, không lưu xuống bảng business_profiles.
+    @Transient private String fullName;
 }

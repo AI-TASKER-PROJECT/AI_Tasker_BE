@@ -990,42 +990,56 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 93. GET /api/v1/profiles/portfolio/me
+#### 93. GET /api/v1/profiles/business/{businessId}
+
+- Mục đích: Lấy thông tin business profile theo ID để xem trang cá nhân doanh nghiệp.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 94. GET /api/v1/profiles/expert/{expertId}
+
+- Mục đích: Lấy thông tin expert profile theo ID để xem trang cá nhân chuyên gia.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 95. GET /api/v1/profiles/portfolio/me
 
 - Mục đích: Lấy thông tin của account đang đăng nhập.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 94. GET /api/v1/profiles/files/view-url
+#### 96. GET /api/v1/profiles/files/view-url
 
 - Mục đích: Upload file hoặc lấy URL xem file.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 95. GET /api/v1/profiles/expert/me
+#### 97. GET /api/v1/profiles/expert/me
 
 - Mục đích: Lấy thông tin của account đang đăng nhập.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 96. GET /api/v1/profiles/business/me
+#### 98. GET /api/v1/profiles/business/me
 
 - Mục đích: Lấy thông tin của account đang đăng nhập.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 97. GET /api/v1/profiles/business/by-job/{jobId}
+#### 99. GET /api/v1/profiles/business/by-job/{jobId}
 
 - Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 98. POST /api/v1/profiles/portfolio
+#### 100. POST /api/v1/profiles/portfolio
 
 - Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
@@ -1042,14 +1056,14 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 }
 ```
 
-#### 99. POST /api/v1/profiles/portfolio/certificate-file
+#### 101. POST /api/v1/profiles/portfolio/certificate-file
 
 - Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
 - Token: Cần Bearer token theo role phù hợp.
 - Body form-data: key `file`, type `File`, chọn file cần upload.
 
-#### 100. POST /api/v1/profiles/expert
+#### 102. POST /api/v1/profiles/expert
 
 - Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
@@ -1064,7 +1078,7 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 }
 ```
 
-#### 101. POST /api/v1/profiles/business
+#### 103. POST /api/v1/profiles/business
 
 - Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
@@ -1079,14 +1093,14 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 }
 ```
 
-#### 102. POST /api/v1/profiles/business/license-file
+#### 104. POST /api/v1/profiles/business/license-file
 
 - Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
 - Token: Cần Bearer token theo role phù hợp.
 - Body form-data: key `file`, type `File`, chọn file cần upload.
 
-#### 103. POST /api/v1/profiles/approve/{type}/{id}
+#### 105. POST /api/v1/profiles/approve/{type}/{id}
 
 - Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
@@ -1095,7 +1109,7 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 
 ### SoW Generation
 
-#### 104. POST /api/jobs/generate-sow
+#### 106. POST /api/jobs/generate-sow
 
 - Mục đích: AI sinh SoW, milestone gợi ý và cấu trúc dự án.
 - Phục vụ: AI generate SoW, milestone gợi ý và cấu trúc dự án.
@@ -1122,7 +1136,7 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 
 ### tax-check-controller
 
-#### 105. GET /api/auth/tax-check/{mst}
+#### 107. GET /api/auth/tax-check/{mst}
 
 - Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
 - Phục vụ: Kiểm tra mã số thuế.
@@ -1131,7 +1145,7 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 
 ### test-controller
 
-#### 106. GET /api/test/secure
+#### 108. GET /api/test/secure
 
 - Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
 - Phục vụ: API kiểm thử bảo mật trong môi trường dev.
@@ -1140,7 +1154,7 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 
 ### wallet-controller
 
-#### 107. GET /api/v1/wallet/me
+#### 109. GET /api/v1/wallet/me
 
 - Mục đích: Lấy thông tin của account đang đăng nhập.
 - Phục vụ: Ví của người dùng.
