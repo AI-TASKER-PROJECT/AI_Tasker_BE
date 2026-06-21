@@ -82,6 +82,13 @@ public class ProfileController {
     public ResponseEntity<ApiResponse<Object>> listExpert() { return ResponseEntity.ok(ApiResponse.success("LIST EXPERT PROFILE SUCCESS", profileService.allExpertProfiles())); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/expert/{expertId}")
+    // Note: Hàm `getExpertById` trả hồ sơ chuyên gia theo expertId để business xem trang cá nhân của expert.
+    public ResponseEntity<ApiResponse<ExpertProfileEntity>> getExpertById(@PathVariable Integer expertId) {
+        return ResponseEntity.ok(ApiResponse.success("GET EXPERT PROFILE BY ID SUCCESS", profileService.expertProfileById(expertId)));
+    }
+
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/expert/me")
     // Note: Hàm `myExpert` trả hồ sơ KYC của chính chuyên gia đang đăng nhập để reload trang vẫn thấy status mới.
     public ResponseEntity<ApiResponse<ExpertProfileEntity>> myExpert() {

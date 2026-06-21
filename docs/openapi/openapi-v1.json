@@ -657,6 +657,37 @@
         }
       }
     },
+    "/api/v1/profiles/expert/{expertId}": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "getExpertById",
+        "parameters": [
+          {
+            "name": "expertId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/profiles/business": {
       "get": {
         "tags": [

@@ -43,6 +43,7 @@ docker compose up -d
 - `GET /api/v1/profiles/business`
 - `GET /api/v1/profiles/business/{businessId}` — xem trang ca nhan doanh nghiep
 - `GET /api/v1/profiles/expert`
+- `GET /api/v1/profiles/expert/{expertId}` — xem trang ca nhan chuyen gia
 
 ### C. Marketplace
 1. BUSINESS tao job: `POST /api/v1/jobs`.

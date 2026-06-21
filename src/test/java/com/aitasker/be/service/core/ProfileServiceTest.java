@@ -9,6 +9,7 @@ import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
+import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.AuditLogRepository;
 import com.aitasker.be.repository.BusinessProfileRepository;
@@ -120,6 +121,59 @@ class ProfileServiceTest {
         when(accountRepository.findById(anyInt())).thenReturn(Optional.of(AccountEntity.builder().fullName("N").build()));
 
         profileService.businessProfileById(businessId);
+
+        verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+    }
+
+    @Test
+    void expertProfileById_shouldThrowWhenProfileNotFound() {
+        Integer expertId = 999;
+        doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
+        when(expertProfileRepository.findById(expertId)).thenReturn(Optional.empty());
+
+        NotFoundException ex = assertThrows(NotFoundException.class,
+                () -> profileService.expertProfileById(expertId));
+        assertEquals("KHONG TIM THAY EXPERT PROFILE", ex.getMessage());
+        verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+    }
+
+    @Test
+    void expertProfileById_shouldReturnProfileWithPublicAccountInfoOnly() {
+        Integer expertId = 2;
+        Integer accountId = 20;
+        ExpertProfileEntity profile = ExpertProfileEntity.builder()
+                .expertId(expertId).accountId(accountId)
+                .nationalId("0123456789").portfolioUrl("https://portfolio.example.com")
+                .yearsOfExperience(5).kycStatus("Approved").build();
+        AccountEntity account = AccountEntity.builder()
+                .accountId(accountId).fullName("Expert Name").email("expert@test.com").phone("091")
+                .build();
+
+        doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
+        when(expertProfileRepository.findById(expertId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+        ExpertProfileEntity result = profileService.expertProfileById(expertId);
+
+        assertEquals("Expert Name", result.getFullName());
+        assertEquals("Chuyên gia AI", result.getTitle());
+        assertNull(result.getPhone());
+        assertEquals(5, result.getYearsOfExperience());
+    }
+
+    @Test
+    void expertProfileById_shouldRequireExpectedRoles() {
+        Integer expertId = 2;
+        ExpertProfileEntity profile = ExpertProfileEntity.builder()
+                .expertId(expertId).accountId(20)
+                .nationalId("0123456789").portfolioUrl("https://portfolio.example.com")
+                .yearsOfExperience(5).kycStatus("Pending").build();
+
+        doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
+        when(expertProfileRepository.findById(expertId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(anyInt())).thenReturn(Optional.of(AccountEntity.builder().fullName("N").build()));
+
+        profileService.expertProfileById(expertId);
 
         verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
     }

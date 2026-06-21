@@ -161,6 +161,14 @@ public class ProfileService {
                 .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
     }
 
+    // Note: Hàm `expertProfileById` lấy hồ sơ chuyên gia theo expertId để hiển thị trang cá nhân public cho business xem.
+    public ExpertProfileEntity expertProfileById(Integer expertId) {
+        accessService.requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+        return expertProfileRepository.findById(expertId)
+                .map(this::attachExpertPublicAccountInfo)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
+    }
+
     // Note: Hàm `currentPortfolio` lấy portfolio của chính chuyên gia đang đăng nhập để form không mất dữ liệu sau khi reload.
     public PortfolioEntity currentPortfolio() {
         accessService.requireRole("EXPERT");
@@ -247,6 +255,15 @@ public class ProfileService {
         accountRepository.findById(business.getAccountId()).ifPresent(account ->
                 business.setFullName(account.getFullName()));
         return business;
+    }
+
+    // Note: Hàm `attachExpertPublicAccountInfo` chỉ gắn thông tin public của tài khoản vào trang cá nhân expert.
+    private ExpertProfileEntity attachExpertPublicAccountInfo(ExpertProfileEntity expert) {
+        accountRepository.findById(expert.getAccountId()).ifPresent(account -> {
+            expert.setFullName(account.getFullName());
+            expert.setTitle("Chuyên gia AI");
+        });
+        return expert;
     }
 
     // Note: Hàm `attachExpertAccountInfo` gắn thông tin tài khoản đọc được vào response expert để BUSINESS xem chi tiết proposal.
