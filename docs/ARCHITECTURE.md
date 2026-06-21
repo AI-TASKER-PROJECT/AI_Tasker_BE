@@ -235,6 +235,7 @@ Current rules to preserve:
 - Only approved experts can submit proposals.
 - Experts can submit proposals only to jobs in `OPEN` status.
 - Public `GET /api/v1/jobs` returns only `OPEN` jobs.
+- Public `GET /api/v1/jobs/{jobId}/milestones` is readable for `OPEN` jobs.
 - Business dashboard behavior that needs draft/open/closed jobs uses
   `GET /api/v1/jobs/my`.
 - A proposal can move into contract creation only after it is `Accepted`.

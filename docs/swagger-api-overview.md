@@ -75,7 +75,7 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 39 | GET | `/api/v1/milestones/{milestoneId}/transactions` | Xem giao dịch theo milestone. | Finance theo milestone. |
 | 40 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | Xem deliverable theo milestone. | Theo dõi bàn giao. |
 | 41 | GET | `/api/v1/milestones/{milestoneId}/criteria` | Xem tiêu chí nghiệm thu của milestone. | Acceptance review. |
-| 42 | GET | `/api/v1/jobs/{jobId}/milestones` | Xem milestone của job. | Job detail, contract draft. |
+| 42 | GET | `/api/v1/jobs/{jobId}/milestones` | Xem milestone của job. Public voi job `OPEN`, job chua public van kiem tra quyen tham gia/so huu. | Job detail, contract draft. |
 | 43 | GET | `/api/v1/jobs/{jobId}/matching` | Lấy danh sách matching theo keyword. | AI/matching chuyên gia mức MVP. |
 | 44 | GET | `/api/v1/disputes/{disputeId}` | Xem chi tiết dispute. | Dispute detail. |
 | 45 | GET | `/api/v1/contracts` | Xem danh sách contract theo quyền. | Contract management. |
