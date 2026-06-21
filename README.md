@@ -62,6 +62,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
 ## 7) Cac API backend da bo sung (week 4-8)
 - Profile/KYC-KYB:
   - `POST /api/v1/profiles/business`
+  - `GET /api/v1/profiles/business/{businessId}`
   - `POST /api/v1/profiles/expert`
   - `POST /api/v1/profiles/approve/{type}/{id}?status=...`
 - Marketplace:

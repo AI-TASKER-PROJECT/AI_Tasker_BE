@@ -1367,7 +1367,18 @@ GET {{baseUrl}}/api/v1/profiles/business
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 93. GET /api/v1/profiles/portfolio/me
+#### 93. GET /api/v1/profiles/business/{businessId}
+
+```http
+GET {{baseUrl}}/api/v1/profiles/business/{businessId}
+```
+
+- Mục đích: Lấy thông tin business profile theo ID để xem trang cá nhân doanh nghiệp.
+- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
+- Token: Cần Bearer token theo role phù hợp.
+- Body: Không có.
+
+#### 94. GET /api/v1/profiles/portfolio/me
 
 ```http
 GET {{baseUrl}}/api/v1/profiles/portfolio/me
@@ -1378,7 +1389,7 @@ GET {{baseUrl}}/api/v1/profiles/portfolio/me
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 94. GET /api/v1/profiles/files/view-url
+#### 95. GET /api/v1/profiles/files/view-url
 
 ```http
 GET {{baseUrl}}/api/v1/profiles/files/view-url
@@ -1389,7 +1400,7 @@ GET {{baseUrl}}/api/v1/profiles/files/view-url
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 95. GET /api/v1/profiles/expert/me
+#### 96. GET /api/v1/profiles/expert/me
 
 ```http
 GET {{baseUrl}}/api/v1/profiles/expert/me
@@ -1400,7 +1411,7 @@ GET {{baseUrl}}/api/v1/profiles/expert/me
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 96. GET /api/v1/profiles/business/me
+#### 97. GET /api/v1/profiles/business/me
 
 ```http
 GET {{baseUrl}}/api/v1/profiles/business/me
@@ -1411,7 +1422,7 @@ GET {{baseUrl}}/api/v1/profiles/business/me
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 97. GET /api/v1/profiles/business/by-job/{jobId}
+#### 98. GET /api/v1/profiles/business/by-job/{jobId}
 
 ```http
 GET {{baseUrl}}/api/v1/profiles/business/by-job/{jobId}
@@ -1422,7 +1433,7 @@ GET {{baseUrl}}/api/v1/profiles/business/by-job/{jobId}
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 98. POST /api/v1/profiles/portfolio
+#### 99. POST /api/v1/profiles/portfolio
 
 ```http
 POST {{baseUrl}}/api/v1/profiles/portfolio
@@ -1443,7 +1454,7 @@ POST {{baseUrl}}/api/v1/profiles/portfolio
 }
 ```
 
-#### 99. POST /api/v1/profiles/portfolio/certificate-file
+#### 100. POST /api/v1/profiles/portfolio/certificate-file
 
 ```http
 POST {{baseUrl}}/api/v1/profiles/portfolio/certificate-file
@@ -1454,7 +1465,7 @@ POST {{baseUrl}}/api/v1/profiles/portfolio/certificate-file
 - Token: Cần Bearer token theo role phù hợp.
 - Body form-data: key `file`, type `File`, chọn file cần upload.
 
-#### 100. POST /api/v1/profiles/expert
+#### 101. POST /api/v1/profiles/expert
 
 ```http
 POST {{baseUrl}}/api/v1/profiles/expert
@@ -1473,7 +1484,7 @@ POST {{baseUrl}}/api/v1/profiles/expert
 }
 ```
 
-#### 101. POST /api/v1/profiles/business
+#### 102. POST /api/v1/profiles/business
 
 ```http
 POST {{baseUrl}}/api/v1/profiles/business
@@ -1492,7 +1503,7 @@ POST {{baseUrl}}/api/v1/profiles/business
 }
 ```
 
-#### 102. POST /api/v1/profiles/business/license-file
+#### 103. POST /api/v1/profiles/business/license-file
 
 ```http
 POST {{baseUrl}}/api/v1/profiles/business/license-file
@@ -1503,7 +1514,7 @@ POST {{baseUrl}}/api/v1/profiles/business/license-file
 - Token: Cần Bearer token theo role phù hợp.
 - Body form-data: key `file`, type `File`, chọn file cần upload.
 
-#### 103. POST /api/v1/profiles/approve/{type}/{id}
+#### 104. POST /api/v1/profiles/approve/{type}/{id}
 
 ```http
 POST {{baseUrl}}/api/v1/profiles/approve/{type}/{id}
@@ -1516,7 +1527,7 @@ POST {{baseUrl}}/api/v1/profiles/approve/{type}/{id}
 
 ### SoW Generation
 
-#### 104. POST /api/jobs/generate-sow
+#### 105. POST /api/jobs/generate-sow
 
 ```http
 POST {{baseUrl}}/api/jobs/generate-sow
@@ -1547,7 +1558,7 @@ POST {{baseUrl}}/api/jobs/generate-sow
 
 ### tax-check-controller
 
-#### 105. GET /api/auth/tax-check/{mst}
+#### 106. GET /api/auth/tax-check/{mst}
 
 ```http
 GET {{baseUrl}}/api/auth/tax-check/{mst}
@@ -1560,7 +1571,7 @@ GET {{baseUrl}}/api/auth/tax-check/{mst}
 
 ### test-controller
 
-#### 106. GET /api/test/secure
+#### 107. GET /api/test/secure
 
 ```http
 GET {{baseUrl}}/api/test/secure
@@ -1573,7 +1584,7 @@ GET {{baseUrl}}/api/test/secure
 
 ### wallet-controller
 
-#### 107. GET /api/v1/wallet/me
+#### 108. GET /api/v1/wallet/me
 
 ```http
 GET {{baseUrl}}/api/v1/wallet/me

@@ -58,6 +58,13 @@ public class ProfileController {
     public ResponseEntity<ApiResponse<Object>> listBusiness() { return ResponseEntity.ok(ApiResponse.success("LIST BUSINESS PROFILE SUCCESS", profileService.allBusinessProfiles())); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/business/{businessId}")
+    // Note: Hàm `getBusinessById` trả hồ sơ doanh nghiệp theo businessId để expert xem trang cá nhân của business.
+    public ResponseEntity<ApiResponse<BusinessProfileEntity>> getBusinessById(@PathVariable Integer businessId) {
+        return ResponseEntity.ok(ApiResponse.success("GET BUSINESS PROFILE BY ID SUCCESS", profileService.businessProfileById(businessId)));
+    }
+
+    // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/business/me")
     // Note: Hàm `myBusiness` trả hồ sơ KYB của chính doanh nghiệp đang đăng nhập để reload trang vẫn thấy dữ liệu mới.
     public ResponseEntity<ApiResponse<BusinessProfileEntity>> myBusiness() {

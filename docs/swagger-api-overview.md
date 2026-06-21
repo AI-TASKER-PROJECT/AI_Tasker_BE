@@ -179,29 +179,30 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 83 | GET | `/api/v1/profiles/portfolio` | Staff/Business xem portfolio expert theo quyền. | Review năng lực chuyên gia. |
 | 84 | GET | `/api/v1/profiles/expert` | Lấy danh sách hồ sơ expert theo quyền. | Staff/Business xem hồ sơ chuyên gia. |
 | 85 | GET | `/api/v1/profiles/business` | Lấy danh sách hồ sơ business theo quyền. | Staff/Admin xem hồ sơ doanh nghiệp. |
-| 86 | GET | `/api/v1/profiles/portfolio/me` | Expert xem portfolio của mình. | Hồ sơ năng lực cá nhân. |
-| 87 | GET | `/api/v1/profiles/files/view-url` | Lấy signed URL để xem file Firebase. | Xem chứng chỉ, giấy phép, proposal file. |
-| 88 | GET | `/api/v1/profiles/expert/me` | Expert xem hồ sơ KYC của mình. | Hồ sơ chuyên gia cá nhân. |
-| 89 | GET | `/api/v1/profiles/business/me` | Business xem hồ sơ KYB của mình. | Hồ sơ doanh nghiệp cá nhân. |
-| 90 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Xem thông tin business theo job. | Expert xem chi tiết doanh nghiệp của job. |
-| 91 | POST | `/api/v1/profiles/portfolio` | Expert tạo hoặc cập nhật portfolio. | Hồ sơ năng lực AI của chuyên gia. |
-| 92 | POST | `/api/v1/profiles/portfolio/certificate-file` | Upload file chứng chỉ portfolio lên Firebase Storage. | Lưu file chứng chỉ chuyên gia. |
-| 93 | POST | `/api/v1/profiles/expert` | Expert tạo hoặc cập nhật hồ sơ KYC. | Hồ sơ xác minh chuyên gia. |
-| 94 | POST | `/api/v1/profiles/business` | Business tạo hoặc cập nhật hồ sơ KYB. | Hồ sơ xác minh doanh nghiệp. |
-| 95 | POST | `/api/v1/profiles/business/license-file` | Upload giấy phép kinh doanh lên Firebase Storage. | Lưu file giấy phép doanh nghiệp. |
-| 96 | POST | `/api/v1/profiles/approve/{type}/{id}` | Staff duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT. | KYB/KYC approval. |
+| 86 | GET | `/api/v1/profiles/business/{businessId}` | Lấy thông tin business profile theo ID. | Expert xem trang cá nhân doanh nghiệp. |
+| 87 | GET | `/api/v1/profiles/portfolio/me` | Expert xem portfolio của mình. | Hồ sơ năng lực cá nhân. |
+| 88 | GET | `/api/v1/profiles/files/view-url` | Lấy signed URL để xem file Firebase. | Xem chứng chỉ, giấy phép, proposal file. |
+| 89 | GET | `/api/v1/profiles/expert/me` | Expert xem hồ sơ KYC của mình. | Hồ sơ chuyên gia cá nhân. |
+| 90 | GET | `/api/v1/profiles/business/me` | Business xem hồ sơ KYB của mình. | Hồ sơ doanh nghiệp cá nhân. |
+| 91 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Xem thông tin business theo job. | Expert xem chi tiết doanh nghiệp của job. |
+| 92 | POST | `/api/v1/profiles/portfolio` | Expert tạo hoặc cập nhật portfolio. | Hồ sơ năng lực AI của chuyên gia. |
+| 93 | POST | `/api/v1/profiles/portfolio/certificate-file` | Upload file chứng chỉ portfolio lên Firebase Storage. | Lưu file chứng chỉ chuyên gia. |
+| 94 | POST | `/api/v1/profiles/expert` | Expert tạo hoặc cập nhật hồ sơ KYC. | Hồ sơ xác minh chuyên gia. |
+| 95 | POST | `/api/v1/profiles/business` | Business tạo hoặc cập nhật hồ sơ KYB. | Hồ sơ xác minh doanh nghiệp. |
+| 96 | POST | `/api/v1/profiles/business/license-file` | Upload giấy phép kinh doanh lên Firebase Storage. | Lưu file giấy phép doanh nghiệp. |
+| 97 | POST | `/api/v1/profiles/approve/{type}/{id}` | Staff duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT. | KYB/KYC approval. |
 
 ## SoW Generation
 
 | STT | Method | API | API dùng để làm gì | Phục vụ chức năng |
 | --- | --- | --- | --- | --- |
-| 97 | POST | `/api/jobs/generate-sow` | AI generate cấu trúc SoW từ yêu cầu dự án. | AI hỗ trợ tạo job/SoW. |
+| 98 | POST | `/api/jobs/generate-sow` | AI generate cấu trúc SoW từ yêu cầu dự án. | AI hỗ trợ tạo job/SoW. |
 
 ## tax-check-controller
 
 | STT | Method | API | API dùng để làm gì | Phục vụ chức năng |
 | --- | --- | --- | --- | --- |
-| 98 | GET | `/api/auth/tax-check/{mst}` | Kiểm tra mã số thuế doanh nghiệp. | Register/KYB business. |
+| 99 | GET | `/api/auth/tax-check/{mst}` | Kiểm tra mã số thuế doanh nghiệp. | Register/KYB business. |
 
 ## test-controller
 

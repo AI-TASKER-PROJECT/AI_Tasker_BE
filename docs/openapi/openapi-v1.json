@@ -705,6 +705,37 @@
         }
       }
     },
+    "/api/v1/profiles/business/{businessId}": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "getBusinessById",
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/profiles/business/license-file": {
       "post": {
         "tags": [

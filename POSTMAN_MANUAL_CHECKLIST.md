@@ -108,7 +108,12 @@ docker compose up -d
 }
 ```
 
-4. ADMIN/STAFF DUYET HO SO  
+4. EXPERT XEM TRANG CA NHAN DOANH NGHIEP
+- `GET {{base_url}}/api/v1/profiles/business/{businessId}`
+- AUTH: `{{expert_token}}`
+- EXPECT: `200`, tra ve `BusinessProfileEntity` kem `fullName`, `email`, `phone`
+
+5. ADMIN/STAFF DUYET HO SO  
 - `POST {{base_url}}/api/v1/profiles/approve/BUSINESS/{id}?status=Approved`  
 - `POST {{base_url}}/api/v1/profiles/approve/EXPERT/{id}?status=Approved`
 
