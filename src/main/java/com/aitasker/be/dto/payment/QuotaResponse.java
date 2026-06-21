@@ -13,17 +13,26 @@ public class QuotaResponse {
     private Integer jobPostQuotaBalance;
     private Integer proposalQuotaBalance;
     private LocalDateTime badgeExpiredAt;
-    private Boolean premiumRecommendationVisible;
+    private LocalDateTime premiumExpiredAt;
     private Boolean premiumActive;
+    private String activePackageCode;
+    private String activePackageName;
 
-    public static QuotaResponse from(UserQuotaEntity quota, boolean premiumActive) {
+    public static QuotaResponse from(
+            UserQuotaEntity quota,
+            boolean premiumActive,
+            String activePackageCode,
+            String activePackageName
+    ) {
         return QuotaResponse.builder()
                 .accountId(quota.getAccountId())
                 .jobPostQuotaBalance(quota.getJobPostQuotaBalance())
                 .proposalQuotaBalance(quota.getProposalQuotaBalance())
                 .badgeExpiredAt(quota.getBadgeExpiredAt())
-                .premiumRecommendationVisible(quota.getPremiumRecommendationVisible())
+                .premiumExpiredAt(quota.getPremiumExpiredAt())
                 .premiumActive(premiumActive)
+                .activePackageCode(activePackageCode)
+                .activePackageName(activePackageName)
                 .build();
     }
 }

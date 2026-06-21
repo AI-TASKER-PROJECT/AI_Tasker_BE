@@ -300,11 +300,18 @@ Finance is partially MVP and partially integrated:
 - Wallet and system-wallet services exist.
 - Membership package purchase and credit purchase use wallet available balance
   and create wallet/quota ledger records.
+- Premium membership entitlement is based only on
+  `user_quotas.premium_expired_at`; lower-tier package purchases must not clear
+  or shorten that timestamp.
+- `GET /api/users/me/quota` is the authoritative source for active package,
+  quota, and Premium permission display. Frontend-local values such as
+  `aitasker_active_package` are not business truth.
 - Business job publishing consumes one job-post credit only when publish to
   `OPEN` succeeds and the job has a saved SoW.
 - Expert proposal submission consumes one proposal credit only when the
   proposal save succeeds.
-- Active Business Premium quota is required to view AI expert recommendations.
+- Active Business Premium entitlement is required to view AI expert
+  recommendations.
 - Contract security deposit moves Business available balance to escrow.
 - Withdrawal requests move available balance to holding; admin approval removes
   holding and admin rejection returns holding to available.

@@ -46,7 +46,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -65,6 +70,10 @@ public class PaymentWalletService {
     private static final String QUOTA_JOB_POST = "JOB_POST";
     private static final String QUOTA_PROPOSAL = "PROPOSAL";
     private static final String TOPUP_ENDPOINT = "/api/payments/payos/create";
+    private static final String TIER_PREMIUM = "PREMIUM";
+    private static final String TIER_PLUS = "PLUS";
+    private static final String TIER_STANDARD = "STANDARD";
+    private static final String TIER_BASIC = "BASIC";
 
     private final AccessService accessService;
     private final SystemWalletService systemWalletService;
@@ -127,7 +136,12 @@ public class PaymentWalletService {
                 : now;
         LocalDateTime badgeEnd = badgeStart.plusDays(membershipPackage.getBadgeDurationDays());
         quota.setBadgeExpiredAt(badgeEnd);
-        quota.setPremiumRecommendationVisible(Boolean.TRUE.equals(membershipPackage.getRecommendVisibility()));
+        if (isPremiumPackage(membershipPackage)) {
+            LocalDateTime premiumStart = quota.getPremiumExpiredAt() != null && quota.getPremiumExpiredAt().isAfter(now)
+                    ? quota.getPremiumExpiredAt()
+                    : now;
+            quota.setPremiumExpiredAt(premiumStart.plusDays(membershipPackage.getBadgeDurationDays()));
+        }
         userQuotaRepository.save(quota);
 
         MembershipPurchaseEntity purchase = membershipPurchaseRepository.save(MembershipPurchaseEntity.builder()
@@ -206,7 +220,13 @@ public class PaymentWalletService {
     public QuotaResponse currentQuota() {
         AccountEntity actor = requireApprovedBusinessOrExpert();
         UserQuotaEntity quota = ensureQuotaForAccountForUpdate(actor);
-        return QuotaResponse.from(quota, isPremiumActive(quota));
+        ActivePackage activePackage = resolveActivePackage(actor, quota, LocalDateTime.now());
+        return QuotaResponse.from(
+                quota,
+                isPremiumActive(quota),
+                activePackage.code(),
+                activePackage.name()
+        );
     }
 
     @Transactional
@@ -490,7 +510,6 @@ public class PaymentWalletService {
                             .accountId(account.getAccountId())
                             .jobPostQuotaBalance(0)
                             .proposalQuotaBalance(initialProposalQuota)
-                            .premiumRecommendationVisible(false)
                             .build());
                     if (initialProposalQuota > 0) {
                         quotaUsageLogRepository.save(QuotaUsageLogEntity.builder()
@@ -668,10 +687,64 @@ public class PaymentWalletService {
     }
 
     private boolean isPremiumActive(UserQuotaEntity quota) {
-        return Boolean.TRUE.equals(quota.getPremiumRecommendationVisible())
-                && quota.getBadgeExpiredAt() != null
-                && quota.getBadgeExpiredAt().isAfter(LocalDateTime.now());
+        return quota.getPremiumExpiredAt() != null && quota.getPremiumExpiredAt().isAfter(LocalDateTime.now());
     }
+
+    private ActivePackage resolveActivePackage(AccountEntity actor, UserQuotaEntity quota, LocalDateTime now) {
+        List<MembershipPurchaseEntity> activePurchases = membershipPurchaseRepository.findByAccountIdOrderByCreatedAtDesc(actor.getAccountId()).stream()
+                .filter(purchase -> "SUCCESS".equals(purchase.getStatus()))
+                .filter(purchase -> purchase.getBadgeEndAt() != null && purchase.getBadgeEndAt().isAfter(now))
+                .toList();
+        if (activePurchases.isEmpty()) {
+            return basicPackage();
+        }
+        Map<Long, MembershipPackageEntity> packagesById = membershipPackageRepository.findAllById(
+                        activePurchases.stream()
+                                .map(MembershipPurchaseEntity::getPackageId)
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toSet())
+                ).stream()
+                .collect(Collectors.toMap(MembershipPackageEntity::getPackageId, Function.identity()));
+        return activePurchases.stream()
+                .map(purchase -> packagesById.get(purchase.getPackageId()))
+                .filter(Objects::nonNull)
+                .filter(pkg -> !isPremiumPackage(pkg) || isPremiumActive(quota))
+                .max(Comparator
+                        .comparingInt(this::packagePriority)
+                        .thenComparing(MembershipPackageEntity::getPackageName, Comparator.nullsLast(String::compareTo)))
+                .map(pkg -> new ActivePackage(packageTier(pkg), pkg.getPackageName()))
+                .orElseGet(this::basicPackage);
+    }
+
+    private ActivePackage basicPackage() {
+        return new ActivePackage(TIER_BASIC, "Basic");
+    }
+
+    private boolean isPremiumPackage(MembershipPackageEntity membershipPackage) {
+        return TIER_PREMIUM.equals(packageTier(membershipPackage));
+    }
+
+    private int packagePriority(MembershipPackageEntity membershipPackage) {
+        return switch (packageTier(membershipPackage)) {
+            case TIER_PREMIUM -> 4;
+            case TIER_PLUS -> 3;
+            case TIER_STANDARD -> 2;
+            default -> 1;
+        };
+    }
+
+    private String packageTier(MembershipPackageEntity membershipPackage) {
+        if (membershipPackage == null || membershipPackage.getPackageCode() == null) {
+            return TIER_BASIC;
+        }
+        String code = membershipPackage.getPackageCode().trim().toUpperCase();
+        if (code.endsWith("_" + TIER_PREMIUM) || TIER_PREMIUM.equals(code)) return TIER_PREMIUM;
+        if (code.endsWith("_" + TIER_PLUS) || TIER_PLUS.equals(code)) return TIER_PLUS;
+        if (code.endsWith("_" + TIER_STANDARD) || TIER_STANDARD.equals(code)) return TIER_STANDARD;
+        return TIER_BASIC;
+    }
+
+    private record ActivePackage(String code, String name) {}
 
     private BigDecimal money(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;

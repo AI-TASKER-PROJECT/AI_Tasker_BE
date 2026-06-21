@@ -17,7 +17,8 @@ to `ACTIVE` and job `IN_PROGRESS` after deposit payment.
 The payment MVP uses PayOS only for wallet top-up. Internal purchases and
 security-deposit movements use wallet balance and ledger records. Business and
 Expert users can buy role-scoped membership packages, buy credits, view quota,
-consume job/proposal quota, and submit withdrawal requests. Business contracts
+consume job/proposal quota, read authoritative active package/Premium
+entitlement data from `/api/users/me/quota`, and submit withdrawal requests. Business contracts
 move to `PENDING` after both contract and NDA signatures, then move to
 `ACTIVE` and the job moves to `IN_PROGRESS` only after the 20% security deposit
 is held. Admin can finalize deposit refund/resolution and withdrawal approval or

@@ -123,7 +123,7 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 
 | STT | Method | API | API dung de lam gi | Phuc vu chuc nang |
 | --- | --- | --- | --- | --- |
-| 74 | GET | `/api/users/me/quota` | Business/Expert xem quota hien tai. | Job/proposal quota. |
+| 74 | GET | `/api/users/me/quota` | Business/Expert xem quota, Premium expiration, premiumActive, activePackageCode, activePackageName. | Authoritative package/quota/permission source. |
 
 ## withdrawal-controller
 

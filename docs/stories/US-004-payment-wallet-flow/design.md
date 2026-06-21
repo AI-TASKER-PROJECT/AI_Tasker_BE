@@ -18,7 +18,8 @@ New domain records:
 
 1. PayOS top-up remains provider-sync based and credits available balance once.
 2. Membership purchase debits wallet available balance, records purchase, extends
-   badge expiration, and grants role-specific quota.
+   badge expiration, grants role-specific quota, and extends
+   `premium_expired_at` only for Premium packages.
 3. Credit purchase debits wallet available balance and grants quota.
 4. Publishing a job requires a saved SoW and one job-post credit, consumed only
    after successful status change to `OPEN`.
@@ -62,7 +63,10 @@ transaction constraints are expanded to allow `HOLD`, `RELEASE`, `HOLDING`, and
 
 Frontend can keep the existing wallet top-up flow. New screens can use package,
 credit, quota, deposit, and withdrawal endpoints. Non-Premium Business users get
-a clear premium-required failure when reading saved recommendations.
+a clear premium-required failure when reading saved recommendations. Frontend
+state such as `aitasker_active_package` must not be treated as business truth;
+`GET /api/users/me/quota` is authoritative for active package, quota, and
+Premium permission data.
 
 ## Observability
 

@@ -32,6 +32,9 @@ Swagger/OpenAPI:
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 - De goi API duoc bao ve, bam `Authorize` va nhap access token JWT, khong them tien to `Bearer`.
 - Dat `SWAGGER_ENABLED=false` neu can tat Swagger UI va OpenAPI docs.
+- `GET /api/users/me/quota` la source of truth cho quota, active package va
+  Premium permission. Frontend khong duoc dung localStorage
+  `aitasker_active_package` lam business truth.
 
 ## 5) Flyway migration
 - Da bo sung migration `V8__align_excel_schema.sql` de dong bo theo DB/BR moi.
@@ -43,6 +46,8 @@ Swagger/OpenAPI:
 - Da bo sung migration `V31__status_enum_constraint_alignment.sql` de chuan hoa
   status uppercase cho contract/job/milestone va gioi han `wallet_transactions`
   ve `POSTED`.
+- Da bo sung migration `V32__premium_expiration_entitlement.sql` de them
+  `user_quotas.premium_expired_at`, backfill Premium hien huu, va xoa flag cu.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.

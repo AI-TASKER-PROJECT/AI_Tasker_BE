@@ -2,12 +2,15 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
+import com.aitasker.be.dto.payment.QuotaResponse;
 import com.aitasker.be.dto.payment.WithdrawalReviewRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ContractDepositEntity;
 import com.aitasker.be.entity.ContractEntity;
 import com.aitasker.be.entity.ContractMilestoneEntity;
+import com.aitasker.be.entity.MembershipPackageEntity;
+import com.aitasker.be.entity.MembershipPurchaseEntity;
 import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.UserQuotaEntity;
@@ -34,6 +37,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,6 +110,106 @@ class PaymentWalletServiceTest {
         assertEquals(new BigDecimal("200000"), response.getRequiredAmount());
         assertEquals(new BigDecimal("150000"), response.getMissingAmount());
         assertEquals("/api/payments/payos/create", response.getRedirectUrl());
+    }
+
+    @Test
+    void purchaseMembership_shouldKeepPremiumActiveWhenLowerTierIsBoughtBeforePremiumExpires() {
+        AccountEntity business = businessAccount();
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+        MembershipPackageEntity premium = packageEntity(1L, "BUSINESS_PREMIUM", "Business Premium", 90);
+        MembershipPackageEntity plus = packageEntity(2L, "BUSINESS_PLUS", "Business Plus", 60);
+
+        when(accessService.currentAccount()).thenReturn(business);
+        when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L)).thenReturn(Optional.of(premium));
+        when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(2L)).thenReturn(Optional.of(plus));
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("3000000"));
+        when(walletLedgerService.debitAvailable(any(), any(), any(), any(), any(), any()))
+                .thenReturn(WalletTransactionEntity.builder().id(100L).build());
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> {
+            MembershipPurchaseEntity purchase = invocation.getArgument(0);
+            purchase.setPurchaseId(purchase.getPackageId());
+            return purchase;
+        });
+
+        paymentWalletService.purchaseMembership(1L);
+        LocalDateTime premiumExpiredAt = quota.getPremiumExpiredAt();
+        paymentWalletService.purchaseMembership(2L);
+
+        assertNotNull(premiumExpiredAt);
+        assertEquals(premiumExpiredAt, quota.getPremiumExpiredAt());
+        assertTrue(quota.getPremiumExpiredAt().isAfter(LocalDateTime.now()));
+    }
+
+    @Test
+    void purchaseMembership_shouldExtendPremiumExpirationCumulatively() {
+        AccountEntity business = businessAccount();
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+        MembershipPackageEntity premium = packageEntity(1L, "BUSINESS_PREMIUM", "Business Premium", 90);
+
+        when(accessService.currentAccount()).thenReturn(business);
+        when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L)).thenReturn(Optional.of(premium));
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("3000000"));
+        when(walletLedgerService.debitAvailable(any(), any(), any(), any(), any(), any()))
+                .thenReturn(WalletTransactionEntity.builder().id(100L).build());
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        paymentWalletService.purchaseMembership(1L);
+        LocalDateTime firstExpiration = quota.getPremiumExpiredAt();
+        paymentWalletService.purchaseMembership(1L);
+
+        assertEquals(firstExpiration.plusDays(90), quota.getPremiumExpiredAt());
+    }
+
+    @Test
+    void currentQuota_shouldUsePremiumExpirationAndFallBackToHighestActiveNonPremiumPackage() {
+        AccountEntity business = businessAccount();
+        LocalDateTime now = LocalDateTime.now();
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(4)
+                .proposalQuotaBalance(0)
+                .badgeExpiredAt(now.plusDays(20))
+                .premiumExpiredAt(now.minusDays(1))
+                .build();
+        MembershipPurchaseEntity standardPurchase = purchase(1L, 10, 11L, now.minusDays(1), now.plusDays(20));
+        MembershipPurchaseEntity plusPurchase = purchase(2L, 10, 12L, now.minusDays(1), now.plusDays(10));
+        MembershipPurchaseEntity premiumPurchase = purchase(3L, 10, 13L, now.minusDays(90), now.minusDays(1));
+        MembershipPackageEntity standard = packageEntity(11L, "BUSINESS_STANDARD", "Business Standard", 30);
+        MembershipPackageEntity plus = packageEntity(12L, "BUSINESS_PLUS", "Business Plus", 60);
+        MembershipPackageEntity premium = packageEntity(13L, "BUSINESS_PREMIUM", "Business Premium", 90);
+
+        when(accessService.currentAccount()).thenReturn(business);
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(membershipPurchaseRepository.findByAccountIdOrderByCreatedAtDesc(10))
+                .thenReturn(List.of(premiumPurchase, plusPurchase, standardPurchase));
+        when(membershipPackageRepository.findAllById(any()))
+                .thenReturn(List.of(standard, plus, premium));
+
+        QuotaResponse response = paymentWalletService.currentQuota();
+
+        assertFalse(response.getPremiumActive());
+        assertEquals(quota.getPremiumExpiredAt(), response.getPremiumExpiredAt());
+        assertEquals("PLUS", response.getActivePackageCode());
+        assertEquals("Business Plus", response.getActivePackageName());
+        assertEquals(Integer.valueOf(4), response.getJobPostQuotaBalance());
+    }
+
+    @Test
+    void quotaResponse_shouldNotExposePremiumRecommendationVisible() throws Exception {
+        assertThrows(NoSuchFieldException.class, () ->
+                QuotaResponse.class.getDeclaredField("premiumRecommendationVisible"));
     }
 
     @Test
@@ -195,5 +299,40 @@ class PaymentWalletServiceTest {
         assertEquals(Integer.valueOf(1), saved.getAdminId());
         assertEquals(Long.valueOf(91), saved.getReviewTransactionId());
         assertEquals("Invalid bank info", saved.getAdminNote());
+    }
+
+    private AccountEntity businessAccount() {
+        return AccountEntity.builder()
+                .accountId(10)
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .status("Approved")
+                .build();
+    }
+
+    private MembershipPackageEntity packageEntity(Long packageId, String code, String name, int durationDays) {
+        return MembershipPackageEntity.builder()
+                .packageId(packageId)
+                .roleType("BUSINESS")
+                .packageCode(code)
+                .packageName(name)
+                .price(BigDecimal.ZERO)
+                .badgeDurationDays(durationDays)
+                .jobPostQuota(0)
+                .proposalQuota(0)
+                .recommendVisibility(code.endsWith("PREMIUM"))
+                .isActive(true)
+                .build();
+    }
+
+    private MembershipPurchaseEntity purchase(Long purchaseId, Integer accountId, Long packageId, LocalDateTime start, LocalDateTime end) {
+        return MembershipPurchaseEntity.builder()
+                .purchaseId(purchaseId)
+                .accountId(accountId)
+                .packageId(packageId)
+                .amount(BigDecimal.ZERO)
+                .status("SUCCESS")
+                .badgeStartAt(start)
+                .badgeEndAt(end)
+                .build();
     }
 }

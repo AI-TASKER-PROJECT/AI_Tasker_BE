@@ -41,8 +41,8 @@ public class UserQuotaEntity {
     @Column(name = "badge_expired_at")
     private LocalDateTime badgeExpiredAt;
 
-    @Column(name = "premium_recommendation_visible", nullable = false)
-    private Boolean premiumRecommendationVisible;
+    @Column(name = "premium_expired_at")
+    private LocalDateTime premiumExpiredAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
