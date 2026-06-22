@@ -1,22 +1,17 @@
 # Hướng Dẫn Test API Back-end Bằng Swagger
 
-Tài liệu này hướng dẫn test API trực tiếp trên Swagger UI của back-end AITASKER. Danh sách API được đồng bộ từ `/v3/api-docs` hiện tại.
+Tài liệu này dùng để test thủ công API AITASKER trên Swagger UI. Danh sách endpoint đã được đồng bộ từ controller source hiện tại và static OpenAPI snapshot.
 
-## 1. Chuẩn Bị
+## 1. Chuẩn bị
 
-Chạy hạ tầng và back-end:
 ```powershell
 docker compose up -d
 .\mvnw.cmd spring-boot:run
 ```
-Mở Swagger:
-```text
-http://localhost:8080/swagger-ui.html
-```
-Với API cần đăng nhập: gọi `POST /api/auth/login`, copy `accessToken`, bấm `Authorize`, dán **chỉ accessToken** vào ô token. Không tự thêm chữ `Bearer` vì Swagger sẽ tự gắn prefix này.
-Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Execute`; không tự nhập `Content-Type`.
 
-## 2. Tài Khoản Seed Thường Dùng
+Swagger UI: `http://localhost:8080/swagger-ui.html`. Với API cần đăng nhập, gọi `POST /api/auth/login`, copy `accessToken`, bấm `Authorize`, dán **chỉ accessToken** vào ô token. Không tự thêm chữ `Bearer`.
+
+## 2. Tài khoản seed thường dùng
 
 | Role | Email | Mật khẩu |
 | --- | --- | --- |
@@ -25,193 +20,43 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 | ADMIN | `admin@aitasker.local` | `12345678` |
 | STAFF | `staff@aitasker.local` | `12345678` |
 
-## 3. Danh Sách API Theo Swagger
+## 3. Thứ tự test khuyến nghị
 
-### admin-controller
+1. Kiểm tra health và đăng nhập để lấy token cho từng role.
+2. Test KYB/KYC và profile để có business/expert hợp lệ.
+3. Test catalog, tạo job draft, publish job, expert gửi proposal, business duyệt proposal.
+4. Tạo contract từ proposal, ký contract/NDA, chuẩn bị wallet, trả deposit, tạo/hoàn tất milestone.
+5. Test membership, credit, quota, wallet transaction, withdrawal và admin vận hành.
 
-#### 1. DELETE /api/v1/admin/accounts/{accountId}
+## 4. Danh sách API test theo luồng
 
-- Mục đích: Xóa, khóa hoặc vô hiệu hóa dữ liệu theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
+### Auth, OTP và session
 
-#### 2. GET /api/v1/admin/staffs
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | GET | `/api/auth/check-email` | auth-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 2 | GET | `/api/auth/me` | auth-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 3 | POST | `/api/auth/google/login` | auth-controller | Không cần token; Public | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 4 | POST | `/api/auth/google/register` | auth-controller | Không cần token; Public | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 5 | POST | `/api/auth/login` | auth-controller | Không cần token; Public | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 6 | POST | `/api/auth/register` | auth-controller | Không cần token; Public | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 7 | POST | `/api/auth/email/send-otp` | email-otp-controller | Không cần token; Public | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 8 | POST | `/api/auth/email/verify-otp` | email-otp-controller | Không cần token; Public | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 9 | GET | `/api/auth/tax-check/{mst}` | tax-check-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
+Body mẫu hay dùng trong luồng này:
 
-#### 3. GET /api/v1/admin/accounts
+**POST `/api/auth/login`**
 
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 4. GET /api/v1/admin/wallet
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 5. GET /api/v1/admin/settings
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 6. GET /api/v1/admin/reviews/contracts/{contractId}
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 7. GET /api/v1/admin/audit-logs
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 8. GET /api/v1/admin/analytics/overview
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 9. PATCH /api/v1/admin/staffs/{staffId}
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
 ```json
 {
-  "accountId": 4,
-  "specialization": "KYB"
+  "email": "admin@aitasker.local",
+  "password": "12345678"
 }
 ```
 
-#### 10. PATCH /api/v1/admin/settings/{key}
+**POST `/api/auth/register`**
 
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 11. PATCH /api/v1/admin/accounts/{accountId}
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "email": "staff2@aitasker.local",
-  "phone": "0900000003",
-  "fullName": "Staff Two Updated",
-  "role": "STAFF",
-  "status": "Approved",
-  "specialization": "KYB"
-}
-```
-
-#### 12. PATCH /api/v1/admin/accounts/{accountId}/status
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 13. PATCH /api/v1/admin/accounts/{accountId}/active
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 14. POST /api/v1/admin/wallet/sync
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 15. POST /api/v1/admin/staffs
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "accountId": 4,
-  "specialization": "KYC"
-}
-```
-
-#### 16. POST /api/v1/admin/reviews
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "contractId": 1,
-  "reviewerId": 1,
-  "revieweeId": 2,
-  "rating": 4.5,
-  "comment": "Hoàn thành đúng phạm vi."
-}
-```
-
-#### 17. POST /api/v1/admin/accounts
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Quản lý admin, account, staff, setting, audit log và ví hệ thống.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "email": "staff2@aitasker.local",
-  "password": "12345678",
-  "phone": "0900000002",
-  "fullName": "Staff Two",
-  "role": "STAFF",
-  "status": "Approved",
-  "specialization": "KYC"
-}
-```
-
-### auth-controller
-
-#### 18. GET /api/auth/me
-
-- Mục đích: Lấy thông tin của account đang đăng nhập.
-- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 19. GET /api/auth/check-email
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
-- Token: Không cần token.
-- Body: Không có.
-
-#### 20. POST /api/auth/register
-
-- Mục đích: Đăng ký tài khoản sau khi email đã xác thực OTP.
-- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
-- Token: Không cần token.
-- Body raw mẫu:
 ```json
 {
   "email": "expert.manual@example.com",
@@ -222,471 +67,16 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 }
 ```
 
-#### 21. POST /api/auth/login
+**POST `/api/auth/email/send-otp`**
 
-- Mục đích: Đăng nhập và nhận accessToken/refreshToken.
-- Phục vụ: Xác thực, đăng nhập, đăng ký và session.
-- Token: Không cần token.
-- Body raw mẫu:
 ```json
 {
-  "email": "admin@aitasker.local",
-  "password": "12345678"
+  "email": "expert.manual@example.com"
 }
 ```
 
-### catalog-controller
+**POST `/api/auth/email/verify-otp`**
 
-#### 22. GET /api/v1/jobs/{jobId}/technologies
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 23. GET /api/v1/jobs/{jobId}/skills
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 24. GET /api/v1/jobs/{jobId}/domains
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 25. GET /api/v1/technologies
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 26. GET /api/v1/skills
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 27. GET /api/v1/domains
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 28. GET /api/v1/acceptance-criteria
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 29. PATCH /api/v1/technologies/{technologyId}
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "technologyCode": "REACT_TS",
-  "technologyName": "React TypeScript",
-  "description": "Công nghệ frontend dùng React và TypeScript.",
-  "isActive": true,
-  "sortOrder": 1
-}
-```
-
-#### 30. PATCH /api/v1/skills/{skillId}
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "skillCode": "RAG_ARCH",
-  "skillName": "RAG Architecture",
-  "description": "Thiết kế retrieval, chunking, embedding và evaluation cho RAG.",
-  "isActive": true
-}
-```
-
-#### 31. PATCH /api/v1/domains/{domainId}
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "domainCode": "AI_PRODUCT",
-  "domainName": "AI Product Strategy",
-  "description": "Discovery, feasibility, roadmap và outcome sản phẩm AI.",
-  "isActive": true,
-  "sortOrder": 1
-}
-```
-
-#### 32. POST /api/v1/technologies
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "technologyCode": "REACT_TS",
-  "technologyName": "React TypeScript",
-  "description": "Công nghệ frontend dùng React và TypeScript.",
-  "isActive": true,
-  "sortOrder": 1
-}
-```
-
-#### 33. POST /api/v1/skills
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "skillCode": "RAG_ARCH",
-  "skillName": "RAG Architecture",
-  "description": "Thiết kế retrieval, chunking, embedding và evaluation cho RAG.",
-  "isActive": true
-}
-```
-
-#### 34. POST /api/v1/domains
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "domainCode": "AI_PRODUCT",
-  "domainName": "AI Product Strategy",
-  "description": "Discovery, feasibility, roadmap và outcome sản phẩm AI.",
-  "isActive": true,
-  "sortOrder": 1
-}
-```
-
-#### 35. PUT /api/v1/jobs/{jobId}/technologies
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-[
-  1,
-  2,
-  3
-]
-```
-
-#### 36. PUT /api/v1/jobs/{jobId}/skills
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-[
-  {
-    "skillId": 2,
-    "isMandatory": true
-  },
-  {
-    "skillId": 3,
-    "isMandatory": false
-  }
-]
-```
-
-#### 37. PUT /api/v1/jobs/{jobId}/domains
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-[
-  2,
-  3
-]
-```
-
-### chatbot-controller
-
-#### 38. POST /api/chatbot/ask
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Chatbot hỗ trợ người dùng.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "question": "Tôi cần hướng dẫn tạo hồ sơ doanh nghiệp"
-}
-```
-
-### contract-execution-controller
-
-#### 39. GET /api/v1/milestones/{milestoneId}/transactions
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 40. GET /api/v1/milestones/{milestoneId}/deliverables
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 41. GET /api/v1/milestones/{milestoneId}/criteria
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 42. GET /api/v1/jobs/{jobId}/milestones
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 43. GET /api/v1/jobs/{jobId}/matching
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 44. GET /api/v1/disputes/{disputeId}
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 45. GET /api/v1/contracts
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 46. GET /api/v1/contracts/{contractId}
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 47. GET /api/v1/contracts/{contractId}/milestones
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 48. GET /api/v1/contracts/{contractId}/disputes
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 49. PATCH /api/v1/transactions/{transactionId}/status
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 50. PATCH /api/v1/disputes/{disputeId}/resolve
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 51. PATCH /api/v1/disputes/{disputeId}/assign
-
-- Mục đích: Cập nhật một phần dữ liệu theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 52. POST /api/v1/transactions
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "milestoneId": 1,
-  "amount": 30000000,
-  "commissionFee": 3000000,
-  "transactionType": "ESCROW",
-  "status": "Pending"
-}
-```
-
-#### 53. POST /api/v1/transactions/{transactionId}/webhook
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 54. POST /api/v1/milestones
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "jobId": 1,
-  "milestoneName": "Kiểm thử nghiệm thu",
-  "description": "Kiểm thử UAT và hoàn thiện tài liệu.",
-  "fundsAllocated": 20000000,
-  "orderIndex": 3,
-  "status": "Pending",
-  "criteriaIds": [
-    1,
-    2
-  ]
-}
-```
-
-#### 55. POST /api/v1/milestones/sla-auto-approve
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 56. POST /api/v1/disputes
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "contractId": 1,
-  "milestoneId": 1,
-  "evidenceReport": "Deliverable chưa đạt tiêu chí nghiệm thu.",
-  "proposedAction": "Yêu cầu chỉnh sửa trong 3 ngày.",
-  "status": "Open"
-}
-```
-
-#### 57. POST /api/v1/disputes/{disputeId}/technical-report
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 58. POST /api/v1/disputes/{disputeId}/demo-testing
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 59. POST /api/v1/deliverables
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "milestoneId": 1,
-  "sourceCodeUrl": "https://github.com/example/repo",
-  "demoLink": "https://demo.example.com",
-  "submissionNotes": "Đã nộp source code, demo và tài liệu cài đặt."
-}
-```
-
-#### 60. POST /api/v1/criteria
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "criteriaCode": "RAG_ANSWER_QUALITY",
-  "description": "Chatbot trả lời đúng tối thiểu 80% bộ câu hỏi kiểm thử.",
-  "isActive": true,
-  "sortOrder": 1
-}
-```
-
-#### 61. POST /api/v1/contracts/{contractId}/terminate
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 62. POST /api/v1/contracts/{contractId}/sign
-
-- Mục đích: Ký xác nhận hợp đồng hoặc NDA.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 63. POST /api/v1/contracts/{contractId}/nda-sign
-
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 64. POST /api/v1/contracts/from-proposals/{proposalId}
-
-- Mục đích: Tạo hợp đồng nháp từ proposal đã được chấp nhận.
-- Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "contractTitle": "Hợp đồng triển khai RAG chatbot",
-  "timelineDays": 45
-}
-```
-
-
-### email-otp-controller
-
-#### 66. POST /api/auth/email/verify-otp
-
-- Mục đích: Xác thực OTP email.
-- Phục vụ: Gửi và xác thực OTP email.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
 ```json
 {
   "email": "expert.manual@example.com",
@@ -694,272 +84,199 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 }
 ```
 
-#### 67. POST /api/auth/email/send-otp
+### KYB/KYC, profile và file
 
-- Mục đích: Gửi OTP xác thực email.
-- Phục vụ: Gửi và xác thực OTP email.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10 | GET | `/api/v1/profiles/business` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 11 | GET | `/api/v1/profiles/business/by-job/{jobId}` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 12 | GET | `/api/v1/profiles/business/me` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 13 | GET | `/api/v1/profiles/business/{businessId}` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 14 | GET | `/api/v1/profiles/expert` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 15 | GET | `/api/v1/profiles/expert/me` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 16 | GET | `/api/v1/profiles/expert/{expertId}` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 17 | GET | `/api/v1/profiles/files/view-url` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 18 | GET | `/api/v1/profiles/portfolio` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 19 | GET | `/api/v1/profiles/portfolio/me` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 20 | POST | `/api/v1/profiles/approve/{type}/{id}` | profile-controller | Cần Bearer JWT; STAFF/ADMIN | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 21 | POST | `/api/v1/profiles/business` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 22 | POST | `/api/v1/profiles/business/license-file` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | form-data key `file` | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 23 | POST | `/api/v1/profiles/expert` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 24 | POST | `/api/v1/profiles/portfolio` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 25 | POST | `/api/v1/profiles/portfolio/certificate-file` | profile-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | form-data key `file` | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+
+### Catalog job metadata
+
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 26 | GET | `/api/v1/acceptance-criteria` | catalog-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 27 | GET | `/api/v1/domains` | catalog-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 28 | GET | `/api/v1/jobs/{jobId}/domains` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 29 | GET | `/api/v1/jobs/{jobId}/skills` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 30 | GET | `/api/v1/jobs/{jobId}/technologies` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 31 | GET | `/api/v1/skills` | catalog-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 32 | GET | `/api/v1/technologies` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 33 | POST | `/api/v1/domains` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 34 | POST | `/api/v1/skills` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 35 | POST | `/api/v1/technologies` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 36 | PUT | `/api/v1/jobs/{jobId}/domains` | catalog-controller | Cần Bearer JWT; BUSINESS | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 37 | PUT | `/api/v1/jobs/{jobId}/skills` | catalog-controller | Cần Bearer JWT; BUSINESS | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 38 | PUT | `/api/v1/jobs/{jobId}/technologies` | catalog-controller | Cần Bearer JWT; BUSINESS | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 39 | PATCH | `/api/v1/domains/{domainId}` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 40 | PATCH | `/api/v1/skills/{skillId}` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 41 | PATCH | `/api/v1/technologies/{technologyId}` | catalog-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+
+### Marketplace job và proposal
+
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 42 | GET | `/api/v1/jobs/{jobId}/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 43 | GET | `/api/v1/jobs` | marketplace-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 44 | GET | `/api/v1/jobs/my` | marketplace-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 45 | GET | `/api/v1/jobs/{jobId}` | marketplace-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 46 | GET | `/api/v1/jobs/{jobId}/proposals` | marketplace-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 47 | GET | `/api/v1/proposals/my` | marketplace-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 48 | POST | `/api/v1/jobs` | marketplace-controller | Cần Bearer JWT; BUSINESS | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 49 | POST | `/api/v1/jobs/{jobId}/publish` | marketplace-controller | Cần Bearer JWT; BUSINESS | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 50 | POST | `/api/v1/proposals` | marketplace-controller | Cần Bearer JWT; EXPERT | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 51 | POST | `/api/v1/proposals/file` | marketplace-controller | Cần Bearer JWT; EXPERT | form-data key `file` | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 52 | PATCH | `/api/v1/jobs/{jobId}/status` | marketplace-controller | Cần Bearer JWT; BUSINESS | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 53 | PATCH | `/api/v1/proposals/{proposalId}/status` | marketplace-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+
+Body mẫu hay dùng trong luồng này:
+
+**POST `/api/v1/jobs`**
+
 ```json
 {
-  "email": "expert.manual@example.com"
-}
-```
-
-### Expert Candidates
-
-#### 68. GET /api/jobs/{jobPostingId}/expert-candidates
-
-- Mục đích: Lấy danh sách ứng viên chuyên gia phù hợp với job.
-- Phục vụ: AI đề xuất và lọc chuyên gia phù hợp với job.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-### Expert Recommendations
-
-#### 69. GET /api/jobs/{jobPostingId}/expert-recommendations
-
-- Mục đích: Sinh hoặc xem danh sách chuyên gia AI đề xuất cho job.
-- Phục vụ: AI đề xuất và lọc chuyên gia phù hợp với job.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 70. POST /api/jobs/{jobPostingId}/expert-recommendations
-
-- Mục đích: Sinh hoặc xem danh sách chuyên gia AI đề xuất cho job.
-- Phục vụ: AI đề xuất và lọc chuyên gia phù hợp với job.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-### health-controller
-
-#### 71. GET /api/health
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Kiểm tra trạng thái backend.
-- Token: Không cần token.
-- Body: Không có.
-
-### marketplace-controller
-
-#### 72. GET /api/v1/jobs
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 73. GET /api/v1/proposals/my
-
-- Mục đích: Gửi, xem hoặc duyệt proposal.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 74. GET /api/v1/jobs/{jobId}
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 75. GET /api/v1/jobs/{jobId}/proposals
-
-- Mục đích: Gửi, xem hoặc duyệt proposal.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 76. GET /api/v1/jobs/my
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 77. PATCH /api/v1/proposals/{proposalId}/status
-
-- Mục đích: Gửi, xem hoặc duyệt proposal.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 78. PATCH /api/v1/jobs/{jobId}/status
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 79. POST /api/v1/proposals
-
-- Mục đích: Gửi, xem hoặc duyệt proposal.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "jobId": 1,
-  "technicalSolution": "Triển khai RAG với embedding, vector search, backend Spring Boot và frontend React.",
-  "proposalDescription": "Chia dự án thành 2 giai đoạn, ưu tiên dữ liệu FAQ và đánh giá chất lượng câu trả lời.",
-  "proposalFileUrl": "proposal-files/experts/1/example.pdf",
-  "bidAmount": 90000000,
-  "proposalMilestone": [
-    {
-      "milestoneId": 1,
-      "proposedBudget": 30000000
-    },
-    {
-      "milestoneId": 2,
-      "proposedBudget": 60000000
-    }
-  ]
-}
-```
-
-#### 80. POST /api/v1/proposals/file
-
-- Mục đích: Upload file hoặc lấy URL xem file.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body form-data: key `file`, type `File`, chọn file cần upload.
-
-#### 81. POST /api/v1/jobs
-
-- Mục đích: Xem, tạo hoặc cập nhật dữ liệu job.
-- Phục vụ: Luồng job posting, job public, proposal và review proposal.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "title": "Tích hợp RAG chatbot cho chăm sóc khách hàng",
-  "rawRequirements": "Cần chatbot trả lời câu hỏi sản phẩm, lấy dữ liệu từ FAQ và chuyển lead cho nhân viên.",
-  "structuredSow": "Triển khai RAG chatbot, dashboard quản trị nội dung và API tích hợp CRM.",
+  "title": "Tích hợp RAG chatbot",
+  "rawRequirements": "Chatbot trả lời FAQ và chuyển lead.",
+  "structuredSow": "Xây dựng RAG chatbot và dashboard quản trị.",
   "budget": 90000000,
   "plannedDurationValue": 6,
   "plannedDurationUnit": "WEEK",
-  "domainIds": [
-    2,
-    3
-  ],
-  "skills": [
-    {
-      "skillId": 2,
-      "isMandatory": true
-    },
-    {
-      "skillId": 3,
-      "isMandatory": false
-    }
-  ],
-  "technologyIds": [
-    1,
-    2
-  ],
-  "milestones": [
-    {
-      "milestoneName": "Phân tích yêu cầu và thiết kế RAG",
-      "description": "Khảo sát FAQ, thiết kế luồng dữ liệu và kiến trúc retrieval.",
-      "fundsAllocated": 30000000,
-      "orderIndex": 1,
-      "criteriaIds": [
-        1,
-        2
-      ]
-    },
-    {
-      "milestoneName": "Triển khai chatbot và bàn giao",
-      "description": "Xây dựng API, giao diện chat, kiểm thử và tài liệu bàn giao.",
-      "fundsAllocated": 60000000,
-      "orderIndex": 2,
-      "criteriaIds": [
-        3,
-        4
-      ]
-    }
-  ]
+  "domainIds": [2, 3],
+  "skills": [{"skillId": 2, "isMandatory": true}],
+  "technologyIds": [1, 2]
 }
 ```
 
-### notification-controller
+**POST `/api/v1/proposals`**
 
-#### 82. GET /api/v1/notifications
-
-- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
-- Phục vụ: Thông báo realtime và trạng thái đã đọc.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 83. GET /api/v1/notifications/unread-count
-
-- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
-- Phục vụ: Thông báo realtime và trạng thái đã đọc.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 84. PATCH /api/v1/notifications/{notificationId}/read
-
-- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
-- Phục vụ: Thông báo realtime và trạng thái đã đọc.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 85. PATCH /api/v1/notifications/read-all
-
-- Mục đích: Lấy hoặc cập nhật trạng thái thông báo.
-- Phục vụ: Thông báo realtime và trạng thái đã đọc.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-### pay-os-payment-controller
-
-#### 86. GET /api/payments/payos/return
-
-- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
-- Phục vụ: Thanh toán PayOS và nạp ví.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 87. POST /api/payments/payos/{orderCode}/sync
-
-- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
-- Phục vụ: Thanh toán PayOS và nạp ví.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 88. POST /api/payments/payos/webhook
-
-- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
-- Phục vụ: Thanh toán PayOS và nạp ví.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
 ```json
 {
-  "code": "00",
-  "desc": "success",
-  "success": true,
-  "data": {
-    "orderCode": 123456,
-    "amount": 50000,
-    "description": "Nạp ví AITASKER",
-    "accountNumber": "123456789",
-    "reference": "PAYOS_REF",
-    "transactionDateTime": "2026-06-18 10:00:00",
-    "currency": "VND",
-    "paymentLinkId": "link-id",
-    "code": "00",
-    "desc": "success"
-  },
-  "signature": "test-signature"
+  "jobId": 1,
+  "technicalSolution": "Triển khai RAG, backend Spring Boot và frontend React.",
+  "proposalDescription": "Chia dự án thành 2 giai đoạn.",
+  "proposalFileUrl": "proposal-files/experts/1/example.pdf",
+  "bidAmount": 90000000
 }
 ```
 
-#### 89. POST /api/payments/payos/create
+### AI hỗ trợ job và matching
 
-- Mục đích: Tạo, đồng bộ hoặc nhận callback thanh toán.
-- Phục vụ: Thanh toán PayOS và nạp ví.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 54 | POST | `/api/chatbot/ask` | chatbot-controller | Không cần token; Public | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 55 | GET | `/api/v1/jobs/{jobId}/matching` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 56 | GET | `/api/jobs/{jobPostingId}/expert-candidates` | Expert Candidates | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 57 | GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Expert Recommendations | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 58 | POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Expert Recommendations | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 59 | POST | `/api/jobs/generate-sow` | SoW Generation | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+
+Body mẫu hay dùng trong luồng này:
+
+**POST `/api/jobs/generate-sow`**
+
+```json
+{
+  "projectTitle": "Tích hợp RAG chatbot",
+  "rawRequirement": "Cần chatbot trả lời FAQ.",
+  "budget": 90000000,
+  "duration": 6,
+  "durationUnit": "WEEK",
+  "supportFields": ["E-commerce"],
+  "requiredSkills": ["RAG Architecture"]
+}
+```
+
+### Contract, milestone, deliverable và dispute
+
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 60 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 61 | GET | `/api/v1/contracts` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 62 | GET | `/api/v1/contracts/{contractId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 63 | GET | `/api/v1/contracts/{contractId}/disputes` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 64 | GET | `/api/v1/contracts/{contractId}/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 65 | GET | `/api/v1/disputes/{disputeId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 66 | GET | `/api/v1/milestones/{milestoneId}/criteria` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 67 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 68 | GET | `/api/v1/milestones/{milestoneId}/transactions` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 69 | POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | contract-execution-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 70 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 71 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 72 | POST | `/api/v1/contracts/{contractId}/nda-sign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 73 | POST | `/api/v1/contracts/{contractId}/reject` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 74 | POST | `/api/v1/contracts/{contractId}/sign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 75 | POST | `/api/v1/contracts/{contractId}/terminate` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 76 | POST | `/api/v1/criteria` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 77 | POST | `/api/v1/deliverables` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 78 | POST | `/api/v1/disputes` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 79 | POST | `/api/v1/disputes/{disputeId}/demo-testing` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 80 | POST | `/api/v1/disputes/{disputeId}/technical-report` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 81 | POST | `/api/v1/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 82 | POST | `/api/v1/milestones/sla-auto-approve` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 83 | POST | `/api/v1/milestones/{milestoneId}/complete` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 84 | PATCH | `/api/v1/disputes/{disputeId}/assign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 85 | PATCH | `/api/v1/disputes/{disputeId}/resolve` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+
+### Payment, wallet, membership, quota và withdrawal
+
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 86 | GET | `/api/v1/admin/wallet` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 87 | POST | `/api/v1/admin/wallet/sync` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 88 | POST | `/api/v1/transactions` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 89 | POST | `/api/v1/transactions/{transactionId}/webhook` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 90 | PATCH | `/api/v1/transactions/{transactionId}/status` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 91 | POST | `/api/credits/job-post/purchase` | credit-controller | Cần Bearer JWT; BUSINESS | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 92 | POST | `/api/credits/proposal/purchase` | credit-controller | Cần Bearer JWT; EXPERT | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 93 | GET | `/api/membership/packages` | membership-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 94 | POST | `/api/membership/packages/{packageId}/purchase` | membership-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 95 | GET | `/api/payments/payos/return` | pay-o-s-payment-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 96 | POST | `/api/payments/payos/create` | pay-o-s-payment-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 97 | POST | `/api/payments/payos/{orderCode}/sync` | pay-o-s-payment-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 98 | GET | `/api/users/me/quota` | user-quota-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 99 | GET | `/api/wallet/current` | wallet-api-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 100 | GET | `/api/wallet/transactions` | wallet-api-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 101 | GET | `/api/v1/wallet/me` | wallet-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 102 | GET | `/api/v1/admin/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 103 | GET | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 104 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 105 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 106 | POST | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+
+Body mẫu hay dùng trong luồng này:
+
+**POST `/api/credits/job-post/purchase`**
+
+```json
+{
+  "quantity": 5
+}
+```
+
+**POST `/api/credits/proposal/purchase`**
+
+```json
+{
+  "quantity": 5
+}
+```
+
+**POST `/api/payments/payos/create`**
+
 ```json
 {
   "amount": 50000,
@@ -967,196 +284,78 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 }
 ```
 
-### profile-controller
+**POST `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve`**
 
-#### 90. GET /api/v1/profiles/portfolio
-
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 91. GET /api/v1/profiles/expert
-
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 92. GET /api/v1/profiles/business
-
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 93. GET /api/v1/profiles/business/{businessId}
-
-- Mục đích: Lấy thông tin business profile theo ID để xem trang cá nhân doanh nghiệp.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 94. GET /api/v1/profiles/expert/{expertId}
-
-- Mục đích: Lấy thông tin expert profile theo ID để xem trang cá nhân chuyên gia.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 95. GET /api/v1/profiles/portfolio/me
-
-- Mục đích: Lấy thông tin của account đang đăng nhập.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 96. GET /api/v1/profiles/files/view-url
-
-- Mục đích: Upload file hoặc lấy URL xem file.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 97. GET /api/v1/profiles/expert/me
-
-- Mục đích: Lấy thông tin của account đang đăng nhập.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 98. GET /api/v1/profiles/business/me
-
-- Mục đích: Lấy thông tin của account đang đăng nhập.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 99. GET /api/v1/profiles/business/by-job/{jobId}
-
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-#### 100. POST /api/v1/profiles/portfolio
-
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
 ```json
 {
-  "domainIds": "2,3",
-  "skillIds": "2,3,6",
-  "technologyIds": "1,2,3",
-  "yearsExperience": 5,
-  "certificates": "expert-certificates/accounts/2/certificate-demo.pdf",
-  "selfDescription": "Tôi có kinh nghiệm triển khai RAG, backend Spring Boot và frontend React."
+  "adminNote": "Đã chuyển khoản thủ công",
+  "bankTxCode": "BANK-TX-001"
 }
 ```
 
-#### 101. POST /api/v1/profiles/portfolio/certificate-file
+**POST `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject`**
 
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body form-data: key `file`, type `File`, chọn file cần upload.
-
-#### 102. POST /api/v1/profiles/expert
-
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
 ```json
 {
-  "nationalId": "079201000001",
-  "portfolioUrl": "https://portfolio.example.com/expert-ai",
-  "yearsOfExperience": 5,
-  "title": "AI Engineer"
+  "adminNote": "Thông tin tài khoản ngân hàng không hợp lệ"
 }
 ```
 
-#### 103. POST /api/v1/profiles/business
+**POST `/api/v1/withdrawal-requests`**
 
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
 ```json
 {
-  "taxCode": "0312345678",
-  "companyName": "Nova Retail",
-  "address": "Quận 1, TP. Hồ Chí Minh",
-  "businessLicenseUrl": "business-licenses/accounts/1/license-demo.pdf"
+  "amount": 100000,
+  "bankName": "VCB",
+  "bankAccountNumber": "0123456789",
+  "bankAccountName": "AITASKER USER"
 }
 ```
 
-#### 104. POST /api/v1/profiles/business/license-file
+### Admin vận hành hệ thống
 
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body form-data: key `file`, type `File`, chọn file cần upload.
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 107 | GET | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 108 | GET | `/api/v1/admin/analytics/overview` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 109 | GET | `/api/v1/admin/audit-logs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 110 | GET | `/api/v1/admin/settings` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 111 | GET | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 112 | POST | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 113 | POST | `/api/v1/admin/reviews` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 114 | POST | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 115 | PATCH | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 116 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 117 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 118 | PATCH | `/api/v1/admin/settings/{key}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 119 | PATCH | `/api/v1/admin/staffs/{staffId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 120 | DELETE | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
-#### 105. POST /api/v1/profiles/approve/{type}/{id}
+### Notification
 
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
-- Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 121 | GET | `/api/v1/notifications` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 122 | GET | `/api/v1/notifications/unread-count` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 123 | PATCH | `/api/v1/notifications/read-all` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 124 | PATCH | `/api/v1/notifications/{notificationId}/read` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
-### SoW Generation
+### Dev/Test và health check
 
-#### 106. POST /api/jobs/generate-sow
+| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
+| --- | --- | --- | --- | --- | --- | --- |
+| 125 | GET | `/api/health` | health-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 126 | GET | `/api/test/secure` | test-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
-- Mục đích: AI sinh SoW, milestone gợi ý và cấu trúc dự án.
-- Phục vụ: AI generate SoW, milestone gợi ý và cấu trúc dự án.
-- Token: Cần Bearer token theo role phù hợp.
-- Body raw mẫu:
-```json
-{
-  "projectTitle": "Tích hợp RAG chatbot cho chăm sóc khách hàng",
-  "rawRequirement": "Cần chatbot trả lời câu hỏi sản phẩm, lấy dữ liệu từ FAQ và chuyển lead cho nhân viên.",
-  "budget": 90000000,
-  "duration": 6,
-  "durationUnit": "WEEK",
-  "supportFields": [
-    "E-commerce",
-    "Customer Support"
-  ],
-  "requiredSkills": [
-    "RAG Architecture",
-    "React TypeScript",
-    "Java Spring Boot"
-  ]
-}
-```
+## 5. Lưu ý payment/contract flow
 
-### tax-check-controller
+- PayOS top-up hiện không dùng public webhook endpoint trong controller. Test tạo order bằng `POST /api/payments/payos/create`, sau đó dùng return hoặc sync theo `orderCode`.
+- Membership/credit/deposit/withdrawal dùng wallet hiện tại, nên cần chuẩn bị số dư phù hợp.
+- `GET /api/users/me/quota` là nguồn chính để frontend đọc quota, active package và premium entitlement.
+- Contract chỉ ACTIVE sau khi đủ chữ ký contract, đủ NDA và business trả deposit thành công.
 
-#### 107. GET /api/auth/tax-check/{mst}
+## 6. Kiểm tra sau khi chạy
 
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Kiểm tra mã số thuế.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-### test-controller
-
-#### 108. GET /api/test/secure
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: API kiểm thử bảo mật trong môi trường dev.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
-### wallet-controller
-
-#### 109. GET /api/v1/wallet/me
-
-- Mục đích: Lấy thông tin của account đang đăng nhập.
-- Phục vụ: Ví của người dùng.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
+- Với API tạo/cập nhật, gọi lại API GET tương ứng để xác nhận dữ liệu đã đổi.
+- Với API finance, kiểm tra thêm `GET /api/wallet/current`, `GET /api/wallet/transactions`, `GET /api/users/me/quota` hoặc admin wallet tùy flow.
+- Với notification, sau hành động nghiệp vụ chính hãy kiểm tra `GET /api/v1/notifications` và `GET /api/v1/notifications/unread-count`.

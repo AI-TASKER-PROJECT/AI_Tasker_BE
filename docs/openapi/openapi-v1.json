@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AITASKER Backend API",
-    "description": "Interactive API documentation for the AITASKER backend.",
+    "description": "Static OpenAPI snapshot synchronized from current Spring REST controllers. Swagger UI runtime is available at /swagger-ui.html.",
     "version": "v1"
   },
   "servers": [
@@ -28,18 +28,196 @@
     {
       "name": "Expert Recommendations",
       "description": "Generate and read saved AI expert recommendations for jobs"
+    },
+    {
+      "name": "admin-controller",
+      "description": "admin-controller"
+    },
+    {
+      "name": "auth-controller",
+      "description": "auth-controller"
+    },
+    {
+      "name": "catalog-controller",
+      "description": "catalog-controller"
+    },
+    {
+      "name": "chatbot-controller",
+      "description": "chatbot-controller"
+    },
+    {
+      "name": "contract-execution-controller",
+      "description": "contract-execution-controller"
+    },
+    {
+      "name": "credit-controller",
+      "description": "credit-controller"
+    },
+    {
+      "name": "email-otp-controller",
+      "description": "email-otp-controller"
+    },
+    {
+      "name": "health-controller",
+      "description": "health-controller"
+    },
+    {
+      "name": "marketplace-controller",
+      "description": "marketplace-controller"
+    },
+    {
+      "name": "membership-controller",
+      "description": "membership-controller"
+    },
+    {
+      "name": "notification-controller",
+      "description": "notification-controller"
+    },
+    {
+      "name": "pay-o-s-payment-controller",
+      "description": "pay-o-s-payment-controller"
+    },
+    {
+      "name": "profile-controller",
+      "description": "profile-controller"
+    },
+    {
+      "name": "tax-check-controller",
+      "description": "tax-check-controller"
+    },
+    {
+      "name": "test-controller",
+      "description": "test-controller"
+    },
+    {
+      "name": "user-quota-controller",
+      "description": "user-quota-controller"
+    },
+    {
+      "name": "wallet-api-controller",
+      "description": "wallet-api-controller"
+    },
+    {
+      "name": "wallet-controller",
+      "description": "wallet-controller"
+    },
+    {
+      "name": "withdrawal-controller",
+      "description": "withdrawal-controller"
     }
   ],
   "paths": {
-    "/api/v1/jobs/{jobId}/technologies": {
+    "/api/v1/admin/accounts": {
       "get": {
         "tags": [
-          "catalog-controller"
+          "admin-controller"
         ],
-        "operationId": "listJobTechnologies",
+        "operationId": "listAccounts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý account hệ thống."
+      },
+      "post": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "createAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý account hệ thống."
+      }
+    },
+    "/api/v1/admin/analytics/overview": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "analyticsOverview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Xem dashboard analytics."
+      }
+    },
+    "/api/v1/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listAuditLogs",
         "parameters": [
           {
-            "name": "jobId",
+            "name": "actorGroup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Xem audit logs."
+      }
+    },
+    "/api/v1/admin/reviews/contracts/{contractId}": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listReviewsByContract",
+        "parameters": [
+          {
+            "name": "contractId",
             "in": "path",
             "required": true,
             "schema": {
@@ -59,16 +237,163 @@
               }
             }
           }
-        }
-      },
-      "put": {
+        },
+        "summary": "Tạo hoặc xem review sau contract."
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
         "tags": [
-          "catalog-controller"
+          "admin-controller"
         ],
-        "operationId": "replaceJobTechnologies",
+        "operationId": "listSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý system settings."
+      }
+    },
+    "/api/v1/admin/staffs": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "listStaffs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý staff."
+      },
+      "post": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "createStaff",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStaffResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý staff."
+      }
+    },
+    "/api/v1/admin/wallet": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "systemWallet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/admin/reviews": {
+      "post": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "createReview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo hoặc xem review sau contract."
+      }
+    },
+    "/api/v1/admin/wallet/sync": {
+      "post": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "syncSystemWallet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/admin/accounts/{accountId}": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "updateAccount",
         "parameters": [
           {
-            "name": "jobId",
+            "name": "accountId",
             "in": "path",
             "required": true,
             "schema": {
@@ -81,11 +406,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "type": "integer",
-                  "format": "int32"
-                }
+                "$ref": "#/components/schemas/AccountRequest"
               }
             }
           },
@@ -97,68 +418,345 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
                 }
               }
             }
           }
+        },
+        "summary": "Quản lý account hệ thống."
+      },
+      "delete": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "deactivateAccount",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý account hệ thống."
+      }
+    },
+    "/api/v1/admin/accounts/{accountId}/active": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "setAccountActive",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý account hệ thống."
+      }
+    },
+    "/api/v1/admin/accounts/{accountId}/status": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "setAccountStatus",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý account hệ thống."
+      }
+    },
+    "/api/v1/admin/settings/{key}": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "updateSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "value",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemSettingEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý system settings."
+      }
+    },
+    "/api/v1/admin/staffs/{staffId}": {
+      "patch": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "updateStaff",
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStaffResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quản lý staff."
+      }
+    },
+    "/api/auth/check-email": {
+      "get": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "checkEmail",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Lấy thông tin session hiện tại."
+      }
+    },
+    "/api/auth/google/login": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "summary": "Đăng nhập bằng Google token.",
+        "operationId": "googleLogin",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
         }
       }
     },
-    "/api/v1/jobs/{jobId}/skills": {
-      "get": {
+    "/api/auth/google/register": {
+      "post": {
         "tags": [
-          "catalog-controller"
+          "auth-controller"
         ],
-        "operationId": "listJobSkills",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
+        "summary": "Đăng ký/khởi tạo bằng Google token.",
+        "operationId": "googleRegister",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
+                  "type": "object"
                 }
               }
             }
           }
-        }
-      },
-      "put": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "replaceJobSkills",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
+        },
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/JobSkillAssignmentRequest"
-                }
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
               }
             }
           },
@@ -170,12 +768,139 @@
             "content": {
               "*/*": {
                 "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Đăng nhập và nhận accessToken/refreshToken."
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Đăng ký tài khoản mới."
+      }
+    },
+    "/api/v1/acceptance-criteria": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listAcceptanceCriteria",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
                   "$ref": "#/components/schemas/ApiResponseObject"
                 }
               }
             }
           }
-        }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/domains": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listDomains",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "post": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "createDomain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDomainEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
       }
     },
     "/api/v1/jobs/{jobId}/domains": {
@@ -206,7 +931,8 @@
               }
             }
           }
-        }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
       },
       "put": {
         "tags": [
@@ -249,7 +975,1264 @@
               }
             }
           }
+        },
+        "summary": "Thay thế danh sách/dữ liệu liên quan."
+      }
+    },
+    "/api/v1/jobs/{jobId}/skills": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listJobSkills",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "put": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "replaceJobSkills",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/JobSkillAssignmentRequest"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Thay thế danh sách/dữ liệu liên quan."
+      }
+    },
+    "/api/v1/jobs/{jobId}/technologies": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listJobTechnologies",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "put": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "replaceJobTechnologies",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Thay thế danh sách/dữ liệu liên quan."
+      }
+    },
+    "/api/v1/skills": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listSkills",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "post": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "createSkill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSkillEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/technologies": {
+      "get": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "listTechnologies",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "post": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "createTechnology",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TechnologyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTechnologyEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/domains/{domainId}": {
+      "patch": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "updateDomain",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DomainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDomainEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/v1/skills/{skillId}": {
+      "patch": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "updateSkill",
+        "parameters": [
+          {
+            "name": "skillId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSkillEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/v1/technologies/{technologyId}": {
+      "patch": {
+        "tags": [
+          "catalog-controller"
+        ],
+        "operationId": "updateTechnology",
+        "parameters": [
+          {
+            "name": "technologyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TechnologyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTechnologyEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/chatbot/ask": {
+      "post": {
+        "tags": [
+          "chatbot-controller"
+        ],
+        "operationId": "ask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/contracts": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listContracts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/contracts/{contractId}": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "getContract",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/contracts/{contractId}/disputes": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listDisputes",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/contracts/{contractId}/milestones": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listMilestones",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/disputes/{disputeId}": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "getDispute",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/jobs/{jobId}/matching": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "matching",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/jobs/{jobId}/milestones": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listJobMilestones",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/milestones/{milestoneId}/criteria": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listCriteria",
+        "parameters": [
+          {
+            "name": "milestoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/milestones/{milestoneId}/deliverables": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listDeliverables",
+        "parameters": [
+          {
+            "name": "milestoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/milestones/{milestoneId}/transactions": {
+      "get": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "listTransactions",
+        "parameters": [
+          {
+            "name": "milestoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/admin/contracts/{contractId}/deposit/refund": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "summary": "Admin xử lý hoàn/resolution ký quỹ.",
+        "operationId": "refundContractDeposit",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
         }
+      }
+    },
+    "/api/v1/contracts/from-proposals/{proposalId}": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createDraft",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo contract draft từ proposal accepted."
+      }
+    },
+    "/api/v1/contracts/{contractId}/deposit/pay": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "summary": "Business trả ký quỹ hợp đồng từ wallet.",
+        "operationId": "payContractDeposit",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/contracts/{contractId}/nda-sign": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "signNda",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ký NDA."
+      }
+    },
+    "/api/v1/contracts/{contractId}/reject": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "summary": "Từ chối contract theo flow.",
+        "operationId": "rejectContract",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/contracts/{contractId}/sign": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "signContract",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ký xác nhận contract."
+      }
+    },
+    "/api/v1/contracts/{contractId}/terminate": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "terminate",
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContractEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/criteria": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createCriteria",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptanceCriteriaEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAcceptanceCriteriaEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/deliverables": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "submitDeliverable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverableEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliverableEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/disputes": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createDispute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/disputes/{disputeId}/demo-testing": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "recordDemoTesting",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "testResult",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ghi kết quả demo testing trong dispute."
+      }
+    },
+    "/api/v1/disputes/{disputeId}/technical-report": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "issueTechnicalReport",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "reportContent",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposedAction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ghi báo cáo kỹ thuật cho dispute."
+      }
+    },
+    "/api/v1/milestones": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "createMilestone",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MilestoneEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMilestoneEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/milestones/sla-auto-approve": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "runSlaAutoApprove",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mô phỏng SLA auto approve milestone."
+      }
+    },
+    "/api/v1/milestones/{milestoneId}/complete": {
+      "post": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "summary": "Business nghiệm thu milestone.",
+        "operationId": "completeMilestone",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "milestoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ]
       }
     },
     "/api/v1/transactions": {
@@ -279,7 +2262,8 @@
               }
             }
           }
-        }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
       }
     },
     "/api/v1/transactions/{transactionId}/webhook": {
@@ -334,23 +2318,491 @@
               }
             }
           }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/disputes/{disputeId}/assign": {
+      "patch": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "assignDispute",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "staffId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/v1/disputes/{disputeId}/resolve": {
+      "patch": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "resolveDispute",
+        "parameters": [
+          {
+            "name": "disputeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "proposedAction",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/v1/transactions/{transactionId}/status": {
+      "patch": {
+        "tags": [
+          "contract-execution-controller"
+        ],
+        "operationId": "updateTransactionStatus",
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTransactionEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/credits/job-post/purchase": {
+      "post": {
+        "tags": [
+          "credit-controller"
+        ],
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ.",
+        "operationId": "purchaseJobPostCredits",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
         }
       }
     },
-    "/api/v1/technologies": {
+    "/api/credits/proposal/purchase": {
+      "post": {
+        "tags": [
+          "credit-controller"
+        ],
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ.",
+        "operationId": "purchaseProposalCredits",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        }
+      }
+    },
+    "/api/auth/email/send-otp": {
+      "post": {
+        "tags": [
+          "email-otp-controller"
+        ],
+        "operationId": "sendOtp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSendOtpResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Gửi OTP xác thực email."
+      }
+    },
+    "/api/auth/email/verify-otp": {
+      "post": {
+        "tags": [
+          "email-otp-controller"
+        ],
+        "operationId": "verifyOtp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Xác thực OTP email."
+      }
+    },
+    "/api/jobs/{jobPostingId}/expert-candidates": {
       "get": {
         "tags": [
-          "catalog-controller"
+          "Expert Candidates"
         ],
-        "operationId": "listTechnologies",
+        "summary": "Lấy danh sách expert candidate phù hợp job.",
+        "description": "Extract SoW keywords and rank matching expert portfolios.",
+        "operationId": "findTopCandidates",
         "parameters": [
           {
-            "name": "activeOnly",
-            "in": "query",
-            "required": false,
+            "name": "jobPostingId",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "boolean",
-              "default": false
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpertCandidateSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{jobPostingId}/expert-recommendations": {
+      "get": {
+        "tags": [
+          "Expert Recommendations"
+        ],
+        "summary": "Sinh hoặc xem expert recommendations bằng AI.",
+        "description": "Read saved expert recommendations without calling AI.",
+        "operationId": "getRecommendations",
+        "parameters": [
+          {
+            "name": "jobPostingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertRecommendationListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Expert Recommendations"
+        ],
+        "summary": "Sinh hoặc xem expert recommendations bằng AI.",
+        "description": "Generate and persist Top 5 expert recommendations for a job.",
+        "operationId": "generateRecommendations",
+        "parameters": [
+          {
+            "name": "jobPostingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertRecommendationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health-controller"
+        ],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Kiểm tra backend còn sống."
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "listJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "post": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "createJob",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/jobs/my": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "listMyJobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "jobDetail",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/jobs/{jobId}/proposals": {
+      "get": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "listProposals",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -365,54 +2817,16 @@
               }
             }
           }
-        }
-      },
-      "post": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "createTechnology",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TechnologyRequest"
-              }
-            }
-          },
-          "required": true
         },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseTechnologyEntity"
-                }
-              }
-            }
-          }
-        }
+        "summary": "Xem proposal của job."
       }
     },
-    "/api/v1/skills": {
+    "/api/v1/proposals/my": {
       "get": {
         "tags": [
-          "catalog-controller"
+          "marketplace-controller"
         ],
-        "operationId": "listSkills",
-        "parameters": [
-          {
-            "name": "activeOnly",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          }
-        ],
+        "operationId": "listMyProposals",
         "responses": {
           "200": {
             "description": "OK",
@@ -424,35 +2838,40 @@
               }
             }
           }
-        }
-      },
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/jobs/{jobId}/publish": {
       "post": {
         "tags": [
-          "catalog-controller"
+          "marketplace-controller"
         ],
-        "operationId": "createSkill",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SkillRequest"
-              }
-            }
-          },
-          "required": true
-        },
+        "summary": "Publish job và tiêu thụ job-post credit.",
+        "operationId": "publishJob",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSkillEntity"
+                  "type": "object"
                 }
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ]
       }
     },
     "/api/v1/proposals": {
@@ -482,7 +2901,8 @@
               }
             }
           }
-        }
+        },
+        "summary": "Expert gửi proposal."
       }
     },
     "/api/v1/proposals/file": {
@@ -520,152 +2940,215 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/profiles/portfolio": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "listPortfolio",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "upsertPortfolio",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PortfolioEntity"
-              }
-            }
-          },
-          "required": true
         },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePortfolioEntity"
-                }
-              }
-            }
-          }
-        }
+        "summary": "Upload file proposal."
       }
     },
-    "/api/v1/profiles/portfolio/certificate-file": {
-      "post": {
+    "/api/v1/jobs/{jobId}/status": {
+      "patch": {
         "tags": [
-          "profile-controller"
+          "marketplace-controller"
         ],
-        "operationId": "uploadExpertCertificate",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                },
-                "required": [
-                  "file"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseString"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/profiles/expert": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "listExpert",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "upsertExpert",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExpertProfileEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/profiles/expert/{expertId}": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "getExpertById",
+        "operationId": "updateJobStatus",
         "parameters": [
           {
-            "name": "expertId",
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/v1/proposals/{proposalId}/status": {
+      "patch": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "reviewProposal",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProposalEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Duyệt hoặc từ chối proposal."
+      }
+    },
+    "/api/membership/packages": {
+      "get": {
+        "tags": [
+          "membership-controller"
+        ],
+        "summary": "Xem membership package theo role.",
+        "operationId": "listPackages",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/membership/packages/{packageId}/purchase": {
+      "post": {
+        "tags": [
+          "membership-controller"
+        ],
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ.",
+        "operationId": "purchasePackage",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "packageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "listMine",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy danh sách thông báo."
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "countUnreadMine",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUnreadNotificationCountResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "patch": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "markAllAsRead",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read": {
+      "patch": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "markAsRead",
+        "parameters": [
+          {
+            "name": "notificationId",
             "in": "path",
             "required": true,
             "schema": {
@@ -680,12 +3163,110 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                  "$ref": "#/components/schemas/ApiResponseNotificationResponse"
                 }
               }
             }
           }
-        }
+        },
+        "summary": "Cập nhật một phần dữ liệu hoặc trạng thái."
+      }
+    },
+    "/api/payments/payos/return": {
+      "get": {
+        "tags": [
+          "pay-os-payment-controller"
+        ],
+        "operationId": "handleReturn",
+        "parameters": [
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Nhận return từ PayOS và sync trạng thái."
+      }
+    },
+    "/api/payments/payos/create": {
+      "post": {
+        "tags": [
+          "pay-os-payment-controller"
+        ],
+        "operationId": "createPayment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWalletTopupPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCreatePayOSPaymentResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo payment order PayOS để nạp ví."
+      }
+    },
+    "/api/payments/payos/{orderCode}/sync": {
+      "post": {
+        "tags": [
+          "pay-os-payment-controller"
+        ],
+        "operationId": "syncPaymentStatus",
+        "parameters": [
+          {
+            "name": "orderCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chủ động sync trạng thái PayOS theo order code."
       }
     },
     "/api/v1/profiles/business": {
@@ -705,7 +3286,8 @@
               }
             }
           }
-        }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
       },
       "post": {
         "tags": [
@@ -733,7 +3315,61 @@
               }
             }
           }
-        }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/profiles/business/by-job/{jobId}": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "businessByJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/profiles/business/me": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "myBusiness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
       }
     },
     "/api/v1/profiles/business/{businessId}": {
@@ -764,33 +3400,129 @@
               }
             }
           }
-        }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
       }
     },
-    "/api/v1/profiles/business/license-file": {
-      "post": {
+    "/api/v1/profiles/expert": {
+      "get": {
         "tags": [
           "profile-controller"
         ],
-        "operationId": "uploadBusinessLicense",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                },
-                "required": [
-                  "file"
-                ]
+        "operationId": "listExpert",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
               }
             }
           }
         },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "upsertExpert",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpertProfileEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/profiles/expert/me": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "myExpert",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/profiles/expert/{expertId}": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "getExpertById",
+        "parameters": [
+          {
+            "name": "expertId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/profiles/files/view-url": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "fileViewUrl",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -802,7 +3534,79 @@
               }
             }
           }
-        }
+        },
+        "summary": "Lấy signed URL để xem file."
+      }
+    },
+    "/api/v1/profiles/portfolio": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "listPortfolio",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      },
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "upsertPortfolio",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePortfolioEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
+      }
+    },
+    "/api/v1/profiles/portfolio/me": {
+      "get": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "myPortfolio",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePortfolioEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
       }
     },
     "/api/v1/profiles/approve/{type}/{id}": {
@@ -849,24 +3653,33 @@
               }
             }
           }
-        }
+        },
+        "summary": "Duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT."
       }
     },
-    "/api/v1/milestones": {
+    "/api/v1/profiles/business/license-file": {
       "post": {
         "tags": [
-          "contract-execution-controller"
+          "profile-controller"
         ],
-        "operationId": "createMilestone",
+        "operationId": "uploadBusinessLicense",
         "requestBody": {
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/MilestoneEntity"
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -874,67 +3687,38 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMilestoneEntity"
+                  "$ref": "#/components/schemas/ApiResponseString"
                 }
               }
             }
           }
-        }
+        },
+        "summary": "Upload giấy phép kinh doanh."
       }
     },
-    "/api/v1/milestones/sla-auto-approve": {
+    "/api/v1/profiles/portfolio/certificate-file": {
       "post": {
         "tags": [
-          "contract-execution-controller"
+          "profile-controller"
         ],
-        "operationId": "runSlaAutoApprove",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs": {
-      "get": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "listJobs",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "createJob",
+        "operationId": "uploadExpertCertificate",
         "requestBody": {
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/JobEntity"
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -942,690 +3726,13 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                  "$ref": "#/components/schemas/ApiResponseString"
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/domains": {
-      "get": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "listDomains",
-        "parameters": [
-          {
-            "name": "activeOnly",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "createDomain",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DomainRequest"
-              }
-            }
-          },
-          "required": true
         },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDomainEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/disputes": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "createDispute",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DisputeEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/disputes/{disputeId}/technical-report": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "issueTechnicalReport",
-        "parameters": [
-          {
-            "name": "disputeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "reportContent",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "proposedAction",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/disputes/{disputeId}/demo-testing": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "recordDemoTesting",
-        "parameters": [
-          {
-            "name": "disputeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "testResult",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/deliverables": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "submitDeliverable",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeliverableEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDeliverableEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/criteria": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "createCriteria",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AcceptanceCriteriaEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAcceptanceCriteriaEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts/{contractId}/terminate": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "terminate",
-        "parameters": [
-          {
-            "name": "contractId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "reason",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseContractEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts/{contractId}/sign": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "signContract",
-        "parameters": [
-          {
-            "name": "contractId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseContractEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts/{contractId}/nda-sign": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "signNda",
-        "parameters": [
-          {
-            "name": "contractId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseContractEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts/from-proposals/{proposalId}": {
-      "post": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "createDraft",
-        "parameters": [
-          {
-            "name": "proposalId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ContractEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseContractEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/wallet/sync": {
-      "post": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "syncSystemWallet",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/staffs": {
-      "get": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "listStaffs",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "createStaff",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StaffEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseStaffResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/reviews": {
-      "post": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "createReview",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReviewEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseReviewEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/accounts": {
-      "get": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "listAccounts",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "createAccount",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AccountRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/payments/payos/{orderCode}/sync": {
-      "post": {
-        "tags": [
-          "pay-os-payment-controller"
-        ],
-        "operationId": "syncPaymentStatus",
-        "parameters": [
-          {
-            "name": "orderCode",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/payments/payos/webhook": {
-      "post": {
-        "tags": [
-          "pay-os-payment-controller"
-        ],
-        "operationId": "handleWebhook",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Webhook"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/payments/payos/create": {
-      "post": {
-        "tags": [
-          "pay-os-payment-controller"
-        ],
-        "operationId": "createPayment",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateWalletTopupPaymentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCreatePayOSPaymentResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{jobPostingId}/expert-recommendations": {
-      "get": {
-        "tags": [
-          "Expert Recommendations"
-        ],
-        "summary": "Get saved expert recommendations",
-        "description": "Read saved expert recommendations without calling AI.",
-        "operationId": "getRecommendations",
-        "parameters": [
-          {
-            "name": "jobPostingId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseExpertRecommendationListResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Expert Recommendations"
-        ],
-        "summary": "Generate expert recommendations",
-        "description": "Generate and persist Top 5 expert recommendations for a job.",
-        "operationId": "generateRecommendations",
-        "parameters": [
-          {
-            "name": "jobPostingId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseExpertRecommendationListResponse"
-                }
-              }
-            }
-          }
-        }
+        "summary": "Upload chứng chỉ portfolio."
       }
     },
     "/api/jobs/generate-sow": {
@@ -1633,7 +3740,7 @@
         "tags": [
           "SoW Generation"
         ],
-        "summary": "Generate SoW",
+        "summary": "AI sinh SoW và milestone gợi ý.",
         "description": "Generate structured SoW, milestones and milestone budgets from raw job requirements.",
         "operationId": "generateSow",
         "requestBody": {
@@ -1658,1604 +3765,6 @@
             }
           }
         }
-      }
-    },
-    "/api/chatbot/ask": {
-      "post": {
-        "tags": [
-          "chatbot-controller"
-        ],
-        "operationId": "ask",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChatResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/register": {
-      "post": {
-        "tags": [
-          "auth-controller"
-        ],
-        "operationId": "register",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
-    "/api/auth/login": {
-      "post": {
-        "tags": [
-          "auth-controller"
-        ],
-        "operationId": "login",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
-    "/api/auth/email/verify-otp": {
-      "post": {
-        "tags": [
-          "email-otp-controller"
-        ],
-        "operationId": "verifyOtp",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyOtpRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/email/send-otp": {
-      "post": {
-        "tags": [
-          "email-otp-controller"
-        ],
-        "operationId": "sendOtp",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendOtpRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSendOtpResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/transactions/{transactionId}/status": {
-      "patch": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "updateTransactionStatus",
-        "parameters": [
-          {
-            "name": "transactionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseTransactionEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/technologies/{technologyId}": {
-      "patch": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "updateTechnology",
-        "parameters": [
-          {
-            "name": "technologyId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TechnologyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseTechnologyEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/skills/{skillId}": {
-      "patch": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "updateSkill",
-        "parameters": [
-          {
-            "name": "skillId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SkillRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSkillEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/proposals/{proposalId}/status": {
-      "patch": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "reviewProposal",
-        "parameters": [
-          {
-            "name": "proposalId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseProposalEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/notifications/{notificationId}/read": {
-      "patch": {
-        "tags": [
-          "notification-controller"
-        ],
-        "operationId": "markAsRead",
-        "parameters": [
-          {
-            "name": "notificationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseNotificationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/notifications/read-all": {
-      "patch": {
-        "tags": [
-          "notification-controller"
-        ],
-        "operationId": "markAllAsRead",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs/{jobId}/status": {
-      "patch": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "updateJobStatus",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseJobEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/domains/{domainId}": {
-      "patch": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "updateDomain",
-        "parameters": [
-          {
-            "name": "domainId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DomainRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDomainEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/disputes/{disputeId}/resolve": {
-      "patch": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "resolveDispute",
-        "parameters": [
-          {
-            "name": "disputeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "proposedAction",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/disputes/{disputeId}/assign": {
-      "patch": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "assignDispute",
-        "parameters": [
-          {
-            "name": "disputeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "staffId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/staffs/{staffId}": {
-      "patch": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "updateStaff",
-        "parameters": [
-          {
-            "name": "staffId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StaffEntity"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseStaffResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/settings/{key}": {
-      "patch": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "updateSetting",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "value",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "isActive",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSystemSettingEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/accounts/{accountId}": {
-      "delete": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "deactivateAccount",
-        "parameters": [
-          {
-            "name": "accountId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "updateAccount",
-        "parameters": [
-          {
-            "name": "accountId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AccountRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/accounts/{accountId}/status": {
-      "patch": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "setAccountStatus",
-        "parameters": [
-          {
-            "name": "accountId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/accounts/{accountId}/active": {
-      "patch": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "setAccountActive",
-        "parameters": [
-          {
-            "name": "accountId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "active",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/wallet/me": {
-      "get": {
-        "tags": [
-          "wallet-controller"
-        ],
-        "operationId": "currentWallet",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/proposals/my": {
-      "get": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "listMyProposals",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/profiles/portfolio/me": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "myPortfolio",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePortfolioEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/profiles/files/view-url": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "fileViewUrl",
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseString"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/profiles/expert/me": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "myExpert",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseExpertProfileEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/profiles/business/me": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "myBusiness",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/profiles/business/by-job/{jobId}": {
-      "get": {
-        "tags": [
-          "profile-controller"
-        ],
-        "operationId": "businessByJob",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseBusinessProfileEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/notifications": {
-      "get": {
-        "tags": [
-          "notification-controller"
-        ],
-        "operationId": "listMine",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListNotificationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/notifications/unread-count": {
-      "get": {
-        "tags": [
-          "notification-controller"
-        ],
-        "operationId": "countUnreadMine",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseUnreadNotificationCountResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/milestones/{milestoneId}/transactions": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "listTransactions",
-        "parameters": [
-          {
-            "name": "milestoneId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/milestones/{milestoneId}/deliverables": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "listDeliverables",
-        "parameters": [
-          {
-            "name": "milestoneId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/milestones/{milestoneId}/criteria": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "listCriteria",
-        "parameters": [
-          {
-            "name": "milestoneId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs/{jobId}": {
-      "get": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "jobDetail",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseJobEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs/{jobId}/proposals": {
-      "get": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "listProposals",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs/{jobId}/milestones": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "listJobMilestones",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs/{jobId}/matching": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "matching",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/jobs/my": {
-      "get": {
-        "tags": [
-          "marketplace-controller"
-        ],
-        "operationId": "listMyJobs",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/disputes/{disputeId}": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "getDispute",
-        "parameters": [
-          {
-            "name": "disputeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseDisputeEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "listContracts",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts/{contractId}": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "getContract",
-        "parameters": [
-          {
-            "name": "contractId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts/{contractId}/milestones": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "listMilestones",
-        "parameters": [
-          {
-            "name": "contractId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/contracts/{contractId}/disputes": {
-      "get": {
-        "tags": [
-          "contract-execution-controller"
-        ],
-        "operationId": "listDisputes",
-        "parameters": [
-          {
-            "name": "contractId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/wallet": {
-      "get": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "systemWallet",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/settings": {
-      "get": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "listSettings",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/reviews/contracts/{contractId}": {
-      "get": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "listReviewsByContract",
-        "parameters": [
-          {
-            "name": "contractId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/audit-logs": {
-      "get": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "listAuditLogs",
-        "parameters": [
-          {
-            "name": "actorGroup",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/analytics/overview": {
-      "get": {
-        "tags": [
-          "admin-controller"
-        ],
-        "operationId": "analyticsOverview",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/acceptance-criteria": {
-      "get": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "listAcceptanceCriteria",
-        "parameters": [
-          {
-            "name": "activeOnly",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": true
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/test/secure": {
-      "get": {
-        "tags": [
-          "test-controller"
-        ],
-        "operationId": "secure",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/payments/payos/return": {
-      "get": {
-        "tags": [
-          "pay-os-payment-controller"
-        ],
-        "operationId": "handleReturn",
-        "parameters": [
-          {
-            "name": "params",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePaymentOrderEntity"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{jobPostingId}/expert-candidates": {
-      "get": {
-        "tags": [
-          "Expert Candidates"
-        ],
-        "summary": "Find top expert candidates",
-        "description": "Extract SoW keywords and rank matching expert portfolios.",
-        "operationId": "findTopCandidates",
-        "parameters": [
-          {
-            "name": "jobPostingId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExpertCandidateSearchResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/health": {
-      "get": {
-        "tags": [
-          "health-controller"
-        ],
-        "operationId": "health",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": []
       }
     },
     "/api/auth/tax-check/{mst}": {
@@ -3285,63 +3794,268 @@
               }
             }
           }
+        },
+        "summary": "Kiểm tra mã số thuế doanh nghiệp."
+      }
+    },
+    "/api/test/secure": {
+      "get": {
+        "tags": [
+          "test-controller"
+        ],
+        "operationId": "secure",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/users/me/quota": {
+      "get": {
+        "tags": [
+          "user-quota-controller"
+        ],
+        "summary": "Xem quota, package active và premium entitlement.",
+        "operationId": "currentQuota",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
         }
       }
     },
-    "/api/auth/me": {
+    "/api/wallet/current": {
       "get": {
         "tags": [
-          "auth-controller"
+          "wallet-api-controller"
         ],
-        "operationId": "me",
+        "summary": "Xem wallet hiện tại.",
+        "operationId": "currentWallet",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAuthResponse"
+                  "type": "object"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        }
       }
     },
-    "/api/auth/check-email": {
+    "/api/wallet/transactions": {
       "get": {
         "tags": [
-          "auth-controller"
+          "wallet-api-controller"
         ],
-        "operationId": "checkEmail",
-        "parameters": [
-          {
-            "name": "email",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "summary": "Xem lịch sử wallet transaction.",
+        "operationId": "walletTransactions",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "type": "boolean"
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wallet/me": {
+      "get": {
+        "tags": [
+          "wallet-controller"
+        ],
+        "operationId": "currentWallet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSystemWalletEntity"
                 }
               }
             }
           }
         },
-        "security": []
+        "summary": "Lấy dữ liệu hoặc danh sách theo quyền."
+      }
+    },
+    "/api/v1/admin/withdrawal-requests": {
+      "get": {
+        "tags": [
+          "withdrawal-controller"
+        ],
+        "summary": "Xem danh sách withdrawal request.",
+        "operationId": "listWithdrawalRequestsForAdmin",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/withdrawal-requests": {
+      "get": {
+        "tags": [
+          "withdrawal-controller"
+        ],
+        "summary": "Xem danh sách withdrawal request.",
+        "operationId": "listMyWithdrawalRequests",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "withdrawal-controller"
+        ],
+        "summary": "Tạo withdrawal request.",
+        "operationId": "createWithdrawalRequest",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        }
+      }
+    },
+    "/api/v1/admin/withdrawal-requests/{withdrawalId}/approve": {
+      "post": {
+        "tags": [
+          "withdrawal-controller"
+        ],
+        "summary": "Admin approve withdrawal sau khi chuyển khoản thủ công.",
+        "operationId": "approveWithdrawal",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "withdrawalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        }
+      }
+    },
+    "/api/v1/admin/withdrawal-requests/{withdrawalId}/reject": {
+      "post": {
+        "tags": [
+          "withdrawal-controller"
+        ],
+        "summary": "Admin reject withdrawal và trả holding về available.",
+        "operationId": "rejectWithdrawal",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "withdrawalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        }
       }
     }
   },
