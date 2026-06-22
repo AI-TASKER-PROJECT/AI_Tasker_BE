@@ -209,12 +209,12 @@ INSERT INTO membership_packages (
     recommend_visibility,
     is_active
 ) VALUES
-('BUSINESS', 'BUSINESS_STANDARD', 'Business Standard', 200000, 30, 0, 0, FALSE, TRUE),
-('BUSINESS', 'BUSINESS_PLUS', 'Business Plus', 500000, 60, 10, 0, FALSE, TRUE),
-('BUSINESS', 'BUSINESS_PREMIUM', 'Business Premium', 1000000, 90, 30, 0, TRUE, TRUE),
-('EXPERT', 'EXPERT_STANDARD', 'Expert Standard', 150000, 30, 0, 0, FALSE, TRUE),
-('EXPERT', 'EXPERT_PLUS', 'Expert Plus', 400000, 60, 0, 30, FALSE, TRUE),
-('EXPERT', 'EXPERT_PREMIUM', 'Expert Premium', 800000, 90, 0, 90, FALSE, TRUE)
+('BUSINESS', 'BUSINESS_STANDARD', 'Business Standard', 200, 30, 0, 0, FALSE, TRUE),
+('BUSINESS', 'BUSINESS_PLUS', 'Business Plus', 500, 60, 10, 0, FALSE, TRUE),
+('BUSINESS', 'BUSINESS_PREMIUM', 'Business Premium', 1000, 90, 30, 0, TRUE, TRUE),
+('EXPERT', 'EXPERT_STANDARD', 'Expert Standard', 100, 30, 0, 0, FALSE, TRUE),
+('EXPERT', 'EXPERT_PLUS', 'Expert Plus', 200, 60, 0, 30, FALSE, TRUE),
+('EXPERT', 'EXPERT_PREMIUM', 'Expert Premium', 600, 90, 0, 90, FALSE, TRUE)
 ON CONFLICT (package_code) DO UPDATE SET
     package_name = EXCLUDED.package_name,
     price = EXCLUDED.price,
