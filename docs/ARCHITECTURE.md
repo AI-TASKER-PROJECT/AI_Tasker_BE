@@ -238,6 +238,14 @@ Current rules to preserve:
 - Experts can submit proposals only to jobs in `OPEN` status.
 - Public `GET /api/v1/jobs` returns only `OPEN` jobs.
 - Public `GET /api/v1/jobs/{jobId}/milestones` is readable for `OPEN` jobs.
+- Public `GET /api/v1/profiles/business/{businessId}` is Guest-readable without
+  JWT (US-017); it returns the business profile with `fullName` and `404` when
+  not found. Sibling routes `/business/me`, `/business/by-job/{jobId}`, and
+  `/business` remain protected by their service-layer role/ownership checks.
+- Public `GET /api/v1/profiles/business/by-job/{jobId}` is Guest-readable without
+  JWT (US-018) only for `OPEN` jobs; the service layer
+  `businessProfileByJob(jobId)` still requires `STAFF/ADMIN/BUSINESS` for
+  non-`OPEN` jobs. `/business/me` and `/business` remain private.
 - Business dashboard behavior that needs draft/open/closed jobs uses
   `GET /api/v1/jobs/my`.
 - A proposal can move into contract creation only after it is `Accepted`.

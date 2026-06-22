@@ -39,6 +39,8 @@ public class MilestoneEntity {
     @Column(name = "order_index", nullable = false) private Integer orderIndex;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "status", nullable = false, length = 50) private String status;
+    @Column(name = "duration") private Integer duration;
+    @Column(name = "duration_unit", length = 20) private String durationUnit;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

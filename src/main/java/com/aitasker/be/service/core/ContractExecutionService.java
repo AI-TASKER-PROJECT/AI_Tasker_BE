@@ -7,6 +7,7 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -186,6 +187,8 @@ public class ContractExecutionService {
         contractMilestoneRepository.deleteByContractId(contractId);
         for (MilestoneEntity milestone : jobMilestones) {
             BigDecimal finalBudget = proposedBudgetByMilestone.getOrDefault(milestone.getMilestoneId(), milestone.getFundsAllocated());
+            String normalizedUnit = milestone.getDurationUnit() != null ? milestone.getDurationUnit().trim().toUpperCase() : null;
+            String criteriaSnapshot = buildCriteriaSnapshot(milestone.getMilestoneId());
             contractMilestoneRepository.save(ContractMilestoneEntity.builder()
                     .contractId(contractId)
                     .jobMilestoneId(milestone.getMilestoneId())
@@ -194,9 +197,31 @@ public class ContractExecutionService {
                     .originalBudget(milestone.getFundsAllocated())
                     .finalBudget(finalBudget)
                     .orderIndex(milestone.getOrderIndex())
+                    .duration(milestone.getDuration())
+                    .durationUnit(normalizedUnit)
+                    .criteriaSnapshot(criteriaSnapshot)
+                    .deliverableExpectation(milestone.getDescription())
                     .status("PENDING")
                     .build());
         }
+    }
+
+    // Note: Hàm `buildCriteriaSnapshot` dựng văn bản tiêu chí nghiệm thu tại thời điểm tạo contract để snapshot không bị thay đổi sau này.
+    private String buildCriteriaSnapshot(Integer milestoneId) {
+        List<MilestoneAcceptanceCriteriaEntity> links = milestoneCriteriaRepository.findByIdMilestoneId(milestoneId);
+        if (links == null || links.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (MilestoneAcceptanceCriteriaEntity link : links) {
+            if (link.getId() == null || link.getId().getCriteriaId() == null) continue;
+            criteriaRepository.findById(link.getId().getCriteriaId())
+                    .filter(AcceptanceCriteriaEntity::getIsActive)
+                    .map(AcceptanceCriteriaEntity::getDescription)
+                    .ifPresent(description -> {
+                        if (sb.length() > 0) sb.append("\n");
+                        sb.append(description);
+                    });
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 
     // Note: Hàm `applyContractMilestoneBudgets` cập nhật ngân sách chốt từ contract_milestones về milestone thật khi contract active.
@@ -345,11 +370,43 @@ public class ContractExecutionService {
         if (milestoneRepository.existsByJobIdAndOrderIndex(input.getJobId(), input.getOrderIndex())) {
             throw new AppException("ORDER INDEX DA TON TAI TRONG JOB");
         }
+        validateDuration(input.getDuration(), input.getDurationUnit());
         input.setContractId(null);
         if (input.getStatus() == null) input.setStatus("PENDING");
+        if (input.getDurationUnit() != null) input.setDurationUnit(input.getDurationUnit().trim().toUpperCase());
         MilestoneEntity saved = milestoneRepository.save(input);
         replaceMilestoneCriteria(saved.getMilestoneId(), input.getCriteriaIds());
         auditLogService.record(AuditLogService.ACTION_CREATE_MILESTONE, "milestones", String.valueOf(saved.getMilestoneId()), accessService.currentAccount().getAccountId());
+        return attachCriteria(saved);
+    }
+
+    @Transactional
+    public MilestoneEntity updateMilestone(Integer milestoneId, MilestoneEntity input) {
+        accessService.requireRole("BUSINESS");
+        accessService.requireApprovedAccount();
+        MilestoneEntity existing = milestoneRepository.findById(milestoneId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        if (existing.getContractId() != null) {
+            throw new AppException("KHONG THE SUA MILESTONE DA THUOC CONTRACT");
+        }
+        requireBusinessOwnedJob(existing.getJobId());
+        if (input.getMilestoneName() != null && !input.getMilestoneName().isBlank()) {
+            existing.setMilestoneName(input.getMilestoneName());
+        }
+        if (input.getDescription() != null) {
+            existing.setDescription(input.getDescription());
+        }
+        if (input.getFundsAllocated() != null && input.getFundsAllocated().signum() >= 0) {
+            existing.setFundsAllocated(input.getFundsAllocated());
+        }
+        boolean durationProvided = input.getDuration() != null || (input.getDurationUnit() != null && !input.getDurationUnit().isBlank());
+        if (durationProvided) {
+            validateDuration(input.getDuration(), input.getDurationUnit());
+            existing.setDuration(input.getDuration());
+            existing.setDurationUnit(input.getDurationUnit().trim().toUpperCase());
+        }
+        MilestoneEntity saved = milestoneRepository.save(existing);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_MILESTONE, "milestones", String.valueOf(milestoneId), accessService.currentAccount().getAccountId());
         return attachCriteria(saved);
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -387,7 +444,9 @@ public class ContractExecutionService {
                 .ifPresent(business -> notificationService.notifyDeliverableSubmitted(
                         business.getAccountId(),
                         accessService.currentAccount().getAccountId(),
+                        contract.getContractId(),
                         milestone.getMilestoneId(),
+                        saved.getDeliverableId(),
                         milestone.getMilestoneName()
                 ));
         return saved;
@@ -533,9 +592,31 @@ public class ContractExecutionService {
     }
 
     // Note: Hàm `listMilestonesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public List<ContractMilestoneEntity> listMilestonesByContract(Integer contractId) {
+    public List<ContractMilestoneViewResponse> listMilestonesByContract(Integer contractId) {
         ContractEntity contract = requireContractParticipantOrOperator(contractId);
-        return contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId());
+        List<ContractMilestoneEntity> contractMilestones = contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId());
+        return contractMilestones.stream().map(cm -> {
+            String liveStatus = milestoneRepository.findById(cm.getJobMilestoneId())
+                    .map(MilestoneEntity::getStatus)
+                    .orElse(cm.getStatus());
+            return ContractMilestoneViewResponse.builder()
+                    .contractMilestoneId(cm.getContractMilestoneId())
+                    .contractId(cm.getContractId())
+                    .jobMilestoneId(cm.getJobMilestoneId())
+                    .milestoneName(cm.getMilestoneName())
+                    .description(cm.getDescription())
+                    .originalBudget(cm.getOriginalBudget())
+                    .finalBudget(cm.getFinalBudget())
+                    .orderIndex(cm.getOrderIndex())
+                    .status(liveStatus)
+                    .duration(cm.getDuration())
+                    .durationUnit(cm.getDurationUnit())
+                    .criteriaSnapshot(cm.getCriteriaSnapshot())
+                    .deliverableExpectation(cm.getDeliverableExpectation())
+                    .createdAt(cm.getCreatedAt())
+                    .updatedAt(cm.getUpdatedAt())
+                    .build();
+        }).toList();
     }
 
     // Note: Hàm `attachContractMilestones` gắn milestone chốt vào contract để API trả đủ dữ liệu hợp đồng.
@@ -904,5 +985,22 @@ public class ContractExecutionService {
                 .map(String::toLowerCase)
                 .map(v -> v.equals("true") || v.equals("1"))
                 .orElse(false);
+    }
+
+    private void validateDuration(Integer duration, String durationUnit) {
+        boolean hasDuration = duration != null;
+        boolean hasUnit = durationUnit != null && !durationUnit.isBlank();
+        if (hasDuration != hasUnit) {
+            throw new AppException("DURATION VA DURATION UNIT PHAI CUNG CO HOAC CUNG KHONG CO");
+        }
+        if (hasDuration && duration <= 0) {
+            throw new AppException("DURATION PHAI LON HON 0");
+        }
+        if (hasUnit) {
+            String unit = durationUnit.trim().toUpperCase();
+            if (!List.of("DAY", "WEEK", "MONTH").contains(unit)) {
+                throw new AppException("DURATION UNIT KHONG HOP LE. CHAP NHAN: DAY, WEEK, MONTH");
+            }
+        }
     }
 }

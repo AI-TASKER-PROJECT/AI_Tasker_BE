@@ -6,11 +6,13 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.service.core.ContractExecutionService;
 import com.aitasker.be.service.core.PaymentWalletService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -99,6 +101,11 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("COMPLETE MILESTONE SUCCESS", service.completeMilestone(milestoneId)));
     }
 
+    @PatchMapping("/milestones/{milestoneId}")
+    public ResponseEntity<ApiResponse<MilestoneEntity>> updateMilestone(@PathVariable Integer milestoneId, @RequestBody MilestoneEntity request) {
+        return ResponseEntity.ok(ApiResponse.success("UPDATE MILESTONE SUCCESS", service.updateMilestone(milestoneId, request)));
+    }
+
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/transactions")
     // Note: Hàm `createTransaction` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
@@ -184,7 +191,7 @@ public class ContractExecutionController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/contracts/{contractId}/milestones")
-    public ResponseEntity<ApiResponse<Object>> listMilestones(@PathVariable Integer contractId) { return ResponseEntity.ok(ApiResponse.success("LIST MILESTONES SUCCESS", service.listMilestonesByContract(contractId))); }
+    public ResponseEntity<ApiResponse<List<ContractMilestoneViewResponse>>> listMilestones(@PathVariable Integer contractId) { return ResponseEntity.ok(ApiResponse.success("LIST MILESTONES SUCCESS", service.listMilestonesByContract(contractId))); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/jobs/{jobId}/milestones")

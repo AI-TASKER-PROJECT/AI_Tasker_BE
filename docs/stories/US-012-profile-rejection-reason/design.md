@@ -18,7 +18,7 @@ Add nullable `VARCHAR(500)` columns:
 - `business_profiles.rejection_reason`
 - `expert_profiles.rejection_reason`
 
-The migration is `V33__profile_rejection_reason.sql` because week6 already uses
+The migration is `V34__profile_rejection_reason.sql` because week6 already uses
 `V32`.
 
 ## Service Rules

@@ -139,7 +139,6 @@ public class ProfileService {
 
     // Note: Hàm `businessProfileById` lấy hồ sơ doanh nghiệp theo businessId để hiển thị trang cá nhân public cho expert xem.
     public BusinessProfileEntity businessProfileById(Integer businessId) {
-        accessService.requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
         return businessProfileRepository.findById(businessId)
                 .map(this::attachBusinessAccountInfo)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));

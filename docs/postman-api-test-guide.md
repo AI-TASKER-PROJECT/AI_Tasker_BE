@@ -702,7 +702,7 @@ GET {{baseUrl}}/api/v1/contracts/{contractId}
 GET {{baseUrl}}/api/v1/contracts/{contractId}/milestones
 ```
 
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Mục đích: Lấy danh sách `ContractMilestoneViewResponse` với trạng thái live từ bảng `milestones`.
 - Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
@@ -1375,8 +1375,9 @@ GET {{baseUrl}}/api/v1/profiles/business/{businessId}
 
 - Mục đích: Lấy thông tin business profile theo ID để xem trang cá nhân doanh nghiệp.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Không cần JWT (US-017). Route public cho Guest; trả kèm `fullName`, `404` khi không tìm thấy. Các route `/me`, `/by-job/{jobId}`, `/business` vẫn yêu cầu Bearer token theo role.
 - Body: Không có.
+- Thử nhanh (Guest): `GET {{baseUrl}}/api/v1/profiles/business/1` không kèm header `Authorization` kỳ vọng `200` với `data.fullName`; `businessId` không tồn tại kỳ vọng `404`.
 
 #### 94. GET /api/v1/profiles/expert/{expertId}
 
@@ -1439,10 +1440,11 @@ GET {{baseUrl}}/api/v1/profiles/business/me
 GET {{baseUrl}}/api/v1/profiles/business/by-job/{jobId}
 ```
 
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Mục đích: Xem thông tin business theo job để chuyên gia xem chi tiết doanh nghiệp của job.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Không cần JWT (US-018) khi job `OPEN`; route public cho Guest. Job chưa public (`non-OPEN`) vẫn yêu cầu Bearer token STAFF/ADMIN/BUSINESS theo luật service. `/me` và `/business` vẫn yêu cầu Bearer token theo role.
 - Body: Không có.
+- Thử nhanh (Guest): `GET {{baseUrl}}/api/v1/profiles/business/by-job/1` không kèm header `Authorization` với job `OPEN` kỳ vọng `200`; job `non-OPEN` không có token kỳ vọng `401/403`; `jobId` không tồn tại kỳ vọng `404`.
 
 #### 100. POST /api/v1/profiles/portfolio
 
