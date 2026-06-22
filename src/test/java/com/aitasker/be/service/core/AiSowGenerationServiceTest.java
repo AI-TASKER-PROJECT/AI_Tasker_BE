@@ -144,6 +144,142 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
+    void buildPrompt_shouldForbidMilestoneGuidanceInSowFields() {
+        String prompt = service.buildPrompt(buildRequest(), "RAG with Recommended milestones");
+
+        assertTrue(prompt.contains("Tuyet doi khong liet ke milestones"));
+        assertTrue(prompt.contains("sow.overview"));
+        assertTrue(prompt.contains("sow.scopeOfWork"));
+        assertTrue(prompt.contains("sow.deliverables"));
+        assertTrue(prompt.contains("array milestones"));
+    }
+
+    @Test
+    void parseAiResponse_shouldStripRecommendedMilestonesBlockFromScopeOfWorkAndDeliverables() {
+        GenerateSowResponse response = service.parseAiResponse("""
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "sow": {
+                    "title": "AI Chatbot",
+                    "overview": "Build AI chatbot for customer support. Recommended milestones: 1. Discovery 2. Build 3. Deploy. The project will use RAG technology.",
+                    "objectives": ["Answer customer questions"],
+                    "scopeOfWork": ["Design system", "Recommended milestones:", "1. Architecture", "2. Development", "3. Testing", "Scalability planning"],
+                    "deliverables": ["Chatbot API", "Recommended milestones:", "1. MVP delivery", "2. Final product", "Documentation"],
+                    "assumptions": ["API available"],
+                    "outOfScope": ["CRM rebuild"]
+                  },
+                  "milestones": [
+                    {
+                      "name": "Discovery",
+                      "description": "Analyze requirements",
+                      "duration": 2,
+                      "durationUnit": "tuan",
+                      "budget": 30
+                    },
+                    {
+                      "name": "Build",
+                      "description": "Develop chatbot",
+                      "duration": 4,
+                      "durationUnit": "tuan",
+                      "budget": 50
+                    }
+                  ]
+                }
+                """);
+
+        assertFalse(response.getNeedMoreInfo());
+        assertEquals("Build AI chatbot for customer support. Recommended milestones: 1. Discovery 2. Build 3. Deploy. The project will use RAG technology.",
+                response.getSow().getOverview());
+        assertEquals(List.of("Design system", "Scalability planning"),
+                response.getSow().getScopeOfWork());
+        assertEquals(List.of("Chatbot API", "Documentation"),
+                response.getSow().getDeliverables());
+        assertEquals(2, response.getMilestones().size());
+        assertEquals("Discovery", response.getMilestones().get(0).getName());
+    }
+
+    @Test
+    void parseAiResponse_shouldKeepSowFieldsWhenNoMilestoneDuplication() {
+        GenerateSowResponse response = service.parseAiResponse("""
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "sow": {
+                    "title": "AI support bot",
+                    "overview": "Build bot for Q&A automation",
+                    "objectives": [],
+                    "scopeOfWork": ["Design", "Develop"],
+                    "deliverables": ["Bot API"],
+                    "assumptions": [],
+                    "outOfScope": []
+                  },
+                  "milestones": [
+                    {
+                      "name": "Build",
+                      "description": "Develop bot",
+                      "duration": 1,
+                      "durationUnit": "tuan",
+                      "budget": 90000000
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals("Build bot for Q&A automation", response.getSow().getOverview());
+        assertEquals(List.of("Design", "Develop"), response.getSow().getScopeOfWork());
+        assertEquals(List.of("Bot API"), response.getSow().getDeliverables());
+    }
+
+    @Test
+    void parseAiResponse_shouldStripExtendedMilestoneBlockHeaders() {
+        GenerateSowResponse response = service.parseAiResponse("""
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "sow": {
+                    "title": "OCR project",
+                    "overview": "OCR pipeline with document parsing. Suggested milestones: 1. Setup 2. Train. Backend integration follows.",
+                    "objectives": [],
+                    "scopeOfWork": [
+                        "Document analysis",
+                        "Proposed milestones:",
+                        "1. Preprocessing",
+                        "2. Model training",
+                        "3. Validation",
+                        "API integration"
+                    ],
+                    "deliverables": [
+                        "OCR service",
+                        "Milestone breakdown:",
+                        "1. MVP",
+                        "2. Production",
+                        "User guide"
+                    ],
+                    "assumptions": [],
+                    "outOfScope": []
+                  },
+                  "milestones": [
+                    {
+                      "name": "Setup",
+                      "description": "Initial setup",
+                      "duration": 2,
+                      "durationUnit": "tuan",
+                      "budget": 40
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals("OCR pipeline with document parsing. Suggested milestones: 1. Setup 2. Train. Backend integration follows.",
+                response.getSow().getOverview());
+        assertEquals(List.of("Document analysis", "API integration"),
+                response.getSow().getScopeOfWork());
+        assertEquals(List.of("OCR service", "User guide"),
+                response.getSow().getDeliverables());
+    }
+
+    @Test
     void generateSow_shouldContinueWhenRagContextEmpty() {
         RestTemplate restTemplate = mock(RestTemplate.class);
         OpenAiProperties openAiProperties = new OpenAiProperties();

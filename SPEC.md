@@ -93,3 +93,71 @@ order by package_id;
 ## Handoff Instruction For Next Model
 
 Read `AGENTS.md` and this `SPEC.md`, then implement `US-023` only.
+
+---
+
+# US-024 - Prevent Duplicated Milestone Guidance Inside Generated SoW
+
+## Goal
+
+Fix AI SoW generation so milestone guidance appears only in the structured
+`milestones` array and is not repeated inside `sow` text fields.
+
+## Problem Summary
+
+Current behavior can return:
+
+- a correct `milestones` array for frontend milestone suggestion
+- plus duplicated milestone-like guidance inside `sow.overview`,
+  `sow.scopeOfWork`, or `sow.deliverables`
+
+This makes the generated SoW look like it contains an extra milestone section
+even though the actual duplicate is inside the free-text SoW content.
+
+## Likely Root Cause
+
+- Prompt wording asks the model to both write the SoW and split milestones, but
+  does not explicitly forbid milestone duplication inside `sow` fields.
+- RAG knowledge files include `Recommended milestones`, which the model may
+  echo into SoW text.
+
+## Expected Scope
+
+The next model should inspect and update:
+
+1. prompt shaping in `AiSowGenerationService`
+2. any response normalization needed after AI JSON parse
+3. focused tests for duplicated milestone text inside `sow`
+
+## Likely Files
+
+- `src/main/java/com/aitasker/be/service/core/AiSowGenerationService.java`
+- `src/test/java/com/aitasker/be/service/core/AiSowGenerationServiceTest.java`
+- `src/main/resources/knowledge/sow/*.md` only if prompt-only mitigation is not enough
+
+## Rules
+
+- Keep the API contract unchanged: `sow` + `milestones` remain in the response.
+- Do not remove or weaken valid `milestones` output.
+- Do not break `needMoreInfo=true` behavior.
+- Prefer prompt-level correction first; add post-parse cleanup only if needed.
+- If post-parse cleanup is added, use block-based cleanup only.
+- Do not aggressively strip milestone-like words from normal prose in
+  `sow.overview`.
+- Prefer preserving ambiguous text over removing too much content.
+- Avoid unrelated SoW, job draft, or marketplace changes.
+
+## Acceptance Criteria
+
+- Generated response still includes the structured `milestones` array.
+- `sow.overview`, `sow.scopeOfWork`, and `sow.deliverables` do not repeat
+  milestone guidance already represented in `milestones`.
+- The response does not echo `Recommended milestones` from RAG into SoW text.
+- Focused tests cover the duplication guard.
+- Cleanup logic only removes clearly delimited milestone guidance blocks and
+  does not damage normal SoW prose.
+
+## Handoff Instruction For Next Model
+
+Read `AGENTS.md` and this `SPEC.md`, then implement `US-024` only if assigned
+to the duplicated-milestone-in-SoW issue.

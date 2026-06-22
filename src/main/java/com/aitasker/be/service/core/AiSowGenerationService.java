@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 // Note: Annotation này cho Spring quản lý class như một service nghiệp vụ.
 @Service
@@ -90,6 +91,11 @@ public class AiSowGenerationService {
                 Su dung RAG CONTEXT ben duoi de tao SoW dung nghiep vu he thong.
                 Neu RAG CONTEXT khong lien quan, hay bo qua phan khong lien quan.
                 Khong duoc copy may moc context, chi dung no lam quy tac tham khao.
+                Tuyet doi khong liet ke milestones hoac milestone guidance (ten milestone,
+                mo ta milestone, phan bo ngan sach %%) trong cac field sow.overview,
+                sow.scopeOfWork, sow.deliverables. Cac field sow chi mo ta tong quan
+                du an, pham vi cong viec va san pham ban giao. Milestones duoc liet ke
+                doc lap trong array milestones.
 
                 RAG CONTEXT:
                 %s
@@ -158,6 +164,7 @@ public class AiSowGenerationService {
         try {
             JsonNode responseNode = objectMapper.readTree(jsonPayload);
             normalizeStringListFields(responseNode);
+            stripMilestoneGuidanceFromSow(responseNode);
             normalizeBudgetFields(responseNode);
             normalizeDurationFields(responseNode);
             return objectMapper.treeToValue(responseNode, GenerateSowResponse.class);
@@ -199,6 +206,58 @@ public class AiSowGenerationService {
             values.add(field.toString());
         }
         node.set(fieldName, values);
+    }
+
+    private void stripMilestoneGuidanceFromSow(JsonNode responseNode) {
+        JsonNode sowNode = responseNode.get("sow");
+        if (!(sowNode instanceof ObjectNode sow)) {
+            return;
+        }
+        Pattern milestoneSectionStart = Pattern.compile(
+                "(?i)(recommended|suggested|proposed)\\s+milestones?\\s*:"
+                + "|milestone\\s+(recommendations?|breakdown|plan)\\s*:",
+                Pattern.UNICODE_CHARACTER_CLASS);
+        stripFromTextField(sow, "scopeOfWork", milestoneSectionStart);
+        stripFromTextField(sow, "deliverables", milestoneSectionStart);
+    }
+
+    private void stripFromTextField(ObjectNode sow, String fieldName, Pattern sectionPattern) {
+        JsonNode fieldNode = sow.get(fieldName);
+        if (!(fieldNode instanceof ArrayNode items)) {
+            return;
+        }
+        ArrayNode cleaned = objectMapper.createArrayNode();
+        boolean inMilestoneSection = false;
+        for (JsonNode item : items) {
+            String text = item.isTextual() ? item.asText() : "";
+            if (sectionPattern.matcher(text).find()) {
+                inMilestoneSection = true;
+                continue;
+            }
+            if (inMilestoneSection) {
+                if (!text.isBlank() && !isMilestoneListItem(text)) {
+                    inMilestoneSection = false;
+                    cleaned.add(text);
+                }
+                continue;
+            }
+            cleaned.add(text);
+        }
+        sow.set(fieldName, cleaned);
+    }
+
+    private boolean isMilestoneListItem(String text) {
+        String trimmed = text.trim();
+        if (trimmed.isEmpty()) {
+            return true;
+        }
+        if (trimmed.matches("^\\d+\\..*")) {
+            return true;
+        }
+        if (trimmed.matches("^[-•*]\\s+.*")) {
+            return true;
+        }
+        return false;
     }
 
     // Note: Hàm chuẩn hóa budget milestone khi AI trả tiền dạng text như "30 triệu" hoặc có ký tự phân cách.
