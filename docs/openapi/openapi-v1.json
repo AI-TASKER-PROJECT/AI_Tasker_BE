@@ -2555,6 +2555,7 @@
           "profile-controller"
         ],
         "operationId": "businessByJob",
+        "description": "Public Business-by-job profile for Guest access on OPEN jobs (US-018). No JWT required at the route level; the service layer still enforces that only OPEN jobs are public, while non-OPEN jobs require STAFF/ADMIN/BUSINESS. 404 when the job or business profile is not found.",
         "parameters": [
           {
             "name": "jobId",
@@ -2577,7 +2578,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/notifications": {

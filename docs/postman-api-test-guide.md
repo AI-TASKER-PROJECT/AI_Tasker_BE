@@ -1440,10 +1440,11 @@ GET {{baseUrl}}/api/v1/profiles/business/me
 GET {{baseUrl}}/api/v1/profiles/business/by-job/{jobId}
 ```
 
-- Mục đích: Xem, tạo hoặc cập nhật hồ sơ người dùng.
+- Mục đích: Xem thông tin business theo job để chuyên gia xem chi tiết doanh nghiệp của job.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Không cần JWT (US-018) khi job `OPEN`; route public cho Guest. Job chưa public (`non-OPEN`) vẫn yêu cầu Bearer token STAFF/ADMIN/BUSINESS theo luật service. `/me` và `/business` vẫn yêu cầu Bearer token theo role.
 - Body: Không có.
+- Thử nhanh (Guest): `GET {{baseUrl}}/api/v1/profiles/business/by-job/1` không kèm header `Authorization` với job `OPEN` kỳ vọng `200`; job `non-OPEN` không có token kỳ vọng `401/403`; `jobId` không tồn tại kỳ vọng `404`.
 
 #### 100. POST /api/v1/profiles/portfolio
 

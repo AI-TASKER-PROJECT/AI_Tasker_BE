@@ -10,11 +10,13 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
+import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.AuditLogRepository;
 import com.aitasker.be.repository.BusinessProfileRepository;
 import com.aitasker.be.repository.ExpertProfileRepository;
+import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.PortfolioRepository;
 import com.aitasker.be.repository.StaffRepository;
 import org.junit.jupiter.api.Test;
@@ -53,6 +55,7 @@ class ProfileServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private FirebaseStorageService firebaseStorageService;
     @Mock private NotificationService notificationService;
+    @Mock private JobRepository jobRepository;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ProfileService profileService;
@@ -125,6 +128,52 @@ class ProfileServiceTest {
 
         profileService.businessProfileById(businessId);
 
+        verifyNoInteractions(accessService);
+    }
+
+    @Test
+    void businessProfileByJob_shouldReturnProfileWhenJobOpen() {
+        Integer jobId = 5;
+        Integer businessId = 7;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(businessId).status("OPEN").build();
+        BusinessProfileEntity profile = BusinessProfileEntity.builder()
+                .businessId(businessId).accountId(10).companyName("Open Corp").taxCode("t1").kybStatus("Approved").build();
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
+
+        BusinessProfileEntity result = profileService.businessProfileByJob(jobId);
+
+        assertEquals(businessId, result.getBusinessId());
+        verifyNoInteractions(accessService);
+    }
+
+    @Test
+    void businessProfileByJob_shouldRequireRoleWhenJobNotOpen() {
+        Integer jobId = 6;
+        Integer businessId = 8;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(businessId).status("IN_PROGRESS").build();
+        BusinessProfileEntity profile = BusinessProfileEntity.builder()
+                .businessId(businessId).accountId(11).companyName("Closed Corp").taxCode("t2").kybStatus("Approved").build();
+
+        doNothing().when(accessService).requireRole(anyString(), anyString(), anyString());
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
+
+        BusinessProfileEntity result = profileService.businessProfileByJob(jobId);
+
+        assertEquals(businessId, result.getBusinessId());
+        verify(accessService).requireRole("STAFF", "ADMIN", "BUSINESS");
+    }
+
+    @Test
+    void businessProfileByJob_shouldThrow404WhenJobNotFound() {
+        Integer jobId = 999;
+        when(jobRepository.findById(jobId)).thenReturn(Optional.empty());
+
+        NotFoundException ex = assertThrows(NotFoundException.class,
+                () -> profileService.businessProfileByJob(jobId));
+        assertEquals("KHONG TIM THAY JOB", ex.getMessage());
         verifyNoInteractions(accessService);
     }
 

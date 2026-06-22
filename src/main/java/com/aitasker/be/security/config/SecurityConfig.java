@@ -78,6 +78,7 @@ public class SecurityConfig {
                                 "/api/v1/acceptance-criteria"
                         ).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/\\d+")).permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/by-job/\\d+")).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

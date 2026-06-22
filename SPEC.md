@@ -230,3 +230,134 @@ The biggest risk is using an overly broad matcher that leaks `/me`.
 Do not claim “public profile” proof unless there is at least minimal route-level validation.
 
 US-009 is the historical version where this route was authenticated. US-017 is the new story that changes the contract to Guest-public.
+
+---
+
+# US-018 - Open Business-by-Job Profile for Guest Access on Public Jobs
+
+## User Story
+
+As a Guest user,
+I want to view the Business profile associated with a public job without logging in,
+so that I can inspect the company directly from the public job detail flow.
+
+As the backend team,
+we want to open only the intended route and preserve the existing `OPEN`-job rule,
+so that unpublished jobs and private business routes remain protected.
+
+## Problem
+
+The current backend already contains the correct service-layer business rule in
+`ProfileService.businessProfileByJob(Integer jobId)`:
+
+* if the job is `OPEN`, the Business profile is readable
+* if the job is not `OPEN`, access still requires a protected role
+
+However, Spring Security blocks Guests before the controller is reached, because
+`GET /api/v1/profiles/business/by-job/{jobId}` does not match the existing
+public matcher set. As a result, anonymous callers receive `401` or `403`
+before the request can reach `ProfileController` or `ProfileService`.
+
+## Target Product Contract
+
+After completing US-018:
+
+* Guest users can call `GET /api/v1/profiles/business/by-job/{jobId}` without a JWT.
+* The route remains public only for jobs whose status is `OPEN`.
+* Non-`OPEN` jobs must continue to follow the existing protected behavior in the service layer.
+* `GET /api/v1/profiles/business/{businessId}` remains public as defined by US-017.
+* `GET /api/v1/profiles/business/me` remains private.
+* `GET /api/v1/profiles/business` remains private.
+
+## Required Backend Changes
+
+## 1. SecurityConfig
+
+Add an anonymous `permitAll` matcher only for:
+
+```http
+GET /api/v1/profiles/business/by-job/{jobId}
+```
+
+Recommended implementation approach:
+
+* use an exact GET matcher for the `/by-job/{numericId}` pattern
+* prefer a regex matcher if needed
+* do not broaden the existing `/api/v1/profiles/business/...` security surface
+
+Do not use overly broad patterns such as:
+
+```text
+/api/v1/profiles/business/**
+/api/v1/profiles/business/*
+```
+
+because they can accidentally weaken unrelated routes.
+
+## 2. ProfileService
+
+No business-rule change is required if the product requirement is:
+
+* Guest may read Business-by-job only when the job is `OPEN`
+
+The existing service logic in `businessProfileByJob(Integer jobId)` should be preserved:
+
+* `OPEN` job -> public read allowed
+* non-`OPEN` job -> protected role required
+
+Only change the service if the product contract itself changes beyond that.
+
+## 3. Docs / Contract Sync
+
+Update:
+
+* `docs/openapi/openapi-v1.json`
+* `docs/swagger-api-overview.md`
+* `docs/swagger-api-test-guide.md`
+* `docs/postman-api-test-guide.md`
+* Story packet for US-018
+* Architecture wording if it still implies the route is authenticated-only
+
+## Validation Expectations
+
+### Route / Security
+
+At minimum, prove:
+
+* anonymous `GET /api/v1/profiles/business/by-job/{jobId}` is not blocked by Spring Security
+* unrelated sibling routes are still protected
+
+### Service Behavior
+
+At minimum, prove:
+
+* `OPEN` job still returns the Business profile
+* non-`OPEN` job still requires protected access and is not made public accidentally
+
+## Suggested Commands
+
+If the project only has focused tests available quickly, run the smallest safe
+test scope and record any limitation honestly.
+
+Example:
+
+```powershell
+.\mvnw.cmd -Dtest=ProfileServiceTest test
+```
+
+If a dedicated route matcher or security-boundary test is added, run that test too.
+
+## Acceptance Criteria
+
+* Guest can call `GET /api/v1/profiles/business/by-job/{jobId}` without JWT.
+* The route works for jobs in `OPEN` status.
+* The route is not unintentionally opened for non-`OPEN` job access beyond the existing service rule.
+* `/me` and `/business` stay protected.
+* Docs and OpenAPI are synchronized with the final contract.
+
+## Handoff Notes for the Next Model
+
+1. This is primarily a Spring Security route-opening task, not a service rewrite.
+2. The existing `businessProfileByJob(...)` logic already contains the intended `OPEN`-job public rule.
+3. The main risk is opening the route too broadly and weakening sibling business profile routes.
+4. Do not claim full public-route proof unless at least one security-boundary check has actually been run.

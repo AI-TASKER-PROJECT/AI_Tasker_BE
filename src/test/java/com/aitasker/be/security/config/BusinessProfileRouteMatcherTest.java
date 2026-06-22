@@ -14,6 +14,9 @@ class BusinessProfileRouteMatcherTest {
     private final RequestMatcher matcher =
             RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/\\d+");
 
+    private final RequestMatcher byJobMatcher =
+            RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/by-job/\\d+");
+
     @Test
     void matches_numericBusinessId() {
         assertTrue(matcher.matches(req("GET", "/api/v1/profiles/business/1")));
@@ -38,6 +41,32 @@ class BusinessProfileRouteMatcherTest {
     @Test
     void doesNotMatch_nonGet() {
         assertFalse(matcher.matches(req("POST", "/api/v1/profiles/business/1")));
+    }
+
+    @Test
+    void byJobMatcher_matchesNumericJobId() {
+        assertTrue(byJobMatcher.matches(req("GET", "/api/v1/profiles/business/by-job/1")));
+        assertTrue(byJobMatcher.matches(req("GET", "/api/v1/profiles/business/by-job/999")));
+    }
+
+    @Test
+    void byJobMatcher_doesNotMatch_meRoute() {
+        assertFalse(byJobMatcher.matches(req("GET", "/api/v1/profiles/business/me")));
+    }
+
+    @Test
+    void byJobMatcher_doesNotMatch_bareBusinessRoute() {
+        assertFalse(byJobMatcher.matches(req("GET", "/api/v1/profiles/business")));
+    }
+
+    @Test
+    void byJobMatcher_doesNotMatch_businessByIdRoute() {
+        assertFalse(byJobMatcher.matches(req("GET", "/api/v1/profiles/business/1")));
+    }
+
+    @Test
+    void byJobMatcher_doesNotMatch_nonGet() {
+        assertFalse(byJobMatcher.matches(req("POST", "/api/v1/profiles/business/by-job/1")));
     }
 
     private MockHttpServletRequest req(String method, String uri) {

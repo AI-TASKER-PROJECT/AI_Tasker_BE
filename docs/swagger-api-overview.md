@@ -185,7 +185,7 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 89 | GET | `/api/v1/profiles/files/view-url` | Lấy signed URL để xem file Firebase. | Xem chứng chỉ, giấy phép, proposal file. |
 | 90 | GET | `/api/v1/profiles/expert/me` | Expert xem hồ sơ KYC của mình. | Hồ sơ chuyên gia cá nhân. |
 | 91 | GET | `/api/v1/profiles/business/me` | Business xem hồ sơ KYB của mình. | Hồ sơ doanh nghiệp cá nhân. |
-| 92 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Xem thông tin business theo job. | Expert xem chi tiết doanh nghiệp của job. |
+| 92 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Xem thông tin business theo job. Public cho Guest (US-018) khi job `OPEN`, không cần JWT; job chưa public vẫn yêu cầu STAFF/ADMIN/BUSINESS. `/me` và `/business` vẫn bảo vệ. | Guest/expert xem doanh nghiệp đăng job trên trang job detail. |
 | 93 | POST | `/api/v1/profiles/portfolio` | Expert tạo hoặc cập nhật portfolio. | Hồ sơ năng lực AI của chuyên gia. |
 | 94 | POST | `/api/v1/profiles/portfolio/certificate-file` | Upload file chứng chỉ portfolio lên Firebase Storage. | Lưu file chứng chỉ chuyên gia. |
 | 95 | POST | `/api/v1/profiles/expert` | Expert tạo hoặc cập nhật hồ sơ KYC. | Hồ sơ xác minh chuyên gia. |
