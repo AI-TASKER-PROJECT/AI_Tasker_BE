@@ -127,121 +127,122 @@ Tài liệu này liệt kê đầy đủ REST API đang có trong source control
 | --- | --- | --- | --- | --- | --- |
 | 76 | GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Cần Bearer JWT | AI hỗ trợ job và matching | Sinh hoặc xem expert recommendations bằng AI. |
 | 77 | POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Cần Bearer JWT | AI hỗ trợ job và matching | Sinh hoặc xem expert recommendations bằng AI. |
+| 78 | POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | Cần Bearer JWT | AI hỗ trợ job và matching | Business chọn expert được AI recommend và gửi thông báo cho expert nộp proposal. |
 
 ## health-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 78 | GET | `/api/health` | Không cần token | Dev/Test và health check | Kiểm tra backend còn sống. |
+| 79 | GET | `/api/health` | Không cần token | Dev/Test và health check | Kiểm tra backend còn sống. |
 
 ## marketplace-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 79 | GET | `/api/v1/jobs` | Không cần token | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 80 | GET | `/api/v1/jobs/my` | Không cần token | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 81 | GET | `/api/v1/jobs/{jobId}` | Không cần token | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 82 | GET | `/api/v1/jobs/{jobId}/proposals` | Cần Bearer JWT | Marketplace job và proposal | Xem proposal của job. |
-| 83 | GET | `/api/v1/proposals/my` | Cần Bearer JWT | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 84 | POST | `/api/v1/jobs` | Cần Bearer JWT | Marketplace job và proposal | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
-| 85 | POST | `/api/v1/jobs/{jobId}/publish` | Cần Bearer JWT | Marketplace job và proposal | Publish job và tiêu thụ job-post credit. |
-| 86 | POST | `/api/v1/proposals` | Cần Bearer JWT | Marketplace job và proposal | Expert gửi proposal. |
-| 87 | POST | `/api/v1/proposals/file` | Cần Bearer JWT | Marketplace job và proposal | Upload file proposal. |
-| 88 | PATCH | `/api/v1/jobs/{jobId}/status` | Cần Bearer JWT | Marketplace job và proposal | Cập nhật một phần dữ liệu hoặc trạng thái. |
-| 89 | PATCH | `/api/v1/proposals/{proposalId}/status` | Cần Bearer JWT | Marketplace job và proposal | Duyệt hoặc từ chối proposal. |
+| 80 | GET | `/api/v1/jobs` | Không cần token | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 81 | GET | `/api/v1/jobs/my` | Không cần token | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 82 | GET | `/api/v1/jobs/{jobId}` | Không cần token | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 83 | GET | `/api/v1/jobs/{jobId}/proposals` | Cần Bearer JWT | Marketplace job và proposal | Xem proposal của job. |
+| 84 | GET | `/api/v1/proposals/my` | Cần Bearer JWT | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 85 | POST | `/api/v1/jobs` | Cần Bearer JWT | Marketplace job và proposal | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
+| 86 | POST | `/api/v1/jobs/{jobId}/publish` | Cần Bearer JWT | Marketplace job và proposal | Publish job và tiêu thụ job-post credit. |
+| 87 | POST | `/api/v1/proposals` | Cần Bearer JWT | Marketplace job và proposal | Expert gửi proposal. |
+| 88 | POST | `/api/v1/proposals/file` | Cần Bearer JWT | Marketplace job và proposal | Upload file proposal. |
+| 89 | PATCH | `/api/v1/jobs/{jobId}/status` | Cần Bearer JWT | Marketplace job và proposal | Cập nhật một phần dữ liệu hoặc trạng thái. |
+| 90 | PATCH | `/api/v1/proposals/{proposalId}/status` | Cần Bearer JWT | Marketplace job và proposal | Duyệt hoặc từ chối proposal. |
 
 ## membership-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 90 | GET | `/api/membership/packages` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem membership package theo role. |
-| 91 | POST | `/api/membership/packages/{packageId}/purchase` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
+| 91 | GET | `/api/membership/packages` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem membership package theo role. |
+| 92 | POST | `/api/membership/packages/{packageId}/purchase` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
 
 ## notification-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 92 | GET | `/api/v1/notifications` | Cần Bearer JWT | Notification | Lấy danh sách thông báo. |
-| 93 | GET | `/api/v1/notifications/unread-count` | Cần Bearer JWT | Notification | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 94 | PATCH | `/api/v1/notifications/read-all` | Cần Bearer JWT | Notification | Cập nhật một phần dữ liệu hoặc trạng thái. |
-| 95 | PATCH | `/api/v1/notifications/{notificationId}/read` | Cần Bearer JWT | Notification | Cập nhật một phần dữ liệu hoặc trạng thái. |
+| 93 | GET | `/api/v1/notifications` | Cần Bearer JWT | Notification | Lấy danh sách thông báo. |
+| 94 | GET | `/api/v1/notifications/unread-count` | Cần Bearer JWT | Notification | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 95 | PATCH | `/api/v1/notifications/read-all` | Cần Bearer JWT | Notification | Cập nhật một phần dữ liệu hoặc trạng thái. |
+| 96 | PATCH | `/api/v1/notifications/{notificationId}/read` | Cần Bearer JWT | Notification | Cập nhật một phần dữ liệu hoặc trạng thái. |
 
 ## pay-o-s-payment-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 96 | GET | `/api/payments/payos/return` | Không cần token | Payment, wallet, membership, quota và withdrawal | Nhận return từ PayOS và sync trạng thái. |
-| 97 | POST | `/api/payments/payos/create` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo payment order PayOS để nạp ví. |
-| 98 | POST | `/api/payments/payos/{orderCode}/sync` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Chủ động sync trạng thái PayOS theo order code. |
+| 97 | GET | `/api/payments/payos/return` | Không cần token | Payment, wallet, membership, quota và withdrawal | Nhận return từ PayOS và sync trạng thái. |
+| 98 | POST | `/api/payments/payos/create` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo payment order PayOS để nạp ví. |
+| 99 | POST | `/api/payments/payos/{orderCode}/sync` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Chủ động sync trạng thái PayOS theo order code. |
 
 ## profile-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 99 | GET | `/api/v1/profiles/business` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 100 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 101 | GET | `/api/v1/profiles/business/me` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 102 | GET | `/api/v1/profiles/business/{businessId}` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 103 | GET | `/api/v1/profiles/expert` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 104 | GET | `/api/v1/profiles/expert/me` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 105 | GET | `/api/v1/profiles/expert/{expertId}` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 106 | GET | `/api/v1/profiles/files/view-url` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy signed URL để xem file. |
-| 107 | GET | `/api/v1/profiles/portfolio` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 108 | GET | `/api/v1/profiles/portfolio/me` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 109 | POST | `/api/v1/profiles/approve/{type}/{id}` | Cần Bearer JWT | KYB/KYC, profile và file | Staff duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT; khi `status=Rejected` phải gửi query `reason` để lưu lý do từ chối. |
-| 110 | POST | `/api/v1/profiles/business` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
-| 111 | POST | `/api/v1/profiles/business/license-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload giấy phép kinh doanh. |
-| 112 | POST | `/api/v1/profiles/expert` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
-| 113 | POST | `/api/v1/profiles/expert/portfolio-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload file portfolio chuyên gia. |
-| 114 | POST | `/api/v1/profiles/portfolio` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
-| 115 | POST | `/api/v1/profiles/portfolio/certificate-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload chứng chỉ portfolio. |
+| 100 | GET | `/api/v1/profiles/business` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 101 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 102 | GET | `/api/v1/profiles/business/me` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 103 | GET | `/api/v1/profiles/business/{businessId}` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 104 | GET | `/api/v1/profiles/expert` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 105 | GET | `/api/v1/profiles/expert/me` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 106 | GET | `/api/v1/profiles/expert/{expertId}` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 107 | GET | `/api/v1/profiles/files/view-url` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy signed URL để xem file. |
+| 108 | GET | `/api/v1/profiles/portfolio` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 109 | GET | `/api/v1/profiles/portfolio/me` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 110 | POST | `/api/v1/profiles/approve/{type}/{id}` | Cần Bearer JWT | KYB/KYC, profile và file | Staff duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT; khi `status=Rejected` phải gửi query `reason` để lưu lý do từ chối. |
+| 111 | POST | `/api/v1/profiles/business` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
+| 112 | POST | `/api/v1/profiles/business/license-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload giấy phép kinh doanh. |
+| 113 | POST | `/api/v1/profiles/expert` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
+| 114 | POST | `/api/v1/profiles/expert/portfolio-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload file portfolio chuyên gia. |
+| 115 | POST | `/api/v1/profiles/portfolio` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
+| 116 | POST | `/api/v1/profiles/portfolio/certificate-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload chứng chỉ portfolio. |
 
 ## SoW Generation
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 116 | POST | `/api/jobs/generate-sow` | Cần Bearer JWT | AI hỗ trợ job và matching | AI sinh SoW và milestone gợi ý. |
+| 117 | POST | `/api/jobs/generate-sow` | Cần Bearer JWT | AI hỗ trợ job và matching | AI sinh SoW và milestone gợi ý. |
 
 ## tax-check-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 117 | GET | `/api/auth/tax-check/{mst}` | Không cần token | Auth, OTP và session | Kiểm tra mã số thuế doanh nghiệp. |
+| 118 | GET | `/api/auth/tax-check/{mst}` | Không cần token | Auth, OTP và session | Kiểm tra mã số thuế doanh nghiệp. |
 
 ## test-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 118 | GET | `/api/test/secure` | Cần Bearer JWT | Dev/Test và health check | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 119 | GET | `/api/test/secure` | Cần Bearer JWT | Dev/Test và health check | Lấy dữ liệu hoặc danh sách theo quyền. |
 
 ## user-quota-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 119 | GET | `/api/users/me/quota` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem quota, package active và premium entitlement. |
+| 120 | GET | `/api/users/me/quota` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem quota, package active và premium entitlement. |
 
 ## wallet-api-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 120 | GET | `/api/wallet/current` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem wallet hiện tại. |
-| 121 | GET | `/api/wallet/transactions` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem lịch sử wallet transaction. |
+| 121 | GET | `/api/wallet/current` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem wallet hiện tại. |
+| 122 | GET | `/api/wallet/transactions` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem lịch sử wallet transaction. |
 
 ## wallet-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 122 | GET | `/api/v1/wallet/me` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 123 | GET | `/api/v1/wallet/me` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Lấy dữ liệu hoặc danh sách theo quyền. |
 
 ## withdrawal-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 123 | GET | `/api/v1/admin/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
-| 124 | GET | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
-| 125 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin approve withdrawal sau khi chuyển khoản thủ công. |
-| 126 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin reject withdrawal và trả holding về available. |
-| 127 | POST | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo withdrawal request. |
+| 124 | GET | `/api/v1/admin/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
+| 125 | GET | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
+| 126 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin approve withdrawal sau khi chuyển khoản thủ công. |
+| 127 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin reject withdrawal và trả holding về available. |
+| 128 | POST | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo withdrawal request. |
 
 ## Ghi chú kiểm tra
 

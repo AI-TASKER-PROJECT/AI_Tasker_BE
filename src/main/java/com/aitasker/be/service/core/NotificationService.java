@@ -102,6 +102,18 @@ public class NotificationService {
         );
     }
 
+    // Note: Hàm `notifyExpertSelectedForJob` báo cho expert khi doanh nghiệp chọn expert từ danh sách AI recommendation.
+    public void notifyExpertSelectedForJob(Integer receiverAccountId, Integer actorAccountId, Integer jobId, String jobTitle) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "EXPERT_RECOMMENDATION_SELECTED",
+                "Bạn được doanh nghiệp chọn",
+                "Doanh nghiệp đã chọn bạn cho dự án \"" + safeText(jobTitle, "không tên") + "\". Hãy xem job và nộp proposal nếu phù hợp.",
+                "/expert/jobs/" + jobId
+        );
+    }
+
     // Note: Hàm `notifyProfileReviewed` tạo thông báo tiếng Việt khi staff duyệt hoặc từ chối hồ sơ KYB/KYC.
     public void notifyProfileReviewed(Integer receiverAccountId, Integer actorAccountId, String profileType, String status) {
         boolean approved = "Approved".equalsIgnoreCase(status);

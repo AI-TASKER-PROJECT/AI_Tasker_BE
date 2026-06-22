@@ -44,6 +44,8 @@ public class ProposalEntity {
     @Column(name = "bid_amount", nullable = false) private BigDecimal bidAmount;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "status", nullable = false, length = 50) private String status;
+    @Builder.Default
+    @Column(name = "business_selected", nullable = false) private Boolean businessSelected = Boolean.FALSE;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

@@ -5,10 +5,13 @@ import com.aitasker.be.dto.candidate.ExpertCandidateResponse;
 import com.aitasker.be.dto.candidate.ExpertCandidateSearchResponse;
 import com.aitasker.be.dto.candidate.ExpertRecommendationListResponse;
 import com.aitasker.be.dto.candidate.SowKeywordExtractionResult;
+import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.ExpertRecommendationEntity;
+import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.SowEntity;
 import com.aitasker.be.repository.ExpertRecommendationRepository;
+import com.aitasker.be.repository.ExpertProfileRepository;
 import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.MilestoneRepository;
 import com.aitasker.be.repository.SowRepository;
@@ -45,6 +48,9 @@ class ExpertRecommendationServiceTest {
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private RestTemplate restTemplate;
     @Mock private PaymentWalletService paymentWalletService;
+    @Mock private AccessService accessService;
+    @Mock private ExpertProfileRepository expertProfileRepository;
+    @Mock private NotificationService notificationService;
 
     private OpenAiProperties openAiProperties;
     private ExpertRecommendationService service;
@@ -60,7 +66,10 @@ class ExpertRecommendationServiceTest {
                 milestoneRepository,
                 restTemplate,
                 openAiProperties,
-                paymentWalletService
+                paymentWalletService,
+                accessService,
+                expertProfileRepository,
+                notificationService
         );
     }
 
@@ -150,6 +159,30 @@ class ExpertRecommendationServiceTest {
         List<ExpertRecommendationEntity> saved = toList(captor.getValue());
         assertEquals(1, saved.size());
         assertEquals(2L, saved.get(0).getExpertId());
+    }
+
+    @Test
+    void selectRecommendedExpert_shouldMarkSelectedAndNotifyExpertOnce() {
+        ExpertRecommendationEntity recommendation = ExpertRecommendationEntity.builder()
+                .id(100L)
+                .jobPostingId(1L)
+                .expertId(2L)
+                .portfolioId(20L)
+                .rankPosition(1)
+                .businessSelected(Boolean.FALSE)
+                .build();
+        when(expertRecommendationRepository.findByJobPostingIdAndExpertId(1L, 2L))
+                .thenReturn(Optional.of(recommendation));
+        when(jobRepository.findById(1)).thenReturn(Optional.of(JobEntity.builder().jobId(1).title("AI chatbot").build()));
+        when(expertRecommendationRepository.save(any(ExpertRecommendationEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(expertProfileRepository.findById(2)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(2).accountId(22).build()));
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(11).build());
+
+        var response = service.selectRecommendedExpert(1L, 2L);
+
+        assertTrue(response.getBusinessSelected());
+        verify(paymentWalletService).requirePremiumRecommendationAccess(1L);
+        verify(notificationService).notifyExpertSelectedForJob(22, 11, 1, "AI chatbot");
     }
 
     private ExpertCandidateSearchResponse candidateSearch(List<ExpertCandidateResponse> candidates) {

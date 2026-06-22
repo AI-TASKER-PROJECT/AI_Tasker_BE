@@ -19,4 +19,5 @@ public class ExpertRecommendationResponse {
     private List<String> matchedSkills;
     private List<String> matchedDomains;
     private String reason;
+    private Boolean businessSelected;
 }

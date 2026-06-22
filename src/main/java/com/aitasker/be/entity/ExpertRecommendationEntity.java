@@ -53,6 +53,10 @@ public class ExpertRecommendationEntity {
     @Column(name = "matched_domains", columnDefinition = "TEXT")
     private String matchedDomains;
 
+    @Builder.Default
+    @Column(name = "business_selected", nullable = false)
+    private Boolean businessSelected = Boolean.FALSE;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

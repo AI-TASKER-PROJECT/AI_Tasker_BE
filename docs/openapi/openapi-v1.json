@@ -4106,6 +4106,48 @@
           "required": false
         }
       }
+    },
+    "/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select": {
+      "post": {
+        "tags": [
+          "Expert Recommendations"
+        ],
+        "summary": "Business ch?n expert ???c AI recommend.",
+        "description": "Mark a saved recommendation as selected by the Business and notify the Expert to submit a proposal.",
+        "operationId": "selectRecommendedExpert",
+        "parameters": [
+          {
+            "name": "jobPostingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "expertId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5935,6 +5977,9 @@
           },
           "reason": {
             "type": "string"
+          },
+          "businessSelected": {
+            "type": "boolean"
           }
         }
       },

@@ -59,6 +59,7 @@ class AdminServiceTest {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditLogService auditLogService;
+    @Mock private PaymentWalletService paymentWalletService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private AdminService adminService;
@@ -107,5 +108,34 @@ class AdminServiceTest {
         verify(staffRepository).save(staffCaptor.capture());
         assertEquals(99, staffCaptor.getValue().getAccountId());
         assertEquals("KYB/KYC profile verification, Data Engineering", staffCaptor.getValue().getSpecialization());
+    }
+
+    @Test
+    void createAccount_shouldEnsureQuotaWhenRoleIsBusiness() {
+        AccountRequest request = new AccountRequest();
+        request.setEmail("new.business@mail.com");
+        request.setPassword("12345678");
+        request.setFullName("New Business");
+        request.setPhone("0900999001");
+        request.setRole("BUSINESS");
+        request.setStatus("Approved");
+
+        RoleEntity businessRole = RoleEntity.builder().roleId(2).roleName("BUSINESS").build();
+        when(accountRepository.existsByEmailIgnoreCase("new.business@mail.com")).thenReturn(false);
+        when(roleRepository.findByRoleNameIgnoreCase("BUSINESS")).thenReturn(Optional.of(businessRole));
+        when(passwordEncoder.encode("12345678")).thenReturn("hashed");
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> {
+            AccountEntity account = invocation.getArgument(0);
+            account.setAccountId(100);
+            return account;
+        });
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
+
+        adminService.createAccount(request);
+
+        verify(paymentWalletService).ensureQuotaForAccount(org.mockito.ArgumentMatchers.argThat(account ->
+                Integer.valueOf(100).equals(account.getAccountId())
+                        && "BUSINESS".equals(account.getRole().getRoleName())
+        ));
     }
 }

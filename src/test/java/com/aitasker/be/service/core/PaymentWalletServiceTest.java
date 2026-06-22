@@ -91,6 +91,30 @@ class PaymentWalletServiceTest {
     }
 
     @Test
+    void ensureQuotaForAccount_shouldGrantInitialBusinessJobPostCredits() {
+        AccountEntity business = AccountEntity.builder()
+                .accountId(10)
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.empty());
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        paymentWalletService.ensureQuotaForAccount(business);
+
+        verify(userQuotaRepository).save(argThat(quota ->
+                Integer.valueOf(3).equals(quota.getJobPostQuotaBalance())
+                        && Integer.valueOf(0).equals(quota.getProposalQuotaBalance())
+        ));
+        verify(quotaUsageLogRepository).save(argThat(log ->
+                "JOB_POST".equals(log.getQuotaType())
+                        && "GRANT".equals(log.getActionType())
+                        && Integer.valueOf(3).equals(log.getAmount())
+                        && Integer.valueOf(3).equals(log.getBalanceAfter())
+                        && "INITIAL_BUSINESS_GRANT".equals(log.getReferenceType())
+        ));
+    }
+
+    @Test
     void purchaseJobPostCredits_shouldReturnTopupInfoWhenBalanceInsufficient() {
         AccountEntity business = AccountEntity.builder()
                 .accountId(10)

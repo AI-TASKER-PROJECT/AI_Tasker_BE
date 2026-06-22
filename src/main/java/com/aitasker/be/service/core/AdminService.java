@@ -42,6 +42,7 @@ public class AdminService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final PaymentWalletService paymentWalletService;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -214,6 +215,9 @@ public class AdminService {
         AccountEntity saved = accountRepository.save(account);
         if (hasRole(role, "STAFF")) {
             ensureStaffProfile(saved.getAccountId(), request.getSpecialization());
+        }
+        if (hasRole(role, "BUSINESS") || hasRole(role, "EXPERT")) {
+            paymentWalletService.ensureQuotaForAccount(saved);
         }
         auditLogService.record(AuditLogService.ACTION_CREATE_ACCOUNT, "account", String.valueOf(saved.getAccountId()), accessService.currentAccount().getAccountId());
         return toAccountResponse(saved);

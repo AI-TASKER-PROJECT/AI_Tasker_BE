@@ -41,4 +41,16 @@ public class ExpertRecommendationController {
                 expertRecommendationService.getRecommendations(jobPostingId)
         ));
     }
+
+    @Operation(summary = "Select a recommended expert", description = "Mark a saved recommendation as selected by the Business and notify the Expert to submit a proposal.")
+    @PostMapping("/{jobPostingId}/expert-recommendations/{expertId}/select")
+    public ResponseEntity<ApiResponse<Object>> selectRecommendedExpert(
+            @PathVariable Long jobPostingId,
+            @PathVariable Long expertId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "SELECT EXPERT RECOMMENDATION SUCCESS",
+                expertRecommendationService.selectRecommendedExpert(jobPostingId, expertId)
+        ));
+    }
 }

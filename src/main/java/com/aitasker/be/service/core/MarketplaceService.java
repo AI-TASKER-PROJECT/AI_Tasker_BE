@@ -138,6 +138,7 @@ public class MarketplaceService {
                 .proposalDescription(request.getProposalDescription())
                 .proposalFileUrl(request.getProposalFileUrl())
                 .bidAmount(request.getBidAmount())
+                .businessSelected(Boolean.FALSE)
                 .build();
         input.assignProposalMilestone(normalizeProposalMilestone(request.proposalMilestoneText(), job, request.getBidAmount()));
         input.setExpertId(expertId);

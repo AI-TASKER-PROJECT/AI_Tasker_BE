@@ -79,9 +79,10 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 - `wallet_transactions`: real wallet ledger movements.
 - `membership_packages`: configurable Business/Expert packages.
 - `membership_purchases`: membership purchase history and badge range.
-- `user_quotas`: job-post/proposal credit balances, badge expiration, and
-  Premium entitlement expiration.
-- `quota_usage_logs`: grant, purchase, consume, and adjust quota history.
+- `user_quotas`: job-post/proposal credit balances, initial free quota grants,
+  badge expiration, and Premium entitlement expiration.
+- `quota_usage_logs`: grant, purchase, consume, and adjust quota history,
+  including `INITIAL_BUSINESS_GRANT` and `INITIAL_EXPERT_GRANT`.
 - `contract_deposits`: 20% contract security deposit hold/refund lifecycle.
 - `withdrawal_requests`: manual withdrawal requests and admin review.
 

@@ -8,10 +8,12 @@ import com.aitasker.be.dto.candidate.ExpertRecommendationListResponse;
 import com.aitasker.be.dto.candidate.ExpertRecommendationResponse;
 import com.aitasker.be.dto.candidate.SowKeywordExtractionResult;
 import com.aitasker.be.entity.ExpertRecommendationEntity;
+import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.SowEntity;
 import com.aitasker.be.repository.ExpertRecommendationRepository;
+import com.aitasker.be.repository.ExpertProfileRepository;
 import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.MilestoneRepository;
 import com.aitasker.be.repository.SowRepository;
@@ -61,6 +63,9 @@ public class ExpertRecommendationService {
     private final RestTemplate restTemplate;
     private final OpenAiProperties openAiProperties;
     private final PaymentWalletService paymentWalletService;
+    private final AccessService accessService;
+    private final ExpertProfileRepository expertProfileRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -128,6 +133,31 @@ public class ExpertRecommendationService {
                 .generatedByAi(null)
                 .message(recommendations.isEmpty() ? "No saved expert recommendations found." : "Saved expert recommendations loaded.")
                 .build();
+    }
+
+    @Transactional
+    public ExpertRecommendationResponse selectRecommendedExpert(Long jobPostingId, Long expertId) {
+        paymentWalletService.requirePremiumRecommendationAccess(jobPostingId);
+        ExpertRecommendationEntity recommendation = expertRecommendationRepository
+                .findByJobPostingIdAndExpertId(jobPostingId, expertId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT RECOMMENDATION"));
+        JobEntity job = jobRepository.findById(toIntegerJobId(jobPostingId))
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+
+        boolean firstSelection = !Boolean.TRUE.equals(recommendation.getBusinessSelected());
+        if (firstSelection) {
+            recommendation.setBusinessSelected(Boolean.TRUE);
+            recommendation = expertRecommendationRepository.save(recommendation);
+            ExpertProfileEntity expert = expertProfileRepository.findById(toIntegerExpertId(expertId))
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
+            notificationService.notifyExpertSelectedForJob(
+                    expert.getAccountId(),
+                    accessService.currentAccount().getAccountId(),
+                    job.getJobId(),
+                    job.getTitle()
+            );
+        }
+        return toResponse(recommendation);
     }
 
     private Optional<RecommendationGenerationResult> generateWithAi(
@@ -382,6 +412,7 @@ public class ExpertRecommendationService {
                     .matchedSkills(isEmpty(raw.getMatchedSkills()) ? defaultList(candidate.getMatchedSkills()) : raw.getMatchedSkills())
                     .matchedDomains(isEmpty(raw.getMatchedDomains()) ? defaultList(candidate.getMatchedDomains()) : raw.getMatchedDomains())
                     .reason(isBlank(raw.getReason()) ? FALLBACK_REASON : raw.getReason())
+                    .businessSelected(Boolean.FALSE)
                     .build());
             nextRank++;
         }
@@ -405,6 +436,7 @@ public class ExpertRecommendationService {
                     .matchedSkills(defaultList(candidate.getMatchedSkills()))
                     .matchedDomains(defaultList(candidate.getMatchedDomains()))
                     .reason(FALLBACK_REASON)
+                    .businessSelected(Boolean.FALSE)
                     .build());
         }
         return recommendations;
@@ -424,6 +456,7 @@ public class ExpertRecommendationService {
                         .aiReason(response.getReason())
                         .matchedSkills(writeStringList(response.getMatchedSkills()))
                         .matchedDomains(writeStringList(response.getMatchedDomains()))
+                        .businessSelected(Boolean.FALSE)
                         .build())
                 .toList();
     }
@@ -437,6 +470,7 @@ public class ExpertRecommendationService {
                 .matchedSkills(readStoredStringList(entity.getMatchedSkills()))
                 .matchedDomains(readStoredStringList(entity.getMatchedDomains()))
                 .reason(entity.getAiReason())
+                .businessSelected(Boolean.TRUE.equals(entity.getBusinessSelected()))
                 .build();
     }
 
@@ -537,6 +571,14 @@ public class ExpertRecommendationService {
             return Math.toIntExact(jobPostingId);
         } catch (ArithmeticException ex) {
             throw new NotFoundException("KHONG TIM THAY JOB");
+        }
+    }
+
+    private Integer toIntegerExpertId(Long expertId) {
+        try {
+            return Math.toIntExact(expertId);
+        } catch (ArithmeticException ex) {
+            throw new NotFoundException("KHONG TIM THAY EXPERT PROFILE");
         }
     }
 

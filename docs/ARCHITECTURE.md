@@ -35,7 +35,8 @@ Current product domains:
 - Marketplace jobs, proposals, and proposal review.
 - Domain, skill, technology, and acceptance-criteria catalogs.
 - AI SoW generation and job assistant support.
-- Expert candidate recommendation and matching.
+- Expert candidate recommendation, matching, and Business-selected expert
+  invitation notifications.
 - Contract draft, signatures, NDA signatures, milestones, acceptance
   criteria, deliverables, and termination.
 - Finance, wallet, payment order, PayOS payment, wallet ledger, membership,
@@ -311,12 +312,17 @@ Finance is partially MVP and partially integrated:
 - `GET /api/users/me/quota` is the authoritative source for active package,
   quota, and Premium permission display. Frontend-local values such as
   `aitasker_active_package` are not business truth.
-- Business job publishing consumes one job-post credit only when publish to
-  `OPEN` succeeds and the job has a saved SoW.
+- Business accounts receive 3 initial free job-post credits. Business job
+  publishing consumes one job-post credit only when publish to `OPEN` succeeds
+  and the job has a saved SoW.
 - Expert proposal submission consumes one proposal credit only when the
   proposal save succeeds.
 - Active Business Premium entitlement is required to view AI expert
   recommendations.
+- Business can select a saved AI expert recommendation through
+  `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select`; the
+  recommendation is marked selected and the Expert receives a notification to
+  review the job and submit a proposal.
 - Contract security deposit moves Business available balance to escrow.
 - Withdrawal requests move available balance to holding; admin approval removes
   holding and admin rejection returns holding to available.

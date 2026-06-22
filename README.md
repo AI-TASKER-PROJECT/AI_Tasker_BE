@@ -51,6 +51,9 @@ Swagger/OpenAPI:
 - Da bo sung migration `V33__profile_rejection_reason.sql` de luu ly do
   staff tu choi xac minh KYB/KYC vao `business_profiles.rejection_reason`
   va `expert_profiles.rejection_reason`.
+- Da bo sung migration `V34__business_initial_quota_and_recommendation_selection.sql`
+  de cap 3 job-post quota mien phi cho Business va luu trang thai Business
+  chon expert duoc AI recommend.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.
@@ -106,6 +109,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/credits/proposal/purchase`
   - `GET /api/users/me/quota`
   - `POST /api/v1/jobs/{jobId}/publish`
+  - `POST /api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select`
   - `POST /api/v1/contracts/{contractId}/deposit/pay`
   - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
   - `POST /api/v1/withdrawal-requests`

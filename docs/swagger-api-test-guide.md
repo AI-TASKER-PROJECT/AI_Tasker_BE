@@ -183,7 +183,8 @@ Body mẫu hay dùng trong luồng này:
 | 57 | GET | `/api/jobs/{jobPostingId}/expert-candidates` | Expert Candidates | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 | 58 | GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Expert Recommendations | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 | 59 | POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Expert Recommendations | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 60 | POST | `/api/jobs/generate-sow` | SoW Generation | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 60 | POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | Expert Recommendations | Cần Bearer JWT; BUSINESS sở hữu job và có Premium active | Không có body | Response trả recommendation với `businessSelected=true`; expert nhận notification `EXPERT_RECOMMENDATION_SELECTED`. |
+| 61 | POST | `/api/jobs/generate-sow` | SoW Generation | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
 Body mẫu hay dùng trong luồng này:
 
@@ -205,58 +206,58 @@ Body mẫu hay dùng trong luồng này:
 
 | STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
 | --- | --- | --- | --- | --- | --- | --- |
-| 61 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 62 | GET | `/api/v1/contracts` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 63 | GET | `/api/v1/contracts/{contractId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 64 | GET | `/api/v1/contracts/{contractId}/disputes` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 65 | GET | `/api/v1/contracts/{contractId}/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 66 | GET | `/api/v1/disputes/{disputeId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 67 | GET | `/api/v1/milestones/{milestoneId}/criteria` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 68 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 69 | GET | `/api/v1/milestones/{milestoneId}/transactions` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 70 | POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | contract-execution-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 71 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 72 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 73 | POST | `/api/v1/contracts/{contractId}/nda-sign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 74 | POST | `/api/v1/contracts/{contractId}/reject` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 75 | POST | `/api/v1/contracts/{contractId}/sign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 76 | POST | `/api/v1/contracts/{contractId}/terminate` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 77 | POST | `/api/v1/criteria` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 78 | POST | `/api/v1/deliverables` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 79 | POST | `/api/v1/disputes` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 80 | POST | `/api/v1/disputes/{disputeId}/demo-testing` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 81 | POST | `/api/v1/disputes/{disputeId}/technical-report` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 82 | POST | `/api/v1/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 83 | POST | `/api/v1/milestones/sla-auto-approve` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 84 | POST | `/api/v1/milestones/{milestoneId}/complete` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 85 | PATCH | `/api/v1/disputes/{disputeId}/assign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 86 | PATCH | `/api/v1/disputes/{disputeId}/resolve` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 62 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 63 | GET | `/api/v1/contracts` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 64 | GET | `/api/v1/contracts/{contractId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 65 | GET | `/api/v1/contracts/{contractId}/disputes` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 66 | GET | `/api/v1/contracts/{contractId}/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 67 | GET | `/api/v1/disputes/{disputeId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 68 | GET | `/api/v1/milestones/{milestoneId}/criteria` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 69 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 70 | GET | `/api/v1/milestones/{milestoneId}/transactions` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 71 | POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | contract-execution-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 72 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 73 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 74 | POST | `/api/v1/contracts/{contractId}/nda-sign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 75 | POST | `/api/v1/contracts/{contractId}/reject` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 76 | POST | `/api/v1/contracts/{contractId}/sign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 77 | POST | `/api/v1/contracts/{contractId}/terminate` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 78 | POST | `/api/v1/criteria` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 79 | POST | `/api/v1/deliverables` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 80 | POST | `/api/v1/disputes` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 81 | POST | `/api/v1/disputes/{disputeId}/demo-testing` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 82 | POST | `/api/v1/disputes/{disputeId}/technical-report` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 83 | POST | `/api/v1/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 84 | POST | `/api/v1/milestones/sla-auto-approve` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 85 | POST | `/api/v1/milestones/{milestoneId}/complete` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 86 | PATCH | `/api/v1/disputes/{disputeId}/assign` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 87 | PATCH | `/api/v1/disputes/{disputeId}/resolve` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
 ### Payment, wallet, membership, quota và withdrawal
 
 | STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
 | --- | --- | --- | --- | --- | --- | --- |
-| 87 | GET | `/api/v1/admin/wallet` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 88 | POST | `/api/v1/admin/wallet/sync` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 89 | POST | `/api/v1/transactions` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 90 | POST | `/api/v1/transactions/{transactionId}/webhook` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 91 | PATCH | `/api/v1/transactions/{transactionId}/status` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 92 | POST | `/api/credits/job-post/purchase` | credit-controller | Cần Bearer JWT; BUSINESS | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 93 | POST | `/api/credits/proposal/purchase` | credit-controller | Cần Bearer JWT; EXPERT | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 94 | GET | `/api/membership/packages` | membership-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 95 | POST | `/api/membership/packages/{packageId}/purchase` | membership-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 96 | GET | `/api/payments/payos/return` | pay-o-s-payment-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 97 | POST | `/api/payments/payos/create` | pay-o-s-payment-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 98 | POST | `/api/payments/payos/{orderCode}/sync` | pay-o-s-payment-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 99 | GET | `/api/users/me/quota` | user-quota-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 100 | GET | `/api/wallet/current` | wallet-api-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 101 | GET | `/api/wallet/transactions` | wallet-api-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 102 | GET | `/api/v1/wallet/me` | wallet-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 103 | GET | `/api/v1/admin/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 104 | GET | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 105 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 106 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 107 | POST | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 88 | GET | `/api/v1/admin/wallet` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 89 | POST | `/api/v1/admin/wallet/sync` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 90 | POST | `/api/v1/transactions` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 91 | POST | `/api/v1/transactions/{transactionId}/webhook` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 92 | PATCH | `/api/v1/transactions/{transactionId}/status` | contract-execution-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 93 | POST | `/api/credits/job-post/purchase` | credit-controller | Cần Bearer JWT; BUSINESS | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 94 | POST | `/api/credits/proposal/purchase` | credit-controller | Cần Bearer JWT; EXPERT | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 95 | GET | `/api/membership/packages` | membership-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 96 | POST | `/api/membership/packages/{packageId}/purchase` | membership-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 97 | GET | `/api/payments/payos/return` | pay-o-s-payment-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 98 | POST | `/api/payments/payos/create` | pay-o-s-payment-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 99 | POST | `/api/payments/payos/{orderCode}/sync` | pay-o-s-payment-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 100 | GET | `/api/users/me/quota` | user-quota-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 101 | GET | `/api/wallet/current` | wallet-api-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 102 | GET | `/api/wallet/transactions` | wallet-api-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 103 | GET | `/api/v1/wallet/me` | wallet-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 104 | GET | `/api/v1/admin/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 105 | GET | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 106 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 107 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | withdrawal-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 108 | POST | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Có body mẫu bên dưới | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
 Body mẫu hay dùng trong luồng này:
 
@@ -317,36 +318,36 @@ Body mẫu hay dùng trong luồng này:
 
 | STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
 | --- | --- | --- | --- | --- | --- | --- |
-| 108 | GET | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 109 | GET | `/api/v1/admin/analytics/overview` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 110 | GET | `/api/v1/admin/audit-logs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 111 | GET | `/api/v1/admin/settings` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 112 | GET | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 113 | POST | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 114 | POST | `/api/v1/admin/reviews` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 115 | POST | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 116 | PATCH | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 117 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 118 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 119 | PATCH | `/api/v1/admin/settings/{key}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 120 | PATCH | `/api/v1/admin/staffs/{staffId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 121 | DELETE | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 109 | GET | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 110 | GET | `/api/v1/admin/analytics/overview` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 111 | GET | `/api/v1/admin/audit-logs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 112 | GET | `/api/v1/admin/settings` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 113 | GET | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 114 | POST | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 115 | POST | `/api/v1/admin/reviews` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 116 | POST | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 117 | PATCH | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 118 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 119 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 120 | PATCH | `/api/v1/admin/settings/{key}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 121 | PATCH | `/api/v1/admin/staffs/{staffId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Có JSON body theo schema Swagger | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 122 | DELETE | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT; ADMIN/STAFF tùy API | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
 ### Notification
 
 | STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
 | --- | --- | --- | --- | --- | --- | --- |
-| 122 | GET | `/api/v1/notifications` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 123 | GET | `/api/v1/notifications/unread-count` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 124 | PATCH | `/api/v1/notifications/read-all` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 125 | PATCH | `/api/v1/notifications/{notificationId}/read` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 123 | GET | `/api/v1/notifications` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 124 | GET | `/api/v1/notifications/unread-count` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 125 | PATCH | `/api/v1/notifications/read-all` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 126 | PATCH | `/api/v1/notifications/{notificationId}/read` | notification-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
 ### Dev/Test và health check
 
 | STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
 | --- | --- | --- | --- | --- | --- | --- |
-| 126 | GET | `/api/health` | health-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
-| 127 | GET | `/api/test/secure` | test-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 127 | GET | `/api/health` | health-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 128 | GET | `/api/test/secure` | test-controller | Cần Bearer JWT; User đã đăng nhập phù hợp quyền | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 
 ## 5. Lưu ý payment/contract flow
 

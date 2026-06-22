@@ -74,6 +74,7 @@ public class PaymentWalletService {
     private static final String TIER_PLUS = "PLUS";
     private static final String TIER_STANDARD = "STANDARD";
     private static final String TIER_BASIC = "BASIC";
+    private static final int INITIAL_FREE_QUOTA = 3;
 
     private final AccessService accessService;
     private final SystemWalletService systemWalletService;
@@ -505,12 +506,25 @@ public class PaymentWalletService {
         return userQuotaRepository.findByAccountIdForUpdate(account.getAccountId())
                 .orElseGet(() -> {
                     String role = account.getRole().getRoleName();
-                    int initialProposalQuota = ROLE_EXPERT.equals(role) ? 3 : 0;
+                    int initialJobPostQuota = ROLE_BUSINESS.equals(role) ? INITIAL_FREE_QUOTA : 0;
+                    int initialProposalQuota = ROLE_EXPERT.equals(role) ? INITIAL_FREE_QUOTA : 0;
                     UserQuotaEntity created = userQuotaRepository.save(UserQuotaEntity.builder()
                             .accountId(account.getAccountId())
-                            .jobPostQuotaBalance(0)
+                            .jobPostQuotaBalance(initialJobPostQuota)
                             .proposalQuotaBalance(initialProposalQuota)
                             .build());
+                    if (initialJobPostQuota > 0) {
+                        quotaUsageLogRepository.save(QuotaUsageLogEntity.builder()
+                                .accountId(account.getAccountId())
+                                .quotaType(QUOTA_JOB_POST)
+                                .actionType("GRANT")
+                                .amount(initialJobPostQuota)
+                                .balanceBefore(0)
+                                .balanceAfter(initialJobPostQuota)
+                                .referenceType("INITIAL_BUSINESS_GRANT")
+                                .referenceId(account.getAccountId().longValue())
+                                .build());
+                    }
                     if (initialProposalQuota > 0) {
                         quotaUsageLogRepository.save(QuotaUsageLogEntity.builder()
                                 .accountId(account.getAccountId())
