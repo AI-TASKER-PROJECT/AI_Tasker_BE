@@ -135,6 +135,7 @@ Tài liệu này liệt kê REST API đang có trong controller source hiện t�
 | --- | --- | --- | --- | --- | --- |
 | 80 | GET | `/api/v1/jobs` | Cần Bearer JWT | Job marketplace và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 81 | POST | `/api/v1/jobs` | Cần Bearer JWT | Job marketplace và proposal | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
+| 81a | PUT | `/api/v1/jobs/{jobId}` | Cần Bearer JWT (BUSINESS) | Job marketplace và proposal | Cập nhật draft job: persist cùng `jobs` + `sow` + `milestones` (US-022). Chỉ cho DRAFT, upsert sow theo jobId, thay milestone nháp. Không tiêu quota publish. |
 | 82 | GET | `/api/v1/jobs/my` | Cần Bearer JWT | Job marketplace và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 83 | GET | `/api/v1/jobs/{jobId}` | Cần Bearer JWT | Job marketplace và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 84 | GET | `/api/v1/jobs/{jobId}/proposals` | Cần Bearer JWT | Job marketplace và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |

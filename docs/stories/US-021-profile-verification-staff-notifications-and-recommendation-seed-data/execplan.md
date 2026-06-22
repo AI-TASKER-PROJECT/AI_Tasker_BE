@@ -10,7 +10,7 @@ In scope:
 
 - Add staff notification dispatch for Business KYB submission.
 - Add staff notification dispatch for Expert KYC submission.
-- Add migration V38 for verified demo accounts, profiles, portfolios, jobs, milestones, proposals, quotas, and wallets.
+- Add migration V39 for verified demo accounts, profiles, portfolios, jobs, milestones, proposals, quotas, and wallets.
 - Add focused unit tests.
 - Record Harness story, validation, and trace evidence.
 

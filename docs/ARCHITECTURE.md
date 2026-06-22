@@ -273,6 +273,11 @@ Marketplace behavior is not just CRUD. Preserve these state rules:
 - Public job listing must not leak draft, cancelled, closed, or other non-open
   jobs.
 - Business-owned job management uses `/api/v1/jobs/my`, not the public list.
+- Draft job editing uses `PUT /api/v1/jobs/{jobId}` (US-022): BUSINESS + approved
+  KYB + ownership + `DRAFT` status + no existing contract. The flow persists
+  `jobs` + `sow` (upsert by `jobId`) + `milestones` (replace draft set) in one
+  transaction and does not consume publish quota. `JOB_MUST_HAVE_AI_SOW` on
+  publish remains a genuine missing-SoW guard.
 
 ## Contract Execution Rules
 

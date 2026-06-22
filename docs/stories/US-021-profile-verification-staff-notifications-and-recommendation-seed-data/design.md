@@ -20,7 +20,7 @@ This reuses `NotificationService.createAndPush(...)`, so notifications are both 
 
 ## Seed Data
 
-Migration `V38__seed_recommendation_demo_profiles_jobs_proposals.sql` adds deterministic demo data with high numeric IDs to avoid existing local seed collisions.
+Migration `V39__seed_recommendation_demo_profiles_jobs_proposals.sql` adds deterministic demo data with high numeric IDs to avoid existing local seed collisions.
 
 Seeded Expert data:
 

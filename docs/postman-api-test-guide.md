@@ -1214,6 +1214,43 @@ POST {{baseUrl}}/api/v1/jobs
 }
 ```
 
+#### 81a. PUT /api/v1/jobs/{jobId}
+
+```http
+PUT {{baseUrl}}/api/v1/jobs/{jobId}
+```
+
+- Mục đích: Cập nhật draft job, persist cùng `jobs` + `sow` + `milestones` (US-022).
+- Phục vụ: Luồng job posting chỉnh sửa nháp trước khi publish.
+- Token: Cần Bearer token BUSINESS đã KYB Approved và sở hữu job.
+- Điều kiện: Job phải `DRAFT` và chưa có contract. Upsert sow theo `jobId`; thay milestone nháp (xoá + chèn lại). Không tiêu quota publish.
+- Body raw mẫu (giống `POST /api/v1/jobs`, gửi lại `sow` + `milestones` đã chỉnh):
+```json
+{
+  "title": "Tích hợp RAG chatbot cho chăm sóc khách hàng (v2)",
+  "rawRequirements": "Cần chatbot trả lời câu hỏi sản phẩm, lấy dữ liệu từ FAQ và chuyển lead cho nhân viên.",
+  "budget": 95000000,
+  "sow": {
+    "title": "SoW RAG chatbot v2",
+    "overview": "Phiên bản chỉnh sửa sau review nội bộ"
+  },
+  "milestones": [
+    {
+      "milestoneName": "Phân tích và thiết kế RAG (sửa)",
+      "fundsAllocated": 35000000,
+      "orderIndex": 1
+    },
+    {
+      "milestoneName": "Triển khai chatbot và bàn giao",
+      "fundsAllocated": 60000000,
+      "orderIndex": 2
+    }
+  ]
+}
+```
+- Lỗi nghiệp vụ: `KHONG TIM THAY JOB` (404), `BAN KHONG CO QUYEN THAO TAC JOB NAY`, `JOB KHONG O TRANG THAI DRAFT`, `JOB DA CO CONTRACT, KHONG DUOC CHINH MILESTONE`, `SOW TITLE KHONG DUOC DE TRONG`.
+- Sau khi cập nhật, `POST /api/v1/jobs/{jobId}/publish` không còn fail `JOB_MUST_HAVE_AI_SOW` vì sow đã được upsert.
+
 ### notification-controller
 
 #### 82. GET /api/v1/notifications

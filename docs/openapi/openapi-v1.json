@@ -952,6 +952,48 @@
         }
       }
     },
+    "/api/v1/jobs/{jobId}": {
+      "put": {
+        "tags": [
+          "marketplace-controller"
+        ],
+        "operationId": "updateDraftJob",
+        "description": "Update a draft job's core fields, SoW, and milestones together (US-022). BUSINESS + approved KYB + ownership required; job must be in DRAFT status and have no contract. Upserts sow by jobId and replaces draft milestones. Does not consume publish quota. 404 when job missing; non-owner, non-DRAFT, and contract-exists cases are rejected.",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJobEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/domains": {
       "get": {
         "tags": [
