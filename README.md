@@ -75,6 +75,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/profiles/approve/{type}/{id}?status=...`
 - Marketplace:
   - `POST /api/v1/jobs`
+  - `PUT /api/v1/jobs/{jobId}` (draft update: persist jobs + sow + milestones, US-022)
   - `GET /api/v1/jobs`
   - `GET /api/v1/jobs/{jobId}`
   - `POST /api/v1/proposals`

@@ -11,6 +11,8 @@ This sprint includes the completed stories and the next story to implement:
 * US-015: Strengthen contract milestone snapshot fields
 * US-016: Add regression tests for contract milestone and notification flow
 * US-017: Open public business profile for guest access
+* US-018: Open business-by-job profile for guest access on public jobs
+* US-022: Preserve and update SoW when editing draft job milestones
 
 ## Current Completed Baseline
 
@@ -363,3 +365,202 @@ If a dedicated route matcher or security-boundary test is added, run that test t
 2. The existing `businessProfileByJob(...)` logic already contains the intended `OPEN`-job public rule.
 3. The main risk is opening the route too broadly and weakening sibling business profile routes.
 4. Do not claim full public-route proof unless at least one security-boundary check has actually been run.
+
+---
+
+# US-022 - Preserve and Update SoW When Editing Draft Job Milestones
+
+## User Story
+
+As a Business user,
+I want to edit milestone content on a draft job without losing the job's SoW persistence state,
+so that I can continue refining the draft and still publish it successfully later.
+
+As the backend team,
+we want draft-job editing to keep SoW and milestone data consistent in the database,
+so that `publish` does not fail with `JOB_MUST_HAVE_AI_SOW` after ordinary draft edits.
+
+## Problem
+
+Current behavior suggests the following failure mode:
+
+1. the client generates or prepares SoW and milestone data
+2. the user edits milestone content before publishing
+3. the draft job remains editable
+4. later, `POST /api/v1/jobs/{jobId}/publish` fails with:
+
+```text
+JOB_MUST_HAVE_AI_SOW
+```
+
+The backend currently checks publish eligibility by querying persisted SoW rows:
+
+* `sowRepository.findByJobId(jobId).isEmpty()` -> reject publish
+
+This means client-side SoW state is not enough. A draft job must have a real row
+in table `sow` for publish to succeed.
+
+The likely product gap is that the repository currently has:
+
+* job creation with SoW persistence
+* job publish
+* status update
+* domain / skill / technology updates
+
+but no clear full-draft update flow that re-persists both:
+
+* edited milestone data
+* edited or previously generated SoW data
+
+## Target Product Contract
+
+After completing US-022:
+
+1. Editing a draft job's milestones must not silently break the persisted SoW requirement for publish.
+2. A draft job that already had a persisted SoW must still be publishable after milestone edits, unless the user explicitly removes or invalidates SoW data.
+3. If the product supports editing a draft job after initial creation, the backend must provide one consistent persistence path for:
+   * job core fields
+   * SoW
+   * milestones
+4. `JOB_MUST_HAVE_AI_SOW` should only occur when the draft job genuinely has no persisted SoW row.
+
+## Required Investigation
+
+The next model must first confirm which of these is true in the current product flow:
+
+### Case A
+
+The frontend is editing milestone state locally and later calling a backend flow
+that never persists SoW to table `sow`.
+
+### Case B
+
+The backend has an update path for the draft job, but that path updates
+milestones without preserving or upserting SoW.
+
+### Case C
+
+The frontend is re-creating or replacing draft job state incorrectly and loses
+the original persisted SoW relation.
+
+Do not implement blindly before determining which case matches the real code path.
+
+## Expected Backend Direction
+
+If the product intends draft jobs to remain editable after creation, the likely
+backend shape should be:
+
+* a dedicated draft job update endpoint, or
+* a draft save/upsert flow
+
+that persists together:
+
+* `jobs`
+* `sow`
+* `milestones`
+
+The update flow should:
+
+1. verify ownership and `BUSINESS` role
+2. allow editing only while the job is still in editable draft state
+3. upsert the `sow` row by `jobId` instead of requiring only create-time insert
+4. replace or update milestones safely for the same draft job
+
+## Data Rules
+
+For a draft job update flow:
+
+* `sow` remains a single row per `jobId`
+* milestone edits before contract creation are allowed
+* once milestones belong to a contract, milestone editing remains blocked
+* publish still requires a persisted SoW row
+
+## Suggested Backend Changes
+
+### 1. Marketplace API surface
+
+Investigate whether the repo needs a new endpoint such as:
+
+```http
+PUT /api/v1/jobs/{jobId}
+```
+
+or another existing draft-save route that should be extended.
+
+The contract should make it clear that the draft save operation persists:
+
+* job fields
+* SoW
+* milestones
+
+### 2. SoW persistence behavior
+
+Current create flow saves SoW only through create-time logic.
+
+The next model should likely introduce an upsert-style behavior for SoW on draft edits:
+
+* if `sow` exists for `jobId`, update it
+* otherwise create it
+
+Do not break the unique-per-job rule of the `sow` table.
+
+### 3. Milestone edit behavior
+
+Milestones sent by the Business before contract creation should still be stored
+as the authoritative editable draft milestone set.
+
+If the draft update flow replaces milestones, it must do so intentionally and
+consistently with SoW persistence.
+
+## Validation Expectations
+
+At minimum, prove:
+
+1. create draft job with SoW and milestones
+2. edit milestone(s) through the intended draft-edit flow
+3. verify the job still has a persisted SoW row
+4. publish succeeds without `JOB_MUST_HAVE_AI_SOW`
+
+If possible, also prove the failure case:
+
+* a job with no actual SoW row still fails publish with `JOB_MUST_HAVE_AI_SOW`
+
+## Suggested Commands / Checks
+
+Useful verification steps for the next model:
+
+```sql
+select job_id, title, status from jobs order by job_id;
+select sow_id, job_id, title from sow order by sow_id;
+select milestone_id, job_id, milestone_name, status from milestones order by milestone_id;
+```
+
+And a focused code review of:
+
+* `MarketplaceController`
+* `MarketplaceService`
+* `SowRepository`
+* any draft job update flow already present in the repo
+
+## Acceptance Criteria
+
+* Editing draft milestones does not accidentally make publish fail due to missing SoW persistence.
+* The chosen draft-save flow persists SoW and milestones consistently.
+* `JOB_MUST_HAVE_AI_SOW` remains only a genuine missing-SoW guard.
+* Docs and API contract are updated if a new draft update endpoint is introduced.
+
+## Non-goals
+
+US-022 does not automatically include:
+
+* changing publish quota rules
+* changing SoW AI generation output format
+* changing milestone snapshot rules after contract creation
+* changing public job visibility rules
+
+## Handoff Notes for the Next Model
+
+1. This is not primarily a quota bug.
+2. This is not primarily a milestone validation bug.
+3. The likely root cause is missing SoW persistence across draft edits.
+4. Confirm the real frontend/backend save path before choosing the endpoint shape.

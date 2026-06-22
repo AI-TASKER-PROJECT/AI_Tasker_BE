@@ -43,6 +43,7 @@ public class AuditLogService {
     public static final String ACTION_UPLOAD_EXPERT_PORTFOLIO_FILE = "Tải file portfolio chuyên gia";
     public static final String ACTION_UPSERT_PORTFOLIO = "Cập nhật portfolio chuyên gia";
     public static final String ACTION_CREATE_JOB_DRAFT = "Tạo job nháp";
+    public static final String ACTION_UPDATE_JOB_DRAFT = "Cập nhật job nháp";
     public static final String ACTION_CHANGE_JOB_STATUS = "Đổi trạng thái job";
     public static final String ACTION_SUBMIT_PROPOSAL = "Gửi proposal";
     public static final String ACTION_REVIEW_PROPOSAL = "Duyệt proposal";

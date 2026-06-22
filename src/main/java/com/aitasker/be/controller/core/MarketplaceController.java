@@ -32,6 +32,11 @@ public class MarketplaceController {
         return ResponseEntity.ok(ApiResponse.success("CREATE JOB SUCCESS", marketplaceService.createJob(request)));
     }
 
+    @PutMapping("/jobs/{jobId}")
+    public ResponseEntity<ApiResponse<JobEntity>> updateDraftJob(@PathVariable Integer jobId, @RequestBody JobEntity request) {
+        return ResponseEntity.ok(ApiResponse.success("UPDATE DRAFT JOB SUCCESS", marketplaceService.updateDraftJob(jobId, request)));
+    }
+
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/jobs")
     // Note: Hàm `listJobs` trả về các job đang OPEN để chuyên gia nhìn thấy trên marketplace.

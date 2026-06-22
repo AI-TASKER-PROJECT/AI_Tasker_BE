@@ -44,6 +44,7 @@ public class MarketplaceService {
     private final ProposalRepository proposalRepository;
     private final SowRepository sowRepository;
     private final MilestoneRepository milestoneRepository;
+    private final ContractRepository contractRepository;
     private final DomainRepository domainRepository;
     private final SkillRepository skillRepository;
     private final JobDomainRepository jobDomainRepository;
@@ -81,6 +82,31 @@ public class MarketplaceService {
         saveJobSkills(saved.getJobId(), input.getSkills());
         saveJobTechnologies(saved.getJobId(), input.getTechnologyIds());
         auditLogService.record(AuditLogService.ACTION_CREATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
+        return attachJobDetails(saved);
+    }
+
+    @Transactional
+    public JobEntity updateDraftJob(Integer jobId, JobEntity input) {
+        accessService.requireRole("BUSINESS");
+        if (input == null) throw new AppException("JOB UPDATE BODY KHONG DUOC DE TRONG");
+        JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        BusinessProfileEntity business = currentApprovedBusiness();
+        if (!business.getBusinessId().equals(job.getBusinessId())) {
+            throw new AppException("BAN KHONG CO QUYEN THAO TAC JOB NAY");
+        }
+        if (!"DRAFT".equalsIgnoreCase(job.getStatus())) {
+            throw new AppException("JOB KHONG O TRANG THAI DRAFT");
+        }
+        if (contractRepository.findByJobId(jobId).isPresent()) {
+            throw new AppException("JOB DA CO CONTRACT, KHONG DUOC CHINH MILESTONE");
+        }
+        if (input.getTitle() != null && !input.getTitle().isBlank()) job.setTitle(input.getTitle());
+        if (input.getRawRequirements() != null && !input.getRawRequirements().isBlank()) job.setRawRequirements(input.getRawRequirements());
+        if (input.getBudget() != null && input.getBudget().signum() > 0) job.setBudget(input.getBudget());
+        JobEntity saved = jobRepository.save(job);
+        upsertSow(saved.getJobId(), input.getSow());
+        replaceDraftMilestones(saved, input.getMilestones());
+        auditLogService.record(AuditLogService.ACTION_UPDATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
         return attachJobDetails(saved);
     }
 
@@ -272,7 +298,53 @@ public class MarketplaceService {
         sowRepository.save(sow);
     }
 
+    private void upsertSow(Integer jobId, SowEntity sow) {
+        if (sow == null) return;
+        if (sow.getTitle() == null || sow.getTitle().isBlank()) throw new AppException("SOW TITLE KHONG DUOC DE TRONG");
+        SowEntity existing = sowRepository.findByJobId(jobId).orElse(null);
+        if (existing != null) {
+            existing.setTitle(sow.getTitle());
+            existing.setOverview(sow.getOverview());
+            existing.setObjectives(sow.getObjectives());
+            existing.setScopeOfWork(sow.getScopeOfWork());
+            existing.setDeliverable(sow.getDeliverable());
+            existing.setAssumptions(sow.getAssumptions());
+            existing.setOutOfScope(sow.getOutOfScope());
+            sowRepository.save(existing);
+        } else {
+            sow.setSowId(null);
+            sow.setJobId(jobId);
+            sowRepository.save(sow);
+        }
+    }
+
     private void saveMilestones(JobEntity job, List<MilestoneEntity> milestones) {
+        if (milestones == null || milestones.isEmpty()) return;
+        Set<Integer> orderIndexes = new LinkedHashSet<>();
+        int defaultOrderIndex = 1;
+        for (MilestoneEntity milestone : milestones) {
+            if (milestone.getOrderIndex() == null) milestone.setOrderIndex(defaultOrderIndex);
+            if (milestone.getMilestoneName() == null || milestone.getMilestoneName().isBlank()) throw new AppException("MILESTONE NAME KHONG DUOC DE TRONG");
+            if (milestone.getFundsAllocated() == null || milestone.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
+            if (milestone.getOrderIndex() == null || milestone.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
+            if (!orderIndexes.add(milestone.getOrderIndex())) throw new AppException("ORDER INDEX BI TRUNG TRONG MILESTONE");
+            milestone.setMilestoneId(null);
+            milestone.setJobId(job.getJobId());
+            milestone.setContractId(null);
+            if (milestone.getStatus() == null) milestone.setStatus("PENDING");
+            MilestoneEntity saved = milestoneRepository.save(milestone);
+            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getCriteriaIds());
+            defaultOrderIndex++;
+        }
+    }
+
+    private void replaceDraftMilestones(JobEntity job, List<MilestoneEntity> milestones) {
+        List<MilestoneEntity> existing = milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId());
+        for (MilestoneEntity old : existing) {
+            milestoneCriteriaRepository.deleteByIdMilestoneId(old.getMilestoneId());
+            milestoneRepository.delete(old);
+        }
+        milestoneRepository.flush();
         if (milestones == null || milestones.isEmpty()) return;
         Set<Integer> orderIndexes = new LinkedHashSet<>();
         int defaultOrderIndex = 1;

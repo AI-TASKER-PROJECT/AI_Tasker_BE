@@ -8,9 +8,11 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
+import com.aitasker.be.entity.ContractEntity;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.RoleEntity;
+import com.aitasker.be.entity.SowEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,9 @@ import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -38,13 +43,20 @@ class MarketplaceServiceTest {
     @Mock private ExpertProfileRepository expertProfileRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private JobRepository jobRepository;
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
-    @Mock private JobDomainRepository jobDomainRepository;
-    @Mock private JobSkillRepository jobSkillRepository;
     @Mock private PortfolioRepository portfolioRepository;
     @Mock private ProposalRepository proposalRepository;
     @Mock private SowRepository sowRepository;
     @Mock private MilestoneRepository milestoneRepository;
+    @Mock private ContractRepository contractRepository;
+    @Mock private DomainRepository domainRepository;
+    @Mock private SkillRepository skillRepository;
+    @Mock private TechnologyRepository technologyRepository;
+    @Mock private JobDomainRepository jobDomainRepository;
+    @Mock private JobSkillRepository jobSkillRepository;
+    @Mock private JobTechnologyRepository jobTechnologyRepository;
+    @Mock private PaymentWalletService paymentWalletService;
+    @Mock private NotificationService notificationService;
+    @Mock private FirebaseStorageService firebaseStorageService;
     @Mock private AcceptanceCriteriaRepository criteriaRepository;
     @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     @Mock private AuditLogService auditLogService;
@@ -94,6 +106,141 @@ class MarketplaceServiceTest {
         assertEquals("DRAFT", saved.getStatus());
         assertNull(saved.getPublishedAt());
         assertEquals(20, saved.getBusinessId());
+    }
+
+    @Test
+    void updateDraftJob_shouldUpsertSowAndReplaceMilestonesForDraftJob() {
+        Integer jobId = 1;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("DRAFT")
+                .title("Old").rawRequirements("Old req").budget(BigDecimal.TEN).build();
+        JobEntity input = JobEntity.builder()
+                .title("New title").rawRequirements("New req").budget(BigDecimal.valueOf(20))
+                .sow(SowEntity.builder().title("New Sow").overview("ov").build())
+                .milestones(List.of(MilestoneEntity.builder().milestoneName("M1").fundsAllocated(BigDecimal.valueOf(5)).orderIndex(1).build()))
+                .build();
+        SowEntity existingSow = SowEntity.builder().sowId(7).jobId(jobId).title("Old Sow").build();
+        MilestoneEntity oldMilestone = MilestoneEntity.builder().milestoneId(100).jobId(jobId).milestoneName("old").build();
+
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(contractRepository.findByJobId(jobId)).thenReturn(Optional.empty());
+        when(sowRepository.findByJobId(jobId)).thenReturn(Optional.of(existingSow));
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId)).thenReturn(List.of(oldMilestone));
+        when(jobRepository.save(any(JobEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(inv -> {
+            MilestoneEntity m = inv.getArgument(0);
+            m.setMilestoneId(200);
+            return m;
+        });
+
+        JobEntity result = marketplaceService.updateDraftJob(jobId, input);
+
+        assertEquals("New title", result.getTitle());
+        assertEquals("New Sow", existingSow.getTitle());
+        verify(sowRepository).save(existingSow);
+        verify(milestoneRepository).delete(oldMilestone);
+        verify(milestoneRepository).save(any(MilestoneEntity.class));
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_JOB_DRAFT, "jobs", String.valueOf(jobId), 10);
+    }
+
+    @Test
+    void updateDraftJob_shouldInsertSowWhenNoneExists() {
+        Integer jobId = 2;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("DRAFT")
+                .title("T").rawRequirements("R").budget(BigDecimal.TEN).build();
+        JobEntity input = JobEntity.builder()
+                .sow(SowEntity.builder().title("Inserted Sow").build())
+                .build();
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(contractRepository.findByJobId(jobId)).thenReturn(Optional.empty());
+        when(sowRepository.findByJobId(jobId)).thenReturn(Optional.empty());
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId)).thenReturn(List.of());
+        when(jobRepository.save(any(JobEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        marketplaceService.updateDraftJob(jobId, input);
+
+        verify(sowRepository).save(any(SowEntity.class));
+    }
+
+    @Test
+    void updateDraftJob_shouldRejectNonOwner() {
+        Integer jobId = 3;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(99).status("DRAFT").build();
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+
+        AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateDraftJob(jobId, JobEntity.builder().build()));
+        assertEquals("BAN KHONG CO QUYEN THAO TAC JOB NAY", ex.getMessage());
+        verify(sowRepository, never()).save(any(SowEntity.class));
+    }
+
+    @Test
+    void updateDraftJob_shouldRejectNonDraftJob() {
+        Integer jobId = 4;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("OPEN").build();
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+
+        AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateDraftJob(jobId, JobEntity.builder().build()));
+        assertEquals("JOB KHONG O TRANG THAI DRAFT", ex.getMessage());
+    }
+
+    @Test
+    void updateDraftJob_shouldRejectWhenContractExists() {
+        Integer jobId = 5;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("DRAFT").build();
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(contractRepository.findByJobId(jobId)).thenReturn(Optional.of(ContractEntity.builder().build()));
+
+        AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateDraftJob(jobId, JobEntity.builder().build()));
+        assertEquals("JOB DA CO CONTRACT, KHONG DUOC CHINH MILESTONE", ex.getMessage());
+    }
+
+    @Test
+    void updateDraftJob_shouldRejectBlankSowTitle() {
+        Integer jobId = 6;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("DRAFT")
+                .title("T").rawRequirements("R").budget(BigDecimal.TEN).build();
+        JobEntity input = JobEntity.builder().sow(SowEntity.builder().title(" ").build()).build();
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(contractRepository.findByJobId(jobId)).thenReturn(Optional.empty());
+        when(jobRepository.save(any(JobEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateDraftJob(jobId, input));
+        assertEquals("SOW TITLE KHONG DUOC DE TRONG", ex.getMessage());
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
