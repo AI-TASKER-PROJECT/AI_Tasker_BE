@@ -76,7 +76,7 @@ Tài liệu này liệt kê đầy đủ REST API đang có trong source control
 | 44 | GET | `/api/v1/contracts/{contractId}/milestones` | Cần Bearer JWT | Contract, milestone, deliverable và dispute | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 45 | GET | `/api/v1/disputes/{disputeId}` | Cần Bearer JWT | Contract, milestone, deliverable và dispute | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 46 | GET | `/api/v1/jobs/{jobId}/matching` | Cần Bearer JWT | AI hỗ trợ job và matching | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 47 | GET | `/api/v1/jobs/{jobId}/milestones` | Cần Bearer JWT | Marketplace job và proposal | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 47 | GET | `/api/v1/jobs/{jobId}/milestones` | Không cần token với job `OPEN`; cần Bearer JWT với job chưa public | Marketplace job và proposal | Xem milestone của job. Public với job `OPEN`, job chưa public vẫn kiểm tra quyền tham gia/sở hữu. |
 | 48 | GET | `/api/v1/milestones/{milestoneId}/criteria` | Cần Bearer JWT | Contract, milestone, deliverable và dispute | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 49 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | Cần Bearer JWT | Contract, milestone, deliverable và dispute | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 50 | GET | `/api/v1/milestones/{milestoneId}/transactions` | Cần Bearer JWT | Contract, milestone, deliverable và dispute | Lấy dữ liệu hoặc danh sách theo quyền. |

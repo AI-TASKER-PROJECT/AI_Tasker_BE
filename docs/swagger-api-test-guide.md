@@ -130,7 +130,7 @@ Body mẫu hay dùng trong luồng này:
 
 | STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
 | --- | --- | --- | --- | --- | --- | --- |
-| 42 | GET | `/api/v1/jobs/{jobId}/milestones` | contract-execution-controller | Cần Bearer JWT; BUSINESS/EXPERT/STAFF/ADMIN theo flow | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
+| 42 | GET | `/api/v1/jobs/{jobId}/milestones` | contract-execution-controller | Không cần token nếu job `OPEN`; cần Bearer JWT nếu job chưa public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 | 43 | GET | `/api/v1/jobs` | marketplace-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 | 44 | GET | `/api/v1/jobs/my` | marketplace-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
 | 45 | GET | `/api/v1/jobs/{jobId}` | marketplace-controller | Không cần token; Public | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra `success`, `message`, `data`. |
