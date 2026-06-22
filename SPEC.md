@@ -2,6 +2,8 @@
 
 ## Overall Scope
 
+
+
 This sprint includes the completed stories and the next story to implement:
 
 * US-013: Add duration for milestone and contract milestone snapshot
