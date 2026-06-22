@@ -11,6 +11,7 @@ import com.aitasker.be.dto.notification.NotificationResponse;
 import com.aitasker.be.dto.notification.UnreadNotificationCountResponse;
 import com.aitasker.be.entity.NotificationEntity;
 import com.aitasker.be.repository.NotificationRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 // Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
@@ -27,6 +29,7 @@ public class NotificationService {
     private final AccessService accessService;
     private final NotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Note: Hàm `listMine` lấy toàn bộ thông báo của tài khoản đang đăng nhập để giao diện hiển thị lịch sử thông báo.
     public List<NotificationResponse> listMine() {
@@ -117,14 +120,21 @@ public class NotificationService {
     }
 
     // Note: Hàm `notifyDeliverableSubmitted` tạo thông báo tiếng Việt khi chuyên gia nộp sản phẩm bàn giao cho milestone.
-    public void notifyDeliverableSubmitted(Integer receiverAccountId, Integer actorAccountId, Integer milestoneId, String milestoneName) {
+    public void notifyDeliverableSubmitted(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Integer milestoneId, Integer deliverableId, String milestoneName) {
+        Map<String, Object> metadata = Map.of(
+                "contractId", contractId,
+                "milestoneId", milestoneId,
+                "deliverableId", deliverableId
+        );
         createAndPush(
                 receiverAccountId,
                 actorAccountId,
                 "DELIVERABLE_SUBMITTED",
                 "Có sản phẩm bàn giao mới",
                 "Chuyên gia vừa nộp sản phẩm bàn giao cho milestone \"" + safeText(milestoneName, "không tên") + "\".",
-                "/business/milestones/" + milestoneId + "/deliverables"
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                metadata
         );
     }
 
@@ -166,7 +176,19 @@ public class NotificationService {
     // Note: Hàm `createAndPush` lưu thông báo vào database và đẩy realtime tới đúng tài khoản nhận qua WebSocket.
     @Transactional
     public NotificationResponse createAndPush(Integer receiverAccountId, Integer actorAccountId, String type, String title, String message, String targetUrl) {
+        return createAndPush(receiverAccountId, actorAccountId, type, title, message, targetUrl, null);
+    }
+
+    @Transactional
+    public NotificationResponse createAndPush(Integer receiverAccountId, Integer actorAccountId, String type, String title, String message, String targetUrl, Map<String, Object> metadata) {
         if (receiverAccountId == null) return null;
+        String metadataJson = null;
+        if (metadata != null && !metadata.isEmpty()) {
+            try {
+                metadataJson = objectMapper.writeValueAsString(metadata);
+            } catch (Exception ignored) {
+            }
+        }
         NotificationEntity saved = notificationRepository.save(NotificationEntity.builder()
                 .receiverAccountId(receiverAccountId)
                 .actorAccountId(actorAccountId)
@@ -174,6 +196,7 @@ public class NotificationService {
                 .title(title)
                 .message(message)
                 .targetUrl(targetUrl)
+                .metadata(metadataJson)
                 .isRead(Boolean.FALSE)
                 .build());
         NotificationResponse response = toResponse(saved);
@@ -183,12 +206,20 @@ public class NotificationService {
 
     // Note: Hàm `toResponse` chuyển entity sang DTO để không trả trực tiếp dữ liệu database nội bộ.
     private NotificationResponse toResponse(NotificationEntity notification) {
+        Object metadataObj = null;
+        if (notification.getMetadata() != null && !notification.getMetadata().isBlank()) {
+            try {
+                metadataObj = objectMapper.readValue(notification.getMetadata(), Object.class);
+            } catch (Exception ignored) {
+            }
+        }
         return NotificationResponse.builder()
                 .notificationId(notification.getNotificationId())
                 .type(notification.getType())
                 .title(notification.getTitle())
                 .message(notification.getMessage())
                 .targetUrl(notification.getTargetUrl())
+                .metadata(metadataObj)
                 .isRead(notification.getIsRead())
                 .createdAt(notification.getCreatedAt())
                 .readAt(notification.getReadAt())

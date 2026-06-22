@@ -54,6 +54,7 @@ public class AuditLogService {
     public static final String ACTION_COMPLETE_CONTRACT = "Hoàn tất hợp đồng";
     public static final String ACTION_TERMINATE_CONTRACT = "Chấm dứt hợp đồng";
     public static final String ACTION_CREATE_MILESTONE = "Tạo milestone";
+    public static final String ACTION_UPDATE_MILESTONE = "Cập nhật milestone";
     public static final String ACTION_COMPLETE_MILESTONE = "Hoàn tất milestone";
     public static final String ACTION_CREATE_ACCEPTANCE_CRITERIA = "Tạo tiêu chí nghiệm thu";
     public static final String ACTION_SUBMIT_DELIVERABLE = "Nộp sản phẩm bàn giao";

@@ -74,6 +74,19 @@ Alternate exits:
   cancelled contracts remain `CANCELLED`.
 - `COMPLETED` and `CANCELLED` contracts cannot be terminated again.
 
+- `GET /api/v1/contracts/{contractId}/milestones` returns contract milestones as
+  `ContractMilestoneViewResponse` DTOs. Snapshot fields (`milestoneName`,
+  `description`, `originalBudget`, `finalBudget`, `orderIndex`, `duration`,
+  `durationUnit`, `criteriaSnapshot`, `deliverableExpectation`) come from
+  `contract_milestones`. Displayed status comes from the live `milestones` table
+  (via `job_milestone_id` lookup), falling back to `contract_milestones.status`
+  when the linked milestone is missing. `criteriaSnapshot` is built from the
+  milestone's active acceptance criteria descriptions at contract creation time,
+  joined by newlines. `deliverableExpectation` is copied from the milestone
+  `description` at contract creation time. Both snapshot fields stay stable after
+  contract creation even if the source milestone or its acceptance criteria are
+  later edited.
+
 ## API
 
 - `POST /api/v1/contracts/from-proposals/{proposalId}`
@@ -82,6 +95,7 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/deposit/pay`
 - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
 - `POST /api/v1/contracts/{contractId}/reject`
+- `GET /api/v1/contracts/{contractId}/milestones`
 - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
 - `POST /api/v1/deliverables`
 - `POST /api/v1/milestones/{milestoneId}/complete`

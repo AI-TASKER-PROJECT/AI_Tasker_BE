@@ -27,6 +27,10 @@ public class ContractMilestoneEntity {
     @Column(name = "final_budget", nullable = false) private BigDecimal finalBudget;
     @Column(name = "order_index", nullable = false) private Integer orderIndex;
     @Column(name = "status", nullable = false, length = 50) private String status;
+    @Column(name = "duration") private Integer duration;
+    @Column(name = "duration_unit", length = 20) private String durationUnit;
+    @Column(name = "criteria_snapshot") private String criteriaSnapshot;
+    @Column(name = "deliverable_expectation") private String deliverableExpectation;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
 

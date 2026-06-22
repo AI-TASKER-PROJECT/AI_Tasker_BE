@@ -702,7 +702,7 @@ GET {{baseUrl}}/api/v1/contracts/{contractId}
 GET {{baseUrl}}/api/v1/contracts/{contractId}/milestones
 ```
 
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
+- Mục đích: Lấy danh sách `ContractMilestoneViewResponse` với trạng thái live từ bảng `milestones`.
 - Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.

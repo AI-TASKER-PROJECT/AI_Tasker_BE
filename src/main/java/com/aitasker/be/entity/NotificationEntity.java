@@ -27,6 +27,7 @@ public class NotificationEntity {
     @Column(name = "title", nullable = false, length = 255) private String title;
     @Column(name = "message", nullable = false, columnDefinition = "TEXT") private String message;
     @Column(name = "target_url", length = 500) private String targetUrl;
+    @Column(name = "metadata", columnDefinition = "TEXT") private String metadata;
     @Column(name = "is_read", nullable = false) private Boolean isRead;
 
     // Note: Annotation này tự ghi thời điểm tạo thông báo khi insert database.

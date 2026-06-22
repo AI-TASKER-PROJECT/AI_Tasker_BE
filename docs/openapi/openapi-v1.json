@@ -2960,7 +2960,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
+                  "$ref": "#/components/schemas/ApiResponseListContractMilestoneViewResponse"
                 }
               }
             }
@@ -4532,6 +4532,95 @@
           },
           "difference": {
             "type": "number"
+          }
+        }
+      },
+      "ContractMilestoneViewResponse": {
+        "type": "object",
+        "properties": {
+          "contractMilestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contractId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobMilestoneId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "milestoneName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "originalBudget": {
+            "type": "number"
+          },
+          "finalBudget": {
+            "type": "number"
+          },
+          "orderIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "description": "Live status from milestones table, falling back to contract_milestones.status when linked milestone is missing"
+          },
+          "duration": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Snapshot of milestone duration at contract creation time"
+          },
+          "durationUnit": {
+            "type": "string",
+            "description": "Snapshot of milestone duration unit (DAY, WEEK, MONTH) at contract creation time"
+          },
+          "criteriaSnapshot": {
+            "type": "string",
+            "description": "Acceptance criteria text captured at contract creation time, joined by newlines. Stays stable after source milestone edits."
+          },
+          "deliverableExpectation": {
+            "type": "string",
+            "description": "Deliverable expectation text captured from milestone description at contract creation time. Stays stable after source milestone edits."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "difference": {
+            "type": "number"
+          }
+        }
+      },
+      "ApiResponseListContractMilestoneViewResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractMilestoneViewResponse"
+            }
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
