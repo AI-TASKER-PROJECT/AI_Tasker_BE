@@ -225,6 +225,16 @@ public class ProfileService {
         return path;
     }
 
+    // Note: Hàm `uploadExpertPortfolio` upload file portfolio chuyên gia lên Firebase Storage và trả về storage path để frontend lưu vào hồ sơ KYC/portfolio.
+    public String uploadExpertPortfolio(MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        String path = firebaseStorageService.upload(file, "expert-portfolios/accounts/" + accountId);
+        expertProfileRepository.findByAccountId(accountId)
+                .ifPresent(profile -> auditLogService.record(AuditLogService.ACTION_UPLOAD_EXPERT_PORTFOLIO_FILE, "expert_profiles", String.valueOf(profile.getExpertId()), accountId));
+        return path;
+    }
+
     // TAO HOAC CAP NHAT PORTFOLIO MOI CUA CHUYEN GIA DE BUSINESS DOC KHI REVIEW PROPOSAL.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional

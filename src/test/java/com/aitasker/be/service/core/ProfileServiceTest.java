@@ -24,6 +24,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Optional;
 
@@ -50,6 +51,7 @@ class ProfileServiceTest {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private AuditLogService auditLogService;
+    @Mock private FirebaseStorageService firebaseStorageService;
     @Mock private NotificationService notificationService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -179,6 +181,32 @@ class ProfileServiceTest {
         profileService.expertProfileById(expertId);
 
         verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+    }
+
+    @Test
+    void uploadExpertPortfolio_shouldUploadToExpertPortfolioFolderAndAuditProfile() {
+        Integer accountId = 20;
+        Integer expertId = 2;
+        MultipartFile file = mock(MultipartFile.class);
+        String expectedPath = "expert-portfolios/accounts/20/portfolio.pdf";
+        ExpertProfileEntity profile = ExpertProfileEntity.builder()
+                .expertId(expertId)
+                .accountId(accountId)
+                .nationalId("0123456789")
+                .portfolioUrl("https://portfolio.example.com")
+                .yearsOfExperience(5)
+                .kycStatus("Approved")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(accountId).build());
+        when(firebaseStorageService.upload(file, "expert-portfolios/accounts/" + accountId)).thenReturn(expectedPath);
+        when(expertProfileRepository.findByAccountId(accountId)).thenReturn(Optional.of(profile));
+
+        String path = profileService.uploadExpertPortfolio(file);
+
+        assertEquals(expectedPath, path);
+        verify(accessService).requireRole("EXPERT");
+        verify(auditLogService).record(AuditLogService.ACTION_UPLOAD_EXPERT_PORTFOLIO_FILE, "expert_profiles", String.valueOf(expertId), accountId);
     }
 
     @Test

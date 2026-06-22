@@ -3454,6 +3454,45 @@
         "summary": "Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ."
       }
     },
+    "/api/v1/profiles/expert/portfolio-file": {
+      "post": {
+        "tags": [
+          "profile-controller"
+        ],
+        "operationId": "uploadExpertPortfolio",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upload file portfolio chuy?n gia."
+      }
+    },
     "/api/v1/profiles/expert/me": {
       "get": {
         "tags": [

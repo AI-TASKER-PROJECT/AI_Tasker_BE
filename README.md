@@ -68,6 +68,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `GET /api/v1/profiles/business/{businessId}`
   - `POST /api/v1/profiles/expert`
   - `GET /api/v1/profiles/expert/{expertId}`
+  - `POST /api/v1/profiles/expert/portfolio-file`
   - `POST /api/v1/profiles/approve/{type}/{id}?status=...`
 - Marketplace:
   - `POST /api/v1/jobs`

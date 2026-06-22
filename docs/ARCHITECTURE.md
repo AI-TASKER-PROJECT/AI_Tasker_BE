@@ -115,7 +115,8 @@ The following service boundaries are established and should be preserved:
 - `service/auth/TaxCheckService`: business tax-code lookup/check.
 - `service/core/AccessService`: current account lookup from JWT and role checks.
 - `service/core/ProfileService`: KYB/KYC, portfolio, approval, and approval
-  audit behavior.
+  audit behavior, including Firebase-backed business license, expert
+  certificate, and expert portfolio file uploads.
 - `service/core/MarketplaceService`: job lifecycle, proposal submission, and
   proposal review.
 - `service/core/CatalogService`: domain, skill, technology, acceptance criteria,

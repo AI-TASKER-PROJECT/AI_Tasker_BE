@@ -192,55 +192,56 @@ Tài liệu này liệt kê đầy đủ REST API đang có trong source control
 | 110 | POST | `/api/v1/profiles/business` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
 | 111 | POST | `/api/v1/profiles/business/license-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload giấy phép kinh doanh. |
 | 112 | POST | `/api/v1/profiles/expert` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
-| 113 | POST | `/api/v1/profiles/portfolio` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
-| 114 | POST | `/api/v1/profiles/portfolio/certificate-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload chứng chỉ portfolio. |
+| 113 | POST | `/api/v1/profiles/expert/portfolio-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload file portfolio chuyên gia. |
+| 114 | POST | `/api/v1/profiles/portfolio` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
+| 115 | POST | `/api/v1/profiles/portfolio/certificate-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload chứng chỉ portfolio. |
 
 ## SoW Generation
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 115 | POST | `/api/jobs/generate-sow` | Cần Bearer JWT | AI hỗ trợ job và matching | AI sinh SoW và milestone gợi ý. |
+| 116 | POST | `/api/jobs/generate-sow` | Cần Bearer JWT | AI hỗ trợ job và matching | AI sinh SoW và milestone gợi ý. |
 
 ## tax-check-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 116 | GET | `/api/auth/tax-check/{mst}` | Không cần token | Auth, OTP và session | Kiểm tra mã số thuế doanh nghiệp. |
+| 117 | GET | `/api/auth/tax-check/{mst}` | Không cần token | Auth, OTP và session | Kiểm tra mã số thuế doanh nghiệp. |
 
 ## test-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 117 | GET | `/api/test/secure` | Cần Bearer JWT | Dev/Test và health check | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 118 | GET | `/api/test/secure` | Cần Bearer JWT | Dev/Test và health check | Lấy dữ liệu hoặc danh sách theo quyền. |
 
 ## user-quota-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 118 | GET | `/api/users/me/quota` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem quota, package active và premium entitlement. |
+| 119 | GET | `/api/users/me/quota` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem quota, package active và premium entitlement. |
 
 ## wallet-api-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 119 | GET | `/api/wallet/current` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem wallet hiện tại. |
-| 120 | GET | `/api/wallet/transactions` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem lịch sử wallet transaction. |
+| 120 | GET | `/api/wallet/current` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem wallet hiện tại. |
+| 121 | GET | `/api/wallet/transactions` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem lịch sử wallet transaction. |
 
 ## wallet-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 121 | GET | `/api/v1/wallet/me` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Lấy dữ liệu hoặc danh sách theo quyền. |
+| 122 | GET | `/api/v1/wallet/me` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Lấy dữ liệu hoặc danh sách theo quyền. |
 
 ## withdrawal-controller
 
 | STT | Method | API | Auth | Luồng | Mục đích |
 | --- | --- | --- | --- | --- | --- |
-| 122 | GET | `/api/v1/admin/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
-| 123 | GET | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
-| 124 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin approve withdrawal sau khi chuyển khoản thủ công. |
-| 125 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin reject withdrawal và trả holding về available. |
-| 126 | POST | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo withdrawal request. |
+| 123 | GET | `/api/v1/admin/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
+| 124 | GET | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Xem danh sách withdrawal request. |
+| 125 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin approve withdrawal sau khi chuyển khoản thủ công. |
+| 126 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Admin reject withdrawal và trả holding về available. |
+| 127 | POST | `/api/v1/withdrawal-requests` | Cần Bearer JWT | Payment, wallet, membership, quota và withdrawal | Tạo withdrawal request. |
 
 ## Ghi chú kiểm tra
 

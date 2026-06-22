@@ -95,6 +95,13 @@ public class ProfileController {
         return ResponseEntity.ok(ApiResponse.success("GET MY EXPERT PROFILE SUCCESS", profileService.currentExpertProfile()));
     }
 
+    // Note: Annotation này khai báo API upload file portfolio chuyên gia bằng multipart/form-data.
+    @PostMapping(value = "/expert/portfolio-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // Note: Hàm `uploadExpertPortfolio` nhận file portfolio chuyên gia, gọi service upload Firebase và trả về storage path.
+    public ResponseEntity<ApiResponse<String>> uploadExpertPortfolio(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("UPLOAD EXPERT PORTFOLIO SUCCESS", profileService.uploadExpertPortfolio(file)));
+    }
+
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/portfolio")
     // Note: Hàm `upsertPortfolio` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.

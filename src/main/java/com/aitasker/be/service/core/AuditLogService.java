@@ -40,6 +40,7 @@ public class AuditLogService {
     public static final String ACTION_UPSERT_EXPERT_PROFILE = "Cập nhật hồ sơ chuyên gia";
     public static final String ACTION_UPLOAD_BUSINESS_LICENSE = "Tải giấy phép kinh doanh";
     public static final String ACTION_UPLOAD_EXPERT_CERTIFICATE = "Tải chứng chỉ chuyên gia";
+    public static final String ACTION_UPLOAD_EXPERT_PORTFOLIO_FILE = "Tải file portfolio chuyên gia";
     public static final String ACTION_UPSERT_PORTFOLIO = "Cập nhật portfolio chuyên gia";
     public static final String ACTION_CREATE_JOB_DRAFT = "Tạo job nháp";
     public static final String ACTION_CHANGE_JOB_STATUS = "Đổi trạng thái job";
