@@ -48,7 +48,7 @@ Swagger/OpenAPI:
   ve `POSTED`.
 - Da bo sung migration `V32__premium_expiration_entitlement.sql` de them
   `user_quotas.premium_expired_at`, backfill Premium hien huu, va xoa flag cu.
-- Da bo sung migration `V33__profile_rejection_reason.sql` de luu ly do
+- Da bo sung migration `V34__profile_rejection_reason.sql` de luu ly do
   staff tu choi xac minh KYB/KYC vao `business_profiles.rejection_reason`
   va `expert_profiles.rejection_reason`.
 - KHONG SUA migration cu, chi THEM migration moi.

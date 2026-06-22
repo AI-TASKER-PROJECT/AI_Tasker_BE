@@ -32,7 +32,7 @@ Existing notifications continue to work without metadata (backward compatible).
 
 ## Design Notes
 
-- Migration: `V34__add_notification_metadata.sql` adds nullable `metadata TEXT` column to `notifications` table.
+- Migration: `V36__add_notification_metadata.sql` adds nullable `metadata TEXT` column to `notifications` table.
 - Entity: `NotificationEntity` gains `metadata` (String) field.
 - Response: `NotificationResponse` gains `metadata` (Object) field, deserialized from JSON string via `ObjectMapper`.
 - Service: Added overloaded `createAndPush(...)` accepting `Map<String, Object> metadata`; serializes to JSON string before save; deserializes in `toResponse()`.

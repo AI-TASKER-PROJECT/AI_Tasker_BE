@@ -17,7 +17,7 @@ the existing week6 migration history.
 
 Port the behavior into week6 with a new additive migration:
 
-- `V33__profile_rejection_reason.sql`
+- `V34__profile_rejection_reason.sql`
 - `business_profiles.rejection_reason VARCHAR(500)`
 - `expert_profiles.rejection_reason VARCHAR(500)`
 
