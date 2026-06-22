@@ -131,6 +131,27 @@ public class NotificationService {
         );
     }
 
+    public void notifyProfileSubmitted(Integer receiverAccountId, Integer actorAccountId, String profileType, Integer profileId, String displayName) {
+        boolean businessProfile = "BUSINESS".equalsIgnoreCase(profileType);
+        String profileName = businessProfile ? "doanh nghiep" : "chuyen gia";
+        String targetUrl = businessProfile
+                ? "/staff/profiles/business/" + profileId
+                : "/staff/profiles/expert/" + profileId;
+        Map<String, Object> metadata = Map.of(
+                "profileType", businessProfile ? "BUSINESS" : "EXPERT",
+                "profileId", profileId
+        );
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "PROFILE_VERIFICATION_SUBMITTED",
+                "Co ho so can xac minh",
+                "Ho so " + profileName + " \"" + safeText(displayName, "khong ten") + "\" vua duoc gui va can staff kiem tra.",
+                targetUrl,
+                metadata
+        );
+    }
+
     // Note: Hàm `notifyDeliverableSubmitted` tạo thông báo tiếng Việt khi chuyên gia nộp sản phẩm bàn giao cho milestone.
     public void notifyDeliverableSubmitted(Integer receiverAccountId, Integer actorAccountId,
             Integer contractId, Integer milestoneId, Integer deliverableId, String milestoneName) {

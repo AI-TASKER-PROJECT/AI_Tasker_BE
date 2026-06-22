@@ -57,6 +57,7 @@ public class ProfileService {
         accountRepository.save(account);
         BusinessProfileEntity saved = businessProfileRepository.save(entity);
         auditLogService.record(AuditLogService.ACTION_UPSERT_BUSINESS_PROFILE, "business_profiles", String.valueOf(saved.getBusinessId()), account.getAccountId());
+        notifyStaffProfileSubmitted("BUSINESS", saved.getBusinessId(), account.getAccountId(), saved.getCompanyName());
         return saved;
     }
 
@@ -88,6 +89,7 @@ public class ProfileService {
         accountRepository.save(account);
         ExpertProfileEntity saved = expertProfileRepository.save(entity);
         auditLogService.record(AuditLogService.ACTION_UPSERT_EXPERT_PROFILE, "expert_profiles", String.valueOf(saved.getExpertId()), account.getAccountId());
+        notifyStaffProfileSubmitted("EXPERT", saved.getExpertId(), account.getAccountId(), account.getFullName());
         return saved;
     }
 
@@ -322,6 +324,16 @@ public class ProfileService {
             throw new AppException("LY DO TU CHOI KHONG DUOC VUOT QUA 500 KY TU");
         }
         return normalized;
+    }
+
+    private void notifyStaffProfileSubmitted(String profileType, Integer profileId, Integer submitterAccountId, String displayName) {
+        staffRepository.findAll().forEach(staff -> notificationService.notifyProfileSubmitted(
+                staff.getAccountId(),
+                submitterAccountId,
+                profileType,
+                profileId,
+                displayName
+        ));
     }
 
     // BAT BUOC TAI KHOAN STAFF PHAI CO BAN GHI TRONG BANG staffs DE LUU approvedBy.

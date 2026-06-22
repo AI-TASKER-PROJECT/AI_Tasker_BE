@@ -34,7 +34,7 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Jobs
 - Mục đích: Bài toán/tin tuyển dụng của doanh nghiệp.
-- Cột nổi bật: `structured_sow`, `ai_tag`, `budget`, `status`.
+- Cột nổi bật: `structured_sow`, `ai_tag`, `budget`, `status`, `planned_duration_value`, `planned_duration_unit`.
 - Quan hệ chính: `business_id -> BusinessProfiles.business_id`.
 
 ### Proposals
@@ -54,7 +54,8 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Milestones
 - Mục đích: Các cột mốc thực thi trong hợp đồng.
-- Quan hệ chính: `contract_id -> Contracts.contract_id`.
+- Cột nổi bật: `duration`, `duration_unit`.
+- Quan hệ chính: `job_id -> Jobs.job_id`; `contract_id -> Contracts.contract_id` khi milestone đã gắn hợp đồng.
 
 ### AcceptanceCriteria
 - Mục đích: Tiêu chí nghiệm thu chi tiết theo milestone.

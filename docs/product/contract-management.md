@@ -44,6 +44,12 @@ Alternate exits:
   current approved business.
 - A proposal can have only one contract.
 - The proposal job must have at least one milestone.
+- Job duration uses `plannedDurationValue` and `plannedDurationUnit`; milestone
+  duration uses `duration` and `durationUnit`. Valid units are `DAY`, `WEEK`,
+  and `MONTH`. During `POST /api/v1/jobs`, units are normalized to uppercase,
+  milestone durations require job duration, and the converted total milestone
+  duration must not exceed the converted job duration (`DAY=1`, `WEEK=7`,
+  `MONTH=30`).
 - `DRAFT` creation snapshots job milestones into `contract_milestones`, using
   proposal milestone budgets when supplied.
 - Contract and NDA signatures are limited to the business and expert attached

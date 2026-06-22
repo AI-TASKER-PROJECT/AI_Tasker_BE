@@ -29,6 +29,7 @@ creation time and do not change when the source milestone is later edited.
 6. Migration does not break existing data (columns are nullable).
 7. Existing tests still pass.
 8. Duration validation: both or neither of `duration`/`durationUnit` must be provided; `duration` must be > 0; `durationUnit` must be one of `DAY`, `WEEK`, `MONTH`.
+9. Follow-up US-020 validates duration in `POST /api/v1/jobs`: job duration is normalized, nested milestone durations are normalized, milestone duration requires job duration, and total converted milestone duration must not exceed job duration.
 
 ## Design Notes
 

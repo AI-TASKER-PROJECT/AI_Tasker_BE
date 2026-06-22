@@ -8,7 +8,7 @@ Grant Business initial free quota and add Business-to-Expert AI recommendation s
 
 In scope:
 
-- Add migration `V34`.
+- Add migration `V37`.
 - Update quota creation and admin account creation logic.
 - Add selection flags to entities and DTOs.
 - Add recommendation select endpoint.

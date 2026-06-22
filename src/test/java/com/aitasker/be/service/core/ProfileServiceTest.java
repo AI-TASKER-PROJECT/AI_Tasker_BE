@@ -28,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -69,9 +70,84 @@ class ProfileServiceTest {
         assertEquals("TAX CODE KHONG DUOC DE TRONG", ex.getMessage());
     }
 
-    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
-    // Note: Hàm `upsertPortfolio_shouldThrowWhenDomainIdsBlank` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
+    void upsertBusiness_shouldNotifyAllStaffWhenVerificationSubmitted() {
+        Integer accountId = 10;
+        AccountEntity account = AccountEntity.builder()
+                .accountId(accountId)
+                .fullName("Nova Retail Owner")
+                .status("Rejected")
+                .build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder()
+                .taxCode("0312345678")
+                .companyName("Nova Retail")
+                .address("TP HCM")
+                .businessLicenseUrl("licenses/nova.pdf")
+                .build();
+        BusinessProfileEntity savedProfile = BusinessProfileEntity.builder()
+                .businessId(5)
+                .accountId(accountId)
+                .taxCode(input.getTaxCode())
+                .companyName(input.getCompanyName())
+                .kybStatus("Pending")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.empty());
+        when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenReturn(savedProfile);
+        when(staffRepository.findAll()).thenReturn(List.of(
+                StaffEntity.builder().staffId(1).accountId(40).build(),
+                StaffEntity.builder().staffId(2).accountId(41).build()
+        ));
+
+        BusinessProfileEntity result = profileService.upsertBusiness(input);
+
+        assertEquals("Pending", account.getStatus());
+        assertEquals(savedProfile, result);
+        verify(accountRepository).save(account);
+        verify(notificationService).notifyProfileSubmitted(40, accountId, "BUSINESS", 5, "Nova Retail");
+        verify(notificationService).notifyProfileSubmitted(41, accountId, "BUSINESS", 5, "Nova Retail");
+    }
+
+    @Test
+    void upsertExpert_shouldNotifyAllStaffWhenVerificationSubmitted() {
+        Integer accountId = 20;
+        AccountEntity account = AccountEntity.builder()
+                .accountId(accountId)
+                .fullName("Tran Hoang Nam")
+                .status("Pending")
+                .build();
+        ExpertProfileEntity input = ExpertProfileEntity.builder()
+                .nationalId("079203001234")
+                .portfolioUrl("https://portfolio.aitasker.local/tran-hoang-nam")
+                .yearsOfExperience(5)
+                .build();
+        ExpertProfileEntity savedProfile = ExpertProfileEntity.builder()
+                .expertId(6)
+                .accountId(accountId)
+                .nationalId(input.getNationalId())
+                .portfolioUrl(input.getPortfolioUrl())
+                .yearsOfExperience(input.getYearsOfExperience())
+                .kycStatus("Pending")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(expertProfileRepository.findByNationalId(input.getNationalId())).thenReturn(Optional.empty());
+        when(expertProfileRepository.findByAccountId(accountId)).thenReturn(Optional.empty());
+        when(expertProfileRepository.save(any(ExpertProfileEntity.class))).thenReturn(savedProfile);
+        when(staffRepository.findAll()).thenReturn(List.of(
+                StaffEntity.builder().staffId(1).accountId(40).build()
+        ));
+
+        ExpertProfileEntity result = profileService.upsertExpert(input);
+
+        assertEquals("Pending", account.getStatus());
+        assertEquals(savedProfile, result);
+        verify(accountRepository).save(account);
+        verify(notificationService).notifyProfileSubmitted(40, accountId, "EXPERT", 6, "Tran Hoang Nam");
+    }
+
+    @Test
     void upsertPortfolio_shouldThrowWhenDomainIdsBlank() {
         AppException ex = assertThrows(AppException.class, () -> profileService.upsertPortfolio(com.aitasker.be.entity.PortfolioEntity.builder()
                 .domainIds(" ")

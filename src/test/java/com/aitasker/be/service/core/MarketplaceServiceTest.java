@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -41,13 +44,18 @@ class MarketplaceServiceTest {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private JobDomainRepository jobDomainRepository;
     @Mock private JobSkillRepository jobSkillRepository;
+    @Mock private TechnologyRepository technologyRepository;
+    @Mock private JobTechnologyRepository jobTechnologyRepository;
     @Mock private PortfolioRepository portfolioRepository;
     @Mock private ProposalRepository proposalRepository;
     @Mock private SowRepository sowRepository;
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private AcceptanceCriteriaRepository criteriaRepository;
     @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
+    @Mock private PaymentWalletService paymentWalletService;
     @Mock private AuditLogService auditLogService;
+    @Mock private NotificationService notificationService;
+    @Mock private FirebaseStorageService firebaseStorageService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private MarketplaceService marketplaceService;
@@ -99,6 +107,106 @@ class MarketplaceServiceTest {
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
     // Note: Hàm `updateJobStatus_shouldThrowWhenStatusInvalid` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
+    void createJob_shouldThrowWhenJobDurationMissingUnit() {
+        JobEntity input = JobEntity.builder()
+                .title("AI JOB")
+                .rawRequirements("REQ")
+                .budget(BigDecimal.TEN)
+                .plannedDurationValue(2)
+                .build();
+
+        AppException ex = assertThrows(AppException.class, () -> marketplaceService.createJob(input));
+        assertEquals("JOB DURATION VA DURATION UNIT PHAI CUNG CO HOAC CUNG KHONG CO", ex.getMessage());
+    }
+
+    @Test
+    void createJob_shouldThrowWhenMilestoneDurationTotalExceedsJobDuration() {
+        JobEntity input = JobEntity.builder()
+                .title("AI JOB")
+                .rawRequirements("REQ")
+                .budget(BigDecimal.TEN)
+                .plannedDurationValue(2)
+                .plannedDurationUnit("week")
+                .milestones(List.of(
+                        MilestoneEntity.builder()
+                                .milestoneName("M1")
+                                .fundsAllocated(BigDecimal.ONE)
+                                .orderIndex(1)
+                                .duration(10)
+                                .durationUnit("DAY")
+                                .build(),
+                        MilestoneEntity.builder()
+                                .milestoneName("M2")
+                                .fundsAllocated(BigDecimal.ONE)
+                                .orderIndex(2)
+                                .duration(1)
+                                .durationUnit("WEEK")
+                                .build()
+                ))
+                .build();
+
+        AppException ex = assertThrows(AppException.class, () -> marketplaceService.createJob(input));
+        assertEquals("TONG DURATION CUA MILESTONE KHONG DUOC VUOT QUA DURATION CUA JOB", ex.getMessage());
+    }
+
+    @Test
+    void createJob_shouldNormalizeAndSaveJobAndMilestoneDurations() {
+        JobEntity input = JobEntity.builder()
+                .title("AI JOB")
+                .rawRequirements("REQ")
+                .budget(BigDecimal.TEN)
+                .plannedDurationValue(2)
+                .plannedDurationUnit(" week ")
+                .milestones(List.of(
+                        MilestoneEntity.builder()
+                                .milestoneName("M1")
+                                .fundsAllocated(BigDecimal.ONE)
+                                .orderIndex(1)
+                                .duration(7)
+                                .durationUnit(" day ")
+                                .build(),
+                        MilestoneEntity.builder()
+                                .milestoneName("M2")
+                                .fundsAllocated(BigDecimal.ONE)
+                                .orderIndex(2)
+                                .duration(1)
+                                .durationUnit("week")
+                                .build()
+                ))
+                .build();
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder()
+                .businessId(20)
+                .accountId(10)
+                .kybStatus("Approved")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.save(any(JobEntity.class))).thenAnswer(invocation -> {
+            JobEntity job = invocation.getArgument(0);
+            job.setJobId(99);
+            return job;
+        });
+        when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(sowRepository.findByJobId(99)).thenReturn(Optional.empty());
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(99)).thenReturn(List.of());
+        when(jobDomainRepository.findByIdJobId(99)).thenReturn(List.of());
+        when(jobSkillRepository.findByIdJobId(99)).thenReturn(List.of());
+        when(jobTechnologyRepository.findByIdJobId(99)).thenReturn(List.of());
+
+        JobEntity saved = marketplaceService.createJob(input);
+
+        assertEquals("WEEK", saved.getPlannedDurationUnit());
+        ArgumentCaptor<MilestoneEntity> milestoneCaptor = ArgumentCaptor.forClass(MilestoneEntity.class);
+        verify(milestoneRepository, times(2)).save(milestoneCaptor.capture());
+        assertEquals("DAY", milestoneCaptor.getAllValues().get(0).getDurationUnit());
+        assertEquals("WEEK", milestoneCaptor.getAllValues().get(1).getDurationUnit());
+        assertEquals(99, milestoneCaptor.getAllValues().get(0).getJobId());
+    }
+
+    @Test
     void updateJobStatus_shouldThrowWhenStatusInvalid() {
         AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateJobStatus(1, "INVALID"));
         assertEquals("STATUS JOB KHONG HOP LE", ex.getMessage());

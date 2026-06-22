@@ -69,6 +69,8 @@ public class MarketplaceService {
         if (input.getBudget() == null || input.getBudget().signum() <= 0) throw new AppException("BUDGET PHAI LON HON 0");
         SowEntity sow = input.getSow();
         List<MilestoneEntity> milestones = input.getMilestones();
+        validateAndNormalizeJobDuration(input);
+        validateMilestoneDurationsWithinJob(input, milestones);
         BusinessProfileEntity business = currentApprovedBusiness();
         input.setJobId(null);
         input.setBusinessId(business.getBusinessId());
@@ -282,6 +284,7 @@ public class MarketplaceService {
             if (milestone.getFundsAllocated() == null || milestone.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
             if (milestone.getOrderIndex() == null || milestone.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
             if (!orderIndexes.add(milestone.getOrderIndex())) throw new AppException("ORDER INDEX BI TRUNG TRONG MILESTONE");
+            validateAndNormalizeMilestoneDuration(milestone);
             milestone.setMilestoneId(null);
             milestone.setJobId(job.getJobId());
             milestone.setContractId(null);
@@ -306,6 +309,72 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `saveJobSkills` lưu các kỹ năng và trạng thái bắt buộc/tùy chọn business chọn ngay lúc tạo job.
+    private void validateAndNormalizeJobDuration(JobEntity job) {
+        boolean hasDuration = job.getPlannedDurationValue() != null;
+        boolean hasUnit = job.getPlannedDurationUnit() != null && !job.getPlannedDurationUnit().isBlank();
+        if (hasDuration != hasUnit) {
+            throw new AppException("JOB DURATION VA DURATION UNIT PHAI CUNG CO HOAC CUNG KHONG CO");
+        }
+        if (hasDuration && job.getPlannedDurationValue() <= 0) {
+            throw new AppException("JOB DURATION PHAI LON HON 0");
+        }
+        if (hasUnit) {
+            job.setPlannedDurationUnit(normalizeDurationUnit(job.getPlannedDurationUnit()));
+        }
+    }
+
+    private void validateMilestoneDurationsWithinJob(JobEntity job, List<MilestoneEntity> milestones) {
+        if (milestones == null || milestones.isEmpty()) return;
+        int totalMilestoneDays = 0;
+        boolean hasMilestoneDuration = false;
+        for (MilestoneEntity milestone : milestones) {
+            validateAndNormalizeMilestoneDuration(milestone);
+            if (milestone.getDuration() != null) {
+                hasMilestoneDuration = true;
+                totalMilestoneDays += toDurationDays(milestone.getDuration(), milestone.getDurationUnit());
+            }
+        }
+        if (!hasMilestoneDuration) return;
+        if (job.getPlannedDurationValue() == null || job.getPlannedDurationUnit() == null || job.getPlannedDurationUnit().isBlank()) {
+            throw new AppException("JOB DURATION BAT BUOC KHI MILESTONE CO DURATION");
+        }
+        int jobDurationDays = toDurationDays(job.getPlannedDurationValue(), job.getPlannedDurationUnit());
+        if (totalMilestoneDays > jobDurationDays) {
+            throw new AppException("TONG DURATION CUA MILESTONE KHONG DUOC VUOT QUA DURATION CUA JOB");
+        }
+    }
+
+    private void validateAndNormalizeMilestoneDuration(MilestoneEntity milestone) {
+        boolean hasDuration = milestone.getDuration() != null;
+        boolean hasUnit = milestone.getDurationUnit() != null && !milestone.getDurationUnit().isBlank();
+        if (hasDuration != hasUnit) {
+            throw new AppException("MILESTONE DURATION VA DURATION UNIT PHAI CUNG CO HOAC CUNG KHONG CO");
+        }
+        if (hasDuration && milestone.getDuration() <= 0) {
+            throw new AppException("MILESTONE DURATION PHAI LON HON 0");
+        }
+        if (hasUnit) {
+            milestone.setDurationUnit(normalizeDurationUnit(milestone.getDurationUnit()));
+        }
+    }
+
+    private String normalizeDurationUnit(String durationUnit) {
+        String unit = durationUnit.trim().toUpperCase();
+        if (!List.of("DAY", "WEEK", "MONTH").contains(unit)) {
+            throw new AppException("DURATION UNIT KHONG HOP LE. CHAP NHAN: DAY, WEEK, MONTH");
+        }
+        return unit;
+    }
+
+    private int toDurationDays(Integer duration, String durationUnit) {
+        return duration * switch (normalizeDurationUnit(durationUnit)) {
+            case "DAY" -> 1;
+            case "WEEK" -> 7;
+            case "MONTH" -> 30;
+            default -> throw new AppException("DURATION UNIT KHONG HOP LE. CHAP NHAN: DAY, WEEK, MONTH");
+        };
+    }
+
     private void saveJobSkills(Integer jobId, List<JobSkillAssignmentRequest> assignments) {
         if (assignments == null) return;
         Set<Integer> seen = new LinkedHashSet<>();

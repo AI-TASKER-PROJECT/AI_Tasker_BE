@@ -31,7 +31,8 @@ Use unit tests for quota grants, admin-create quota path, recommendation selecti
 ## Acceptance Evidence
 
 - `.\mvnw.cmd "-Dtest=PaymentWalletServiceTest,ExpertRecommendationServiceTest,AdminServiceTest" test` passed on 2026-06-22: 15 tests, 0 failures, 0 errors.
-- `.\scripts\bin\harness-cli.exe story verify US-014` passed on 2026-06-22.
+- `.\scripts\bin\harness-cli.exe story verify US-019` passed on 2026-06-22 after the story was re-registered with a non-conflicting Harness ID.
 - `.\mvnw.cmd test` passed on 2026-06-22: 73 tests, 0 failures, 0 errors.
 - Flyway validated 37 migrations and local PostgreSQL schema is version 37.
 - DB query confirmed `business@aitasker.local` has `job_post_quota_balance=3`, `expert@aitasker.local` has `proposal_quota_balance=3`, and both `proposals.business_selected` and `expert_recommendations.business_selected` are boolean `NOT NULL DEFAULT false`.
+- Re-verified after Harness backfill on 2026-06-23: `.\scripts\bin\harness-cli.exe story verify US-019` passed with 15 tests, and `.\mvnw.cmd test` passed with 108 tests.
