@@ -48,6 +48,9 @@ Swagger/OpenAPI:
   ve `POSTED`.
 - Da bo sung migration `V32__premium_expiration_entitlement.sql` de them
   `user_quotas.premium_expired_at`, backfill Premium hien huu, va xoa flag cu.
+- Da bo sung migration `V33__profile_rejection_reason.sql` de luu ly do
+  staff tu choi xac minh KYB/KYC vao `business_profiles.rejection_reason`
+  va `expert_profiles.rejection_reason`.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.
@@ -65,6 +68,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `GET /api/v1/profiles/business/{businessId}`
   - `POST /api/v1/profiles/expert`
   - `GET /api/v1/profiles/expert/{expertId}`
+  - `POST /api/v1/profiles/expert/portfolio-file`
   - `POST /api/v1/profiles/approve/{type}/{id}?status=...`
 - Marketplace:
   - `POST /api/v1/jobs`

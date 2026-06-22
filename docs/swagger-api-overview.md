@@ -80,7 +80,7 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 44 | GET | `/api/v1/disputes/{disputeId}` | Xem chi tiết dispute. | Dispute detail. |
 | 45 | GET | `/api/v1/contracts` | Xem danh sách contract theo quyền. | Contract management. |
 | 46 | GET | `/api/v1/contracts/{contractId}` | Xem chi tiết contract kèm contract milestones. | Contract detail, ký hợp đồng. |
-| 47 | GET | `/api/v1/contracts/{contractId}/milestones` | Xem milestone đã chốt của contract. Trả về `ContractMilestoneViewResponse` với trạng thái live từ bảng `milestones`. | Contract milestone, trạng thái thực tế. |
+| 47 | GET | `/api/v1/contracts/{contractId}/milestones` | Xem milestone đã chốt của contract. | Contract milestone, ngân sách final. |
 | 48 | GET | `/api/v1/contracts/{contractId}/disputes` | Xem dispute của contract. | Theo dõi tranh chấp hợp đồng. |
 | 49 | PATCH | `/api/v1/transactions/{transactionId}/status` | Cập nhật trạng thái giao dịch. | Finance transaction update. |
 | 50 | PATCH | `/api/v1/disputes/{disputeId}/resolve` | Admin xử lý/kết luận dispute. | Dispute resolution. |

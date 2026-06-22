@@ -49,8 +49,8 @@ public class ProfileController {
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/approve/{type}/{id}")
     // Note: Hàm `approve` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<Object>> approve(@PathVariable String type, @PathVariable Integer id, @RequestParam String status) {
-        return ResponseEntity.ok(ApiResponse.success("APPROVE PROFILE SUCCESS", profileService.approveProfile(type, id, status)));
+    public ResponseEntity<ApiResponse<Object>> approve(@PathVariable String type, @PathVariable Integer id, @RequestParam String status, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("APPROVE PROFILE SUCCESS", profileService.approveProfile(type, id, status, reason)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
@@ -93,6 +93,13 @@ public class ProfileController {
     // Note: Hàm `myExpert` trả hồ sơ KYC của chính chuyên gia đang đăng nhập để reload trang vẫn thấy status mới.
     public ResponseEntity<ApiResponse<ExpertProfileEntity>> myExpert() {
         return ResponseEntity.ok(ApiResponse.success("GET MY EXPERT PROFILE SUCCESS", profileService.currentExpertProfile()));
+    }
+
+    // Note: Annotation này khai báo API upload file portfolio chuyên gia bằng multipart/form-data.
+    @PostMapping(value = "/expert/portfolio-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // Note: Hàm `uploadExpertPortfolio` nhận file portfolio chuyên gia, gọi service upload Firebase và trả về storage path.
+    public ResponseEntity<ApiResponse<String>> uploadExpertPortfolio(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("UPLOAD EXPERT PORTFOLIO SUCCESS", profileService.uploadExpertPortfolio(file)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

@@ -28,4 +28,4 @@ Use any existing `OPEN` job record for manual verification.
 
 ## Acceptance Evidence
 
-Pending verification.
+`.\mvnw.cmd -DskipTests compile` passed on 2026-06-22 after merge conflict resolution.

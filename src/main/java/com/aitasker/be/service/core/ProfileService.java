@@ -52,6 +52,7 @@ public class ProfileService {
         // Moi lan nop/cap nhat KYB deu dua account ve Pending de staff duyet lai.
         entity.setKybStatus("Pending");
         entity.setApprovedBy(null);
+        entity.setRejectionReason(null);
         account.setStatus("Pending");
         accountRepository.save(account);
         BusinessProfileEntity saved = businessProfileRepository.save(entity);
@@ -82,6 +83,7 @@ public class ProfileService {
         // Moi lan nop/cap nhat KYC deu dua account ve Pending de staff duyet lai.
         entity.setKycStatus("Pending");
         entity.setApprovedBy(null);
+        entity.setRejectionReason(null);
         account.setStatus("Pending");
         accountRepository.save(account);
         ExpertProfileEntity saved = expertProfileRepository.save(entity);
@@ -93,18 +95,20 @@ public class ProfileService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `approveProfile` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public Object approveProfile(String type, Integer id, String status) {
+    public Object approveProfile(String type, Integer id, String status, String reason) {
         accessService.requireRole("STAFF");
         // CHI CHO PHEP 2 GIA TRI PHE DUYET DUNG THEO BUSINESS RULE.
         if (!"Approved".equalsIgnoreCase(status) && !"Rejected".equalsIgnoreCase(status)) {
             throw new AppException("STATUS PHE DUYET KHONG HOP LE");
         }
+        String normalizedReason = normalizeRejectionReason(status, reason);
         AccountEntity actor = accessService.currentAccount();
         Integer staffId = resolveStaffId(actor.getAccountId());
         if ("BUSINESS".equalsIgnoreCase(type)) {
             BusinessProfileEntity b = businessProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
             b.setKybStatus(status);
             b.setApprovedBy(staffId);
+            b.setRejectionReason(normalizedReason);
             updateAccountStatus(b.getAccountId(), status);
             audit(approvalAction("BUSINESS", status), "business_profiles", String.valueOf(id), actor.getAccountId());
             BusinessProfileEntity saved = businessProfileRepository.save(b);
@@ -117,6 +121,7 @@ public class ProfileService {
         ExpertProfileEntity e = expertProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
         e.setKycStatus(status);
         e.setApprovedBy(staffId);
+        e.setRejectionReason(normalizedReason);
         updateAccountStatus(e.getAccountId(), status);
         audit(approvalAction("EXPERT", status), "expert_profiles", String.valueOf(id), actor.getAccountId());
         ExpertProfileEntity saved = expertProfileRepository.save(e);
@@ -220,6 +225,16 @@ public class ProfileService {
         return path;
     }
 
+    // Note: Hàm `uploadExpertPortfolio` upload file portfolio chuyên gia lên Firebase Storage và trả về storage path để frontend lưu vào hồ sơ KYC/portfolio.
+    public String uploadExpertPortfolio(MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        Integer accountId = accessService.currentAccount().getAccountId();
+        String path = firebaseStorageService.upload(file, "expert-portfolios/accounts/" + accountId);
+        expertProfileRepository.findByAccountId(accountId)
+                .ifPresent(profile -> auditLogService.record(AuditLogService.ACTION_UPLOAD_EXPERT_PORTFOLIO_FILE, "expert_profiles", String.valueOf(profile.getExpertId()), accountId));
+        return path;
+    }
+
     // TAO HOAC CAP NHAT PORTFOLIO MOI CUA CHUYEN GIA DE BUSINESS DOC KHI REVIEW PROPOSAL.
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -296,6 +311,18 @@ public class ProfileService {
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT CUA PROFILE"));
         account.setStatus("Approved".equalsIgnoreCase(approvalStatus) ? "Approved" : "Rejected");
         accountRepository.save(account);
+    }
+
+    private String normalizeRejectionReason(String status, String reason) {
+        if (!"Rejected".equalsIgnoreCase(status)) return null;
+        if (reason == null || reason.isBlank()) {
+            throw new AppException("LY DO TU CHOI KHONG DUOC DE TRONG");
+        }
+        String normalized = reason.trim();
+        if (normalized.length() > 500) {
+            throw new AppException("LY DO TU CHOI KHONG DUOC VUOT QUA 500 KY TU");
+        }
+        return normalized;
     }
 
     // BAT BUOC TAI KHOAN STAFF PHAI CO BAN GHI TRONG BANG staffs DE LUU approvedBy.
