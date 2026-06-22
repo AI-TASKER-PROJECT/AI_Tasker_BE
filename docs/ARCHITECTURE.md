@@ -247,6 +247,9 @@ Current rules to preserve:
 - Catalog creation/update is admin-only.
 - Job catalog assignments can be changed by admin or the owning business.
 - Profile approval is staff/admin work and should write audit evidence.
+- Profile rejection stores a staff-provided `rejection_reason` on the business
+  or expert profile; the reason is required when `status=Rejected` and cleared
+  when the profile is approved or resubmitted.
 
 ## Marketplace Rules
 

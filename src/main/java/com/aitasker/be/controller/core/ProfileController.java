@@ -49,8 +49,8 @@ public class ProfileController {
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/approve/{type}/{id}")
     // Note: Hàm `approve` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<Object>> approve(@PathVariable String type, @PathVariable Integer id, @RequestParam String status) {
-        return ResponseEntity.ok(ApiResponse.success("APPROVE PROFILE SUCCESS", profileService.approveProfile(type, id, status)));
+    public ResponseEntity<ApiResponse<Object>> approve(@PathVariable String type, @PathVariable Integer id, @RequestParam String status, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("APPROVE PROFILE SUCCESS", profileService.approveProfile(type, id, status, reason)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.

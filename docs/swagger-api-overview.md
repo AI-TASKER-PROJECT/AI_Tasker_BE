@@ -188,7 +188,7 @@ Tài liệu này liệt kê đầy đủ REST API đang có trong source control
 | 106 | GET | `/api/v1/profiles/files/view-url` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy signed URL để xem file. |
 | 107 | GET | `/api/v1/profiles/portfolio` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
 | 108 | GET | `/api/v1/profiles/portfolio/me` | Cần Bearer JWT | KYB/KYC, profile và file | Lấy dữ liệu hoặc danh sách theo quyền. |
-| 109 | POST | `/api/v1/profiles/approve/{type}/{id}` | Cần Bearer JWT | KYB/KYC, profile và file | Duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT. |
+| 109 | POST | `/api/v1/profiles/approve/{type}/{id}` | Cần Bearer JWT | KYB/KYC, profile và file | Staff duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT; khi `status=Rejected` phải gửi query `reason` để lưu lý do từ chối. |
 | 110 | POST | `/api/v1/profiles/business` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |
 | 111 | POST | `/api/v1/profiles/business/license-file` | Cần Bearer JWT | KYB/KYC, profile và file | Upload giấy phép kinh doanh. |
 | 112 | POST | `/api/v1/profiles/expert` | Cần Bearer JWT | KYB/KYC, profile và file | Tạo mới dữ liệu hoặc thực hiện hành động nghiệp vụ. |

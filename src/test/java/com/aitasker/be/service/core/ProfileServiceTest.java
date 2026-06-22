@@ -10,6 +10,7 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
+import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.AuditLogRepository;
 import com.aitasker.be.repository.BusinessProfileRepository;
@@ -48,6 +49,8 @@ class ProfileServiceTest {
     @Mock private StaffRepository staffRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private AuditLogRepository auditLogRepository;
+    @Mock private AuditLogService auditLogService;
+    @Mock private NotificationService notificationService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ProfileService profileService;
@@ -176,5 +179,74 @@ class ProfileServiceTest {
         profileService.expertProfileById(expertId);
 
         verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+    }
+
+    @Test
+    void approveProfile_shouldRequireReasonWhenRejected() {
+        AppException ex = assertThrows(AppException.class,
+                () -> profileService.approveProfile("BUSINESS", 1, "Rejected", " "));
+
+        assertEquals("LY DO TU CHOI KHONG DUOC DE TRONG", ex.getMessage());
+        verify(accessService).requireRole("STAFF");
+        verifyNoInteractions(businessProfileRepository);
+    }
+
+    @Test
+    void approveProfile_shouldStoreTrimmedBusinessRejectionReason() {
+        Integer profileId = 1;
+        Integer profileAccountId = 10;
+        Integer staffAccountId = 99;
+        Integer staffId = 7;
+        BusinessProfileEntity profile = BusinessProfileEntity.builder()
+                .businessId(profileId)
+                .accountId(profileAccountId)
+                .taxCode("0312345678")
+                .companyName("Nova Retail")
+                .kybStatus("Pending")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(staffAccountId).build());
+        when(staffRepository.findByAccountId(staffAccountId)).thenReturn(Optional.of(StaffEntity.builder().staffId(staffId).accountId(staffAccountId).build()));
+        when(businessProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(profileAccountId)).thenReturn(Optional.of(AccountEntity.builder().accountId(profileAccountId).status("Pending").build()));
+        when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessProfileEntity saved = (BusinessProfileEntity) profileService.approveProfile("BUSINESS", profileId, "Rejected", "  Giay phep khong hop le  ");
+
+        assertEquals("Rejected", saved.getKybStatus());
+        assertEquals(staffId, saved.getApprovedBy());
+        assertEquals("Giay phep khong hop le", saved.getRejectionReason());
+        verify(accountRepository).save(argThat(account -> "Rejected".equals(account.getStatus())));
+        verify(notificationService).notifyProfileReviewed(profileAccountId, staffAccountId, "BUSINESS", "Rejected");
+    }
+
+    @Test
+    void approveProfile_shouldClearBusinessRejectionReasonWhenApproved() {
+        Integer profileId = 1;
+        Integer profileAccountId = 10;
+        Integer staffAccountId = 99;
+        Integer staffId = 7;
+        BusinessProfileEntity profile = BusinessProfileEntity.builder()
+                .businessId(profileId)
+                .accountId(profileAccountId)
+                .taxCode("0312345678")
+                .companyName("Nova Retail")
+                .kybStatus("Rejected")
+                .rejectionReason("Old reason")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(staffAccountId).build());
+        when(staffRepository.findByAccountId(staffAccountId)).thenReturn(Optional.of(StaffEntity.builder().staffId(staffId).accountId(staffAccountId).build()));
+        when(businessProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(profileAccountId)).thenReturn(Optional.of(AccountEntity.builder().accountId(profileAccountId).status("Rejected").build()));
+        when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessProfileEntity saved = (BusinessProfileEntity) profileService.approveProfile("BUSINESS", profileId, "Approved", null);
+
+        assertEquals("Approved", saved.getKybStatus());
+        assertEquals(staffId, saved.getApprovedBy());
+        assertNull(saved.getRejectionReason());
+        verify(accountRepository).save(argThat(account -> "Approved".equals(account.getStatus())));
+        verify(notificationService).notifyProfileReviewed(profileAccountId, staffAccountId, "BUSINESS", "Approved");
     }
 }

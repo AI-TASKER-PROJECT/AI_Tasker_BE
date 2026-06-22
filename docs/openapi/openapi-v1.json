@@ -3640,6 +3640,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "description": "Required when status=Rejected; max 500 characters.",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            }
           }
         ],
         "responses": {
@@ -3654,7 +3664,7 @@
             }
           }
         },
-        "summary": "Duyệt hoặc từ chối hồ sơ BUSINESS/EXPERT."
+        "summary": "Staff duy?t ho?c t? ch?i h? s? BUSINESS/EXPERT; reason b?t bu?c khi status=Rejected."
       }
     },
     "/api/v1/profiles/business/license-file": {
@@ -4500,6 +4510,10 @@
           },
           "title": {
             "type": "string"
+          },
+          "rejectionReason": {
+            "type": "string",
+            "maxLength": 500
           }
         }
       },
@@ -4561,6 +4575,10 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "rejectionReason": {
+            "type": "string",
+            "maxLength": 500
           }
         }
       },
