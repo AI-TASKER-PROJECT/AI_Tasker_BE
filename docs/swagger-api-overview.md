@@ -180,7 +180,7 @@ Lưu ý: WebSocket/STOMP không xuất hiện trong Swagger vì không phải RE
 | 84 | GET | `/api/v1/profiles/expert` | Lấy danh sách hồ sơ expert theo quyền. | Staff/Business xem hồ sơ chuyên gia. |
 | 85 | GET | `/api/v1/profiles/expert/{expertId}` | Lấy thông tin expert profile theo ID. | Business xem trang cá nhân chuyên gia. |
 | 86 | GET | `/api/v1/profiles/business` | Lấy danh sách hồ sơ business theo quyền. | Staff/Admin xem hồ sơ doanh nghiệp. |
-| 87 | GET | `/api/v1/profiles/business/{businessId}` | Lấy thông tin business profile theo ID. | Expert xem trang cá nhân doanh nghiệp. |
+| 87 | GET | `/api/v1/profiles/business/{businessId}` | Lấy thông tin business profile theo ID. Public cho Guest (US-017), không cần JWT; trả kèm `fullName`, 404 khi không tìm thấy. `/me`, `/by-job/{jobId}`, `/business` vẫn bảo vệ. | Guest/expert xem trang cá nhân doanh nghiệp. |
 | 88 | GET | `/api/v1/profiles/portfolio/me` | Expert xem portfolio của mình. | Hồ sơ năng lực cá nhân. |
 | 89 | GET | `/api/v1/profiles/files/view-url` | Lấy signed URL để xem file Firebase. | Xem chứng chỉ, giấy phép, proposal file. |
 | 90 | GET | `/api/v1/profiles/expert/me` | Expert xem hồ sơ KYC của mình. | Hồ sơ chuyên gia cá nhân. |

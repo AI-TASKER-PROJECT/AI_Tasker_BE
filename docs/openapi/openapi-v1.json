@@ -742,6 +742,7 @@
           "profile-controller"
         ],
         "operationId": "getBusinessById",
+        "description": "Public Business profile for Guest access (US-017). No JWT required. Returns the business profile with fullName enriched from the related account; 404 when the profile is not found. Sibling routes /me, /by-job/{jobId} and /business remain protected.",
         "parameters": [
           {
             "name": "businessId",
@@ -764,7 +765,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/profiles/business/license-file": {

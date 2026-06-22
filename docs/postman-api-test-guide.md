@@ -1375,8 +1375,9 @@ GET {{baseUrl}}/api/v1/profiles/business/{businessId}
 
 - Mục đích: Lấy thông tin business profile theo ID để xem trang cá nhân doanh nghiệp.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Không cần JWT (US-017). Route public cho Guest; trả kèm `fullName`, `404` khi không tìm thấy. Các route `/me`, `/by-job/{jobId}`, `/business` vẫn yêu cầu Bearer token theo role.
 - Body: Không có.
+- Thử nhanh (Guest): `GET {{baseUrl}}/api/v1/profiles/business/1` không kèm header `Authorization` kỳ vọng `200` với `data.fullName`; `businessId` không tồn tại kỳ vọng `404`.
 
 #### 94. GET /api/v1/profiles/expert/{expertId}
 

@@ -994,7 +994,7 @@ Với API upload file: bấm `Try it out`, chọn file ở ô `file`, rồi `Exe
 
 - Mục đích: Lấy thông tin business profile theo ID để xem trang cá nhân doanh nghiệp.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Không cần JWT (US-017). Route public cho Guest; trả kèm `fullName`, `404` khi không tìm thấy. Các route `/me`, `/by-job/{jobId}`, `/business` vẫn yêu cầu Bearer token theo role.
 - Body: Không có.
 
 #### 94. GET /api/v1/profiles/expert/{expertId}

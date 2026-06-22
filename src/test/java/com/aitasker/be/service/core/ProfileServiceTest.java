@@ -82,13 +82,12 @@ class ProfileServiceTest {
     @Test
     void businessProfileById_shouldThrowWhenProfileNotFound() {
         Integer businessId = 999;
-        doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
         when(businessProfileRepository.findById(businessId)).thenReturn(Optional.empty());
 
         NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> profileService.businessProfileById(businessId));
         assertEquals("KHONG TIM THAY BUSINESS PROFILE", ex.getMessage());
-        verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+        verifyNoInteractions(accessService);
     }
 
     @Test
@@ -103,7 +102,6 @@ class ProfileServiceTest {
                 .accountId(accountId).fullName("Owner Name").email("e@x.com").phone("090")
                 .build();
 
-        doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
         when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
 
@@ -111,23 +109,23 @@ class ProfileServiceTest {
 
         assertEquals("Owner Name", result.getFullName());
         assertEquals("Test Corp", result.getCompanyName());
+        verifyNoInteractions(accessService);
     }
 
     @Test
-    void businessProfileById_shouldRequireExpectedRoles() {
+    void businessProfileById_shouldNotRequireRoleForGuestAccess() {
         Integer businessId = 1;
         BusinessProfileEntity profile = BusinessProfileEntity.builder()
                 .businessId(businessId).accountId(10)
                 .companyName("Test Corp").taxCode("123").kybStatus("Pending")
                 .build();
 
-        doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
         when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
         when(accountRepository.findById(anyInt())).thenReturn(Optional.of(AccountEntity.builder().fullName("N").build()));
 
         profileService.businessProfileById(businessId);
 
-        verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+        verifyNoInteractions(accessService);
     }
 
     @Test
