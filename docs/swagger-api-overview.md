@@ -176,6 +176,26 @@ Khi source, migration va tai lieu mau thuan, uu tien controller source + `Securi
 | --- | --- | --- | --- |
 | GET | `/api/health` | Public | Swagger UI phai hien route nay khong can token. |
 
+## marketplace-controller
+
+- Controller source: `MarketplaceController`
+- Giai thich: Job marketplace, draft update, publish, proposal va review proposal.
+
+| Method | Path | Auth | Ghi chu |
+| --- | --- | --- | --- |
+| GET | `/api/v1/jobs` | Public | Swagger UI phai hien route nay khong can token. |
+| GET | `/api/v1/jobs/my` | Bearer JWT | Dashboard Business route, phai can JWT. |
+| GET | `/api/v1/jobs/{jobId}` | Public | Swagger UI phai hien route nay khong can token. |
+| GET | `/api/v1/jobs/{jobId}/proposals` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+| GET | `/api/v1/proposals/my` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+| PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+| PATCH | `/api/v1/proposals/{proposalId}/status` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+| POST | `/api/v1/jobs` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+| POST | `/api/v1/jobs/{jobId}/publish` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+| POST | `/api/v1/proposals` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+| POST | `/api/v1/proposals/file` | Bearer JWT | Upload file proposal qua multipart/form-data. |
+| PUT | `/api/v1/jobs/{jobId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+
 ## membership-controller
 
 - Controller source: `MembershipController`

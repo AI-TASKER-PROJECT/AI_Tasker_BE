@@ -125,14 +125,36 @@ class PaymentWalletServiceTest {
         request.setQuantity(2);
         when(accessService.currentAccount()).thenReturn(business);
         when(systemSettingRepository.findById("credit.job_post.price_vnd")).thenReturn(Optional.empty());
-        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("50000"));
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("50"));
 
         PaymentActionResponse<UserQuotaEntity> response = paymentWalletService.purchaseJobPostCredits(request);
 
         assertFalse(response.isCompleted());
         assertTrue(response.isNeedTopup());
-        assertEquals(new BigDecimal("200000"), response.getRequiredAmount());
-        assertEquals(new BigDecimal("150000"), response.getMissingAmount());
+        assertEquals(new BigDecimal("200"), response.getRequiredAmount());
+        assertEquals(new BigDecimal("150"), response.getMissingAmount());
+        assertEquals("/api/payments/payos/create", response.getRedirectUrl());
+    }
+
+    @Test
+    void purchaseProposalCredits_shouldReturnTopupInfoWithRetailFallbackPrice() {
+        AccountEntity expert = AccountEntity.builder()
+                .accountId(11)
+                .role(RoleEntity.builder().roleName("EXPERT").build())
+                .status("Approved")
+                .build();
+        CreditPurchaseRequest request = new CreditPurchaseRequest();
+        request.setQuantity(3);
+        when(accessService.currentAccount()).thenReturn(expert);
+        when(systemSettingRepository.findById("credit.proposal.price_vnd")).thenReturn(Optional.empty());
+        when(walletLedgerService.availableBalance(11)).thenReturn(new BigDecimal("20"));
+
+        PaymentActionResponse<UserQuotaEntity> response = paymentWalletService.purchaseProposalCredits(request);
+
+        assertFalse(response.isCompleted());
+        assertTrue(response.isNeedTopup());
+        assertEquals(new BigDecimal("150"), response.getRequiredAmount());
+        assertEquals(new BigDecimal("130"), response.getMissingAmount());
         assertEquals("/api/payments/payos/create", response.getRedirectUrl());
     }
 
