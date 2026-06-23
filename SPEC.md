@@ -10,7 +10,7 @@ Only work on the story below unless a blocking dependency is discovered.
 
 ## Goal
 
-Update the current membership package prices to the new low-price test values requested by the user.
+Update the current membership package prices and single-credit prices to the new low-price test values requested by the user.
 
 This is a pricing/configuration change. The next model should avoid unrelated refactors.
 
@@ -38,14 +38,25 @@ Change prices to:
 
 All values are VND integer-style prices stored in the existing numeric price column.
 
+## Target Single-Credit Prices
+
+Change single-credit prices to:
+
+- `credit.proposal.price_vnd` = `100`
+- `credit.job_post.price_vnd` = `200`
+
+These are the per-purchase prices for one Expert proposal credit and one
+Business job-post credit.
+
 ## Expected Scope
 
 The next model should check and update all relevant sources of truth:
 
 1. Flyway seed / upsert migration for `membership_packages`
-2. Any docs or test guides that mention package prices
-3. Any tests that assert package price values
-4. Local verification query against `membership_packages`
+2. Flyway seed / upsert entries for credit price settings
+3. Any docs or test guides that mention package prices or single-credit prices
+4. Any tests that assert package price values or credit price values
+5. Local verification query against `membership_packages` and the relevant system settings
 
 ## Likely Files
 
@@ -59,7 +70,9 @@ At minimum inspect:
 
 - Do not change package codes.
 - Do not change quota values unless a real inconsistency is discovered.
-- Do not change wallet credit prices unless explicitly required.
+- Update wallet single-credit prices only for:
+  - `credit.proposal.price_vnd` -> `100`
+  - `credit.job_post.price_vnd` -> `200`
 - Do not mix this task with unrelated auth/profile/job fixes.
 
 ## Validation
@@ -77,6 +90,13 @@ from membership_packages
 order by package_id;
 ```
 
+```sql
+select setting_key, setting_value
+from system_settings
+where setting_key in ('credit.proposal.price_vnd', 'credit.job_post.price_vnd')
+order by setting_key;
+```
+
 ## Acceptance Criteria
 
 - Business package prices match:
@@ -87,6 +107,9 @@ order by package_id;
   - Standard `100`
   - Plus `200`
   - Premium `600`
+- Single-credit prices match:
+  - Proposal credit `100`
+  - Job-post credit `200`
 - Docs/tests are updated if they reference old prices.
 - No unrelated behavior is changed.
 

@@ -125,14 +125,14 @@ class PaymentWalletServiceTest {
         request.setQuantity(2);
         when(accessService.currentAccount()).thenReturn(business);
         when(systemSettingRepository.findById("credit.job_post.price_vnd")).thenReturn(Optional.empty());
-        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("50"));
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("100"));
 
         PaymentActionResponse<UserQuotaEntity> response = paymentWalletService.purchaseJobPostCredits(request);
 
         assertFalse(response.isCompleted());
         assertTrue(response.isNeedTopup());
-        assertEquals(new BigDecimal("200"), response.getRequiredAmount());
-        assertEquals(new BigDecimal("150"), response.getMissingAmount());
+        assertEquals(new BigDecimal("400"), response.getRequiredAmount());
+        assertEquals(new BigDecimal("300"), response.getMissingAmount());
         assertEquals("/api/payments/payos/create", response.getRedirectUrl());
     }
 
@@ -153,8 +153,8 @@ class PaymentWalletServiceTest {
 
         assertFalse(response.isCompleted());
         assertTrue(response.isNeedTopup());
-        assertEquals(new BigDecimal("150"), response.getRequiredAmount());
-        assertEquals(new BigDecimal("130"), response.getMissingAmount());
+        assertEquals(new BigDecimal("300"), response.getRequiredAmount());
+        assertEquals(new BigDecimal("280"), response.getMissingAmount());
         assertEquals("/api/payments/payos/create", response.getRedirectUrl());
     }
 
