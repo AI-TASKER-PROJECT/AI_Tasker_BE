@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/ai/FileBasedSowRagRetrievalService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.ai;
 
 import com.aitasker.be.dto.sow.GenerateSowRequest;
@@ -12,16 +17,20 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Locale;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 @Slf4j
 public class FileBasedSowRagRetrievalService implements RagRetrievalService {
     private static final String SOW_KNOWLEDGE_PATH = "knowledge/sow/";
 
+    // Note: Annotation nay inject gia tri cau hinh vao field hoac tham so.
     @Value("${openai.sow.rag.enabled:true}")
     private boolean ragEnabled = true;
 
     @Override
+    // Note: Ham `retrieveContext` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public String retrieveContext(GenerateSowRequest request) {
         if (!ragEnabled) {
             return "";
@@ -36,6 +45,7 @@ public class FileBasedSowRagRetrievalService implements RagRetrievalService {
         }
     }
 
+    // Note: Ham `resolveContextFile` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String resolveContextFile(GenerateSowRequest request) {
         String query = normalize(buildSearchQuery(request));
 
@@ -62,6 +72,7 @@ public class FileBasedSowRagRetrievalService implements RagRetrievalService {
         return "generic-ai-project.md";
     }
 
+    // Note: Ham `buildSearchQuery` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildSearchQuery(GenerateSowRequest request) {
         return String.join(" ",
                 safe(request.getProjectTitle()),
@@ -71,11 +82,13 @@ public class FileBasedSowRagRetrievalService implements RagRetrievalService {
         );
     }
 
+    // Note: Ham `readMarkdown` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String readMarkdown(String fileName) throws IOException {
         ClassPathResource resource = new ClassPathResource(SOW_KNOWLEDGE_PATH + fileName);
         return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
     }
 
+    // Note: Ham `containsAny` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean containsAny(String query, String... keywords) {
         for (String keyword : keywords) {
             if (query.contains(keyword.toLowerCase(Locale.ROOT))) {
@@ -85,10 +98,12 @@ public class FileBasedSowRagRetrievalService implements RagRetrievalService {
         return false;
     }
 
+    // Note: Ham `containsToken` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean containsToken(String query, String token) {
         return query.matches(".*\\b" + token.toLowerCase(Locale.ROOT) + "\\b.*");
     }
 
+    // Note: Ham `normalize` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String normalize(String value) {
         String normalized = Normalizer.normalize(safe(value), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
@@ -97,6 +112,7 @@ public class FileBasedSowRagRetrievalService implements RagRetrievalService {
         return normalized.toLowerCase(Locale.ROOT);
     }
 
+    // Note: Ham `safe` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String safe(String value) {
         return value == null ? "" : value;
     }

@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/auth/AuthServiceImpl.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.auth;
 
 import com.aitasker.be.common.exception.AppException;
@@ -27,7 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 import java.util.UUID;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
@@ -38,11 +45,13 @@ public class AuthServiceImpl implements AuthService {
     private final EmailOtpService emailOtpService;
     private final PaymentWalletService paymentWalletService;
 
+    // Note: Annotation nay inject gia tri cau hinh vao field hoac tham so.
     @Value("${google.client-id:}")
     private String googleClientId;
 
     @Override
     @Transactional
+    // Note: Ham `register` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public AuthResponse register(RegisterRequest req) {
         String email = normalizeEmail(req.getEmail());
         if (!emailOtpService.isEmailVerified(email)) {
@@ -73,6 +82,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
+    // Note: Ham `googleLogin` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public AuthResponse googleLogin(GoogleAuthRequest req) {
         GoogleIdToken.Payload payload = verifyGoogleCredential(req.getCredential());
         if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
@@ -87,6 +97,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional(readOnly = true)
+    // Note: Ham `login` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public AuthResponse login(LoginRequest req) {
         AccountEntity account = accountRepository.findByEmailWithRole(normalizeEmail(req.getEmail()))
                 .orElseThrow(() -> new UnauthorizedException("Sai email hoac mat khau"));
@@ -99,12 +110,14 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    // Note: Ham `emailExists` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public boolean emailExists(String email) {
         return accountRepository.existsByEmailIgnoreCase(normalizeEmail(email));
     }
 
     @Override
     @Transactional(readOnly = true)
+    // Note: Ham `currentSession` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public AuthResponse currentSession() {
         AccountEntity account = accountRepository.findByEmailWithRole(SecurityUtils.getCurrentEmail())
                 .orElseThrow(() -> new UnauthorizedException("Tai khoan khong hop le"));
@@ -116,6 +129,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    // Note: Ham `createGoogleAccount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AuthResponse createGoogleAccount(GoogleAuthRequest req, String email, GoogleIdToken.Payload payload) {
         if (req.getRole() == null || req.getRole().isBlank()) {
             throw new AppException("Role khong duoc de trong khi tao tai khoan Google moi");
@@ -143,6 +157,7 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(saved);
     }
 
+    // Note: Ham `buildAuthResponse` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AuthResponse buildAuthResponse(AccountEntity account) {
         if ("Lock".equalsIgnoreCase(account.getStatus())) {
             throw new UnauthorizedException("Tai khoan da bi khoa");
@@ -161,6 +176,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    // Note: Ham `verifyGoogleCredential` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private GoogleIdToken.Payload verifyGoogleCredential(String credential) {
         if (googleClientId == null || googleClientId.isBlank()) {
             throw new UnauthorizedException("Google client id chua duoc cau hinh");
@@ -184,6 +200,7 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    // Note: Ham `normalizeEmail` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }

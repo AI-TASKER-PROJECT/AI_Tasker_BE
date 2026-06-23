@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/ExpertRecommendationService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
@@ -46,7 +51,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class ExpertRecommendationService {
     private static final int MAX_RECOMMENDATIONS = 5;
@@ -69,6 +76,7 @@ public class ExpertRecommendationService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
+    // Note: Ham `generateRecommendations` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public ExpertRecommendationListResponse generateRecommendations(Long jobPostingId) {
         paymentWalletService.requirePremiumRecommendationAccess(jobPostingId);
         Integer jobId = toIntegerJobId(jobPostingId);
@@ -120,6 +128,7 @@ public class ExpertRecommendationService {
     }
 
     @Transactional(readOnly = true)
+    // Note: Ham `getRecommendations` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public ExpertRecommendationListResponse getRecommendations(Long jobPostingId) {
         paymentWalletService.requirePremiumRecommendationAccess(jobPostingId);
         List<ExpertRecommendationResponse> recommendations = expertRecommendationRepository
@@ -136,6 +145,7 @@ public class ExpertRecommendationService {
     }
 
     @Transactional
+    // Note: Ham `selectRecommendedExpert` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public ExpertRecommendationResponse selectRecommendedExpert(Long jobPostingId, Long expertId) {
         paymentWalletService.requirePremiumRecommendationAccess(jobPostingId);
         ExpertRecommendationEntity recommendation = expertRecommendationRepository
@@ -160,6 +170,7 @@ public class ExpertRecommendationService {
         return toResponse(recommendation);
     }
 
+    // Note: Ham `generateWithAi` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Optional<RecommendationGenerationResult> generateWithAi(
             JobEntity job,
             ExpertCandidateSearchResponse candidateSearch
@@ -184,6 +195,7 @@ public class ExpertRecommendationService {
         }
     }
 
+    // Note: Ham `callOpenAi` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String callOpenAi(String prompt) {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(buildRequestBody(prompt), buildHeaders());
         RestClientResponseException lastException = null;
@@ -210,6 +222,7 @@ public class ExpertRecommendationService {
         throw lastException;
     }
 
+    // Note: Ham `buildRequestBody` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Map<String, Object> buildRequestBody(String prompt) {
         Map<String, Object> systemMessage = new LinkedHashMap<>();
         systemMessage.put("role", "system");
@@ -230,6 +243,7 @@ public class ExpertRecommendationService {
         return requestBody;
     }
 
+    // Note: Ham `buildHeaders` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -237,10 +251,12 @@ public class ExpertRecommendationService {
         return headers;
     }
 
+    // Note: Ham `shouldRetry` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean shouldRetry(HttpStatusCode statusCode) {
         return statusCode.is5xxServerError();
     }
 
+    // Note: Ham `extractContent` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String extractContent(Map<?, ?> responseBody) {
         if (responseBody == null || responseBody.isEmpty()) {
             throw new IllegalArgumentException("AI response body is empty");
@@ -268,6 +284,7 @@ public class ExpertRecommendationService {
         return text;
     }
 
+    // Note: Ham `buildPrompt` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildPrompt(JobEntity job, ExpertCandidateSearchResponse candidateSearch) {
         SowKeywordExtractionResult keywords = candidateSearch.getKeywords();
         return """
@@ -306,6 +323,7 @@ public class ExpertRecommendationService {
         );
     }
 
+    // Note: Ham `buildSowSummary` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildSowSummary(JobEntity job) {
         Integer jobId = job.getJobId();
         Optional<SowEntity> sow = sowRepository.findByJobId(jobId);
@@ -333,6 +351,7 @@ public class ExpertRecommendationService {
         return truncate(String.join("\n", parts), 3000);
     }
 
+    // Note: Ham `buildCandidatePromptList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildCandidatePromptList(List<ExpertCandidateResponse> candidates) {
         List<Map<String, Object>> candidateItems = defaultList(candidates).stream()
                 .limit(20)
@@ -356,6 +375,7 @@ public class ExpertRecommendationService {
         }
     }
 
+    // Note: Ham `parseAiRecommendations` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<ExpertRecommendationResponse> parseAiRecommendations(String aiResponse) throws JsonProcessingException {
         JsonNode root = objectMapper.readTree(extractJsonPayload(aiResponse));
         JsonNode recommendationsNode = root.path("recommendations");
@@ -378,6 +398,7 @@ public class ExpertRecommendationService {
         return recommendations;
     }
 
+    // Note: Ham `normalizeRecommendations` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<ExpertRecommendationResponse> normalizeRecommendations(
             List<ExpertRecommendationResponse> rawRecommendations,
             List<ExpertCandidateResponse> candidates
@@ -424,6 +445,7 @@ public class ExpertRecommendationService {
         return normalized;
     }
 
+    // Note: Ham `fallbackRecommendations` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<ExpertRecommendationResponse> fallbackRecommendations(List<ExpertCandidateResponse> candidates) {
         List<ExpertRecommendationResponse> recommendations = new ArrayList<>();
         for (int i = 0; i < Math.min(MAX_RECOMMENDATIONS, candidates.size()); i++) {
@@ -442,6 +464,7 @@ public class ExpertRecommendationService {
         return recommendations;
     }
 
+    // Note: Ham `toEntities` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<ExpertRecommendationEntity> toEntities(
             Long jobPostingId,
             List<ExpertRecommendationResponse> recommendations
@@ -461,6 +484,7 @@ public class ExpertRecommendationService {
                 .toList();
     }
 
+    // Note: Ham `toResponse` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private ExpertRecommendationResponse toResponse(ExpertRecommendationEntity entity) {
         return ExpertRecommendationResponse.builder()
                 .expertId(entity.getExpertId())
@@ -474,6 +498,7 @@ public class ExpertRecommendationService {
                 .build();
     }
 
+    // Note: Ham `extractJsonPayload` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String extractJsonPayload(String aiResponse) {
         String content = aiResponse == null ? "" : aiResponse.trim();
         if (content.startsWith("```")) {
@@ -496,26 +521,31 @@ public class ExpertRecommendationService {
         return content;
     }
 
+    // Note: Ham `readLong` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Long readLong(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         return value.isNumber() ? value.asLong() : null;
     }
 
+    // Note: Ham `readInteger` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Integer readInteger(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         return value.isNumber() ? value.asInt() : null;
     }
 
+    // Note: Ham `readDouble` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Double readDouble(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         return value.isNumber() ? value.asDouble() : null;
     }
 
+    // Note: Ham `readText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String readText(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         return value.isTextual() ? value.asText() : null;
     }
 
+    // Note: Ham `readStringList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> readStringList(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         if (!value.isArray()) {
@@ -531,6 +561,7 @@ public class ExpertRecommendationService {
         return items;
     }
 
+    // Note: Ham `writeStringList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String writeStringList(List<String> values) {
         try {
             return objectMapper.writeValueAsString(defaultList(values));
@@ -539,6 +570,7 @@ public class ExpertRecommendationService {
         }
     }
 
+    // Note: Ham `readStoredStringList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> readStoredStringList(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
@@ -552,6 +584,7 @@ public class ExpertRecommendationService {
         }
     }
 
+    // Note: Ham `toBigDecimal` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal toBigDecimal(Double value) {
         if (value == null) {
             return null;
@@ -559,6 +592,7 @@ public class ExpertRecommendationService {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
     }
 
+    // Note: Ham `clampScore` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Double clampScore(Double value) {
         if (value == null) {
             return null;
@@ -566,6 +600,7 @@ public class ExpertRecommendationService {
         return Math.max(0.0, Math.min(100.0, Math.round(value * 100.0) / 100.0));
     }
 
+    // Note: Ham `toIntegerJobId` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Integer toIntegerJobId(Long jobPostingId) {
         try {
             return Math.toIntExact(jobPostingId);
@@ -574,6 +609,7 @@ public class ExpertRecommendationService {
         }
     }
 
+    // Note: Ham `toIntegerExpertId` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Integer toIntegerExpertId(Long expertId) {
         try {
             return Math.toIntExact(expertId);
@@ -582,32 +618,39 @@ public class ExpertRecommendationService {
         }
     }
 
+    // Note: Ham `toLong` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Long toLong(Integer value) {
         return value == null ? null : Long.valueOf(value);
     }
 
+    // Note: Ham `defaultList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private <T> List<T> defaultList(List<T> values) {
         return values == null ? List.of() : values;
     }
 
+    // Note: Ham `isEmpty` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean isEmpty(List<?> values) {
         return values == null || values.isEmpty();
     }
 
+    // Note: Ham `isBlank` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
+    // Note: Ham `addPart` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void addPart(List<String> parts, String label, String value) {
         if (value != null && !value.isBlank()) {
             parts.add(label + ": " + value);
         }
     }
 
+    // Note: Ham `nullToBlank` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String nullToBlank(String value) {
         return value == null ? "" : value;
     }
 
+    // Note: Ham `truncate` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String truncate(String value, int maxLength) {
         if (value == null) {
             return "";

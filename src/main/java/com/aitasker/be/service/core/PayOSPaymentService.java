@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/PayOSPaymentService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
@@ -27,7 +32,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class PayOSPaymentService {
     private static final String PURPOSE_WALLET_TOPUP = "WALLET_TOPUP";
@@ -40,6 +47,7 @@ public class PayOSPaymentService {
     private final WalletLedgerService walletLedgerService;
 
     @Transactional
+    // Note: Ham `createPayment` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public CreatePayOSPaymentResponse createPayment(CreateWalletTopupPaymentRequest request) {
         validateCreateRequest(request);
         validateConfig();
@@ -95,6 +103,7 @@ public class PayOSPaymentService {
     }
 
     @Transactional
+    // Note: Ham `syncPaymentStatus` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public PaymentOrderEntity syncPaymentStatus(Long orderCode) {
         validateConfig();
 
@@ -109,6 +118,7 @@ public class PayOSPaymentService {
         }
     }
 
+    // Note: Ham `updatePaymentOrderFromProvider` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private PaymentOrderEntity updatePaymentOrderFromProvider(PaymentOrderEntity paymentOrder, PaymentLink paymentLink) {
         PaymentStatus previousStatus = paymentOrder.getStatus();
         paymentOrder.setProviderPaymentLinkId(paymentLink.getId());
@@ -131,6 +141,7 @@ public class PayOSPaymentService {
         return paymentOrderRepository.save(paymentOrder);
     }
 
+    // Note: Ham `validateCreateRequest` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void validateCreateRequest(CreateWalletTopupPaymentRequest request) {
         if (request == null) {
             throw new AppException("THONG TIN THANH TOAN KHONG HOP LE");
@@ -140,6 +151,7 @@ public class PayOSPaymentService {
         }
     }
 
+    // Note: Ham `validateProviderAmount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void validateProviderAmount(PaymentOrderEntity paymentOrder, PaymentLink paymentLink) {
         if (paymentLink.getAmount() == null
                 || paymentOrder.getAmount().compareTo(BigDecimal.valueOf(paymentLink.getAmount())) != 0) {
@@ -147,6 +159,7 @@ public class PayOSPaymentService {
         }
     }
 
+    // Note: Ham `validateConfig` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void validateConfig() {
         if (isBlank(payOSProperties.getClientId())
                 || isBlank(payOSProperties.getApiKey())
@@ -157,6 +170,7 @@ public class PayOSPaymentService {
         }
     }
 
+    // Note: Ham `resolveCurrentBusinessId` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Long resolveCurrentBusinessId(AccountEntity actor) {
         if (!"BUSINESS".equals(actor.getRole().getRoleName())) {
             return null;
@@ -166,6 +180,7 @@ public class PayOSPaymentService {
                 .orElse(null);
     }
 
+    // Note: Ham `toPayOSAmount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Long toPayOSAmount(BigDecimal amount) {
         try {
             return amount.setScale(0, RoundingMode.UNNECESSARY).longValueExact();
@@ -174,6 +189,7 @@ public class PayOSPaymentService {
         }
     }
 
+    // Note: Ham `buildDescription` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildDescription(String description, Long orderCode) {
         String value = description == null || description.isBlank()
                 ? "Nap vi " + orderCode
@@ -185,6 +201,7 @@ public class PayOSPaymentService {
         return normalized.length() > 25 ? normalized.substring(0, 25).trim() : normalized;
     }
 
+    // Note: Ham `normalizePayOSDescription` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String normalizePayOSDescription(String value) {
         return Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
@@ -195,6 +212,7 @@ public class PayOSPaymentService {
                 .trim();
     }
 
+    // Note: Ham `generateUniqueOrderCode` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Long generateUniqueOrderCode() {
         Long orderCode;
         do {
@@ -204,10 +222,12 @@ public class PayOSPaymentService {
         return orderCode;
     }
 
+    // Note: Ham `isBlank` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
+    // Note: Ham `mapPaymentLinkStatus` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private PaymentStatus mapPaymentLinkStatus(PaymentLinkStatus status) {
         if (status == null) {
             return PaymentStatus.PENDING;
@@ -221,6 +241,7 @@ public class PayOSPaymentService {
         };
     }
 
+    // Note: Ham `resolveProviderResponseCode` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String resolveProviderResponseCode(PaymentLinkStatus status) {
         if (status == null) {
             return null;
@@ -228,6 +249,7 @@ public class PayOSPaymentService {
         return status == PaymentLinkStatus.PAID ? "00" : status.name();
     }
 
+    // Note: Ham `resolveProviderTransactionNo` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String resolveProviderTransactionNo(List<Transaction> transactions) {
         if (transactions == null || transactions.isEmpty()) {
             return null;

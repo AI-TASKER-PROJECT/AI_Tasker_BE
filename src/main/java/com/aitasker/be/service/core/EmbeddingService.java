@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/EmbeddingService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.BadGatewayException;
@@ -20,12 +25,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class EmbeddingService {
     private final RestTemplate restTemplate;
     private final OpenAiProperties openAiProperties;
 
+    // Note: Ham `embed` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<Double> embed(String text) {
         if (openAiProperties.getApiKey() == null || openAiProperties.getApiKey().isBlank()) {
             throw new BadGatewayException("Chua cau hinh OPENAI_API_KEY");
@@ -47,6 +55,7 @@ public class EmbeddingService {
         }
     }
 
+    // Note: Ham `toPgVector` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public static String toPgVector(List<Double> embedding) {
         if (embedding == null || embedding.isEmpty()) {
             throw new BadGatewayException("OpenAI khong tra ve embedding hop le");
@@ -57,6 +66,7 @@ public class EmbeddingService {
                 .collect(Collectors.joining(",", "[", "]"));
     }
 
+    // Note: Ham `callOpenAi` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private ResponseEntity<Map> callOpenAi(HttpEntity<Map<String, Object>> request) {
         RestClientResponseException lastException = null;
 
@@ -79,10 +89,12 @@ public class EmbeddingService {
         throw lastException;
     }
 
+    // Note: Ham `shouldRetry` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean shouldRetry(HttpStatusCode statusCode) {
         return statusCode.is5xxServerError();
     }
 
+    // Note: Ham `buildHeaders` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -90,6 +102,7 @@ public class EmbeddingService {
         return headers;
     }
 
+    // Note: Ham `extractEmbedding` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<Double> extractEmbedding(Map<?, ?> responseBody) {
         if (responseBody == null || responseBody.isEmpty()) {
             throw new BadGatewayException("OpenAI khong tra ve embedding hop le");
@@ -115,6 +128,7 @@ public class EmbeddingService {
                 .toList();
     }
 
+    // Note: Ham `toDouble` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Double toDouble(Object value) {
         if (!(value instanceof Number number)) {
             throw new BadGatewayException("OpenAI tra ve embedding khong dung dinh dang");
@@ -127,6 +141,7 @@ public class EmbeddingService {
         return doubleValue;
     }
 
+    // Note: Ham `formatVectorNumber` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private static String formatVectorNumber(Double value) {
         if (value == null || !Double.isFinite(value)) {
             throw new BadGatewayException("Embedding khong dung dinh dang pgvector");
@@ -134,6 +149,7 @@ public class EmbeddingService {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 
+    // Note: Ham `buildOpenAiErrorMessage` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildOpenAiErrorMessage(RestClientResponseException ex) {
         String responseBody = ex.getResponseBodyAsString();
         if (responseBody == null || responseBody.isBlank()) {
@@ -143,6 +159,7 @@ public class EmbeddingService {
         return "OpenAI Embedding API loi: " + ex.getStatusCode() + " - " + truncate(responseBody, 500);
     }
 
+    // Note: Ham `truncate` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String truncate(String value, int maxLength) {
         if (value.length() <= maxLength) {
             return value;

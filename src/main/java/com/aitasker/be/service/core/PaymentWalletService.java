@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/PaymentWalletService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
@@ -53,7 +58,9 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class PaymentWalletService {
     public static final String ACTION_PURCHASE_MEMBERSHIP = "Mua goi thanh vien";
@@ -96,6 +103,7 @@ public class PaymentWalletService {
     private final WalletTransactionRepository walletTransactionRepository;
 
     @Transactional(readOnly = true)
+    // Note: Ham `listPackagesForCurrentRole` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<MembershipPackageEntity> listPackagesForCurrentRole() {
         AccountEntity actor = accessService.currentAccount();
         String role = actor.getRole().getRoleName();
@@ -106,6 +114,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `purchaseMembership` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public PaymentActionResponse<MembershipPurchaseEntity> purchaseMembership(Long packageId) {
         AccountEntity actor = requireApprovedBusinessOrExpert();
         String role = actor.getRole().getRoleName();
@@ -168,6 +177,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `purchaseJobPostCredits` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public PaymentActionResponse<UserQuotaEntity> purchaseJobPostCredits(CreditPurchaseRequest request) {
         AccountEntity actor = requireApprovedRole(ROLE_BUSINESS);
         int quantity = requirePositiveQuantity(request);
@@ -193,6 +203,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `purchaseProposalCredits` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public PaymentActionResponse<UserQuotaEntity> purchaseProposalCredits(CreditPurchaseRequest request) {
         AccountEntity actor = requireApprovedRole(ROLE_EXPERT);
         int quantity = requirePositiveQuantity(request);
@@ -218,6 +229,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `currentQuota` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public QuotaResponse currentQuota() {
         AccountEntity actor = requireApprovedBusinessOrExpert();
         UserQuotaEntity quota = ensureQuotaForAccountForUpdate(actor);
@@ -231,21 +243,25 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `ensureQuotaForAccount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void ensureQuotaForAccount(AccountEntity account) {
         ensureQuotaForAccountForUpdate(account);
     }
 
     @Transactional
+    // Note: Ham `consumeJobPostCredit` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void consumeJobPostCredit(AccountEntity account, Long jobId) {
         consumeQuota(account, QUOTA_JOB_POST, "JOB", jobId);
     }
 
     @Transactional
+    // Note: Ham `consumeProposalCredit` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void consumeProposalCredit(AccountEntity account, Long proposalId) {
         consumeQuota(account, QUOTA_PROPOSAL, "PROPOSAL", proposalId);
     }
 
     @Transactional(readOnly = true)
+    // Note: Ham `requirePremiumRecommendationAccess` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void requirePremiumRecommendationAccess(Long jobPostingId) {
         AccountEntity actor = requireApprovedRole(ROLE_BUSINESS);
         BusinessProfileEntity business = businessProfileRepository.findByAccountId(actor.getAccountId())
@@ -263,6 +279,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `payContractDeposit` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public PaymentActionResponse<ContractDepositEntity> payContractDeposit(Integer contractId) {
         AccountEntity actor = requireApprovedRole(ROLE_BUSINESS);
         BusinessProfileEntity business = businessProfileRepository.findByAccountId(actor.getAccountId())
@@ -323,6 +340,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `refundContractDeposit` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public ContractDepositEntity refundContractDeposit(Integer contractId, DepositRefundRequest request) {
         AccountEntity admin = accessService.currentAccount();
         accessService.requireRole("ADMIN");
@@ -387,6 +405,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `createWithdrawalRequest` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public PaymentActionResponse<WithdrawalRequestEntity> createWithdrawalRequest(WithdrawalRequest request) {
         AccountEntity actor = requireApprovedBusinessOrExpert();
         validateWithdrawalRequest(request);
@@ -421,18 +440,21 @@ public class PaymentWalletService {
     }
 
     @Transactional(readOnly = true)
+    // Note: Ham `listMyWithdrawalRequests` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<WithdrawalRequestEntity> listMyWithdrawalRequests() {
         AccountEntity actor = requireApprovedBusinessOrExpert();
         return withdrawalRequestRepository.findByAccountIdOrderByRequestedAtDesc(actor.getAccountId());
     }
 
     @Transactional(readOnly = true)
+    // Note: Ham `listWithdrawalRequestsForAdmin` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<WithdrawalRequestEntity> listWithdrawalRequestsForAdmin() {
         accessService.requireRole("ADMIN");
         return withdrawalRequestRepository.findAllByOrderByRequestedAtDesc();
     }
 
     @Transactional
+    // Note: Ham `approveWithdrawal` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WithdrawalRequestEntity approveWithdrawal(Long withdrawalId, WithdrawalReviewRequest request) {
         AccountEntity admin = accessService.currentAccount();
         accessService.requireRole("ADMIN");
@@ -457,6 +479,7 @@ public class PaymentWalletService {
     }
 
     @Transactional
+    // Note: Ham `rejectWithdrawal` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WithdrawalRequestEntity rejectWithdrawal(Long withdrawalId, WithdrawalReviewRequest request) {
         AccountEntity admin = accessService.currentAccount();
         accessService.requireRole("ADMIN");
@@ -481,11 +504,13 @@ public class PaymentWalletService {
     }
 
     @Transactional(readOnly = true)
+    // Note: Ham `listCurrentWalletTransactions` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<WalletTransactionEntity> listCurrentWalletTransactions() {
         AccountEntity actor = accessService.currentAccount();
         return walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(actor.getAccountId());
     }
 
+    // Note: Ham `requireApprovedBusinessOrExpert` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AccountEntity requireApprovedBusinessOrExpert() {
         AccountEntity actor = accessService.currentAccount();
         String role = actor.getRole().getRoleName();
@@ -496,12 +521,14 @@ public class PaymentWalletService {
         return actor;
     }
 
+    // Note: Ham `requireApprovedRole` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AccountEntity requireApprovedRole(String role) {
         accessService.requireRole(role);
         accessService.requireApprovedAccount();
         return accessService.currentAccount();
     }
 
+    // Note: Ham `ensureQuotaForAccountForUpdate` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private UserQuotaEntity ensureQuotaForAccountForUpdate(AccountEntity account) {
         return userQuotaRepository.findByAccountIdForUpdate(account.getAccountId())
                 .orElseGet(() -> {
@@ -541,6 +568,7 @@ public class PaymentWalletService {
                 });
     }
 
+    // Note: Ham `grantQuota` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private UserQuotaEntity grantQuota(Integer accountId, String quotaType, Integer amount, String referenceType, Long referenceId) {
         if (amount == null || amount <= 0) {
             throw new AppException("QUOTA AMOUNT KHONG HOP LE");
@@ -564,6 +592,7 @@ public class PaymentWalletService {
         return saved;
     }
 
+    // Note: Ham `consumeQuota` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void consumeQuota(AccountEntity account, String quotaType, String referenceType, Long referenceId) {
         UserQuotaEntity quota = ensureQuotaForAccountForUpdate(account);
         int before = quotaBalance(quota, quotaType);
@@ -588,12 +617,14 @@ public class PaymentWalletService {
                 account.getAccountId());
     }
 
+    // Note: Ham `quotaBalance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int quotaBalance(UserQuotaEntity quota, String quotaType) {
         return QUOTA_JOB_POST.equals(quotaType)
                 ? nonNegativeInt(quota.getJobPostQuotaBalance())
                 : nonNegativeInt(quota.getProposalQuotaBalance());
     }
 
+    // Note: Ham `setQuotaBalance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void setQuotaBalance(UserQuotaEntity quota, String quotaType, int value) {
         if (QUOTA_JOB_POST.equals(quotaType)) {
             quota.setJobPostQuotaBalance(value);
@@ -602,6 +633,7 @@ public class PaymentWalletService {
         }
     }
 
+    // Note: Ham `accountForQuota` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AccountEntity accountForQuota(Integer accountId) {
         AccountEntity current = accessService.currentAccount();
         if (current.getAccountId().equals(accountId)) {
@@ -614,6 +646,7 @@ public class PaymentWalletService {
                         .orElseThrow(() -> new NotFoundException("KHONG TIM THAY TAI KHOAN")));
     }
 
+    // Note: Ham `accountStub` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AccountEntity accountStub(Integer accountId, String role) {
         return AccountEntity.builder()
                 .accountId(accountId)
@@ -621,6 +654,7 @@ public class PaymentWalletService {
                 .build();
     }
 
+    // Note: Ham `activateContractAfterDeposit` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void activateContractAfterDeposit(ContractEntity contract, LocalDateTime now) {
         contract.setStatus("ACTIVE");
         if (contract.getActivatedAt() == null) {
@@ -635,6 +669,7 @@ public class PaymentWalletService {
         jobRepository.save(job);
     }
 
+    // Note: Ham `applyContractMilestoneBudgets` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void applyContractMilestoneBudgets(ContractEntity contract) {
         for (ContractMilestoneEntity contractMilestone : contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId())) {
             MilestoneEntity milestone = milestoneRepository.findById(contractMilestone.getJobMilestoneId())
@@ -645,6 +680,7 @@ public class PaymentWalletService {
         }
     }
 
+    // Note: Ham `pendingWithdrawal` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private WithdrawalRequestEntity pendingWithdrawal(Long withdrawalId) {
         WithdrawalRequestEntity withdrawal = withdrawalRequestRepository.findById(withdrawalId)
                 .orElseThrow(() -> new NotFoundException("WITHDRAWAL_NOT_FOUND"));
@@ -654,6 +690,7 @@ public class PaymentWalletService {
         return withdrawal;
     }
 
+    // Note: Ham `validateWithdrawalRequest` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void validateWithdrawalRequest(WithdrawalRequest request) {
         if (request == null || request.getAmount() == null || request.getAmount().signum() <= 0) {
             throw new AppException("WITHDRAWAL_AMOUNT_INVALID");
@@ -663,6 +700,7 @@ public class PaymentWalletService {
         }
     }
 
+    // Note: Ham `requirePositiveQuantity` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int requirePositiveQuantity(CreditPurchaseRequest request) {
         if (request == null || request.getQuantity() == null || request.getQuantity() <= 0) {
             throw new AppException("SO LUONG CREDIT KHONG HOP LE");
@@ -670,6 +708,7 @@ public class PaymentWalletService {
         return request.getQuantity();
     }
 
+    // Note: Ham `settingAmount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal settingAmount(String key, BigDecimal fallback) {
         return systemSettingRepository.findById(key)
                 .filter(setting -> Boolean.TRUE.equals(setting.getIsActive()))
@@ -684,12 +723,14 @@ public class PaymentWalletService {
                 .orElse(fallback);
     }
 
+    // Note: Ham `depositAmount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal depositAmount(ContractEntity contract) {
         return money(contract.getTotalBudget())
                 .multiply(new BigDecimal("0.20"))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
+    // Note: Ham `refundStatus` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String refundStatus(BigDecimal refundAmount, BigDecimal resolvedAmount) {
         if (refundAmount.signum() > 0 && resolvedAmount.signum() == 0) {
             return "REFUNDED";
@@ -700,10 +741,12 @@ public class PaymentWalletService {
         return "ADMIN_RESOLVED";
     }
 
+    // Note: Ham `isPremiumActive` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean isPremiumActive(UserQuotaEntity quota) {
         return quota.getPremiumExpiredAt() != null && quota.getPremiumExpiredAt().isAfter(LocalDateTime.now());
     }
 
+    // Note: Ham `resolveActivePackage` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private ActivePackage resolveActivePackage(AccountEntity actor, UserQuotaEntity quota, LocalDateTime now) {
         List<MembershipPurchaseEntity> activePurchases = membershipPurchaseRepository.findByAccountIdOrderByCreatedAtDesc(actor.getAccountId()).stream()
                 .filter(purchase -> "SUCCESS".equals(purchase.getStatus()))
@@ -730,14 +773,17 @@ public class PaymentWalletService {
                 .orElseGet(this::basicPackage);
     }
 
+    // Note: Ham `basicPackage` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private ActivePackage basicPackage() {
         return new ActivePackage(TIER_BASIC, "Basic");
     }
 
+    // Note: Ham `isPremiumPackage` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean isPremiumPackage(MembershipPackageEntity membershipPackage) {
         return TIER_PREMIUM.equals(packageTier(membershipPackage));
     }
 
+    // Note: Ham `packagePriority` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int packagePriority(MembershipPackageEntity membershipPackage) {
         return switch (packageTier(membershipPackage)) {
             case TIER_PREMIUM -> 4;
@@ -747,6 +793,7 @@ public class PaymentWalletService {
         };
     }
 
+    // Note: Ham `packageTier` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String packageTier(MembershipPackageEntity membershipPackage) {
         if (membershipPackage == null || membershipPackage.getPackageCode() == null) {
             return TIER_BASIC;
@@ -760,14 +807,17 @@ public class PaymentWalletService {
 
     private record ActivePackage(String code, String name) {}
 
+    // Note: Ham `money` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal money(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    // Note: Ham `nonNegativeInt` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int nonNegativeInt(Integer value) {
         return value == null || value < 0 ? 0 : value;
     }
 
+    // Note: Ham `toInt` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Integer toInt(Long value) {
         try {
             return Math.toIntExact(value);
@@ -776,10 +826,12 @@ public class PaymentWalletService {
         }
     }
 
+    // Note: Ham `isBlank` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
+    // Note: Ham `insufficient` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private <T> PaymentActionResponse<T> insufficient(BigDecimal current, BigDecimal required, String message) {
         return PaymentActionResponse.<T>builder()
                 .completed(false)
@@ -792,6 +844,7 @@ public class PaymentWalletService {
                 .build();
     }
 
+    // Note: Ham `completed` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private <T> PaymentActionResponse<T> completed(T data, String message) {
         return PaymentActionResponse.<T>builder()
                 .completed(true)

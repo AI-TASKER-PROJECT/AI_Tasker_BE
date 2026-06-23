@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/KnowledgeIngestionService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.config.RagProperties;
@@ -20,7 +25,9 @@ import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class KnowledgeIngestionService {
     private static final String KNOWLEDGE_PATTERN = "classpath*:knowledge/chatbot/*.md";
@@ -34,6 +41,7 @@ public class KnowledgeIngestionService {
 
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
+    // Note: Ham `ingestOnStartup` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void ingestOnStartup() {
         if (!ragProperties.isIngestOnStartup()) {
             log.info("RAG knowledge ingestion on startup is disabled");
@@ -44,6 +52,7 @@ public class KnowledgeIngestionService {
     }
 
     @Transactional
+    // Note: Ham `ingestAll` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void ingestAll() {
         Resource[] resources = loadKnowledgeResources();
         if (resources.length == 0) {
@@ -56,6 +65,7 @@ public class KnowledgeIngestionService {
         }
     }
 
+    // Note: Ham `loadKnowledgeResources` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Resource[] loadKnowledgeResources() {
         try {
             Resource[] resources = new PathMatchingResourcePatternResolver().getResources(KNOWLEDGE_PATTERN);
@@ -66,6 +76,7 @@ public class KnowledgeIngestionService {
         }
     }
 
+    // Note: Ham `ingestResource` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void ingestResource(Resource resource) {
         String sourceFile = safeFilename(resource);
         String markdown = readResource(resource);
@@ -86,6 +97,7 @@ public class KnowledgeIngestionService {
         log.info("Imported {} RAG chunks from {}", chunks.size(), sourceFile);
     }
 
+    // Note: Ham `readResource` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String readResource(Resource resource) {
         try (InputStream inputStream = resource.getInputStream()) {
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
@@ -94,6 +106,7 @@ public class KnowledgeIngestionService {
         }
     }
 
+    // Note: Ham `splitMarkdown` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<PreparedChunk> splitMarkdown(String sourceFile, String markdown) {
         List<PreparedChunk> chunks = new ArrayList<>();
         for (MarkdownSection section : splitByHeading(sourceFile, markdown)) {
@@ -111,6 +124,7 @@ public class KnowledgeIngestionService {
         return chunks;
     }
 
+    // Note: Ham `splitByHeading` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<MarkdownSection> splitByHeading(String sourceFile, String markdown) {
         List<MarkdownSection> sections = new ArrayList<>();
         String fallbackTitle = sourceFile;
@@ -137,6 +151,7 @@ public class KnowledgeIngestionService {
         return sections;
     }
 
+    // Note: Ham `addSection` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void addSection(List<MarkdownSection> sections, String title, StringBuilder content) {
         String sectionContent = content.toString().trim();
         if (!sectionContent.isBlank()) {
@@ -144,6 +159,7 @@ public class KnowledgeIngestionService {
         }
     }
 
+    // Note: Ham `splitLongContent` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> splitLongContent(String content) {
         if (content.length() <= MAX_CHUNK_CHARS) {
             return List.of(content);
@@ -183,6 +199,7 @@ public class KnowledgeIngestionService {
         return chunks;
     }
 
+    // Note: Ham `splitOversizedParagraph` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> splitOversizedParagraph(String paragraph) {
         List<String> chunks = new ArrayList<>();
         String remaining = paragraph.trim();
@@ -197,6 +214,7 @@ public class KnowledgeIngestionService {
         return chunks;
     }
 
+    // Note: Ham `findSplitPoint` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int findSplitPoint(String value) {
         int max = Math.min(MAX_CHUNK_CHARS, value.length());
         for (int index = max - 1; index >= MIN_SPLIT_CHARS; index--) {
@@ -213,6 +231,7 @@ public class KnowledgeIngestionService {
         return max;
     }
 
+    // Note: Ham `flushChunk` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void flushChunk(List<String> chunks, StringBuilder currentChunk) {
         if (!currentChunk.isEmpty()) {
             chunks.add(currentChunk.toString());
@@ -220,11 +239,13 @@ public class KnowledgeIngestionService {
         }
     }
 
+    // Note: Ham `cleanHeading` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String cleanHeading(String heading, String fallbackTitle) {
         String cleanedHeading = heading.replace("#", "").trim();
         return cleanedHeading.isBlank() ? fallbackTitle : cleanedHeading;
     }
 
+    // Note: Ham `truncate` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String truncate(String value, int maxLength) {
         if (value == null || value.length() <= maxLength) {
             return value;
@@ -232,6 +253,7 @@ public class KnowledgeIngestionService {
         return value.substring(0, maxLength).trim();
     }
 
+    // Note: Ham `safeFilename` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String safeFilename(Resource resource) {
         String filename = resource.getFilename();
         if (filename == null || filename.isBlank()) {

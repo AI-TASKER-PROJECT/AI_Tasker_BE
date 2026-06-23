@@ -1,330 +1,230 @@
 # Tong quan Swagger API - AITASKER BE
 
-Tai lieu nay liet ke API theo dung thu tu tag hien thi tren Swagger UI, bam theo `springdoc.swagger-ui.tags-sorter=alpha` va nhom tag thuc te cua springdoc.
-Khi source, migration va tai lieu mau thuan, uu tien controller source + `SecurityConfig` + Flyway migration.
+Tai lieu nay liet ke API theo dung thu tu tag hien thi tren Swagger UI sau khi da sap xep lai theo luong nghiep vu.
+Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sorter=alpha`.
 
-- Tong so REST endpoint trong source: **130**.
-- Public endpoint theo SecurityConfig: **20**.
+- Tong so REST endpoint trong Swagger runtime: **130**.
+- Public endpoint: **20**.
 - Endpoint can Bearer JWT: **110**.
-- Swagger UI: `http://localhost:8080/swagger-ui.html`.
+- Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
-- Thu tu section duoi day la thu tu Swagger UI; overview nay khong con gom lai theo domain nghiep vu.
 
 ## Nguon su that
 
+- Flow order va tag order: `src/main/java/com/aitasker/be/config/OpenApiConfig.java`.
 - Route inventory: `src/main/java/com/aitasker/be/controller/**` va `src/main/java/com/aitasker/be/test_demo/HealthController.java`.
 - Public/private route: `src/main/java/com/aitasker/be/security/config/SecurityConfig.java`.
-- Swagger order: `springdoc.swagger-ui.tags-sorter=alpha`, `springdoc.swagger-ui.operations-sorter=method` trong `src/main/resources/application.properties`.
-
-## admin-controller
-
-- Controller source: `AdminController`
-- Giai thich: Tai khoan, staff, settings, audit, analytics va system wallet.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| DELETE | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/admin/accounts` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/admin/audit-logs` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/admin/settings` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/admin/staffs` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/admin/wallet` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/admin/settings/{key}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/admin/staffs/{staffId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/admin/accounts` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/admin/reviews` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/admin/staffs` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/admin/wallet/sync` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## auth-controller
-
-- Controller source: `AuthController`
-- Giai thich: Dang ky, dang nhap, Google auth va current session.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/auth/check-email` | Public | Swagger UI phai hien route nay khong can token. |
-| GET | `/api/auth/me` | Public | Swagger UI phai hien route nay khong can token. |
-| POST | `/api/auth/google/login` | Public | Swagger UI phai hien route nay khong can token. |
-| POST | `/api/auth/google/register` | Public | Swagger UI phai hien route nay khong can token. |
-| POST | `/api/auth/login` | Public | Swagger UI phai hien route nay khong can token. |
-| POST | `/api/auth/register` | Public | Swagger UI phai hien route nay khong can token. |
-
-## catalog-controller
-
-- Controller source: `CatalogController`
-- Giai thich: Domain, skill, technology, acceptance criteria va taxonomy cua job.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/v1/acceptance-criteria` | Public | Swagger UI phai hien route nay khong can token. |
-| GET | `/api/v1/domains` | Public | Swagger UI phai hien route nay khong can token. |
-| GET | `/api/v1/jobs/{jobId}/domains` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/jobs/{jobId}/skills` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/jobs/{jobId}/technologies` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/skills` | Public | Swagger UI phai hien route nay khong can token. |
-| GET | `/api/v1/technologies` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/domains/{domainId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/skills/{skillId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/technologies/{technologyId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/domains` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/skills` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/technologies` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PUT | `/api/v1/jobs/{jobId}/domains` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PUT | `/api/v1/jobs/{jobId}/skills` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PUT | `/api/v1/jobs/{jobId}/technologies` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## chatbot-controller
-
-- Controller source: `ChatbotController`
-- Giai thich: Q&A ho tro tu knowledge/RAG noi bo.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| POST | `/api/chatbot/ask` | Public | Swagger UI phai hien route nay khong can token. |
-
-## contract-execution-controller
-
-- Controller source: `ContractExecutionController`
-- Giai thich: Hop dong, milestone, deliverable, dispute va legacy transaction flow.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/v1/contracts` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/disputes/{disputeId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/jobs/{jobId}/matching` | Bearer JWT | Flow legacy/manual simulation hoac heuristic, khong nen coi la production-complete. |
-| GET | `/api/v1/jobs/{jobId}/milestones` | Public | Public chi cho numeric milestone route theo SecurityConfig. |
-| GET | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/milestones/{milestoneId}/transactions` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/disputes/{disputeId}/assign` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/disputes/{disputeId}/resolve` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/milestones/{milestoneId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/transactions/{transactionId}/status` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/contracts/{contractId}/deposit/pay` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/contracts/{contractId}/nda-sign` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/contracts/{contractId}/reject` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/contracts/{contractId}/sign` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/contracts/{contractId}/terminate` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/contracts/from-proposals/{proposalId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/criteria` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/deliverables` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/disputes` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/disputes/{disputeId}/demo-testing` | Bearer JWT | Flow legacy/manual simulation hoac heuristic, khong nen coi la production-complete. |
-| POST | `/api/v1/disputes/{disputeId}/technical-report` | Bearer JWT | Flow legacy/manual simulation hoac heuristic, khong nen coi la production-complete. |
-| POST | `/api/v1/milestones` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/milestones/{milestoneId}/complete` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/milestones/sla-auto-approve` | Bearer JWT | Flow legacy/manual simulation hoac heuristic, khong nen coi la production-complete. |
-| POST | `/api/v1/transactions` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/transactions/{transactionId}/webhook` | Bearer JWT | Flow legacy/manual simulation hoac heuristic, khong nen coi la production-complete. |
-
-## credit-controller
-
-- Controller source: `CreditController`
-- Giai thich: Mua credit job-post va proposal.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| POST | `/api/credits/job-post/purchase` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/credits/proposal/purchase` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## email-otp-controller
-
-- Controller source: `EmailOtpController`
-- Giai thich: Gui va xac minh OTP email.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| POST | `/api/auth/email/send-otp` | Public | Swagger UI phai hien route nay khong can token. |
-| POST | `/api/auth/email/verify-otp` | Public | Swagger UI phai hien route nay khong can token. |
-
-## Expert Candidates
-
-- Controller source: `ExpertCandidateController`
-- Giai thich: Ranking candidate expert tu du lieu job/SoW.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/jobs/{jobPostingId}/expert-candidates` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## Expert Recommendations
-
-- Controller source: `ExpertRecommendationController`
-- Giai thich: AI recommendation, luu recommendation va chon expert.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## health-controller
-
-- Controller source: `HealthController`
-- Giai thich: Health check va smoke endpoint.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/health` | Public | Swagger UI phai hien route nay khong can token. |
-
-## marketplace-controller
-
-- Controller source: `MarketplaceController`
-- Giai thich: Job marketplace, draft update, publish, proposal va review proposal.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/v1/jobs` | Public | Swagger UI phai hien route nay khong can token. |
-| GET | `/api/v1/jobs/my` | Bearer JWT | Dashboard Business route, phai can JWT. |
-| GET | `/api/v1/jobs/{jobId}` | Public | Swagger UI phai hien route nay khong can token. |
-| GET | `/api/v1/jobs/{jobId}/proposals` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/proposals/my` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/proposals/{proposalId}/status` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/jobs` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/jobs/{jobId}/publish` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/proposals` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/proposals/file` | Bearer JWT | Upload file proposal qua multipart/form-data. |
-| PUT | `/api/v1/jobs/{jobId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## membership-controller
-
-- Controller source: `MembershipController`
-- Giai thich: Danh sach goi thanh vien va mua goi.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/membership/packages` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/membership/packages/{packageId}/purchase` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
 
-## notification-controller
-
-- Controller source: `NotificationController`
-- Giai thich: Doc thong bao va cap nhat trang thai da doc.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/v1/notifications` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/notifications/unread-count` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/notifications/{notificationId}/read` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| PATCH | `/api/v1/notifications/read-all` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## pay-ospayment-controller
-
-- Controller source: `PayOSPaymentController`
-- Giai thich: Tao order nap vi, return callback va dong bo trang thai PayOS.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/payments/payos/return` | Public | Swagger UI phai hien route nay khong can token. |
-| POST | `/api/payments/payos/{orderCode}/sync` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/payments/payos/create` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## profile-controller
-
-- Controller source: `ProfileController`
-- Giai thich: Business/Expert profile, approval, portfolio va file view/upload.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/v1/profiles/business` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/profiles/business/{businessId}` | Public | Public route tren Swagger; service van giu state/role gate cho case khong thuoc OPEN flow. |
-| GET | `/api/v1/profiles/business/by-job/{jobId}` | Public | Public route tren Swagger; service van giu state/role gate cho case khong thuoc OPEN flow. |
-| GET | `/api/v1/profiles/business/me` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/profiles/expert` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/profiles/expert/{expertId}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/profiles/expert/me` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/profiles/files/view-url` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/profiles/portfolio` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/profiles/portfolio/me` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/profiles/approve/{type}/{id}` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/profiles/business` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/profiles/business/license-file` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/profiles/expert` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/profiles/expert/portfolio-file` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/profiles/portfolio` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/profiles/portfolio/certificate-file` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## SoW Generation
-
-- Controller source: `SowGenerationController`
-- Giai thich: Sinh SoW tu raw requirements.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| POST | `/api/jobs/generate-sow` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## tax-check-controller
-
-- Controller source: `TaxCheckController`
-- Giai thich: Tra cuu ma so thue doanh nghiep.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/auth/tax-check/{mst}` | Public | Swagger UI phai hien route nay khong can token. |
-
-## test-controller
-
-- Controller source: `TestController`
-- Giai thich: Endpoint kiem thu ky thuat noi bo.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/test/secure` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## user-quota-controller
-
-- Controller source: `UserQuotaController`
-- Giai thich: Nguon chuan quota, active package va Premium.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/users/me/quota` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## wallet-api-controller
-
-- Controller source: `WalletApiController`
-- Giai thich: Vi hien tai va ledger wallet_transactions.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/wallet/current` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/wallet/transactions` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## wallet-controller
-
-- Controller source: `WalletController`
-- Giai thich: Snapshot vi hien tai cho account dang nhap.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/v1/wallet/me` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-
-## withdrawal-controller
-
-- Controller source: `WithdrawalController`
-- Giai thich: Tao/ra soat yeu cau rut tien.
-
-| Method | Path | Auth | Ghi chu |
-| --- | --- | --- | --- |
-| GET | `/api/v1/admin/withdrawal-requests` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| GET | `/api/v1/withdrawal-requests` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
-| POST | `/api/v1/withdrawal-requests` | Bearer JWT | Can goi dung role/ownership/state rule trong service. |
+## Auth Flow
+
+- Giai thich flow: Dang ky, dang nhap, OTP email, current session va tra cuu ma so thue.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/auth/check-email` | Public | Kiem tra email da ton tai hay chua. |
+| 2 | GET | `/api/auth/me` | Public | Lay current session theo token hien tai. |
+| 3 | GET | `/api/auth/tax-check/{mst}` | Public | Tra cuu ma so thue doanh nghiep. |
+| 4 | POST | `/api/auth/email/send-otp` | Public | Gui OTP den email. |
+| 5 | POST | `/api/auth/email/verify-otp` | Public | Xac minh OTP email. |
+| 6 | POST | `/api/auth/google/login` | Public | Dang nhap bang Google credential. |
+| 7 | POST | `/api/auth/google/register` | Public | Dang ky/dang nhap Google cho user moi. |
+| 8 | POST | `/api/auth/login` | Public | Dang nhap bang email/password de lay JWT. |
+| 9 | POST | `/api/auth/register` | Public | Dang ky account moi. |
+
+## Profile Verification Flow
+
+- Giai thich flow: Business/Expert profile, portfolio, file profile va luong duyet KYC/KYB.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/v1/profiles/business` | Bearer JWT | Lay danh sach business profiles cho operator. |
+| 2 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Public | Public lay business profile theo job OPEN. |
+| 3 | GET | `/api/v1/profiles/business/me` | Bearer JWT | Lay KYB profile cua business dang dang nhap. |
+| 4 | GET | `/api/v1/profiles/business/{businessId}` | Public | Public lay business profile theo id. |
+| 5 | GET | `/api/v1/profiles/expert` | Bearer JWT | Lay danh sach expert profiles cho operator. |
+| 6 | GET | `/api/v1/profiles/expert/me` | Bearer JWT | Lay KYC profile cua expert dang dang nhap. |
+| 7 | GET | `/api/v1/profiles/expert/{expertId}` | Bearer JWT | Lay expert profile theo id. |
+| 8 | GET | `/api/v1/profiles/files/view-url` | Bearer JWT | Tao signed/view URL cho file Firebase/storage. |
+| 9 | GET | `/api/v1/profiles/portfolio` | Bearer JWT | Lay danh sach portfolio cho operator. |
+| 10 | GET | `/api/v1/profiles/portfolio/me` | Bearer JWT | Lay portfolio cua expert dang dang nhap. |
+| 11 | POST | `/api/v1/profiles/approve/{type}/{id}` | Bearer JWT | Staff/Admin approve/reject KYB/KYC profile. |
+| 12 | POST | `/api/v1/profiles/business` | Bearer JWT | Business tao/cap nhat KYB profile. |
+| 13 | POST | `/api/v1/profiles/business/license-file` | Bearer JWT | Upload business license file. |
+| 14 | POST | `/api/v1/profiles/expert` | Bearer JWT | Expert tao/cap nhat KYC profile. |
+| 15 | POST | `/api/v1/profiles/expert/portfolio-file` | Bearer JWT | Upload portfolio file cua expert. |
+| 16 | POST | `/api/v1/profiles/portfolio` | Bearer JWT | Expert tao/cap nhat portfolio structured. |
+| 17 | POST | `/api/v1/profiles/portfolio/certificate-file` | Bearer JWT | Upload certificate file cua expert. |
+
+## Job Draft & Publish Flow
+
+- Giai thich flow: Tao draft job, cap nhat SoW, gan taxonomy, xem chi tiet va publish job.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/v1/jobs` | Public | Public list job OPEN tren marketplace. |
+| 2 | GET | `/api/v1/jobs/my` | Bearer JWT | Lay job cua Business dang dang nhap. |
+| 3 | GET | `/api/v1/jobs/{jobId}` | Public | Lay chi tiet job. |
+| 4 | GET | `/api/v1/jobs/{jobId}/domains` | Bearer JWT | Lay domain gan voi job. |
+| 5 | GET | `/api/v1/jobs/{jobId}/milestones` | Public | Lay milestone public cua job OPEN. |
+| 6 | GET | `/api/v1/jobs/{jobId}/skills` | Bearer JWT | Lay skill gan voi job. |
+| 7 | GET | `/api/v1/jobs/{jobId}/technologies` | Bearer JWT | Lay technology gan voi job. |
+| 8 | PUT | `/api/v1/jobs/{jobId}` | Bearer JWT | Cap nhat draft job, SoW va milestone. |
+| 9 | PUT | `/api/v1/jobs/{jobId}/domains` | Bearer JWT | Thay the toan bo domain cua job. |
+| 10 | PUT | `/api/v1/jobs/{jobId}/skills` | Bearer JWT | Thay the toan bo skill assignment cua job. |
+| 11 | PUT | `/api/v1/jobs/{jobId}/technologies` | Bearer JWT | Thay the toan bo technology cua job. |
+| 12 | POST | `/api/jobs/generate-sow` | Bearer JWT | Generate SoW, milestone va budget tu requirement tho. |
+| 13 | POST | `/api/v1/jobs` | Bearer JWT | Business tao job draft. |
+| 14 | POST | `/api/v1/jobs/{jobId}/publish` | Bearer JWT | Publish job sang OPEN. |
+| 15 | PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Cap nhat status job. |
+
+## Proposal Flow
+
+- Giai thich flow: Submit proposal, review proposal, matching, expert candidates va expert recommendations.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/jobs/{jobPostingId}/expert-candidates` | Bearer JWT | Lay/rank candidate expert cho job. |
+| 2 | GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Lay recommendation da luu cho job. |
+| 3 | GET | `/api/v1/jobs/{jobId}/matching` | Bearer JWT | Chay matching heuristic/legacy cho job. |
+| 4 | GET | `/api/v1/jobs/{jobId}/proposals` | Bearer JWT | Lay proposal cua job cho Business owner/operator. |
+| 5 | GET | `/api/v1/proposals/my` | Bearer JWT | Lay proposal cua Expert dang dang nhap. |
+| 6 | POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Generate va luu Top expert recommendations. |
+| 7 | POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | Bearer JWT | Business chon expert tu recommendation. |
+| 8 | POST | `/api/v1/proposals` | Bearer JWT | Expert submit proposal vao job OPEN. |
+| 9 | POST | `/api/v1/proposals/file` | Bearer JWT | Upload file proposal. |
+| 10 | PATCH | `/api/v1/proposals/{proposalId}/status` | Bearer JWT | Review proposal Accepted/Rejected. |
+
+## Wallet & Payment Flow
+
+- Giai thich flow: Wallet, quota, membership, credit, PayOS top-up va withdrawal.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/membership/packages` | Bearer JWT | Lay package membership theo role hien tai. |
+| 2 | GET | `/api/payments/payos/return` | Public | Public callback-style return URL cua PayOS. |
+| 3 | GET | `/api/users/me/quota` | Bearer JWT | Lay source of truth cho quota, package active va Premium. |
+| 4 | GET | `/api/v1/admin/withdrawal-requests` | Bearer JWT | Admin lay danh sach withdrawal requests. |
+| 5 | GET | `/api/v1/wallet/me` | Bearer JWT | Snapshot vi hien tai cho account dang nhap. |
+| 6 | GET | `/api/v1/withdrawal-requests` | Bearer JWT | User lay withdrawal requests cua minh. |
+| 7 | GET | `/api/wallet/current` | Bearer JWT | Lay wallet hien tai cua account. |
+| 8 | GET | `/api/wallet/transactions` | Bearer JWT | Lay ledger wallet transactions. |
+| 9 | POST | `/api/credits/job-post/purchase` | Bearer JWT | Mua job-post credits bang wallet. |
+| 10 | POST | `/api/credits/proposal/purchase` | Bearer JWT | Mua proposal credits bang wallet. |
+| 11 | POST | `/api/membership/packages/{packageId}/purchase` | Bearer JWT | Mua membership bang wallet. |
+| 12 | POST | `/api/payments/payos/create` | Bearer JWT | Tao payment order PayOS de nap vi. |
+| 13 | POST | `/api/payments/payos/{orderCode}/sync` | Bearer JWT | Chu dong sync trang thai PayOS theo order code. |
+| 14 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Bearer JWT | Admin approve withdrawal. |
+| 15 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Bearer JWT | Admin reject withdrawal. |
+| 16 | POST | `/api/v1/withdrawal-requests` | Bearer JWT | Tao withdrawal request. |
+
+## Contract Execution Flow
+
+- Giai thich flow: Contract, milestone, deliverable, dispute, deposit va transaction.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/v1/contracts` | Bearer JWT | Lay danh sach contract ma user hien tai duoc phep xem. |
+| 2 | GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Lay chi tiet contract. |
+| 3 | GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Lay dispute cua contract. |
+| 4 | GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Lay milestone snapshot/live view cua contract. |
+| 5 | GET | `/api/v1/disputes/{disputeId}` | Bearer JWT | Lay chi tiet dispute. |
+| 6 | GET | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Lay acceptance criteria cua milestone. |
+| 7 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Lay deliverable cua milestone. |
+| 8 | GET | `/api/v1/milestones/{milestoneId}/transactions` | Bearer JWT | Lay transaction legacy cua milestone. |
+| 9 | POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | Bearer JWT | Admin refund contract deposit. |
+| 10 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | Bearer JWT | Tao contract draft tu proposal da accepted. |
+| 11 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | Bearer JWT | Business thanh toan deposit cho contract. |
+| 12 | POST | `/api/v1/contracts/{contractId}/nda-sign` | Bearer JWT | Ky NDA cho contract. |
+| 13 | POST | `/api/v1/contracts/{contractId}/reject` | Bearer JWT | Expert reject contract draft/pending. |
+| 14 | POST | `/api/v1/contracts/{contractId}/sign` | Bearer JWT | Ky hop dong cho business hoac expert. |
+| 15 | POST | `/api/v1/contracts/{contractId}/terminate` | Bearer JWT | Ket thuc contract co ly do. |
+| 16 | POST | `/api/v1/criteria` | Bearer JWT | Tao acceptance criteria. |
+| 17 | POST | `/api/v1/deliverables` | Bearer JWT | Expert submit deliverable cho milestone. |
+| 18 | POST | `/api/v1/disputes` | Bearer JWT | Tao dispute cho contract/milestone. |
+| 19 | POST | `/api/v1/disputes/{disputeId}/demo-testing` | Bearer JWT | Ghi nhan ket qua demo testing cho dispute. |
+| 20 | POST | `/api/v1/disputes/{disputeId}/technical-report` | Bearer JWT | Staff ghi technical report cho dispute. |
+| 21 | POST | `/api/v1/milestones` | Bearer JWT | Tao milestone. |
+| 22 | POST | `/api/v1/milestones/sla-auto-approve` | Bearer JWT | Chay SLA auto approve dang manual simulation. |
+| 23 | POST | `/api/v1/milestones/{milestoneId}/complete` | Bearer JWT | Business complete milestone. |
+| 24 | POST | `/api/v1/transactions` | Bearer JWT | Tao transaction legacy cho milestone. |
+| 25 | POST | `/api/v1/transactions/{transactionId}/webhook` | Bearer JWT | Simulation webhook transaction legacy. |
+| 26 | PATCH | `/api/v1/disputes/{disputeId}/assign` | Bearer JWT | Gan dispute cho staff. |
+| 27 | PATCH | `/api/v1/disputes/{disputeId}/resolve` | Bearer JWT | Resolve dispute bang proposed action. |
+| 28 | PATCH | `/api/v1/milestones/{milestoneId}` | Bearer JWT | Cap nhat milestone. |
+| 29 | PATCH | `/api/v1/transactions/{transactionId}/status` | Bearer JWT | Cap nhat status transaction legacy. |
+
+## Notification Flow
+
+- Giai thich flow: Thong bao va trang thai da doc.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/v1/notifications` | Bearer JWT | Lay danh sach notification cua user hien tai. |
+| 2 | GET | `/api/v1/notifications/unread-count` | Bearer JWT | Dem notification chua doc. |
+| 3 | PATCH | `/api/v1/notifications/read-all` | Bearer JWT | Danh dau tat ca notification da doc. |
+| 4 | PATCH | `/api/v1/notifications/{notificationId}/read` | Bearer JWT | Danh dau mot notification da doc. |
+
+## Catalog & Reference Flow
+
+- Giai thich flow: Domain, skill, technology va acceptance criteria.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/v1/acceptance-criteria` | Public | Lay danh muc acceptance criteria. |
+| 2 | GET | `/api/v1/domains` | Public | Lay danh muc domain. |
+| 3 | GET | `/api/v1/skills` | Public | Lay danh muc skill. |
+| 4 | GET | `/api/v1/technologies` | Bearer JWT | Lay danh muc technology. |
+| 5 | POST | `/api/v1/domains` | Bearer JWT | Tao domain moi. |
+| 6 | POST | `/api/v1/skills` | Bearer JWT | Tao skill moi. |
+| 7 | POST | `/api/v1/technologies` | Bearer JWT | Tao technology moi. |
+| 8 | PATCH | `/api/v1/domains/{domainId}` | Bearer JWT | Cap nhat domain. |
+| 9 | PATCH | `/api/v1/skills/{skillId}` | Bearer JWT | Cap nhat skill. |
+| 10 | PATCH | `/api/v1/technologies/{technologyId}` | Bearer JWT | Cap nhat technology. |
+
+## AI & Matching Flow
+
+- Giai thich flow: Chatbot va cac endpoint AI/phu tro.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | POST | `/api/chatbot/ask` | Public | Gui cau hoi vao chatbot/RAG. |
+
+## Admin & Governance Flow
+
+- Giai thich flow: Quan tri account, staff, settings, analytics, audit, review va wallet he thong.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/v1/admin/accounts` | Bearer JWT | Lay danh sach account cho man hinh quan tri. |
+| 2 | GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Lay so lieu tong quan cho dashboard admin. |
+| 3 | GET | `/api/v1/admin/audit-logs` | Bearer JWT | Lay audit log, co the loc theo nhom actor. |
+| 4 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Lay review theo contract. |
+| 5 | GET | `/api/v1/admin/settings` | Bearer JWT | Lay danh sach system settings. |
+| 6 | GET | `/api/v1/admin/staffs` | Bearer JWT | Lay danh sach staff. |
+| 7 | GET | `/api/v1/admin/wallet` | Bearer JWT | Lay system wallet cho admin. |
+| 8 | POST | `/api/v1/admin/accounts` | Bearer JWT | Tao account moi tu trang quan tri. |
+| 9 | POST | `/api/v1/admin/reviews` | Bearer JWT | Tao review cho contract. |
+| 10 | POST | `/api/v1/admin/staffs` | Bearer JWT | Tao staff profile gan voi account. |
+| 11 | POST | `/api/v1/admin/wallet/sync` | Bearer JWT | Dong bo/lazy-create system wallet. |
+| 12 | DELETE | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Vo hieu hoa account theo `accountId`. |
+| 13 | PATCH | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Cap nhat thong tin account. |
+| 14 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Bat/tat trang thai active cua account. |
+| 15 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Cap nhat status account bang query param. |
+| 16 | PATCH | `/api/v1/admin/settings/{key}` | Bearer JWT | Cap nhat value hoac trang thai active cua system setting. |
+| 17 | PATCH | `/api/v1/admin/staffs/{staffId}` | Bearer JWT | Cap nhat ho so staff. |
+
+## System & Test Flow
+
+- Giai thich flow: Health check va endpoint test ky thuat.
+
+| # | Method | Path | Auth | Giai thich |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/health` | Public | Health check backend. |
+| 2 | GET | `/api/test/secure` | Bearer JWT | Endpoint smoke test security. |
 
 ## Luu y nghiep vu
 
-- `GET /api/users/me/quota` la nguon chuan cho quota, active package va Premium entitlement.
-- `GET /api/v1/jobs/my` la route rieng cho dashboard Business va phai co JWT.
-- `GET /api/payments/payos/return` la public callback-style route; sync top-up chu dong van qua `POST /api/payments/payos/{orderCode}/sync`.
-- `POST /api/v1/transactions/{transactionId}/webhook`, dispute demo/technical-report, `POST /api/v1/milestones/sla-auto-approve` va `GET /api/v1/jobs/{jobId}/matching` van la nhom legacy/manual simulation.
+- `GET /api/auth/me` dang nam trong Auth Flow; du SecurityConfig permitAll theo pattern `/api/auth/**`, khi test current session van nen gan token de co du lieu user.
+- `GET /api/v1/jobs/{jobId}/milestones` duoc dat trong Job Draft & Publish Flow vi no phuc vu public job detail/open job testing, khong phai luong milestone contract private.
+- `GET /api/v1/jobs/{jobId}/matching`, `GET /api/jobs/{jobPostingId}/expert-candidates` va `POST/GET /api/jobs/{jobPostingId}/expert-recommendations` duoc dua vao Proposal Flow vi chung phuc vu viec tim/chon expert va xu ly proposal.
+- Notification, catalog, AI, admin va system/test duoc day xuong cuoi Swagger de khong pha vo 6 flow nghiep vu chinh.

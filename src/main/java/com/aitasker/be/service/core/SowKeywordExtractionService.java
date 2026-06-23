@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/SowKeywordExtractionService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.dto.candidate.SowKeywordExtractionResult;
@@ -17,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
 public class SowKeywordExtractionService {
     private static final List<KeywordRule> SKILL_RULES = List.of(
@@ -43,6 +49,7 @@ public class SowKeywordExtractionService {
 
     private final ObjectMapper objectMapper;
 
+    // Note: Ham `SowKeywordExtractionService` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public SowKeywordExtractionService() {
         this(new ObjectMapper());
     }
@@ -51,6 +58,7 @@ public class SowKeywordExtractionService {
         this.objectMapper = objectMapper;
     }
 
+    // Note: Ham `extractKeywordsFromSow` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public SowKeywordExtractionResult extractKeywordsFromSow(String sowJson) {
         List<String> textChunks = extractTextChunks(sowJson);
         String text = String.join(" ", textChunks);
@@ -66,18 +74,22 @@ public class SowKeywordExtractionService {
                 .build();
     }
 
+    // Note: Ham `skillAliasesByKeyword` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public Map<String, List<String>> skillAliasesByKeyword() {
         return SKILL_ALIASES;
     }
 
+    // Note: Ham `domainAliasesByKeyword` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public Map<String, List<String>> domainAliasesByKeyword() {
         return DOMAIN_ALIASES;
     }
 
+    // Note: Ham `aliasesForKeyword` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<String> aliasesForKeyword(String keyword) {
         return ALL_ALIASES.getOrDefault(keyword, List.of(keyword));
     }
 
+    // Note: Ham `aliasesForKeywords` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<String> aliasesForKeywords(Collection<String> keywords) {
         if (keywords == null || keywords.isEmpty()) {
             return List.of();
@@ -90,6 +102,7 @@ public class SowKeywordExtractionService {
         return List.copyOf(aliases);
     }
 
+    // Note: Ham `textContainsKeyword` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public boolean textContainsKeyword(String text, String keyword) {
         if (text == null || text.isBlank() || keyword == null || keyword.isBlank()) {
             return false;
@@ -97,6 +110,7 @@ public class SowKeywordExtractionService {
         return containsAnyAlias(normalizeForMatching(text), aliasesForKeyword(keyword));
     }
 
+    // Note: Ham `countKeywordsInText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public long countKeywordsInText(String text, Collection<String> keywords) {
         if (text == null || text.isBlank() || keywords == null || keywords.isEmpty()) {
             return 0;
@@ -106,6 +120,7 @@ public class SowKeywordExtractionService {
                 .count();
     }
 
+    // Note: Ham `normalizeForMatching` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public String normalizeForMatching(String value) {
         if (value == null || value.isBlank()) {
             return "";
@@ -122,6 +137,7 @@ public class SowKeywordExtractionService {
                 .trim();
     }
 
+    // Note: Ham `extractTextChunks` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> extractTextChunks(String sowJson) {
         if (sowJson == null || sowJson.isBlank()) {
             return List.of();
@@ -141,6 +157,7 @@ public class SowKeywordExtractionService {
         }
     }
 
+    // Note: Ham `collectKnownSowFields` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void collectKnownSowFields(JsonNode root, List<String> chunks) {
         JsonNode sowNode = root.path("sow");
         if (sowNode.isMissingNode() || sowNode.isNull()) {
@@ -168,6 +185,7 @@ public class SowKeywordExtractionService {
         }
     }
 
+    // Note: Ham `appendField` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void appendField(JsonNode node, List<String> chunks, String fieldName) {
         if (node == null || node.isMissingNode() || node.isNull()) {
             return;
@@ -179,6 +197,7 @@ public class SowKeywordExtractionService {
         }
     }
 
+    // Note: Ham `appendText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void appendText(JsonNode node, List<String> chunks) {
         if (node == null || node.isNull()) {
             return;
@@ -195,6 +214,7 @@ public class SowKeywordExtractionService {
         node.forEach(child -> appendText(child, chunks));
     }
 
+    // Note: Ham `extractJsonPayload` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String extractJsonPayload(String value) {
         String content = value.trim();
         if (!content.startsWith("```")) {
@@ -209,6 +229,7 @@ public class SowKeywordExtractionService {
         return content;
     }
 
+    // Note: Ham `matchRules` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> matchRules(String text, List<KeywordRule> rules) {
         String normalizedText = normalizeForMatching(text);
         if (normalizedText.isBlank()) {
@@ -224,6 +245,7 @@ public class SowKeywordExtractionService {
         return matches;
     }
 
+    // Note: Ham `containsAnyAlias` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean containsAnyAlias(String normalizedText, Collection<String> aliases) {
         if (normalizedText == null || normalizedText.isBlank()) {
             return false;
@@ -238,10 +260,12 @@ public class SowKeywordExtractionService {
         return false;
     }
 
+    // Note: Ham `containsNormalizedTerm` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean containsNormalizedTerm(String normalizedText, String normalizedTerm) {
         return (" " + normalizedText + " ").contains(" " + normalizedTerm + " ");
     }
 
+    // Note: Ham `combineKeywords` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> combineKeywords(List<String> skills, List<String> domains) {
         LinkedHashSet<String> keywords = new LinkedHashSet<>();
         if (skills != null) {
@@ -253,6 +277,7 @@ public class SowKeywordExtractionService {
         return List.copyOf(keywords);
     }
 
+    // Note: Ham `rule` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private static KeywordRule rule(String label, String... aliases) {
         LinkedHashSet<String> values = new LinkedHashSet<>();
         values.add(label);
@@ -260,6 +285,7 @@ public class SowKeywordExtractionService {
         return new KeywordRule(label, List.copyOf(values));
     }
 
+    // Note: Ham `aliasesByLabel` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private static Map<String, List<String>> aliasesByLabel(List<KeywordRule> rules) {
         Map<String, List<String>> aliases = new LinkedHashMap<>();
         for (KeywordRule rule : rules) {
@@ -268,6 +294,7 @@ public class SowKeywordExtractionService {
         return Map.copyOf(aliases);
     }
 
+    // Note: Ham `allAliases` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private static Map<String, List<String>> allAliases() {
         Map<String, List<String>> aliases = new LinkedHashMap<>();
         aliases.putAll(SKILL_ALIASES);

@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/ExpertCandidateRankingService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
@@ -37,7 +42,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class ExpertCandidateRankingService {
     private static final int MAX_CANDIDATES = 20;
@@ -52,6 +59,7 @@ public class ExpertCandidateRankingService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional(readOnly = true)
+    // Note: Ham `findTopCandidatesByJobPostingId` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public ExpertCandidateSearchResponse findTopCandidatesByJobPostingId(Integer jobPostingId) {
         JobEntity job = jobRepository.findById(jobPostingId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
@@ -74,6 +82,7 @@ public class ExpertCandidateRankingService {
                 .build();
     }
 
+    // Note: Ham `rankPortfolio` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Optional<ExpertCandidateResponse> rankPortfolio(
             PortfolioEntity portfolio,
             SowKeywordExtractionResult keywords,
@@ -122,6 +131,7 @@ public class ExpertCandidateRankingService {
                 .build());
     }
 
+    // Note: Ham `findCandidatePortfolios` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<PortfolioEntity> findCandidatePortfolios(
             SowKeywordExtractionResult keywords,
             CatalogIndex catalogIndex
@@ -151,6 +161,7 @@ public class ExpertCandidateRankingService {
         return new ArrayList<>(portfoliosById.values());
     }
 
+    // Note: Ham `loadCatalogIndex` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private CatalogIndex loadCatalogIndex(SowKeywordExtractionResult keywords) {
         Map<Integer, String> skillTextById = skillRepository.findByIsActiveTrueOrderBySkillNameAsc().stream()
                 .collect(Collectors.toMap(
@@ -175,6 +186,7 @@ public class ExpertCandidateRankingService {
         );
     }
 
+    // Note: Ham `resolveCatalogIds` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Map<String, Set<Integer>> resolveCatalogIds(List<String> requirements, Map<Integer, String> catalogTextById) {
         Map<String, Set<Integer>> idsByRequirement = new LinkedHashMap<>();
         if (requirements == null || requirements.isEmpty()) {
@@ -191,6 +203,7 @@ public class ExpertCandidateRankingService {
         return idsByRequirement;
     }
 
+    // Note: Ham `matchedRequirements` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> matchedRequirements(
             List<String> requirements,
             String rawCatalogValue,
@@ -219,6 +232,7 @@ public class ExpertCandidateRankingService {
         return matches;
     }
 
+    // Note: Ham `buildSowPayload` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildSowPayload(JobEntity job) {
         List<MilestoneEntity> milestones = milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId());
         Optional<SowEntity> sow = sowRepository.findByJobId(job.getJobId());
@@ -238,6 +252,7 @@ public class ExpertCandidateRankingService {
         return "{}";
     }
 
+    // Note: Ham `buildSowPayload` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildSowPayload(SowEntity sow, List<MilestoneEntity> milestones) {
         ObjectNode root = objectMapper.createObjectNode();
         ObjectNode sowNode = root.putObject("sow");
@@ -250,6 +265,7 @@ public class ExpertCandidateRankingService {
         return root.toString();
     }
 
+    // Note: Ham `buildLegacySowPayload` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildLegacySowPayload(String structuredSow, List<MilestoneEntity> milestones) {
         try {
             JsonNode legacyNode = objectMapper.readTree(structuredSow);
@@ -271,6 +287,7 @@ public class ExpertCandidateRankingService {
         }
     }
 
+    // Note: Ham `milestonesToJson` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private ArrayNode milestonesToJson(List<MilestoneEntity> milestones) {
         ArrayNode milestonesNode = objectMapper.createArrayNode();
         for (MilestoneEntity milestone : milestones) {
@@ -282,12 +299,14 @@ public class ExpertCandidateRankingService {
         return milestonesNode;
     }
 
+    // Note: Ham `putText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void putText(ObjectNode node, String fieldName, String value) {
         if (value != null && !value.isBlank()) {
             node.put(fieldName, value);
         }
     }
 
+    // Note: Ham `putJsonText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void putJsonText(ObjectNode node, String fieldName, String value) {
         if (value == null || value.isBlank()) {
             return;
@@ -300,6 +319,7 @@ public class ExpertCandidateRankingService {
         }
     }
 
+    // Note: Ham `addQueryTokens` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void addQueryTokens(LinkedHashSet<String> queryTokens, List<String> keywords) {
         if (keywords == null || keywords.isEmpty()) {
             return;
@@ -311,6 +331,7 @@ public class ExpertCandidateRankingService {
         }
     }
 
+    // Note: Ham `addCatalogIdTokens` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void addCatalogIdTokens(LinkedHashSet<String> queryTokens, Collection<Set<Integer>> catalogIdGroups) {
         for (Set<Integer> catalogIds : catalogIdGroups) {
             for (Integer catalogId : catalogIds) {
@@ -321,12 +342,14 @@ public class ExpertCandidateRankingService {
         }
     }
 
+    // Note: Ham `addQueryToken` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void addQueryToken(LinkedHashSet<String> queryTokens, String token) {
         if (token != null && !token.isBlank()) {
             queryTokens.add(token.trim());
         }
     }
 
+    // Note: Ham `parseCatalogIds` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Set<Integer> parseCatalogIds(String value) {
         if (value == null || value.isBlank()) {
             return Set.of();
@@ -340,6 +363,7 @@ public class ExpertCandidateRankingService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
+    // Note: Ham `parseInteger` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Optional<Integer> parseInteger(String value) {
         try {
             return Optional.of(Integer.valueOf(value));
@@ -348,6 +372,7 @@ public class ExpertCandidateRankingService {
         }
     }
 
+    // Note: Ham `textMatchesRequirement` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean textMatchesRequirement(String text, String requirement) {
         if (text == null || text.isBlank() || requirement == null || requirement.isBlank()) {
             return false;
@@ -364,6 +389,7 @@ public class ExpertCandidateRankingService {
                 .anyMatch(term -> containsNormalizedTerm(normalizedText, term));
     }
 
+    // Note: Ham `catalogRelatedTerms` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<String> catalogRelatedTerms(String requirement) {
         LinkedHashSet<String> terms = new LinkedHashSet<>(sowKeywordExtractionService.aliasesForKeyword(requirement));
         switch (requirement) {
@@ -385,15 +411,18 @@ public class ExpertCandidateRankingService {
         return List.copyOf(terms);
     }
 
+    // Note: Ham `containsNormalizedTerm` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean containsNormalizedTerm(String normalizedText, String normalizedTerm) {
         return (" " + normalizedText + " ").contains(" " + normalizedTerm + " ");
     }
 
+    // Note: Ham `hasAnyKeyword` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean hasAnyKeyword(String text, List<String> keywords) {
         return keywords != null && keywords.stream()
                 .anyMatch(keyword -> sowKeywordExtractionService.textContainsKeyword(text, keyword));
     }
 
+    // Note: Ham `descriptionScore` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private double descriptionScore(String selfDescription, List<String> keywords) {
         int keywordCount = sizeOf(keywords);
         if (keywordCount == 0) {
@@ -403,6 +432,7 @@ public class ExpertCandidateRankingService {
         return percent((int) matchedCount, keywordCount);
     }
 
+    // Note: Ham `experienceScore` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private double experienceScore(int yearsExperience) {
         if (yearsExperience >= 5) {
             return 100.0;
@@ -416,6 +446,7 @@ public class ExpertCandidateRankingService {
         return 20.0;
     }
 
+    // Note: Ham `percent` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private double percent(int matchedCount, int totalCount) {
         if (totalCount == 0) {
             return 0.0;
@@ -423,10 +454,12 @@ public class ExpertCandidateRankingService {
         return matchedCount * 100.0 / totalCount;
     }
 
+    // Note: Ham `round2` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private double round2(double value) {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    // Note: Ham `compareCandidates` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int compareCandidates(ExpertCandidateResponse first, ExpertCandidateResponse second) {
         int scoreCompare = Double.compare(second.getMatchScore(), first.getMatchScore());
         if (scoreCompare != 0) {
@@ -441,30 +474,37 @@ public class ExpertCandidateRankingService {
         return Integer.compare(nullToMax(first.getPortfolioId()), nullToMax(second.getPortfolioId()));
     }
 
+    // Note: Ham `nullToZero` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int nullToZero(Integer value) {
         return value == null ? 0 : value;
     }
 
+    // Note: Ham `nullToMax` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int nullToMax(Integer value) {
         return value == null ? Integer.MAX_VALUE : value;
     }
 
+    // Note: Ham `sizeOf` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private int sizeOf(Collection<?> values) {
         return values == null ? 0 : values.size();
     }
 
+    // Note: Ham `isEmpty` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean isEmpty(Collection<?> values) {
         return values == null || values.isEmpty();
     }
 
+    // Note: Ham `catalogText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String catalogText(SkillEntity skill) {
         return joinText(skill.getSkillId(), skill.getSkillCode(), skill.getSkillName(), skill.getDescription());
     }
 
+    // Note: Ham `catalogText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String catalogText(DomainEntity domain) {
         return joinText(domain.getDomainId(), domain.getDomainCode(), domain.getDomainName(), domain.getDescription());
     }
 
+    // Note: Ham `joinText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String joinText(Object... values) {
         return Arrays.stream(values)
                 .filter(Objects::nonNull)

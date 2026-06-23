@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/auth/TaxCheckService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.auth;
 
 import com.aitasker.be.common.exception.AppException;
@@ -16,7 +21,9 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class TaxCheckService {
     private static final String VIETQR_BUSINESS_API_URL = "https://api.vietqr.io/v2/business/";
@@ -25,6 +32,7 @@ public class TaxCheckService {
 
     private final RestTemplate restTemplate;
 
+    // Note: Ham `checkTaxCode` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public TaxCheckResponse checkTaxCode(String mst) {
         validateTaxCode(mst);
 
@@ -47,12 +55,14 @@ public class TaxCheckService {
                 .build();
     }
 
+    // Note: Ham `validateTaxCode` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void validateTaxCode(String mst) {
         if (mst == null || !mst.matches("\\d{10}|\\d{13}")) {
             throw new AppException("Ma so thue khong hop le");
         }
     }
 
+    // Note: Ham `fetchBusiness` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Map<String, Object> fetchBusiness(String mst) {
         try {
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
@@ -73,6 +83,7 @@ public class TaxCheckService {
         }
     }
 
+    // Note: Ham `getString` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String getString(Map<?, ?> source, String key) {
         Object value = source.get(key);
         if (value == null) {
@@ -83,6 +94,7 @@ public class TaxCheckService {
         return text.isBlank() ? null : text;
     }
 
+    // Note: Ham `defaultIfBlank` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }

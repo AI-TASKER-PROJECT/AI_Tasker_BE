@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/RagRetrievalService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.config.RagProperties;
@@ -12,7 +17,9 @@ import java.util.List;
 import java.util.Map;
 
 @Slf4j
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class RagRetrievalService {
     private static final double MAX_DISTANCE_FROM_BEST_MATCH = 0.12;
@@ -21,6 +28,7 @@ public class RagRetrievalService {
     private final KnowledgeChunkJdbcRepository knowledgeChunkRepository;
     private final RagProperties ragProperties;
 
+    // Note: Ham `retrieveRelevantContext` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public Map<String, String> retrieveRelevantContext(String question) {
         if (question == null || question.isBlank()) {
             return Map.of();
@@ -55,6 +63,7 @@ public class RagRetrievalService {
         return contexts;
     }
 
+    // Note: Ham `buildContextKey` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildContextKey(KnowledgeChunkSearchResult chunk) {
         if (chunk.sectionTitle() == null || chunk.sectionTitle().isBlank()) {
             return chunk.sourceFile();

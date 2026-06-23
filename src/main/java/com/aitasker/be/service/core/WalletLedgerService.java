@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/WalletLedgerService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
@@ -13,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class WalletLedgerService {
     private static final String WALLET_TRANSACTION_TOPUP = "TOPUP";
@@ -26,6 +33,7 @@ public class WalletLedgerService {
     private final SystemWalletService systemWalletService;
 
     @Transactional
+    // Note: Ham `postWalletTopup` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void postWalletTopup(PaymentOrderEntity paymentOrder) {
         if (walletTransactionRepository.existsByPaymentOrderIdAndTransactionType(paymentOrder.getId(), WALLET_TRANSACTION_TOPUP)) {
             return;
@@ -47,6 +55,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `creditAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity creditAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -59,6 +68,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `debitAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity debitAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -80,6 +90,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `holdEscrowFromAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity holdEscrowFromAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -92,6 +103,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `holdWithdrawalFromAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity holdWithdrawalFromAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -104,6 +116,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `releaseEscrowToAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity releaseEscrowToAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -116,6 +129,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `releaseHoldingToAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity releaseHoldingToAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -128,6 +142,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `debitEscrow` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity debitEscrow(
             Integer accountId,
             BigDecimal amount,
@@ -140,6 +155,7 @@ public class WalletLedgerService {
     }
 
     @Transactional
+    // Note: Ham `debitHolding` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public WalletTransactionEntity debitHolding(
             Integer accountId,
             BigDecimal amount,
@@ -152,12 +168,14 @@ public class WalletLedgerService {
     }
 
     @Transactional(readOnly = true)
+    // Note: Ham `availableBalance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public BigDecimal availableBalance(Integer accountId) {
         SystemWalletEntity wallet = systemWalletRepository.findByAccountId(accountId)
                 .orElse(null);
         return wallet == null ? BigDecimal.ZERO : balance(wallet, BALANCE_AVAILABLE);
     }
 
+    // Note: Ham `creditAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private WalletTransactionEntity creditAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -178,6 +196,7 @@ public class WalletLedgerService {
                 amount, before, balance(wallet, BALANCE_AVAILABLE), referenceType, referenceId, description);
     }
 
+    // Note: Ham `transferFromAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private WalletTransactionEntity transferFromAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -205,6 +224,7 @@ public class WalletLedgerService {
                 amount, targetBefore, balance(wallet, targetBalance), referenceType, referenceId, description);
     }
 
+    // Note: Ham `releaseToAvailable` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private WalletTransactionEntity releaseToAvailable(
             Integer accountId,
             BigDecimal amount,
@@ -232,6 +252,7 @@ public class WalletLedgerService {
                 amount, availableBefore, balance(wallet, BALANCE_AVAILABLE), referenceType, referenceId, description);
     }
 
+    // Note: Ham `debitFromBalance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private WalletTransactionEntity debitFromBalance(
             Integer accountId,
             BigDecimal amount,
@@ -253,12 +274,14 @@ public class WalletLedgerService {
                 amount, before, balance(wallet, sourceBalance), referenceType, referenceId, description);
     }
 
+    // Note: Ham `walletForAccount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private SystemWalletEntity walletForAccount(Integer accountId) {
         systemWalletService.ensureWalletByAccountId(accountId);
         return systemWalletRepository.findByAccountIdForUpdate(accountId)
                 .orElseThrow(() -> new NotFoundException("CHUA CO VI CHO TAI KHOAN NAY"));
     }
 
+    // Note: Ham `record` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private WalletTransactionEntity record(
             SystemWalletEntity wallet,
             Integer accountId,
@@ -290,6 +313,7 @@ public class WalletLedgerService {
                 .build());
     }
 
+    // Note: Ham `positiveAmount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal positiveAmount(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
             throw new AppException("SO TIEN PHAI LON HON 0");
@@ -297,12 +321,14 @@ public class WalletLedgerService {
         return amount;
     }
 
+    // Note: Ham `requireSufficient` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void requireSufficient(BigDecimal balance, BigDecimal amount) {
         if (nonNegativeMoney(balance).compareTo(amount) < 0) {
             throw new AppException("INSUFFICIENT_BALANCE");
         }
     }
 
+    // Note: Ham `balance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal balance(SystemWalletEntity wallet, String balanceType) {
         return switch (balanceType) {
             case BALANCE_AVAILABLE -> nonNegativeMoney(wallet.getAvailableBalance());
@@ -312,6 +338,7 @@ public class WalletLedgerService {
         };
     }
 
+    // Note: Ham `setBalance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void setBalance(SystemWalletEntity wallet, String balanceType, BigDecimal value) {
         BigDecimal safe = nonNegativeMoney(value);
         switch (balanceType) {
@@ -322,6 +349,7 @@ public class WalletLedgerService {
         }
     }
 
+    // Note: Ham `recomputeCurrentBalance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void recomputeCurrentBalance(SystemWalletEntity wallet) {
         wallet.setCurrentBalance(balance(wallet, BALANCE_AVAILABLE)
                 .add(balance(wallet, BALANCE_ESCROW))
@@ -329,6 +357,7 @@ public class WalletLedgerService {
                 .add(balance(wallet, "DISPUTE")));
     }
 
+    // Note: Ham `nonNegativeMoney` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal nonNegativeMoney(BigDecimal value) {
         if (value == null || value.signum() < 0) {
             return BigDecimal.ZERO;

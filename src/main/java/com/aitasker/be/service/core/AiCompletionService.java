@@ -1,3 +1,8 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/AiCompletionService.java
+ * Day la file gi: File service chua nghiep vu chinh, dieu phoi repository va kiem tra luat xu ly cua he thong.
+ * Muc dich note: giai thich cac annotation va ham chinh de doc hieu chuc nang code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.BadGatewayException;
@@ -20,7 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+// Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
+// Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class AiCompletionService {
     private static final String SYSTEM_INSTRUCTIONS = """
@@ -37,6 +44,7 @@ public class AiCompletionService {
     private final RestTemplate restTemplate;
     private final OpenAiProperties openAiProperties;
 
+    // Note: Ham `generateAnswer` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public String generateAnswer(String question, Map<String, String> contexts) {
         if (openAiProperties.getApiKey() == null || openAiProperties.getApiKey().isBlank()) {
             throw new BadGatewayException("Chua cau hinh OPENAI_API_KEY");
@@ -55,6 +63,7 @@ public class AiCompletionService {
         }
     }
 
+    // Note: Ham `callOpenAi` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private ResponseEntity<Map> callOpenAi(HttpEntity<Map<String, Object>> request) {
         RestClientResponseException lastException = null;
 
@@ -77,10 +86,12 @@ public class AiCompletionService {
         throw lastException;
     }
 
+    // Note: Ham `shouldRetry` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private boolean shouldRetry(HttpStatusCode statusCode) {
         return statusCode.is5xxServerError();
     }
 
+    // Note: Ham `buildHeaders` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -88,6 +99,7 @@ public class AiCompletionService {
         return headers;
     }
 
+    // Note: Ham `buildRequestBody` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Map<String, Object> buildRequestBody(String question, Map<String, String> contexts) {
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model", openAiProperties.getModel());
@@ -97,6 +109,7 @@ public class AiCompletionService {
         return requestBody;
     }
 
+    // Note: Ham `buildPrompt` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildPrompt(String question, Map<String, String> contexts) {
         String contextText = contexts.entrySet().stream()
                 .map(entry -> "Nguon: " + entry.getKey() + "\n" + entry.getValue())
@@ -111,6 +124,7 @@ public class AiCompletionService {
                 """.formatted(contextText, question);
     }
 
+    // Note: Ham `extractAnswer` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String extractAnswer(Map<?, ?> responseBody) {
         if (responseBody == null || responseBody.isEmpty()) {
             throw new BadGatewayException("OpenAI khong tra ve response hop le");
@@ -143,6 +157,7 @@ public class AiCompletionService {
         return answer;
     }
 
+    // Note: Ham `collectTextFromOutputItem` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private void collectTextFromOutputItem(Object outputItem, List<String> texts) {
         if (!(outputItem instanceof Map<?, ?> item)) {
             return;
@@ -163,6 +178,7 @@ public class AiCompletionService {
         }
     }
 
+    // Note: Ham `getString` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String getString(Map<?, ?> source, String key) {
         Object value = source.get(key);
         if (!(value instanceof String text) || text.isBlank()) {
@@ -171,6 +187,7 @@ public class AiCompletionService {
         return text.trim();
     }
 
+    // Note: Ham `buildOpenAiErrorMessage` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String buildOpenAiErrorMessage(RestClientResponseException ex) {
         String responseBody = ex.getResponseBodyAsString();
         if (responseBody == null || responseBody.isBlank()) {
@@ -180,6 +197,7 @@ public class AiCompletionService {
         return "OpenAI API loi: " + ex.getStatusCode() + " - " + truncate(responseBody, 500);
     }
 
+    // Note: Ham `truncate` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String truncate(String value, int maxLength) {
         if (value.length() <= maxLength) {
             return value;
