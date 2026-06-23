@@ -6,6 +6,7 @@ import com.aitasker.be.dto.auth.SendOtpRequest;
 import com.aitasker.be.dto.auth.SendOtpResponse;
 import com.aitasker.be.dto.auth.VerifyOtpRequest;
 import com.aitasker.be.service.auth.EmailOtpService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth/email")
 @RequiredArgsConstructor
+@SecurityRequirements
 public class EmailOtpController {
     private final EmailOtpService emailOtpService;
 

@@ -12,6 +12,7 @@ import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.service.core.ContractExecutionService;
 import com.aitasker.be.service.core.PaymentWalletService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -195,6 +196,7 @@ public class ContractExecutionController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/jobs/{jobId}/milestones")
+    @SecurityRequirements
     public ResponseEntity<ApiResponse<Object>> listJobMilestones(@PathVariable Integer jobId) { return ResponseEntity.ok(ApiResponse.success("LIST JOB MILESTONES SUCCESS", service.listMilestonesByJob(jobId))); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.

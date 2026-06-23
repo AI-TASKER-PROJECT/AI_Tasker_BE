@@ -12,6 +12,7 @@ import com.aitasker.be.dto.catalog.SkillRequest;
 import com.aitasker.be.dto.catalog.TechnologyRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.service.core.CatalogService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,7 @@ public class CatalogController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/domains")
+    @SecurityRequirements
     // Note: Hàm `listDomains` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<Object>> listDomains(@RequestParam(defaultValue = "false") Boolean activeOnly) {
         return ResponseEntity.ok(ApiResponse.success("LIST DOMAINS SUCCESS", catalogService.listDomains(activeOnly)));
@@ -50,6 +52,7 @@ public class CatalogController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/skills")
+    @SecurityRequirements
     // Note: Hàm `listSkills` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<Object>> listSkills(@RequestParam(defaultValue = "false") Boolean activeOnly) {
         return ResponseEntity.ok(ApiResponse.success("LIST SKILLS SUCCESS", catalogService.listSkills(activeOnly)));
@@ -57,6 +60,7 @@ public class CatalogController {
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @GetMapping("/acceptance-criteria")
+    @SecurityRequirements
     public ResponseEntity<ApiResponse<Object>> listAcceptanceCriteria(@RequestParam(defaultValue = "true") Boolean activeOnly) {
         return ResponseEntity.ok(ApiResponse.success("LIST ACCEPTANCE CRITERIA SUCCESS", catalogService.listAcceptanceCriteria(activeOnly)));
     }

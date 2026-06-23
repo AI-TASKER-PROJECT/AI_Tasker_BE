@@ -10,6 +10,7 @@ import com.aitasker.be.dto.core.ProposalRequest;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.ProposalEntity;
 import com.aitasker.be.service.core.MarketplaceService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,7 @@ public class MarketplaceController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/jobs")
+    @SecurityRequirements
     // Note: Hàm `listJobs` trả về các job đang OPEN để chuyên gia nhìn thấy trên marketplace.
     public ResponseEntity<ApiResponse<Object>> listJobs() { return ResponseEntity.ok(ApiResponse.success("LIST JOBS SUCCESS", marketplaceService.listJobs())); }
 
@@ -49,6 +51,7 @@ public class MarketplaceController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/jobs/{jobId}")
+    @SecurityRequirements
     // Note: Hàm `jobDetail` lấy chi tiết job, cho public xem job OPEN và chỉ chủ doanh nghiệp xem job nháp của mình.
     public ResponseEntity<ApiResponse<JobEntity>> jobDetail(@PathVariable Integer jobId) { return ResponseEntity.ok(ApiResponse.success("GET JOB SUCCESS", marketplaceService.getJob(jobId))); }
 

@@ -1,202 +1,348 @@
-# Hướng dẫn test API Back-end bằng Swagger
+# Huong dan test API Back-end bang Swagger
 
-Tài liệu này dùng để test thủ công API AITASKER trên Swagger UI và được tạo lại từ controller source hiện tại sau khi xử lý merge conflict.
+Tai lieu nay di kem `docs/swagger-api-overview.md`. Overview la inventory day du; guide nay tap trung vao cach test va cac diem can xac nhan khi thao tac tren Swagger UI.
 
-## 1. Chuẩn bị
-
+## 1. Chuan bi
+ 
 ```powershell
 docker compose up -d
 .\mvnw.cmd spring-boot:run
 ```
 
-Swagger UI: http://localhost:8080/swagger-ui.html. Với API cần đăng nhập, gọi POST /api/auth/login, copy accessToken, bấm Authorize, dán chỉ accessToken vào ô token.
+- Swagger UI: `http://localhost:8080/swagger-ui.html`.
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`.
+- Route `Public` trong bang ben duoi khong can token.
+- Route `Bearer JWT` can login qua `POST /api/auth/login`, copy `accessToken`, bam `Authorize`, dan token vao o token, khong them chu `Bearer `.
 
-## 2. Tài khoản seed thường dùng
+## 2. Tai khoan seed thuong dung
 
-| Role | Email | Mật khẩu |
+| Role | Email | Mat khau |
 | --- | --- | --- |
 | BUSINESS | `business@aitasker.local` | `12345678` |
 | EXPERT | `expert@aitasker.local` | `12345678` |
 | ADMIN | `admin@aitasker.local` | `12345678` |
 | STAFF | `staff@aitasker.local` | `12345678` |
 
-## 3. Danh sách API test theo luồng
+## 3. Checklist chung khi test
 
-### Admin vận hành hệ thống
+- Kiem tra response envelope `success`, `message`, `data` cho cac route dung `ApiResponse`.
+- Kiem tra route `Public` truy cap duoc khi khong co token; route `Bearer JWT` phai tra `401/403` khi thieu hoac sai quyen.
+- Kiem tra query param, multipart va body schema trong Swagger co day du va dung ten field.
+- Kiem tra state/business rule quan trong: publish job, submit proposal, sign/NDA/deposit, withdrawal approve/reject, quota va Premium.
+- Danh dau ro endpoint legacy/manual simulation khi chay test regression.
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | GET | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 2 | POST | `/api/v1/admin/accounts` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 3 | DELETE | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 4 | PATCH | `/api/v1/admin/accounts/{accountId}` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 5 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 6 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 7 | GET | `/api/v1/admin/analytics/overview` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 8 | GET | `/api/v1/admin/audit-logs` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 9 | POST | `/api/v1/admin/reviews` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 10 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 11 | GET | `/api/v1/admin/settings` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 12 | PATCH | `/api/v1/admin/settings/{key}` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 13 | GET | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 14 | POST | `/api/v1/admin/staffs` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 15 | PATCH | `/api/v1/admin/staffs/{staffId}` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 16 | GET | `/api/v1/admin/wallet` | admin-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 17 | POST | `/api/v1/admin/wallet/sync` | admin-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 18 | POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 19 | GET | `/api/v1/admin/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 20 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | withdrawal-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 21 | POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | withdrawal-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+## 4. Public route regression uu tien
 
-### Auth, OTP và session
+- `GET /api/health`: tra chuoi health check, khong can token.
+- `GET /api/v1/jobs`: public list chi nen tra job OPEN.
+- `GET /api/v1/jobs/{jobId}`: public voi job OPEN, nhung `GET /api/v1/jobs/my` phai van can JWT.
+- `GET /api/v1/jobs/{jobId}/milestones`: public cho OPEN-job flow.
+- `GET /api/v1/domains`, `GET /api/v1/skills`, `GET /api/v1/acceptance-criteria`: public taxonomy lookup.
+- `GET /api/v1/profiles/business/{businessId}` va `/business/by-job/{jobId}`: public route theo rule da mo.
+- Toan bo `/api/auth/**`, `POST /api/chatbot/ask`, `GET /api/payments/payos/return`: Swagger phai hien la public route.
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 22 | GET | `/api/auth/check-email` | auth-controller | Không cần token | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 23 | POST | `/api/auth/google/login` | auth-controller | Không cần token | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 24 | POST | `/api/auth/google/register` | auth-controller | Không cần token | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 25 | POST | `/api/auth/login` | auth-controller | Không cần token | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 26 | GET | `/api/auth/me` | auth-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 27 | POST | `/api/auth/register` | auth-controller | Không cần token | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 28 | POST | `/api/auth/email/send-otp` | email-otp-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 29 | POST | `/api/auth/email/verify-otp` | email-otp-controller | Không cần token | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 30 | GET | `/api/auth/tax-check/{mst}` | tax-check-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+## Health
 
-### Catalog, skill, technology
+- Pham vi: Health check và smoke endpoint.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 31 | GET | `/api/v1/acceptance-criteria` | catalog-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 32 | GET | `/api/v1/domains` | catalog-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 33 | POST | `/api/v1/domains` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 34 | PATCH | `/api/v1/domains/{domainId}` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 35 | GET | `/api/v1/skills` | catalog-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 36 | POST | `/api/v1/skills` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 37 | PATCH | `/api/v1/skills/{skillId}` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 38 | GET | `/api/v1/technologies` | catalog-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 39 | POST | `/api/v1/technologies` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 40 | PATCH | `/api/v1/technologies/{technologyId}` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/health` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
 
-### Job marketplace và proposal
+## Auth
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 41 | GET | `/api/v1/jobs/{jobId}/domains` | catalog-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 42 | PUT | `/api/v1/jobs/{jobId}/domains` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 43 | GET | `/api/v1/jobs/{jobId}/skills` | catalog-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 44 | PUT | `/api/v1/jobs/{jobId}/skills` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 45 | GET | `/api/v1/jobs/{jobId}/technologies` | catalog-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 46 | PUT | `/api/v1/jobs/{jobId}/technologies` | catalog-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 47 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 48 | GET | `/api/v1/jobs/{jobId}/matching` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 49 | GET | `/api/v1/jobs/{jobId}/milestones` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 50 | POST | `/api/credits/job-post/purchase` | credit-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 51 | POST | `/api/credits/proposal/purchase` | credit-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 52 | GET | `/api/jobs/{jobPostingId}/expert-candidates` | expert-candidate-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 53 | GET | `/api/jobs/{jobPostingId}/expert-recommendations` | expert-recommendation-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 54 | POST | `/api/jobs/{jobPostingId}/expert-recommendations` | expert-recommendation-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 55 | POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | expert-recommendation-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | Sau khi business chọn expert: proposal có businessSelected=true và expert nhận notification/websocket nếu đang online. |
-| 56 | GET | `/api/v1/jobs` | marketplace-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 57 | POST | `/api/v1/jobs` | marketplace-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 57a | PUT | `/api/v1/jobs/{jobId}` | marketplace-controller | Cần Bearer JWT (BUSINESS) | JSON body `JobEntity` với `title`, `rawRequirements`, `budget`, `sow`, `milestones` (US-022) | Chỉ cho DRAFT, upsert sow theo jobId, thay milestone nháp; không tiêu quota publish. HTTP 2xx hoặc lỗi `JOB KHONG O TRANG THAI DRAFT` / `BAN KHONG CO QUYEN THAO TAC JOB NAY` / `JOB DA CO CONTRACT...` / `SOW TITLE KHONG DUOC DE TRONG`. |
-| 58 | GET | `/api/v1/jobs/my` | marketplace-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 59 | GET | `/api/v1/jobs/{jobId}` | marketplace-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 60 | GET | `/api/v1/jobs/{jobId}/proposals` | marketplace-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 61 | POST | `/api/v1/jobs/{jobId}/publish` | marketplace-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 62 | PATCH | `/api/v1/jobs/{jobId}/status` | marketplace-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 63 | POST | `/api/v1/proposals` | marketplace-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 64 | POST | `/api/v1/proposals/file` | marketplace-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 65 | GET | `/api/v1/proposals/my` | marketplace-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 66 | PATCH | `/api/v1/proposals/{proposalId}/status` | marketplace-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 67 | POST | `/api/jobs/generate-sow` | sow-generation-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+- Pham vi: Đăng ký, đăng nhập, Google auth và current session.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
 
-### Chat và messaging
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/auth/check-email` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/auth/google/login` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/auth/google/register` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/auth/login` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| GET | `/api/auth/me` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/auth/register` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 68 | POST | `/api/chatbot/ask` | chatbot-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+## Email OTP
 
-### Contract, milestone, deliverable và dispute
+- Pham vi: Gửi và xác minh OTP email.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 69 | GET | `/api/v1/contracts` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 70 | GET | `/api/v1/contracts/{contractId}` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 71 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 72 | GET | `/api/v1/contracts/{contractId}/disputes` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 73 | GET | `/api/v1/contracts/{contractId}/milestones` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 74 | POST | `/api/v1/contracts/{contractId}/nda-sign` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 75 | POST | `/api/v1/contracts/{contractId}/reject` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 76 | POST | `/api/v1/contracts/{contractId}/sign` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 77 | POST | `/api/v1/contracts/{contractId}/terminate` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 78 | POST | `/api/v1/criteria` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 79 | POST | `/api/v1/deliverables` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 80 | POST | `/api/v1/disputes` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 81 | GET | `/api/v1/disputes/{disputeId}` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 82 | PATCH | `/api/v1/disputes/{disputeId}/assign` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 83 | POST | `/api/v1/disputes/{disputeId}/demo-testing` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 84 | PATCH | `/api/v1/disputes/{disputeId}/resolve` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 85 | POST | `/api/v1/disputes/{disputeId}/technical-report` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 86 | POST | `/api/v1/milestones` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 87 | POST | `/api/v1/milestones/sla-auto-approve` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 88 | PATCH | `/api/v1/milestones/{milestoneId}` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 89 | POST | `/api/v1/milestones/{milestoneId}/complete` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 90 | GET | `/api/v1/milestones/{milestoneId}/criteria` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 91 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 92 | GET | `/api/v1/milestones/{milestoneId}/transactions` | contract-execution-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 93 | POST | `/api/v1/transactions` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 94 | PATCH | `/api/v1/transactions/{transactionId}/status` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 95 | POST | `/api/v1/transactions/{transactionId}/webhook` | contract-execution-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| POST | `/api/auth/email/send-otp` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/auth/email/verify-otp` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
 
-### Payment, wallet, quota và withdrawal
+## Tax Check
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 96 | GET | `/api/membership/packages` | membership-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 97 | POST | `/api/membership/packages/{packageId}/purchase` | membership-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 98 | POST | `/api/payments/payos/create` | pay-ospayment-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 99 | GET | `/api/payments/payos/return` | pay-ospayment-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 100 | POST | `/api/payments/payos/{orderCode}/sync` | pay-ospayment-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 101 | GET | `/api/wallet/current` | wallet-api-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 102 | GET | `/api/wallet/transactions` | wallet-api-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 103 | GET | `/api/v1/wallet/me` | wallet-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 104 | GET | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 105 | POST | `/api/v1/withdrawal-requests` | withdrawal-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+- Pham vi: Tra cứu mã số thuế doanh nghiệp.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
 
-### Notification
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/auth/tax-check/{mst}` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 106 | GET | `/api/v1/notifications` | notification-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 107 | PATCH | `/api/v1/notifications/read-all` | notification-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 108 | GET | `/api/v1/notifications/unread-count` | notification-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 109 | PATCH | `/api/v1/notifications/{notificationId}/read` | notification-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+## Catalog
 
-### Tài khoản, hồ sơ và quota
+- Pham vi: Domain, skill, technology, acceptance criteria và taxonomy của job.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 110 | POST | `/api/v1/profiles/approve/{type}/{id}` | profile-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 111 | GET | `/api/v1/profiles/business` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 112 | POST | `/api/v1/profiles/business` | profile-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 113 | GET | `/api/v1/profiles/business/by-job/{jobId}` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 114 | POST | `/api/v1/profiles/business/license-file` | profile-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 115 | GET | `/api/v1/profiles/business/me` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 116 | GET | `/api/v1/profiles/business/{businessId}` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 117 | GET | `/api/v1/profiles/expert` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 118 | POST | `/api/v1/profiles/expert` | profile-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 119 | GET | `/api/v1/profiles/expert/me` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 120 | POST | `/api/v1/profiles/expert/portfolio-file` | profile-controller | Cần Bearer JWT | Multipart form-data, field file | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 121 | GET | `/api/v1/profiles/expert/{expertId}` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 122 | GET | `/api/v1/profiles/files/view-url` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 123 | GET | `/api/v1/profiles/portfolio` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 124 | POST | `/api/v1/profiles/portfolio` | profile-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 125 | POST | `/api/v1/profiles/portfolio/certificate-file` | profile-controller | Cần Bearer JWT | Có JSON body/query theo Swagger nếu endpoint yêu cầu | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 126 | GET | `/api/v1/profiles/portfolio/me` | profile-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
-| 127 | GET | `/api/users/me/quota` | user-quota-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/v1/acceptance-criteria` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| GET | `/api/v1/domains` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/v1/domains` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/domains/{domainId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/jobs/{jobId}/domains` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PUT | `/api/v1/jobs/{jobId}/domains` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/jobs/{jobId}/skills` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PUT | `/api/v1/jobs/{jobId}/skills` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/jobs/{jobId}/technologies` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PUT | `/api/v1/jobs/{jobId}/technologies` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/skills` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/v1/skills` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/skills/{skillId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/technologies` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/technologies` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/technologies/{technologyId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
 
-### Khác / hạ tầng
+## Marketplace
 
-| STT | Method | API | Swagger tag | Token/Role | Body khi test | Kết quả cần kiểm tra |
-| --- | --- | --- | --- | --- | --- | --- |
-| 128 | GET | `/api/test/secure` | test-controller | Cần Bearer JWT | Không có body | HTTP 2xx hoặc lỗi nghiệp vụ rõ ràng; kiểm tra success, message, data. |
+- Pham vi: Job, draft update, publish, proposal và review proposal.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/v1/jobs` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/v1/jobs` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/jobs/{jobId}` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| PUT | `/api/v1/jobs/{jobId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/jobs/{jobId}/proposals` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/jobs/{jobId}/publish` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/jobs/my` | Bearer JWT | Phai can JWT; regression cho wildcard public route da duoc khoa lai. |
+| POST | `/api/v1/proposals` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/proposals/{proposalId}/status` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/proposals/file` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/proposals/my` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Expert Candidates
+
+- Pham vi: Ranking candidate expert từ dữ liệu job/SoW.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/jobs/{jobPostingId}/expert-candidates` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Expert Recommendations
+
+- Pham vi: AI recommendation, lưu recommendation và chọn expert.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## SoW Generation
+
+- Pham vi: Sinh SoW từ raw requirements.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| POST | `/api/jobs/generate-sow` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Contract Execution
+
+- Pham vi: Hợp đồng, milestone, deliverable, dispute và legacy transaction flow.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| POST | `/api/v1/admin/contracts/{contractId}/deposit/refund` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/contracts` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/contracts/{contractId}/deposit/pay` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/contracts/{contractId}/nda-sign` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/contracts/{contractId}/reject` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/contracts/{contractId}/sign` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/contracts/{contractId}/terminate` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/contracts/from-proposals/{proposalId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/criteria` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/deliverables` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/disputes` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/disputes/{disputeId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/disputes/{disputeId}/assign` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/disputes/{disputeId}/demo-testing` | Bearer JWT | Endpoint legacy/manual simulation; chi test khi can regression backend noi bo. |
+| PATCH | `/api/v1/disputes/{disputeId}/resolve` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/disputes/{disputeId}/technical-report` | Bearer JWT | Endpoint legacy/manual simulation; chi test khi can regression backend noi bo. |
+| GET | `/api/v1/jobs/{jobId}/matching` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/jobs/{jobId}/milestones` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/v1/milestones` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/milestones/{milestoneId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/milestones/{milestoneId}/complete` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/milestones/{milestoneId}/transactions` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/milestones/sla-auto-approve` | Bearer JWT | Endpoint legacy/manual simulation; chi test khi can regression backend noi bo. |
+| POST | `/api/v1/transactions` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/transactions/{transactionId}/status` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/transactions/{transactionId}/webhook` | Bearer JWT | Endpoint legacy/manual simulation; chi test khi can regression backend noi bo. |
+
+## Membership
+
+- Pham vi: Danh sách gói thành viên và mua gói.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/membership/packages` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/membership/packages/{packageId}/purchase` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Credits
+
+- Pham vi: Mua credit job-post và proposal.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| POST | `/api/credits/job-post/purchase` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/credits/proposal/purchase` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## PayOS Payment
+
+- Pham vi: Tạo order nạp ví, return callback và đồng bộ trạng thái PayOS.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| POST | `/api/payments/payos/{orderCode}/sync` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/payments/payos/create` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/payments/payos/return` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+
+## Wallet API
+
+- Pham vi: Ví hiện tại và ledger wallet_transactions.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/wallet/current` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/wallet/transactions` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Wallet
+
+- Pham vi: Snapshot ví hiện tại cho account đăng nhập.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/v1/wallet/me` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## User Quota
+
+- Pham vi: Nguồn chuẩn quota, active package và Premium.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/users/me/quota` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Withdrawal
+
+- Pham vi: Tạo/rà soát yêu cầu rút tiền.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/withdrawal-requests` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/approve` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/admin/withdrawal-requests/{withdrawalId}/reject` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/withdrawal-requests` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/withdrawal-requests` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Profiles
+
+- Pham vi: Business/Expert profile, approval, portfolio và file view/upload.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| POST | `/api/v1/profiles/approve/{type}/{id}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/business` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/profiles/business` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/business/{businessId}` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| GET | `/api/v1/profiles/business/by-job/{jobId}` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+| POST | `/api/v1/profiles/business/license-file` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/business/me` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/expert` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/profiles/expert` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/expert/{expertId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/expert/me` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/profiles/expert/portfolio-file` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/files/view-url` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/portfolio` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/profiles/portfolio` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/profiles/portfolio/certificate-file` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/profiles/portfolio/me` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Notifications
+
+- Pham vi: Đọc thông báo và cập nhật trạng thái đã đọc.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/v1/notifications` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/notifications/{notificationId}/read` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/notifications/read-all` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/notifications/unread-count` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Chatbot
+
+- Pham vi: Q&A hỗ trợ từ knowledge/RAG nội bộ.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| POST | `/api/chatbot/ask` | Public | Goi duoc khi khong co token; Swagger khong khoa auth route nay. |
+
+## Admin
+
+- Pham vi: Tài khoản, staff, settings, audit, analytics và system wallet.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/accounts` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/admin/accounts` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| DELETE | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/admin/audit-logs` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/admin/reviews` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/admin/settings` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/admin/settings/{key}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/admin/staffs` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/admin/staffs` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| PATCH | `/api/v1/admin/staffs/{staffId}` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| GET | `/api/v1/admin/wallet` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+| POST | `/api/v1/admin/wallet/sync` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |
+
+## Test
+
+- Pham vi: Endpoint kiểm thử kỹ thuật nội bộ.
+- Kiem tra toi thieu: auth dung theo bang, schema request/response hien du trong Swagger, va loi nghiep vu tra ve ro rang neu du lieu khong hop le.
+
+| Method | Path | Auth | Can kiem tra |
+| --- | --- | --- | --- |
+| GET | `/api/test/secure` | Bearer JWT | Can JWT hop le; thu them case thieu token va sai role/ownership neu phu hop. |

@@ -10,6 +10,7 @@ import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.PortfolioEntity;
 import com.aitasker.be.service.core.ProfileService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -59,6 +60,7 @@ public class ProfileController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/business/{businessId}")
+    @SecurityRequirements
     // Note: Hàm `getBusinessById` trả hồ sơ doanh nghiệp theo businessId để expert xem trang cá nhân của business.
     public ResponseEntity<ApiResponse<BusinessProfileEntity>> getBusinessById(@PathVariable Integer businessId) {
         return ResponseEntity.ok(ApiResponse.success("GET BUSINESS PROFILE BY ID SUCCESS", profileService.businessProfileById(businessId)));
@@ -73,6 +75,7 @@ public class ProfileController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/business/by-job/{jobId}")
+    @SecurityRequirements
     // Note: Hàm `businessByJob` trả hồ sơ doanh nghiệp theo job để chuyên gia xem thông tin bên đăng dự án.
     public ResponseEntity<ApiResponse<BusinessProfileEntity>> businessByJob(@PathVariable Integer jobId) {
         return ResponseEntity.ok(ApiResponse.success("GET BUSINESS PROFILE BY JOB SUCCESS", profileService.businessProfileByJob(jobId)));

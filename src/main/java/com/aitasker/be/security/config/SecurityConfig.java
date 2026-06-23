@@ -71,12 +71,12 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/v1/jobs",
-                                "/api/v1/jobs/*",
-                                "/api/v1/jobs/*/milestones",
                                 "/api/v1/domains",
                                 "/api/v1/skills",
                                 "/api/v1/acceptance-criteria"
                         ).permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+")).permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+/milestones")).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/\\d+")).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/by-job/\\d+")).permitAll()
                         .anyRequest().authenticated()

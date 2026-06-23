@@ -5,6 +5,7 @@ import com.aitasker.be.dto.payment.CreatePayOSPaymentResponse;
 import com.aitasker.be.dto.payment.CreateWalletTopupPaymentRequest;
 import com.aitasker.be.entity.PaymentOrderEntity;
 import com.aitasker.be.service.core.PayOSPaymentService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ public class PayOSPaymentController {
     }
 
     @GetMapping("/return")
+    @SecurityRequirements
     public ResponseEntity<ApiResponse<PaymentOrderEntity>> handleReturn(@RequestParam Map<String, String> params) {
         String orderCodeValue = params.get("orderCode");
         if (orderCodeValue == null || orderCodeValue.isBlank()) {
