@@ -56,7 +56,7 @@ None.
 
 - Changed `PaymentWalletService` retail credit fallback prices to 100 VND for
   Business job-post credits and 50 VND for Expert proposal credits.
-- Added Flyway migration `V40__update_retail_credit_prices.sql` to update
+- Added Flyway migration `V42__update_retail_credit_prices.sql` to update
   existing `system_settings` rows.
 - Focused validation passed on 2026-06-23:
   `.\mvnw.cmd -Dtest=PaymentWalletServiceTest test` -> 10 tests, 0 failures.

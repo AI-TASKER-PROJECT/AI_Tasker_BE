@@ -153,7 +153,10 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu tag/e
 ### GET `/api/auth/check-email`
 - Giai thich: Kiem tra email da ton tai hay chua.
 - Huong dan test: Khong can token, dien query `email=business@aitasker.local`, kiem tra response `true/false`.
-- Body raw: Khong co body raw.
+- Body raw: 
+{
+  "email": "tronghieu15042005@gmail.com"
+}
 
 ### GET `/api/auth/me`
 - Giai thich: Lay current session theo token hien tai.
