@@ -66,6 +66,17 @@ docker compose up -d
 Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
 
 ## 7) Cac API backend da bo sung (week 4-8)
+- Auth/Security:
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `POST /api/auth/forgot-password`
+  - `POST /api/auth/reset-password`
+  - `POST /api/auth/google/login`
+  - `POST /api/auth/google/register`
+  - `GET /api/auth/check-email`
+  - `GET /api/auth/me`
+  - `POST /api/auth/email/send-otp`
+  - `POST /api/auth/email/verify-otp`
 - Profile/KYC-KYB:
   - `POST /api/v1/profiles/business`
   - `GET /api/v1/profiles/business/{businessId}`

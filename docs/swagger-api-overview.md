@@ -52,8 +52,10 @@ Khi source, migration va tai lieu mau thuan, uu tien controller source + `Securi
 | GET | `/api/auth/me` | Public | Swagger UI phai hien route nay khong can token. |
 | POST | `/api/auth/google/login` | Public | Swagger UI phai hien route nay khong can token. |
 | POST | `/api/auth/google/register` | Public | Swagger UI phai hien route nay khong can token. |
-| POST | `/api/auth/login` | Public | Swagger UI phai hien route nay khong can token. |
+| POST | `/api/auth/login` | Public | Swagger UI phai hien route nay khong can token. Tai khoan bi tam khoa sau 5 lan sai mat khau. |
 | POST | `/api/auth/register` | Public | Swagger UI phai hien route nay khong can token. |
+| POST | `/api/auth/forgot-password` | Public | Gui email reset link, khong tiet lo email co ton tai. |
+| POST | `/api/auth/reset-password` | Public | Dat lai mat khau bang token, mo khoa account bi lock do sai mat khau.
 
 ## catalog-controller
 

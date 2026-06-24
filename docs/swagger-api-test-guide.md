@@ -214,6 +214,27 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu tag/e
 }
 ```
 
+### POST `/api/auth/forgot-password`
+- Giai thich: Yeu cau gui email dat lai mat khau.
+- Huong dan test: Khong can token, nhap email da ton tai, kiem tra response luon tra `success: true` kem message "Neu email ton tai...". Khong duoc tiet lo email co ton tai hay khong.
+- Body raw:
+```json
+{
+  "email": "business@aitasker.local"
+}
+```
+
+### POST `/api/auth/reset-password`
+- Giai thich: Dat lai mat khau bang token tu email.
+- Huong dan test: Khong can token, lay token tu email (hoac Redis), dan body raw rieng ben duoi. Token het han sau 15 phut va chi dung mot lan.
+- Body raw:
+```json
+{
+  "token": "opaque-reset-token-from-email",
+  "newPassword": "newPassword123"
+}
+```
+
 ## catalog-controller
 
 ### GET `/api/v1/acceptance-criteria`
