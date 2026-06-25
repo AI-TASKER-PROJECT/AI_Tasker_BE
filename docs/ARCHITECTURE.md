@@ -429,6 +429,12 @@ contract and dispute decisions, transaction/payment state changes, and other
 sensitive operator actions. Audit coverage is not complete yet and should be
 expanded as sensitive flows are hardened.
 
+Admin audit-log responses normalize stored action and entity values into
+Vietnamese business labels for the table-facing fields. Raw technical entity
+keys remain available through `rawEntityName` and `rawEntityId`, while
+`entityDisplayName`, `entityName`, and `entityId` are presentation-safe and do
+not show numeric IDs for known audit entities.
+
 The desired request log shape remains:
 
 - timestamp

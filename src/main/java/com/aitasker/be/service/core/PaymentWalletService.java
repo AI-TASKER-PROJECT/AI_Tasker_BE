@@ -64,14 +64,14 @@ import java.util.stream.Collectors;
 // Note: Annotation nay giup Lombok sinh constructor cho cac dependency final.
 @RequiredArgsConstructor
 public class PaymentWalletService {
-    public static final String ACTION_PURCHASE_MEMBERSHIP = "Mua goi thanh vien";
+    public static final String ACTION_PURCHASE_MEMBERSHIP = "Mua gói thành viên";
     public static final String ACTION_PURCHASE_CREDIT = "Mua credit";
-    public static final String ACTION_CONSUME_QUOTA = "Su dung quota";
-    public static final String ACTION_PAY_CONTRACT_DEPOSIT = "Tra tien ky quy hop dong";
-    public static final String ACTION_REFUND_CONTRACT_DEPOSIT = "Xu ly hoan ky quy hop dong";
-    public static final String ACTION_CREATE_WITHDRAWAL = "Tao yeu cau rut tien";
-    public static final String ACTION_APPROVE_WITHDRAWAL = "Duyet yeu cau rut tien";
-    public static final String ACTION_REJECT_WITHDRAWAL = "Tu choi yeu cau rut tien";
+    public static final String ACTION_CONSUME_QUOTA = "Sử dụng quota";
+    public static final String ACTION_PAY_CONTRACT_DEPOSIT = "Trả tiền ký quỹ hợp đồng";
+    public static final String ACTION_REFUND_CONTRACT_DEPOSIT = "Xử lý hoàn ký quỹ hợp đồng";
+    public static final String ACTION_CREATE_WITHDRAWAL = "Tạo yêu cầu rút tiền";
+    public static final String ACTION_APPROVE_WITHDRAWAL = "Duyệt yêu cầu rút tiền";
+    public static final String ACTION_REJECT_WITHDRAWAL = "Từ chối yêu cầu rút tiền";
 
     private static final String ROLE_BUSINESS = "BUSINESS";
     private static final String ROLE_EXPERT = "EXPERT";

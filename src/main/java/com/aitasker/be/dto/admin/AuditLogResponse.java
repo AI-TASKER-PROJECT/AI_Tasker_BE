@@ -26,6 +26,8 @@ public class AuditLogResponse {
     private String action;
     private String entityName;
     private String entityId;
+    private String rawEntityName;
+    private String rawEntityId;
     private String entityDisplayName;
     private String entityOwner;
     private String entityOwnerEmail;
@@ -46,6 +48,8 @@ public class AuditLogResponse {
                 .action(displayAction)
                 .entityName(log.getEntityName())
                 .entityId(log.getEntityId())
+                .rawEntityName(log.getEntityName())
+                .rawEntityId(log.getEntityId())
                 .oldValueJson(log.getOldValueJson())
                 .newValueJson(log.getNewValueJson())
                 .createdAt(log.getCreatedAt())
@@ -54,7 +58,13 @@ public class AuditLogResponse {
 
     // Note: Hàm `attachEntityInfo` gắn tên đối tượng và tài khoản sở hữu để admin đọc audit log dễ hiểu hơn mã kỹ thuật.
     public AuditLogResponse attachEntityInfo(String displayName, AccountEntity owner) {
+        return attachEntityInfo(displayName, displayName, owner);
+    }
+
+    public AuditLogResponse attachEntityInfo(String displayName, String displayEntityName, AccountEntity owner) {
         this.entityDisplayName = displayName;
+        this.entityName = displayEntityName;
+        this.entityId = null;
         if (owner != null) {
             this.entityOwner = owner.getFullName();
             this.entityOwnerEmail = owner.getEmail();
