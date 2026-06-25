@@ -381,8 +381,13 @@ Current MVP limitations:
 
 Notifications are available over REST for list, unread count, read-one, and
 read-all behavior. WebSocket/STOMP exists for realtime delivery, but it is not a
-REST API and does not appear in Swagger. Any change to realtime behavior must
-include separate WebSocket verification.
+REST API and does not appear in Swagger. Current realtime notification coverage
+includes marketplace proposal events, AI-recommendation expert selection,
+profile verification submission/review, contract and NDA events, deliverable
+submission, dispute assignment, job-post quota consumption, PayOS wallet top-up,
+withdrawal review outcomes, admin withdrawal review queue, and admin new-account
+alerts. Any change to realtime behavior must include separate WebSocket
+verification.
 
 ## Boundary Rules
 

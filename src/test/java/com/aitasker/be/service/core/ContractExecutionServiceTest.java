@@ -256,6 +256,35 @@ class ContractExecutionServiceTest {
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
     // Note: Hàm `recordDemoTesting_shouldThrowWhenResultBlank` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
+    void terminateContract_byBusinessShouldNotifyExpert() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1)
+                .businessId(10)
+                .expertId(5)
+                .status("DRAFT")
+                .build();
+        AccountEntity businessAccount = AccountEntity.builder()
+                .accountId(99)
+                .status("Approved")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        ExpertProfileEntity expert = ExpertProfileEntity.builder()
+                .expertId(5)
+                .accountId(88)
+                .build();
+
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(accessService.currentAccount()).thenReturn(businessAccount);
+        when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(expert));
+
+        contractExecutionService.terminateContract(1, "Business changes scope");
+
+        verify(notificationService).notifyContractRejectedByBusiness(88, 99, 1, "Business changes scope");
+    }
+
+    @Test
     void recordDemoTesting_shouldThrowWhenResultBlank() {
         AppException ex = assertThrows(AppException.class, () -> contractExecutionService.recordDemoTesting(1, " "));
         assertEquals("KET QUA DEMO TEST KHONG DUOC DE TRONG", ex.getMessage());

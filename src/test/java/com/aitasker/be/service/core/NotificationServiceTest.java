@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -80,5 +81,42 @@ class NotificationServiceTest {
         verify(notificationRepository).save(captor.capture());
         NotificationEntity saved = captor.getValue();
         assertTrue(saved.getMessage().contains("Implement API"));
+    }
+
+    @Test
+    void notifyWithdrawalRejected_shouldIncludeAdminReason() {
+        when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyWithdrawalRejected(20, 1, 90L, new BigDecimal("120000"), "Invalid bank info");
+
+        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository).save(captor.capture());
+        NotificationEntity saved = captor.getValue();
+        assertEquals("WITHDRAWAL_REJECTED", saved.getType());
+        assertTrue(saved.getMessage().contains("Invalid bank info"));
+        assertEquals("/wallet/withdrawals", saved.getTargetUrl());
+    }
+
+    @Test
+    void notifyNewAccountCreated_shouldTargetAdminAccountsPage() {
+        when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyNewAccountCreated(1, 22, "New Business", "new@mail.com", "BUSINESS");
+
+        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository).save(captor.capture());
+        NotificationEntity saved = captor.getValue();
+        assertEquals("NEW_ACCOUNT_CREATED", saved.getType());
+        assertEquals("/admin/accounts", saved.getTargetUrl());
+        assertEquals(1, saved.getReceiverAccountId());
+        assertEquals(22, saved.getActorAccountId());
     }
 }

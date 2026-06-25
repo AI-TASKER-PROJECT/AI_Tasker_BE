@@ -30,6 +30,7 @@ import com.aitasker.be.entity.SystemWalletEntity;
 import com.aitasker.be.entity.UserQuotaEntity;
 import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.entity.WithdrawalRequestEntity;
+import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.BusinessProfileRepository;
 import com.aitasker.be.repository.ContractDepositRepository;
 import com.aitasker.be.repository.ContractMilestoneRepository;
@@ -101,6 +102,8 @@ public class PaymentWalletService {
     private final MilestoneRepository milestoneRepository;
     private final WithdrawalRequestRepository withdrawalRequestRepository;
     private final WalletTransactionRepository walletTransactionRepository;
+    private final AccountRepository accountRepository;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     // Note: Ham `listPackagesForCurrentRole` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -251,7 +254,17 @@ public class PaymentWalletService {
     @Transactional
     // Note: Ham `consumeJobPostCredit` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public void consumeJobPostCredit(AccountEntity account, Long jobId) {
-        consumeQuota(account, QUOTA_JOB_POST, "JOB", jobId);
+        int remainingBalance = consumeQuota(account, QUOTA_JOB_POST, "JOB", jobId);
+        String jobTitle = jobId == null ? null : jobRepository.findById(toInt(jobId))
+                .map(JobEntity::getTitle)
+                .orElse(null);
+        notificationService.notifyJobPostQuotaConsumed(
+                account.getAccountId(),
+                account.getAccountId(),
+                jobId,
+                jobTitle,
+                remainingBalance
+        );
     }
 
     @Transactional
@@ -436,6 +449,7 @@ public class PaymentWalletService {
                 .build());
         auditLogService.record(ACTION_CREATE_WITHDRAWAL, "withdrawal_requests",
                 String.valueOf(withdrawal.getWithdrawalId()), actor.getAccountId());
+        notifyAdminsWithdrawalReviewRequested(actor, withdrawal);
         return completed(withdrawal, "WITHDRAWAL_REQUEST_CREATED");
     }
 
@@ -475,6 +489,12 @@ public class PaymentWalletService {
         WithdrawalRequestEntity saved = withdrawalRequestRepository.save(withdrawal);
         auditLogService.record(ACTION_APPROVE_WITHDRAWAL, "withdrawal_requests",
                 String.valueOf(withdrawalId), admin.getAccountId());
+        notificationService.notifyWithdrawalApproved(
+                saved.getAccountId(),
+                admin.getAccountId(),
+                saved.getWithdrawalId(),
+                saved.getAmount()
+        );
         return saved;
     }
 
@@ -500,6 +520,13 @@ public class PaymentWalletService {
         WithdrawalRequestEntity saved = withdrawalRequestRepository.save(withdrawal);
         auditLogService.record(ACTION_REJECT_WITHDRAWAL, "withdrawal_requests",
                 String.valueOf(withdrawalId), admin.getAccountId());
+        notificationService.notifyWithdrawalRejected(
+                saved.getAccountId(),
+                admin.getAccountId(),
+                saved.getWithdrawalId(),
+                saved.getAmount(),
+                saved.getAdminNote()
+        );
         return saved;
     }
 
@@ -593,7 +620,7 @@ public class PaymentWalletService {
     }
 
     // Note: Ham `consumeQuota` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private void consumeQuota(AccountEntity account, String quotaType, String referenceType, Long referenceId) {
+    private int consumeQuota(AccountEntity account, String quotaType, String referenceType, Long referenceId) {
         UserQuotaEntity quota = ensureQuotaForAccountForUpdate(account);
         int before = quotaBalance(quota, quotaType);
         if (before <= 0) {
@@ -615,6 +642,17 @@ public class PaymentWalletService {
         auditLogService.record(ACTION_CONSUME_QUOTA, "quota_usage_logs",
                 referenceId == null ? String.valueOf(account.getAccountId()) : String.valueOf(referenceId),
                 account.getAccountId());
+        return after;
+    }
+
+    private void notifyAdminsWithdrawalReviewRequested(AccountEntity actor, WithdrawalRequestEntity withdrawal) {
+        accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")
+                .forEach(admin -> notificationService.notifyWithdrawalReviewRequested(
+                        admin.getAccountId(),
+                        actor.getAccountId(),
+                        withdrawal.getWithdrawalId(),
+                        withdrawal.getAmount()
+                ));
     }
 
     // Note: Ham `quotaBalance` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.

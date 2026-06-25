@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,6 +61,7 @@ class AdminServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditLogService auditLogService;
     @Mock private PaymentWalletService paymentWalletService;
+    @Mock private NotificationService notificationService;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private AdminService adminService;
@@ -137,5 +139,33 @@ class AdminServiceTest {
                 Integer.valueOf(100).equals(account.getAccountId())
                         && "BUSINESS".equals(account.getRole().getRoleName())
         ));
+    }
+
+    @Test
+    void createAccount_shouldNotifyAdminsWhenNewAccountIsCreated() {
+        AccountRequest request = new AccountRequest();
+        request.setEmail("new.expert@mail.com");
+        request.setPassword("12345678");
+        request.setFullName("New Expert");
+        request.setPhone("0900999002");
+        request.setRole("EXPERT");
+        request.setStatus("Pending");
+
+        RoleEntity expertRole = RoleEntity.builder().roleId(3).roleName("EXPERT").build();
+        AccountEntity admin = AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build();
+        when(accountRepository.existsByEmailIgnoreCase("new.expert@mail.com")).thenReturn(false);
+        when(roleRepository.findByRoleNameIgnoreCase("EXPERT")).thenReturn(Optional.of(expertRole));
+        when(passwordEncoder.encode("12345678")).thenReturn("hashed");
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> {
+            AccountEntity account = invocation.getArgument(0);
+            account.setAccountId(101);
+            return account;
+        });
+        when(accessService.currentAccount()).thenReturn(admin);
+        when(accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")).thenReturn(List.of(admin));
+
+        adminService.createAccount(request);
+
+        verify(notificationService).notifyNewAccountCreated(1, 101, "New Expert", "new.expert@mail.com", "EXPERT");
     }
 }

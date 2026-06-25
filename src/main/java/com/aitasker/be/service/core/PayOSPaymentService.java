@@ -45,6 +45,7 @@ public class PayOSPaymentService {
     private final BusinessProfileRepository businessProfileRepository;
     private final AccessService accessService;
     private final WalletLedgerService walletLedgerService;
+    private final NotificationService notificationService;
 
     @Transactional
     // Note: Ham `createPayment` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -135,6 +136,11 @@ public class PayOSPaymentService {
             if (previousStatus != PaymentStatus.PAID) {
                 validateProviderAmount(paymentOrder, paymentLink);
                 walletLedgerService.postWalletTopup(paymentOrder);
+                notificationService.notifyWalletTopupSucceeded(
+                        Math.toIntExact(paymentOrder.getAccountId()),
+                        paymentOrder.getProviderOrderCode(),
+                        paymentOrder.getAmount()
+                );
             }
         }
 

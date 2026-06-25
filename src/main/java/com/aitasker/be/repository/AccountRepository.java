@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<AccountEntity, Integer> {
@@ -19,6 +20,7 @@ public interface AccountRepository extends JpaRepository<AccountEntity, Integer>
     Optional<AccountEntity> findByEmailIgnoreCase(String email);
     // Note: Hàm `findFirstByRoleRoleNameOrderByAccountIdAsc` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     Optional<AccountEntity> findFirstByRoleRoleNameOrderByAccountIdAsc(String roleName);
+    List<AccountEntity> findAllByRoleRoleNameOrderByAccountIdAsc(String roleName);
     boolean existsByEmail(String email);
     boolean existsByEmailIgnoreCase(String email);
 

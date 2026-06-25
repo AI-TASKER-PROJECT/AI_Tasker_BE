@@ -17,6 +17,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -182,6 +183,102 @@ public class NotificationService {
         );
     }
 
+    public void notifyContractRejectedByBusiness(Integer receiverAccountId, Integer actorAccountId, Integer contractId, String reason) {
+        String message = "Doanh nghiep da tu choi/cham dut hop dong.";
+        if (reason != null && !reason.isBlank()) {
+            message += " Ly do: " + reason.trim();
+        }
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "CONTRACT_REJECTED_BY_BUSINESS",
+                "Hop dong bi doanh nghiep tu choi",
+                message,
+                "/contracts/" + contractId,
+                Map.of("contractId", contractId, "reason", safeText(reason, ""))
+        );
+    }
+
+    public void notifyJobPostQuotaConsumed(Integer receiverAccountId, Integer actorAccountId, Long jobId, String jobTitle, Integer remainingBalance) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "JOB_POST_QUOTA_CONSUMED",
+                "Da tru quota dang bai",
+                "Du an \"" + safeText(jobTitle, "khong ten") + "\" da duoc public va he thong da tru 1 quota dang bai.",
+                "/business/jobs/" + jobId,
+                Map.of("jobId", jobId, "remainingBalance", remainingBalance == null ? 0 : remainingBalance)
+        );
+    }
+
+    public void notifyWalletTopupSucceeded(Integer receiverAccountId, Long orderCode, BigDecimal amount) {
+        createAndPush(
+                receiverAccountId,
+                receiverAccountId,
+                "WALLET_TOPUP_SUCCEEDED",
+                "Nap tien thanh cong",
+                "Vi cua ban da duoc nap " + formatAmount(amount) + " VND.",
+                "/wallet",
+                Map.of("orderCode", orderCode, "amount", amount == null ? BigDecimal.ZERO : amount)
+        );
+    }
+
+    public void notifyWithdrawalReviewRequested(Integer receiverAccountId, Integer actorAccountId, Long withdrawalId, BigDecimal amount) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "WITHDRAWAL_REVIEW_REQUESTED",
+                "Co yeu cau rut tien can duyet",
+                "Mot user vua tao yeu cau rut " + formatAmount(amount) + " VND va can admin duyet.",
+                "/admin/withdrawal-requests",
+                Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount)
+        );
+    }
+
+    public void notifyWithdrawalApproved(Integer receiverAccountId, Integer actorAccountId, Long withdrawalId, BigDecimal amount) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "WITHDRAWAL_APPROVED",
+                "Rut tien thanh cong",
+                "Yeu cau rut " + formatAmount(amount) + " VND cua ban da duoc admin duyet.",
+                "/wallet/withdrawals",
+                Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount)
+        );
+    }
+
+    public void notifyWithdrawalRejected(Integer receiverAccountId, Integer actorAccountId, Long withdrawalId, BigDecimal amount, String reason) {
+        String message = "Yeu cau rut " + formatAmount(amount) + " VND cua ban da bi admin tu choi.";
+        if (reason != null && !reason.isBlank()) {
+            message += " Ly do: " + reason.trim();
+        }
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "WITHDRAWAL_REJECTED",
+                "Rut tien that bai",
+                message,
+                "/wallet/withdrawals",
+                Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount, "reason", safeText(reason, ""))
+        );
+    }
+
+    public void notifyNewAccountCreated(Integer receiverAccountId, Integer newAccountId, String fullName, String email, String roleName) {
+        createAndPush(
+                receiverAccountId,
+                newAccountId,
+                "NEW_ACCOUNT_CREATED",
+                "Co tai khoan moi",
+                "Tai khoan \"" + safeText(fullName, safeText(email, "khong ten")) + "\" vua duoc tao voi vai tro " + safeText(roleName, "khong ro") + ".",
+                "/admin/accounts",
+                Map.of(
+                        "accountId", newAccountId,
+                        "email", safeText(email, ""),
+                        "role", safeText(roleName, "")
+                )
+        );
+    }
+
     // Note: Hàm `notifyDisputeCreated` tạo thông báo tiếng Việt khi có tranh chấp mới được gán cho staff.
     public void notifyDisputeCreated(Integer receiverAccountId, Integer actorAccountId, Integer disputeId) {
         createAndPush(
@@ -262,5 +359,9 @@ public class NotificationService {
     // Note: Hàm `safeText` tránh trả message bị trống khi dữ liệu gốc chưa có tên rõ ràng.
     private String safeText(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        return amount == null ? "0" : amount.stripTrailingZeros().toPlainString();
     }
 }

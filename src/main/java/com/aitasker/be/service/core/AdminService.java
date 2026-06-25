@@ -43,6 +43,7 @@ public class AdminService {
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
     private final PaymentWalletService paymentWalletService;
+    private final NotificationService notificationService;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -220,7 +221,19 @@ public class AdminService {
             paymentWalletService.ensureQuotaForAccount(saved);
         }
         auditLogService.record(AuditLogService.ACTION_CREATE_ACCOUNT, "account", String.valueOf(saved.getAccountId()), accessService.currentAccount().getAccountId());
+        notifyAdminsNewAccountCreated(saved);
         return toAccountResponse(saved);
+    }
+
+    private void notifyAdminsNewAccountCreated(AccountEntity account) {
+        accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")
+                .forEach(admin -> notificationService.notifyNewAccountCreated(
+                        admin.getAccountId(),
+                        account.getAccountId(),
+                        account.getFullName(),
+                        account.getEmail(),
+                        account.getRole() == null ? null : account.getRole().getRoleName()
+                ));
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.

@@ -355,6 +355,15 @@ public class ContractExecutionService {
         contract.setUpdatedAt(LocalDateTime.now());
         ContractEntity saved = contractRepository.save(contract);
         auditLogService.record(AuditLogService.ACTION_TERMINATE_CONTRACT, "contracts", String.valueOf(contractId), actor.getAccountId());
+        if ("BUSINESS".equals(actor.getRole().getRoleName())) {
+            expertProfileRepository.findById(saved.getExpertId())
+                    .ifPresent(expert -> notificationService.notifyContractRejectedByBusiness(
+                            expert.getAccountId(),
+                            actor.getAccountId(),
+                            saved.getContractId(),
+                            reason
+                    ));
+        }
         return saved;
     }
 

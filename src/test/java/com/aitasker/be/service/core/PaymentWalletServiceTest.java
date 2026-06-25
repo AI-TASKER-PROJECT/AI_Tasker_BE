@@ -3,6 +3,7 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.dto.payment.QuotaResponse;
+import com.aitasker.be.dto.payment.WithdrawalRequest;
 import com.aitasker.be.dto.payment.WithdrawalReviewRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
@@ -30,6 +31,7 @@ import com.aitasker.be.repository.SystemSettingRepository;
 import com.aitasker.be.repository.UserQuotaRepository;
 import com.aitasker.be.repository.WalletTransactionRepository;
 import com.aitasker.be.repository.WithdrawalRequestRepository;
+import com.aitasker.be.repository.AccountRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -67,6 +69,8 @@ class PaymentWalletServiceTest {
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private WithdrawalRequestRepository withdrawalRequestRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
+    @Mock private AccountRepository accountRepository;
+    @Mock private NotificationService notificationService;
 
     @InjectMocks private PaymentWalletService paymentWalletService;
 
@@ -259,6 +263,28 @@ class PaymentWalletServiceTest {
     }
 
     @Test
+    void consumeJobPostCredit_shouldNotifyBusinessWithRemainingBalance() {
+        AccountEntity business = businessAccount();
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(2)
+                .proposalQuotaBalance(0)
+                .build();
+        com.aitasker.be.entity.JobEntity job = com.aitasker.be.entity.JobEntity.builder()
+                .jobId(77)
+                .title("Build AI assistant")
+                .build();
+
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(jobRepository.findById(77)).thenReturn(Optional.of(job));
+
+        paymentWalletService.consumeJobPostCredit(business, 77L);
+
+        assertEquals(Integer.valueOf(1), quota.getJobPostQuotaBalance());
+        verify(notificationService).notifyJobPostQuotaConsumed(10, 10, 77L, "Build AI assistant", 1);
+    }
+
+    @Test
     void payContractDeposit_shouldHoldDepositAndActivateContract() {
         AccountEntity businessAccount = AccountEntity.builder()
                 .accountId(10)
@@ -345,6 +371,66 @@ class PaymentWalletServiceTest {
         assertEquals(Integer.valueOf(1), saved.getAdminId());
         assertEquals(Long.valueOf(91), saved.getReviewTransactionId());
         assertEquals("Invalid bank info", saved.getAdminNote());
+        verify(notificationService).notifyWithdrawalRejected(10, 1, 90L, new BigDecimal("120000"), "Invalid bank info");
+    }
+
+    @Test
+    void createWithdrawalRequest_shouldNotifyAdminsForReview() {
+        AccountEntity expert = AccountEntity.builder()
+                .accountId(10)
+                .role(RoleEntity.builder().roleName("EXPERT").build())
+                .status("Approved")
+                .build();
+        AccountEntity admin = AccountEntity.builder()
+                .accountId(1)
+                .role(RoleEntity.builder().roleName("ADMIN").build())
+                .build();
+        WithdrawalRequest request = new WithdrawalRequest();
+        request.setAmount(new BigDecimal("50000"));
+        request.setBankName("VCB");
+        request.setBankAccountNumber("123456");
+        request.setBankAccountHolder("Expert A");
+
+        when(accessService.currentAccount()).thenReturn(expert);
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("100000"));
+        when(systemWalletService.ensureWalletByAccountId(10))
+                .thenReturn(com.aitasker.be.entity.SystemWalletEntity.builder().systemWalletId(20L).build());
+        when(walletLedgerService.holdWithdrawalFromAvailable(any(), any(), any(), any(), any(), any()))
+                .thenReturn(WalletTransactionEntity.builder().id(30L).build());
+        when(withdrawalRequestRepository.save(any(WithdrawalRequestEntity.class))).thenAnswer(invocation -> {
+            WithdrawalRequestEntity withdrawal = invocation.getArgument(0);
+            withdrawal.setWithdrawalId(40L);
+            return withdrawal;
+        });
+        when(accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")).thenReturn(List.of(admin));
+
+        paymentWalletService.createWithdrawalRequest(request);
+
+        verify(notificationService).notifyWithdrawalReviewRequested(1, 10, 40L, new BigDecimal("50000"));
+    }
+
+    @Test
+    void approveWithdrawal_shouldNotifyRequester() {
+        AccountEntity admin = AccountEntity.builder()
+                .accountId(1)
+                .role(RoleEntity.builder().roleName("ADMIN").build())
+                .build();
+        WithdrawalRequestEntity withdrawal = WithdrawalRequestEntity.builder()
+                .withdrawalId(90L)
+                .accountId(10)
+                .amount(new BigDecimal("120000"))
+                .status("PENDING")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(admin);
+        when(withdrawalRequestRepository.findById(90L)).thenReturn(Optional.of(withdrawal));
+        when(walletLedgerService.debitHolding(any(), any(), any(), any(), any(), any()))
+                .thenReturn(WalletTransactionEntity.builder().id(91L).build());
+        when(withdrawalRequestRepository.save(any(WithdrawalRequestEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        paymentWalletService.approveWithdrawal(90L, null);
+
+        verify(notificationService).notifyWithdrawalApproved(10, 1, 90L, new BigDecimal("120000"));
     }
 
     private AccountEntity businessAccount() {

@@ -18,6 +18,7 @@ import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.RoleRepository;
 import com.aitasker.be.security.SecurityUtils;
 import com.aitasker.be.security.jwt.JwtService;
+import com.aitasker.be.service.core.NotificationService;
 import com.aitasker.be.service.core.PaymentWalletService;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -44,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final EmailOtpService emailOtpService;
     private final PaymentWalletService paymentWalletService;
+    private final NotificationService notificationService;
 
     // Note: Annotation nay inject gia tri cau hinh vao field hoac tham so.
     @Value("${google.client-id:}")
@@ -76,6 +78,7 @@ public class AuthServiceImpl implements AuthService {
 
         AccountEntity saved = accountRepository.save(account);
         paymentWalletService.ensureQuotaForAccount(saved);
+        notifyAdminsNewAccountCreated(saved);
         emailOtpService.clearVerifiedEmail(email);
         return buildAuthResponse(saved);
     }
@@ -154,7 +157,19 @@ public class AuthServiceImpl implements AuthService {
 
         AccountEntity saved = accountRepository.save(account);
         paymentWalletService.ensureQuotaForAccount(saved);
+        notifyAdminsNewAccountCreated(saved);
         return buildAuthResponse(saved);
+    }
+
+    private void notifyAdminsNewAccountCreated(AccountEntity account) {
+        accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")
+                .forEach(admin -> notificationService.notifyNewAccountCreated(
+                        admin.getAccountId(),
+                        account.getAccountId(),
+                        account.getFullName(),
+                        account.getEmail(),
+                        account.getRole() == null ? null : account.getRole().getRoleName()
+                ));
     }
 
     // Note: Ham `buildAuthResponse` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
