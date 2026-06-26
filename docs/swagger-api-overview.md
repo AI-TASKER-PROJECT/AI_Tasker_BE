@@ -109,7 +109,7 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 | 5 | GET | `/api/v1/wallet/me` | Bearer JWT | Snapshot vi hien tai cho account dang nhap. |
 | 6 | GET | `/api/v1/withdrawal-requests` | Bearer JWT | User lay withdrawal requests cua minh. |
 | 7 | GET | `/api/wallet/current` | Bearer JWT | Lay wallet hien tai cua account. |
-| 8 | GET | `/api/wallet/transactions` | Bearer JWT | Lay ledger wallet transactions. |
+| 8 | GET | `/api/wallet/transactions` | Bearer JWT | Lấy lịch sử giao dịch ví dạng minh bạch, gồm mã ledger thô và tiêu đề/mô tả tiếng Việt có ngữ cảnh nghiệp vụ. |
 | 9 | POST | `/api/credits/job-post/purchase` | Bearer JWT | Mua job-post credits bang wallet. |
 | 10 | POST | `/api/credits/proposal/purchase` | Bearer JWT | Mua proposal credits bang wallet. |
 | 11 | POST | `/api/membership/packages/{packageId}/purchase` | Bearer JWT | Mua membership bang wallet. |

@@ -134,7 +134,7 @@ public class NotificationService {
 
     public void notifyProfileSubmitted(Integer receiverAccountId, Integer actorAccountId, String profileType, Integer profileId, String displayName) {
         boolean businessProfile = "BUSINESS".equalsIgnoreCase(profileType);
-        String profileName = businessProfile ? "doanh nghiep" : "chuyen gia";
+        String profileName = businessProfile ? "doanh nghiệp" : "chuyên gia";
         String targetUrl = businessProfile
                 ? "/staff/profiles/business/" + profileId
                 : "/staff/profiles/expert/" + profileId;
@@ -146,8 +146,8 @@ public class NotificationService {
                 receiverAccountId,
                 actorAccountId,
                 "PROFILE_VERIFICATION_SUBMITTED",
-                "Co ho so can xac minh",
-                "Ho so " + profileName + " \"" + safeText(displayName, "khong ten") + "\" vua duoc gui va can staff kiem tra.",
+                "Có hồ sơ cần xác minh",
+                "Hồ sơ " + profileName + " \"" + safeText(displayName, "không tên") + "\" vừa được gửi và cần staff kiểm tra.",
                 targetUrl,
                 metadata
         );
@@ -184,15 +184,15 @@ public class NotificationService {
     }
 
     public void notifyContractRejectedByBusiness(Integer receiverAccountId, Integer actorAccountId, Integer contractId, String reason) {
-        String message = "Doanh nghiep da tu choi/cham dut hop dong.";
+        String message = "Doanh nghiệp đã từ chối/chấm dứt hợp đồng.";
         if (reason != null && !reason.isBlank()) {
-            message += " Ly do: " + reason.trim();
+            message += " Lý do: " + reason.trim();
         }
         createAndPush(
                 receiverAccountId,
                 actorAccountId,
                 "CONTRACT_REJECTED_BY_BUSINESS",
-                "Hop dong bi doanh nghiep tu choi",
+                "Hợp đồng bị doanh nghiệp từ chối",
                 message,
                 "/contracts/" + contractId,
                 Map.of("contractId", contractId, "reason", safeText(reason, ""))
@@ -204,8 +204,8 @@ public class NotificationService {
                 receiverAccountId,
                 actorAccountId,
                 "JOB_POST_QUOTA_CONSUMED",
-                "Da tru quota dang bai",
-                "Du an \"" + safeText(jobTitle, "khong ten") + "\" da duoc public va he thong da tru 1 quota dang bai.",
+                "Đã trừ quota đăng bài",
+                "Dự án \"" + safeText(jobTitle, "không tên") + "\" đã được public và hệ thống đã trừ 1 quota đăng bài.",
                 "/business/jobs/" + jobId,
                 Map.of("jobId", jobId, "remainingBalance", remainingBalance == null ? 0 : remainingBalance)
         );
@@ -216,8 +216,8 @@ public class NotificationService {
                 receiverAccountId,
                 receiverAccountId,
                 "WALLET_TOPUP_SUCCEEDED",
-                "Nap tien thanh cong",
-                "Vi cua ban da duoc nap " + formatAmount(amount) + " VND.",
+                "Nạp tiền thành công",
+                "Ví của bạn đã được nạp " + formatAmount(amount) + " VND.",
                 "/wallet",
                 Map.of("orderCode", orderCode, "amount", amount == null ? BigDecimal.ZERO : amount)
         );
@@ -228,8 +228,8 @@ public class NotificationService {
                 receiverAccountId,
                 actorAccountId,
                 "WITHDRAWAL_REVIEW_REQUESTED",
-                "Co yeu cau rut tien can duyet",
-                "Mot user vua tao yeu cau rut " + formatAmount(amount) + " VND va can admin duyet.",
+                "Có yêu cầu rút tiền cần duyệt",
+                "Một user vừa tạo yêu cầu rút " + formatAmount(amount) + " VND và cần admin duyệt.",
                 "/admin/withdrawal-requests",
                 Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount)
         );
@@ -240,23 +240,23 @@ public class NotificationService {
                 receiverAccountId,
                 actorAccountId,
                 "WITHDRAWAL_APPROVED",
-                "Rut tien thanh cong",
-                "Yeu cau rut " + formatAmount(amount) + " VND cua ban da duoc admin duyet.",
+                "Rút tiền thành công",
+                "Yêu cầu rút " + formatAmount(amount) + " VND của bạn đã được admin duyệt.",
                 "/wallet/withdrawals",
                 Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount)
         );
     }
 
     public void notifyWithdrawalRejected(Integer receiverAccountId, Integer actorAccountId, Long withdrawalId, BigDecimal amount, String reason) {
-        String message = "Yeu cau rut " + formatAmount(amount) + " VND cua ban da bi admin tu choi.";
+        String message = "Yêu cầu rút " + formatAmount(amount) + " VND của bạn đã bị admin từ chối.";
         if (reason != null && !reason.isBlank()) {
-            message += " Ly do: " + reason.trim();
+            message += " Lý do: " + reason.trim();
         }
         createAndPush(
                 receiverAccountId,
                 actorAccountId,
                 "WITHDRAWAL_REJECTED",
-                "Rut tien that bai",
+                "Rút tiền thất bại",
                 message,
                 "/wallet/withdrawals",
                 Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount, "reason", safeText(reason, ""))
@@ -268,8 +268,8 @@ public class NotificationService {
                 receiverAccountId,
                 newAccountId,
                 "NEW_ACCOUNT_CREATED",
-                "Co tai khoan moi",
-                "Tai khoan \"" + safeText(fullName, safeText(email, "khong ten")) + "\" vua duoc tao voi vai tro " + safeText(roleName, "khong ro") + ".",
+                "Có tài khoản mới",
+                "Tài khoản \"" + safeText(fullName, safeText(email, "không tên")) + "\" vừa được tạo với vai trò " + safeText(roleName, "không rõ") + ".",
                 "/admin/accounts",
                 Map.of(
                         "accountId", newAccountId,

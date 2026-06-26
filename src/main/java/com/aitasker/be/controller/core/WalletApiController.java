@@ -6,8 +6,8 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.payment.WalletTransactionHistoryResponse;
 import com.aitasker.be.entity.SystemWalletEntity;
-import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.service.core.PaymentWalletService;
 import com.aitasker.be.service.core.SystemWalletService;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +38,7 @@ public class WalletApiController {
     // Note: Annotation nay khai bao API doc du lieu bang HTTP GET.
     @GetMapping("/transactions")
     // Note: Ham `walletTransactions` xu ly mot API endpoint, nhan request, goi service va tra ket qua cho client.
-    public ResponseEntity<ApiResponse<List<WalletTransactionEntity>>> walletTransactions() {
+    public ResponseEntity<ApiResponse<List<WalletTransactionHistoryResponse>>> walletTransactions() {
         return ResponseEntity.ok(ApiResponse.success("WALLET TRANSACTIONS SUCCESS",
                 paymentWalletService.listCurrentWalletTransactions()));
     }

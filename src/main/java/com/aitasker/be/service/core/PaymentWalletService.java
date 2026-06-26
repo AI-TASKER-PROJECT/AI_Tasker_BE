@@ -11,6 +11,7 @@ import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.dto.payment.QuotaResponse;
+import com.aitasker.be.dto.payment.WalletTransactionHistoryResponse;
 import com.aitasker.be.dto.payment.WithdrawalRequest;
 import com.aitasker.be.dto.payment.WithdrawalReviewRequest;
 import com.aitasker.be.entity.AccountEntity;
@@ -23,6 +24,7 @@ import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MembershipPackageEntity;
 import com.aitasker.be.entity.MembershipPurchaseEntity;
 import com.aitasker.be.entity.MilestoneEntity;
+import com.aitasker.be.entity.PaymentOrderEntity;
 import com.aitasker.be.entity.QuotaUsageLogEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.SystemSettingEntity;
@@ -40,6 +42,7 @@ import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.MembershipPackageRepository;
 import com.aitasker.be.repository.MembershipPurchaseRepository;
 import com.aitasker.be.repository.MilestoneRepository;
+import com.aitasker.be.repository.PaymentOrderRepository;
 import com.aitasker.be.repository.QuotaUsageLogRepository;
 import com.aitasker.be.repository.SystemSettingRepository;
 import com.aitasker.be.repository.UserQuotaRepository;
@@ -56,6 +59,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -65,7 +69,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PaymentWalletService {
     public static final String ACTION_PURCHASE_MEMBERSHIP = "Mua gói thành viên";
-    public static final String ACTION_PURCHASE_CREDIT = "Mua credit";
+    public static final String ACTION_PURCHASE_CREDIT = "Mua lượt sử dụng";
     public static final String ACTION_CONSUME_QUOTA = "Sử dụng quota";
     public static final String ACTION_PAY_CONTRACT_DEPOSIT = "Trả tiền ký quỹ hợp đồng";
     public static final String ACTION_REFUND_CONTRACT_DEPOSIT = "Xử lý hoàn ký quỹ hợp đồng";
@@ -100,6 +104,7 @@ public class PaymentWalletService {
     private final ContractMilestoneRepository contractMilestoneRepository;
     private final JobRepository jobRepository;
     private final MilestoneRepository milestoneRepository;
+    private final PaymentOrderRepository paymentOrderRepository;
     private final WithdrawalRequestRepository withdrawalRequestRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final AccountRepository accountRepository;
@@ -532,9 +537,331 @@ public class PaymentWalletService {
 
     @Transactional(readOnly = true)
     // Note: Ham `listCurrentWalletTransactions` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    public List<WalletTransactionEntity> listCurrentWalletTransactions() {
+    public List<WalletTransactionHistoryResponse> listCurrentWalletTransactions() {
         AccountEntity actor = accessService.currentAccount();
-        return walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(actor.getAccountId());
+        return walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(actor.getAccountId())
+                .stream()
+                .map(tx -> toWalletHistory(tx, actor))
+                .toList();
+    }
+
+    private WalletTransactionHistoryResponse toWalletHistory(WalletTransactionEntity tx, AccountEntity currentActor) {
+        WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder = WalletTransactionHistoryResponse.builder()
+                .transactionId(tx.getId())
+                .accountId(tx.getAccountId())
+                .transactionType(tx.getTransactionType())
+                .direction(tx.getDirection())
+                .balanceType(tx.getBalanceType())
+                .amount(tx.getAmount())
+                .balanceBefore(tx.getBalanceBefore())
+                .balanceAfter(tx.getBalanceAfter())
+                .status(tx.getStatus())
+                .referenceType(tx.getReferenceType())
+                .referenceId(tx.getReferenceId())
+                .rawDescription(tx.getDescription())
+                .createdAt(tx.getCreatedAt());
+        AccountEntity walletOwner = currentActor != null && Objects.equals(currentActor.getAccountId(), tx.getAccountId())
+                ? currentActor
+                : accountRepository.findById(tx.getAccountId()).orElse(null);
+        String actorName = displayAccount(walletOwner, tx.getAccountId());
+        builder.actorName(actorName);
+
+        return switch (safe(tx.getTransactionType())) {
+            case "TOPUP" -> describeTopup(builder, tx, actorName);
+            case "MEMBERSHIP_PURCHASE" -> describeMembership(builder, tx, actorName);
+            case "CREDIT_PURCHASE" -> describeCreditPurchase(builder, tx, actorName);
+            case "CONTRACT_SECURITY_DEPOSIT_HOLD", "CONTRACT_SECURITY_DEPOSIT_REFUND", "CONTRACT_SECURITY_DEPOSIT_RESOLVED" ->
+                    describeContractDeposit(builder, tx, actorName);
+            case "WITHDRAW_HOLD", "WITHDRAW_APPROVED", "WITHDRAW_REJECTED" ->
+                    describeWithdrawal(builder, tx, actorName);
+            default -> builder
+                    .title(defaultTransactionTitle(tx))
+                    .description(cleanLedgerDescription(tx))
+                    .build();
+        };
+    }
+
+    private WalletTransactionHistoryResponse describeTopup(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        Optional<PaymentOrderEntity> order = paymentOrder(tx);
+        order.ifPresent(paymentOrder -> builder
+                .paymentOrderId(paymentOrder.getId())
+                .providerOrderCode(paymentOrder.getProviderOrderCode())
+                .description("Mã thanh toán: " + safeNumber(paymentOrder.getProviderOrderCode()) + ". Số tiền: " + formatAmount(tx.getAmount()) + " VND."));
+        return builder
+                .title(actorName + " đã nạp tiền vào ví")
+                .description(order.isPresent()
+                        ? "Mã thanh toán: " + safeNumber(order.get().getProviderOrderCode()) + ". Số tiền: " + formatAmount(tx.getAmount()) + " VND."
+                        : "Số tiền nạp vào ví: " + formatAmount(tx.getAmount()) + " VND.")
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeMembership(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        Optional<MembershipPurchaseEntity> purchase = membershipPurchaseRepository.findByWalletTransactionId(tx.getId());
+        Long packageId = purchase.map(MembershipPurchaseEntity::getPackageId).orElse(tx.getReferenceId());
+        Optional<MembershipPackageEntity> membershipPackage = packageId == null ? Optional.empty() : membershipPackageRepository.findById(packageId);
+        String packageName = membershipPackage.map(MembershipPackageEntity::getPackageName)
+                .orElseGet(() -> nonBlank(tx.getDescription(), "gói thành viên"));
+        builder.packageId(packageId).packageName(packageName);
+        String description = purchase
+                .map(item -> "Thời hạn badge từ " + item.getBadgeStartAt() + " đến " + item.getBadgeEndAt() + ".")
+                .orElse("Giao dịch mua gói thành viên.");
+        return builder
+                .title(actorName + " đã mua gói " + packageName)
+                .description(description)
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeCreditPurchase(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        String description = cleanLedgerDescription(tx);
+        String title = actorName + " đã mua credit";
+        if (safe(tx.getDescription()).contains("job-post")) {
+            title = actorName + " đã mua lượt đăng job";
+        } else if (safe(tx.getDescription()).contains("proposal")) {
+            title = actorName + " đã mua lượt nộp proposal";
+        }
+        return builder.title(title).description(description).build();
+    }
+
+    private WalletTransactionHistoryResponse describeContractDeposit(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        Optional<ContractDepositEntity> deposit = contractDepositForTransaction(tx);
+        Optional<ContractEntity> contract = contractForDepositTransaction(tx, deposit);
+        contract.ifPresent(item -> attachContractContext(builder, item));
+        deposit.ifPresent(item -> builder.adminId(item.getAdminId())
+                .adminName(item.getAdminId() == null ? null : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
+                .adminNote(item.getAdminNote()));
+
+        String contractTitle = contract.map(this::displayContract).orElse("hợp đồng");
+        String businessName = contract.map(item -> displayBusiness(item.getBusinessId())).orElse(actorName);
+        String expertName = contract.map(item -> displayExpert(item.getExpertId())).orElse(null);
+        String counterparty = expertName == null ? null : expertName;
+        builder.counterpartyName(counterparty);
+
+        return switch (safe(tx.getTransactionType())) {
+            case "CONTRACT_SECURITY_DEPOSIT_REFUND" -> builder
+                    .title("Hoàn tiền ký quỹ cho " + businessName)
+                    .description("Admin đã hoàn " + formatAmount(tx.getAmount()) + " VND từ ký quỹ của " + contractTitle + detailAdminNote(deposit))
+                    .build();
+            case "CONTRACT_SECURITY_DEPOSIT_RESOLVED" -> builder
+                    .title("Xử lý giữ lại tiền ký quỹ của " + businessName)
+                    .description("Admin đã xử lý giữ lại " + formatAmount(tx.getAmount()) + " VND từ ký quỹ của " + contractTitle + detailAdminNote(deposit))
+                    .build();
+            default -> builder
+                    .title(businessName + " đã ký quỹ cho hợp đồng" + (expertName == null ? "" : " với " + expertName))
+                    .description("Đã giữ " + formatAmount(tx.getAmount()) + " VND để bảo đảm thực hiện " + contractTitle + ".")
+                    .build();
+        };
+    }
+
+    private WalletTransactionHistoryResponse describeWithdrawal(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        Optional<WithdrawalRequestEntity> withdrawal = withdrawalForTransaction(tx);
+        String requesterName = withdrawal
+                .map(item -> displayAccount(accountRepository.findById(item.getAccountId()).orElse(null), item.getAccountId()))
+                .orElse(actorName);
+        withdrawal.ifPresent(item -> builder
+                .withdrawalId(item.getWithdrawalId())
+                .bankName(item.getBankName())
+                .bankAccountHolder(item.getBankAccountHolder())
+                .adminId(item.getAdminId())
+                .adminName(item.getAdminId() == null ? null : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
+                .adminNote(item.getAdminNote()));
+        String bankText = withdrawal
+                .map(item -> " Ngân hàng: " + item.getBankName() + ", chủ tài khoản: " + item.getBankAccountHolder() + ".")
+                .orElse("");
+        String adminNote = withdrawal
+                .map(item -> item.getAdminNote() == null || item.getAdminNote().isBlank() ? "" : " Lý do: " + item.getAdminNote().trim())
+                .orElse("");
+        return switch (safe(tx.getTransactionType())) {
+            case "WITHDRAW_APPROVED" -> builder
+                    .title("Yêu cầu rút tiền của " + requesterName + " đã được duyệt")
+                    .description("Admin đã xác nhận rút " + formatAmount(tx.getAmount()) + " VND." + bankText)
+                    .build();
+            case "WITHDRAW_REJECTED" -> builder
+                    .title("Yêu cầu rút tiền của " + requesterName + " bị từ chối")
+                    .description("Admin đã từ chối yêu cầu rút " + formatAmount(tx.getAmount()) + " VND." + bankText + adminNote)
+                    .build();
+            default -> builder
+                    .title(requesterName + " đã tạo yêu cầu rút tiền")
+                    .description("Đã tạm giữ " + formatAmount(tx.getAmount()) + " VND để chờ admin duyệt yêu cầu rút tiền." + bankText)
+                    .build();
+        };
+    }
+
+    private Optional<PaymentOrderEntity> paymentOrder(WalletTransactionEntity tx) {
+        if (tx.getPaymentOrderId() != null) {
+            return paymentOrderRepository.findById(tx.getPaymentOrderId());
+        }
+        if ("PAYMENT_ORDER".equals(tx.getReferenceType()) && tx.getReferenceId() != null) {
+            return paymentOrderRepository.findById(tx.getReferenceId());
+        }
+        return Optional.empty();
+    }
+
+    private Optional<ContractDepositEntity> contractDepositForTransaction(WalletTransactionEntity tx) {
+        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())) {
+            return contractDepositRepository.findByHoldTransactionId(tx.getId());
+        }
+        Optional<ContractDepositEntity> byTransaction = contractDepositRepository.findByRefundTransactionId(tx.getId());
+        if (byTransaction.isPresent()) {
+            return byTransaction;
+        }
+        if (tx.getReferenceId() != null && !"CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())) {
+            return contractDepositRepository.findById(tx.getReferenceId());
+        }
+        return Optional.empty();
+    }
+
+    private Optional<ContractEntity> contractForDepositTransaction(WalletTransactionEntity tx, Optional<ContractDepositEntity> deposit) {
+        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType()) && tx.getReferenceId() != null) {
+            return contractRepository.findById(toInt(tx.getReferenceId()));
+        }
+        return deposit.flatMap(item -> contractRepository.findById(item.getContractId()));
+    }
+
+    private Optional<WithdrawalRequestEntity> withdrawalForTransaction(WalletTransactionEntity tx) {
+        if ("WITHDRAW_HOLD".equals(tx.getTransactionType())) {
+            Optional<WithdrawalRequestEntity> byHold = withdrawalRequestRepository.findByHoldTransactionId(tx.getId());
+            if (byHold.isPresent()) {
+                return byHold;
+            }
+        }
+        Optional<WithdrawalRequestEntity> byReview = withdrawalRequestRepository.findByReviewTransactionId(tx.getId());
+        if (byReview.isPresent()) {
+            return byReview;
+        }
+        if (tx.getReferenceId() != null && !"WITHDRAW_HOLD".equals(tx.getTransactionType())) {
+            return withdrawalRequestRepository.findById(tx.getReferenceId());
+        }
+        return Optional.empty();
+    }
+
+    private void attachContractContext(WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder, ContractEntity contract) {
+        String businessName = displayBusiness(contract.getBusinessId());
+        String expertName = displayExpert(contract.getExpertId());
+        builder.contractId(contract.getContractId())
+                .contractTitle(displayContract(contract))
+                .businessId(contract.getBusinessId())
+                .businessName(businessName)
+                .expertId(contract.getExpertId())
+                .expertName(expertName)
+                .jobId(contract.getJobId())
+                .jobTitle(jobRepository.findById(contract.getJobId()).map(JobEntity::getTitle).orElse(null));
+    }
+
+    private String displayBusiness(Integer businessId) {
+        return businessId == null ? "doanh nghiệp" : businessProfileRepository.findById(businessId)
+                .map(BusinessProfileEntity::getCompanyName)
+                .filter(name -> !name.isBlank())
+                .orElse("doanh nghiệp");
+    }
+
+    private String displayExpert(Integer expertId) {
+        if (expertId == null) {
+            return "chuyên gia";
+        }
+        return expertProfileRepository.findById(expertId)
+                .flatMap(profile -> accountRepository.findById(profile.getAccountId()))
+                .map(AccountEntity::getFullName)
+                .filter(name -> !name.isBlank())
+                .orElse("chuyên gia");
+    }
+
+    private String displayContract(ContractEntity contract) {
+        if (contract.getContractTitle() != null && !contract.getContractTitle().isBlank()) {
+            return "hợp đồng \"" + contract.getContractTitle().trim() + "\"";
+        }
+        return "hợp đồng giữa " + displayBusiness(contract.getBusinessId()) + " và " + displayExpert(contract.getExpertId());
+    }
+
+    private String displayAccount(AccountEntity account, Integer accountId) {
+        if (account != null && account.getFullName() != null && !account.getFullName().isBlank()) {
+            return account.getFullName().trim();
+        }
+        if (account != null && account.getEmail() != null && !account.getEmail().isBlank()) {
+            return account.getEmail().trim();
+        }
+        return accountId == null ? "người dùng" : "người dùng";
+    }
+
+    private String defaultTransactionTitle(WalletTransactionEntity tx) {
+        return switch (safe(tx.getDirection())) {
+            case "CREDIT" -> "Ví được cộng tiền";
+            case "DEBIT" -> "Ví bị trừ tiền";
+            case "HOLD" -> "Ví tạm giữ tiền";
+            case "RELEASE" -> "Ví được giải tỏa tiền";
+            default -> "Giao dịch ví";
+        };
+    }
+
+    private String cleanLedgerDescription(WalletTransactionEntity tx) {
+        String description = safe(tx.getDescription());
+        if (description.startsWith("Buy job-post credits:")) {
+            return "Số lượt đăng job đã mua: " + description.substring("Buy job-post credits:".length()).trim() + ".";
+        }
+        if (description.startsWith("Buy proposal credits:")) {
+            return "Số lượt nộp proposal đã mua: " + description.substring("Buy proposal credits:".length()).trim() + ".";
+        }
+        if ("Contract security deposit".equals(description)) {
+            return "Ký quỹ bảo đảm thực hiện hợp đồng.";
+        }
+        if ("Refund contract security deposit".equals(description)) {
+            return "Hoàn tiền ký quỹ hợp đồng.";
+        }
+        if ("Admin resolved contract security deposit".equals(description)) {
+            return "Admin xử lý giữ lại tiền ký quỹ hợp đồng.";
+        }
+        if ("Withdrawal request".equals(description)) {
+            return "Tạo yêu cầu rút tiền.";
+        }
+        if ("Withdrawal approved after manual transfer".equals(description)) {
+            return "Yêu cầu rút tiền đã được duyệt sau khi chuyển khoản thủ công.";
+        }
+        if ("Withdrawal rejected".equals(description)) {
+            return "Yêu cầu rút tiền bị từ chối.";
+        }
+        return description.isBlank() ? "Giao dịch ví." : description;
+    }
+
+    private String detailAdminNote(Optional<ContractDepositEntity> deposit) {
+        return deposit.map(ContractDepositEntity::getAdminNote)
+                .filter(note -> !note.isBlank())
+                .map(note -> " Ghi chú admin: " + note.trim() + ".")
+                .orElse(".");
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        return amount == null ? "0" : amount.stripTrailingZeros().toPlainString();
+    }
+
+    private String safeNumber(Long value) {
+        return value == null ? "chưa có" : String.valueOf(value);
+    }
+
+    private String nonBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 
     // Note: Ham `requireApprovedBusinessOrExpert` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
