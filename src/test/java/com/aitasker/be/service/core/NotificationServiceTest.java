@@ -97,8 +97,36 @@ class NotificationServiceTest {
         verify(notificationRepository).save(captor.capture());
         NotificationEntity saved = captor.getValue();
         assertEquals("WITHDRAWAL_REJECTED", saved.getType());
+        assertEquals("Rút tiền thất bại", saved.getTitle());
+        assertTrue(saved.getMessage().contains("Yêu cầu rút 120000 VND của bạn đã bị admin từ chối."));
+        assertTrue(saved.getMessage().contains("Lý do: Invalid bank info"));
         assertTrue(saved.getMessage().contains("Invalid bank info"));
         assertEquals("/wallet/withdrawals", saved.getTargetUrl());
+    }
+
+    @Test
+    void financeAndAccountNotifications_shouldUseVietnameseDiacritics() {
+        when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyWalletTopupSucceeded(20, 123L, new BigDecimal("50000"));
+        notificationService.notifyWithdrawalApproved(20, 1, 90L, new BigDecimal("120000"));
+        notificationService.notifyWithdrawalReviewRequested(1, 20, 90L, new BigDecimal("120000"));
+        notificationService.notifyJobPostQuotaConsumed(20, 20, 77L, "AI Assistant", 2);
+        notificationService.notifyNewAccountCreated(1, 22, "New Business", "new@mail.com", "BUSINESS");
+
+        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository, org.mockito.Mockito.times(5)).save(captor.capture());
+
+        assertEquals("Nạp tiền thành công", captor.getAllValues().get(0).getTitle());
+        assertTrue(captor.getAllValues().get(0).getMessage().contains("Ví của bạn đã được nạp"));
+        assertEquals("Rút tiền thành công", captor.getAllValues().get(1).getTitle());
+        assertEquals("Có yêu cầu rút tiền cần duyệt", captor.getAllValues().get(2).getTitle());
+        assertEquals("Đã trừ quota đăng bài", captor.getAllValues().get(3).getTitle());
+        assertEquals("Có tài khoản mới", captor.getAllValues().get(4).getTitle());
     }
 
     @Test

@@ -285,6 +285,7 @@ public class AuditLogService {
             case "REJECT_EXPERT_PROFILE" -> ACTION_REJECT_EXPERT_PROFILE;
             case "ASSIGN_DISPUTE" -> ACTION_ASSIGN_DISPUTE;
             case "Mua goi thanh vien" -> "Mua gói thành viên";
+            case "Mua credit" -> "Mua lượt sử dụng";
             case "Su dung quota" -> "Sử dụng quota";
             case "Duyet yeu cau rut tien" -> "Duyệt yêu cầu rút tiền";
             case "Tao yeu cau rut tien" -> "Tạo yêu cầu rút tiền";

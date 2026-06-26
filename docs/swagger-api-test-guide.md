@@ -845,7 +845,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
   - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
 
 ### GET `/api/wallet/transactions`
-- Giai thich: Lay ledger wallet transactions.
+- Giải thích: Lấy lịch sử giao dịch ví dạng minh bạch. Response giữ mã ledger thô để lọc/debug và bổ sung `title`, `description`, cùng ngữ cảnh top-up, membership, credit, ký quỹ hợp đồng, rút tiền, ngân hàng/admin nếu có.
 - Huong dan test: Dung token hop le, bam Execute, kiem tra transaction list dung account.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:

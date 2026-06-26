@@ -98,8 +98,8 @@ public class ContractExecutionService {
                         expert.getAccountId(),
                         accountId,
                         "CONTRACT_CREATED",
-                        "Hop dong nhap moi",
-                        "Doanh nghiep da tao hop dong nhap de ban xem xet.",
+                        "Hợp đồng nháp mới",
+                        "Doanh nghiệp đã tạo hợp đồng nháp để bạn xem xét.",
                         saved.getContractId()
                 ));
         return saved;
@@ -130,10 +130,10 @@ public class ContractExecutionService {
                 businessId != null && businessId.equals(saved.getBusinessId()) ? saved.getExpertId() : null,
                 expertId != null && expertId.equals(saved.getExpertId()) ? saved.getBusinessId() : null,
                 "CONTRACT_ACCEPTED",
-                "Hop dong da duoc xac nhan",
-                "Ben con lai da ky xac nhan hop dong.");
+                "Hợp đồng đã được xác nhận",
+                "Bên còn lại đã ký xác nhận hợp đồng.");
         if ("PENDING".equals(saved.getStatus())) {
-            notifyBothParticipants(saved, accountId, "CONTRACT_PENDING_DEPOSIT", "Hop dong cho ky quy", "Hop dong da du chu ky Contract va NDA, doanh nghiep can thanh toan ky quy de bat dau du an.");
+            notifyBothParticipants(saved, accountId, "CONTRACT_PENDING_DEPOSIT", "Hợp đồng chờ ký quỹ", "Hợp đồng đã đủ chữ ký Contract và NDA, doanh nghiệp cần thanh toán ký quỹ để bắt đầu dự án.");
         }
         return saved;
     }
@@ -295,10 +295,10 @@ public class ContractExecutionService {
                 businessId != null && businessId.equals(saved.getBusinessId()) ? saved.getExpertId() : null,
                 expertId != null && expertId.equals(saved.getExpertId()) ? saved.getBusinessId() : null,
                 "NDA_SIGNED",
-                "NDA da duoc ky",
-                "Ben con lai da ky NDA cho hop dong.");
+                "NDA đã được ký",
+                "Bên còn lại đã ký NDA cho hợp đồng.");
         if ("PENDING".equals(saved.getStatus())) {
-            notifyBothParticipants(saved, accountId, "CONTRACT_PENDING_DEPOSIT", "Hop dong cho ky quy", "Hop dong da du chu ky Contract va NDA, doanh nghiep can thanh toan ky quy de bat dau du an.");
+            notifyBothParticipants(saved, accountId, "CONTRACT_PENDING_DEPOSIT", "Hợp đồng chờ ký quỹ", "Hợp đồng đã đủ chữ ký Contract và NDA, doanh nghiệp cần thanh toán ký quỹ để bắt đầu dự án.");
         }
         return saved;
     }
@@ -325,8 +325,8 @@ public class ContractExecutionService {
                         business.getAccountId(),
                         actorAccountId,
                         "CONTRACT_REJECTED",
-                        "Hop dong bi tu choi",
-                        "Chuyen gia da tu choi hop dong nhap. Job duoc chuyen ve buoc review proposal.",
+                        "Hợp đồng bị từ chối",
+                        "Chuyên gia đã từ chối hợp đồng nháp. Job được chuyển về bước review proposal.",
                         saved.getContractId()
                 ));
         return saved;
@@ -494,7 +494,7 @@ public class ContractExecutionService {
         ContractEntity saved = contractRepository.save(contract);
         closeCompletedContractJob(saved);
         auditLogService.record(AuditLogService.ACTION_COMPLETE_CONTRACT, "contracts", String.valueOf(saved.getContractId()), actorAccountId);
-        notifyBothParticipants(saved, actorAccountId, "CONTRACT_COMPLETED", "Hop dong da hoan tat", "Tat ca milestone cua hop dong da hoan thanh.");
+        notifyBothParticipants(saved, actorAccountId, "CONTRACT_COMPLETED", "Hợp đồng đã hoàn tất", "Tất cả milestone của hợp đồng đã hoàn thành.");
     }
 
     private void notifyCounterpartyContractEvent(ContractEntity contract, Integer actorAccountId, Integer expertId, Integer businessId, String type, String title, String message) {

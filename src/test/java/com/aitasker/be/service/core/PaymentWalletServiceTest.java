@@ -3,6 +3,7 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.dto.payment.QuotaResponse;
+import com.aitasker.be.dto.payment.WalletTransactionHistoryResponse;
 import com.aitasker.be.dto.payment.WithdrawalRequest;
 import com.aitasker.be.dto.payment.WithdrawalReviewRequest;
 import com.aitasker.be.entity.AccountEntity;
@@ -10,6 +11,7 @@ import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ContractDepositEntity;
 import com.aitasker.be.entity.ContractEntity;
 import com.aitasker.be.entity.ContractMilestoneEntity;
+import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.MembershipPackageEntity;
 import com.aitasker.be.entity.MembershipPurchaseEntity;
 import com.aitasker.be.entity.MilestoneEntity;
@@ -26,6 +28,7 @@ import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.MembershipPackageRepository;
 import com.aitasker.be.repository.MembershipPurchaseRepository;
 import com.aitasker.be.repository.MilestoneRepository;
+import com.aitasker.be.repository.PaymentOrderRepository;
 import com.aitasker.be.repository.QuotaUsageLogRepository;
 import com.aitasker.be.repository.SystemSettingRepository;
 import com.aitasker.be.repository.UserQuotaRepository;
@@ -67,6 +70,7 @@ class PaymentWalletServiceTest {
     @Mock private ContractMilestoneRepository contractMilestoneRepository;
     @Mock private JobRepository jobRepository;
     @Mock private MilestoneRepository milestoneRepository;
+    @Mock private PaymentOrderRepository paymentOrderRepository;
     @Mock private WithdrawalRequestRepository withdrawalRequestRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private AccountRepository accountRepository;
@@ -431,6 +435,129 @@ class PaymentWalletServiceTest {
         paymentWalletService.approveWithdrawal(90L, null);
 
         verify(notificationService).notifyWithdrawalApproved(10, 1, 90L, new BigDecimal("120000"));
+    }
+
+    @Test
+    void listCurrentWalletTransactions_shouldReturnTransparentContractDepositHistory() {
+        AccountEntity businessAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Nova Retail")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        WalletTransactionEntity tx = WalletTransactionEntity.builder()
+                .id(70L)
+                .accountId(10)
+                .transactionType("CONTRACT_SECURITY_DEPOSIT_HOLD")
+                .direction("HOLD")
+                .balanceType("ESCROW")
+                .amount(new BigDecimal("200000"))
+                .balanceBefore(new BigDecimal("500000"))
+                .balanceAfter(new BigDecimal("300000"))
+                .status("POSTED")
+                .referenceType("CONTRACT_DEPOSIT")
+                .referenceId(30L)
+                .description("Contract security deposit")
+                .build();
+        ContractDepositEntity deposit = ContractDepositEntity.builder()
+                .depositId(80L)
+                .contractId(30)
+                .businessId(20)
+                .holdTransactionId(70L)
+                .build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(30)
+                .businessId(20)
+                .expertId(40)
+                .jobId(50)
+                .contractTitle("AI Sales Assistant")
+                .build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder()
+                .businessId(20)
+                .companyName("Nova Retail")
+                .build();
+        ExpertProfileEntity expert = ExpertProfileEntity.builder()
+                .expertId(40)
+                .accountId(11)
+                .build();
+        AccountEntity expertAccount = AccountEntity.builder()
+                .accountId(11)
+                .fullName("Tran Hoang Nam")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(businessAccount);
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10)).thenReturn(List.of(tx));
+        when(contractDepositRepository.findByHoldTransactionId(70L)).thenReturn(Optional.of(deposit));
+        when(contractRepository.findById(30)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findById(20)).thenReturn(Optional.of(business));
+        when(expertProfileRepository.findById(40)).thenReturn(Optional.of(expert));
+        when(accountRepository.findById(11)).thenReturn(Optional.of(expertAccount));
+        when(jobRepository.findById(50)).thenReturn(Optional.of(com.aitasker.be.entity.JobEntity.builder()
+                .jobId(50)
+                .title("Build AI assistant")
+                .build()));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals("Nova Retail đã ký quỹ cho hợp đồng với Tran Hoang Nam", item.getTitle());
+        assertEquals("hợp đồng \"AI Sales Assistant\"", item.getContractTitle());
+        assertEquals("Nova Retail", item.getBusinessName());
+        assertEquals("Tran Hoang Nam", item.getExpertName());
+        assertEquals("Build AI assistant", item.getJobTitle());
+        assertTrue(item.getDescription().contains("Đã giữ 200000 VND"));
+    }
+
+    @Test
+    void listCurrentWalletTransactions_shouldReturnTransparentRejectedWithdrawalHistory() {
+        AccountEntity expertAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Expert A")
+                .role(RoleEntity.builder().roleName("EXPERT").build())
+                .build();
+        AccountEntity adminAccount = AccountEntity.builder()
+                .accountId(1)
+                .fullName("Admin One")
+                .build();
+        WalletTransactionEntity tx = WalletTransactionEntity.builder()
+                .id(91L)
+                .accountId(10)
+                .transactionType("WITHDRAW_REJECTED")
+                .direction("RELEASE")
+                .balanceType("WITHDRAW_HOLD")
+                .amount(new BigDecimal("120000"))
+                .balanceBefore(BigDecimal.ZERO)
+                .balanceAfter(new BigDecimal("120000"))
+                .status("POSTED")
+                .referenceType("WITHDRAW_REQUEST")
+                .referenceId(90L)
+                .description("Withdrawal rejected")
+                .build();
+        WithdrawalRequestEntity withdrawal = WithdrawalRequestEntity.builder()
+                .withdrawalId(90L)
+                .accountId(10)
+                .amount(new BigDecimal("120000"))
+                .bankName("VCB")
+                .bankAccountHolder("Expert A")
+                .adminId(1)
+                .adminNote("Sai số tài khoản")
+                .reviewTransactionId(91L)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(expertAccount);
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10)).thenReturn(List.of(tx));
+        when(withdrawalRequestRepository.findByReviewTransactionId(91L)).thenReturn(Optional.of(withdrawal));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(expertAccount));
+        when(accountRepository.findById(1)).thenReturn(Optional.of(adminAccount));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
+
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals("Yêu cầu rút tiền của Expert A bị từ chối", item.getTitle());
+        assertEquals("VCB", item.getBankName());
+        assertEquals("Admin One", item.getAdminName());
+        assertTrue(item.getDescription().contains("Lý do: Sai số tài khoản"));
+        assertEquals("Sai số tài khoản", item.getAdminNote());
     }
 
     private AccountEntity businessAccount() {

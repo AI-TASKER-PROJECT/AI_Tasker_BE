@@ -13,4 +13,8 @@ import java.util.Optional;
 public interface ContractDepositRepository extends JpaRepository<ContractDepositEntity, Long> {
     // Note: Ham `findByContractId` truy cap hoac truy van du lieu phuc vu tang service.
     Optional<ContractDepositEntity> findByContractId(Integer contractId);
+
+    Optional<ContractDepositEntity> findByHoldTransactionId(Long holdTransactionId);
+
+    Optional<ContractDepositEntity> findByRefundTransactionId(Long refundTransactionId);
 }

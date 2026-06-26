@@ -9,6 +9,7 @@ import com.aitasker.be.entity.WithdrawalRequestEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalRequestEntity, Long> {
     // Note: Ham `findByAccountIdOrderByRequestedAtDesc` truy cap hoac truy van du lieu phuc vu tang service.
@@ -16,4 +17,8 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
 
     // Note: Ham `findAllByOrderByRequestedAtDesc` truy cap hoac truy van du lieu phuc vu tang service.
     List<WithdrawalRequestEntity> findAllByOrderByRequestedAtDesc();
+
+    Optional<WithdrawalRequestEntity> findByHoldTransactionId(Long holdTransactionId);
+
+    Optional<WithdrawalRequestEntity> findByReviewTransactionId(Long reviewTransactionId);
 }

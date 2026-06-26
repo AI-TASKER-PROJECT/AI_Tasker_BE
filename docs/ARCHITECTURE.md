@@ -339,6 +339,11 @@ Finance is partially MVP and partially integrated:
 - Contract security deposit moves Business available balance to escrow.
 - Withdrawal requests move available balance to holding; admin approval removes
   holding and admin rejection returns holding to available.
+- `GET /api/wallet/transactions` returns a read DTO for transparent wallet
+  history. The response preserves raw ledger codes and adds Vietnamese
+  presentation fields explaining top-up, membership, credit, contract-deposit,
+  and withdrawal events with related business/expert/job/contract/bank/admin
+  context where available.
 - Legacy transaction endpoints still model deposit, payout, refund, webhook,
   and status updates for contract/milestone flows.
 - Legacy invoice storage no longer exists in the active schema.
@@ -386,8 +391,9 @@ includes marketplace proposal events, AI-recommendation expert selection,
 profile verification submission/review, contract and NDA events, deliverable
 submission, dispute assignment, job-post quota consumption, PayOS wallet top-up,
 withdrawal review outcomes, admin withdrawal review queue, and admin new-account
-alerts. Any change to realtime behavior must include separate WebSocket
-verification.
+alerts. Active notification titles/messages should be Vietnamese with
+diacritics; machine `type` codes remain stable uppercase identifiers. Any
+change to realtime behavior must include separate WebSocket verification.
 
 ## Boundary Rules
 
