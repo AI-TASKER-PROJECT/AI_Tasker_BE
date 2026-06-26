@@ -70,6 +70,19 @@ Read to prove the change and avoid claiming unsupported completion.
 | Benchmark protocol or external benchmark repo | Skip | Skip unless requested | Must if the story depends on benchmark proof |
 | `docs/HARNESS_MATURITY.md` | Skip | Should for Harness improvements | Must for maturity claims |
 
+Before setting a story to `implemented`, validate the proof surfaces directly:
+
+- `scripts/bin/harness-cli query matrix --numeric` shows the target story with
+  proof values that match the evidence actually collected.
+- The story validation/evidence file contains concrete command results and no
+  unfinished placeholder such as `TBD` or `add results after verification`.
+- If the task changed a public API, route inventory and test-guide docs mention
+  the new or changed routes.
+- The trace that represents the implementation is `completed`; if the latest
+  implementation trace is `partial`, the story remains partial.
+- Each acceptance criterion maps to a command result, manual proof, explicit
+  non-goal, or named blocker.
+
 ### Trace Phase
 
 Read to leave useful evidence for the next agent and for benchmark scoring.
@@ -134,3 +147,7 @@ Before final response:
 - `docs/TRACE_SPEC.md` has been read for normal/high-risk tasks.
 - The final trace includes files read, files changed, outcome, and friction
   when applicable.
+- Any story marked `implemented` has non-empty matrix evidence, completed trace
+  evidence, and no remaining story-validation placeholders.
+- Public API changes have been reflected in Swagger/OpenAPI-facing docs or are
+  named as an unfinished blocker in the final response and trace.

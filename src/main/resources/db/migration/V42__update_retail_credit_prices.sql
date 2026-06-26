@@ -1,4 +1,4 @@
--- V40__update_retail_credit_prices.sql
+-- V42__update_retail_credit_prices.sql
 -- Update retail credit purchase prices to low test values.
 
 UPDATE system_settings

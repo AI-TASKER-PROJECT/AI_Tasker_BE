@@ -155,7 +155,7 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
-    void parseAiResponse_shouldStripRecommendedMilestonesBlockFromScopeOfWorkAndDeliverables() {
+    void parseAiResponse_shouldStripRecommendedMilestonesBlockFromAllSowFields() {
         GenerateSowResponse response = service.parseAiResponse("""
                 {
                   "needMoreInfo": false,
@@ -189,7 +189,7 @@ class AiSowGenerationServiceTest {
                 """);
 
         assertFalse(response.getNeedMoreInfo());
-        assertEquals("Build AI chatbot for customer support. Recommended milestones: 1. Discovery 2. Build 3. Deploy. The project will use RAG technology.",
+        assertEquals("Build AI chatbot for customer support. The project will use RAG technology.",
                 response.getSow().getOverview());
         assertEquals(List.of("Design system", "Scalability planning"),
                 response.getSow().getScopeOfWork());
@@ -271,12 +271,45 @@ class AiSowGenerationServiceTest {
                 }
                 """);
 
-        assertEquals("OCR pipeline with document parsing. Suggested milestones: 1. Setup 2. Train. Backend integration follows.",
+        assertEquals("OCR pipeline with document parsing. Backend integration follows.",
                 response.getSow().getOverview());
         assertEquals(List.of("Document analysis", "API integration"),
                 response.getSow().getScopeOfWork());
         assertEquals(List.of("OCR service", "User guide"),
                 response.getSow().getDeliverables());
+    }
+
+    @Test
+    void parseAiResponse_shouldStripGenericMilestonesBlockFromOverview() {
+        GenerateSowResponse response = service.parseAiResponse("""
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "sow": {
+                    "title": "AI assistant",
+                    "overview": "Build internal AI assistant for support operations.\\n\\nMilestones:\\n- Moc 1: Discovery & Solution Design (Thoi gian: 3 WEEK)\\n- Moc 2: Knowledge Base & Data Preparation (Thoi gian: 3 WEEK)\\n- Moc 3: AI Assistant Development (Thoi gian: 3 WEEK)\\n- Moc 4: Integration & Testing (Thoi gian: 3 WEEK)\\n- Moc 5: Deployment & Handover (Thoi gian: 3 WEEK)",
+                    "objectives": [],
+                    "scopeOfWork": ["Design", "Develop"],
+                    "deliverables": ["Assistant API"],
+                    "assumptions": [],
+                    "outOfScope": []
+                  },
+                  "milestones": [
+                    {
+                      "name": "Discovery",
+                      "description": "Analyze requirements",
+                      "duration": 3,
+                      "durationUnit": "week",
+                      "budget": 20
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals("Build internal AI assistant for support operations.",
+                response.getSow().getOverview());
+        assertEquals(List.of("Design", "Develop"), response.getSow().getScopeOfWork());
+        assertEquals(List.of("Assistant API"), response.getSow().getDeliverables());
     }
 
     @Test

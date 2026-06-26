@@ -22,12 +22,18 @@ fixtures needed for repeatable proof.
 
 ## Commands
 
-Add commands after scripts exist.
+List every validation command that was run. If a required command could not run,
+record the exact blocker and keep the story status partial or blocked.
 
 ```text
-TBD
+command:
+result:
+notes:
 ```
 
 ## Acceptance Evidence
 
-Add results after verification.
+Do not leave this section as `TBD`. Before marking a story implemented, add the
+actual command results, manual proof, screenshots/links if relevant, and the
+trace id that recorded the final completed outcome. If proof is missing, explain
+the blocker here and do not mark the story implemented.
