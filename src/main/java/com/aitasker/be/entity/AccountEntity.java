@@ -80,6 +80,26 @@ public class AccountEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "failed_login_attempts", nullable = false)
+    @Builder.Default
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "lockout_count", nullable = false)
+    @Builder.Default
+    private int lockoutCount = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    @Column(name = "lock_reason", length = 80)
+    private String lockReason;
+
+    @Column(name = "last_failed_login_at")
+    private LocalDateTime lastFailedLoginAt;
+
+    @Column(name = "status_before_lock", length = 20)
+    private String statusBeforeLock;
+
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @UpdateTimestamp // ANNOTATION CỦA HIBERNATE DÙNG ĐỂ GÁN TỰ ĐỘNG THỜI GIAN LÚC UPDATE CHO FIELD
     // Note: Annotation này cấu hình cột database tương ứng với field entity.

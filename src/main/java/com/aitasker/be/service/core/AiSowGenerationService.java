@@ -213,12 +213,84 @@ public class AiSowGenerationService {
         if (!(sowNode instanceof ObjectNode sow)) {
             return;
         }
-        Pattern milestoneSectionStart = Pattern.compile(
-                "(?i)(recommended|suggested|proposed)\\s+milestones?\\s*:"
-                + "|milestone\\s+(recommendations?|breakdown|plan)\\s*:",
-                Pattern.UNICODE_CHARACTER_CLASS);
+        Pattern milestoneSectionStart = milestoneSectionStartPattern();
+        stripOverviewMilestoneBlock(sow, milestoneSectionStart);
         stripFromTextField(sow, "scopeOfWork", milestoneSectionStart);
         stripFromTextField(sow, "deliverables", milestoneSectionStart);
+    }
+
+    private Pattern milestoneSectionStartPattern() {
+        return Pattern.compile(
+                "(?i)^(?:(recommended|suggested|proposed)\\s+)?milestones?\\s*:"
+                        + "|^milestone\\s+(recommendations?|breakdown|plan)\\s*:",
+                Pattern.UNICODE_CHARACTER_CLASS);
+    }
+
+    private void stripOverviewMilestoneBlock(ObjectNode sow, Pattern sectionPattern) {
+        JsonNode fieldNode = sow.get("overview");
+        if (fieldNode == null || !fieldNode.isTextual()) {
+            return;
+        }
+
+        String overview = stripInlineOverviewMilestoneSentence(fieldNode.asText());
+        overview = stripOverviewMilestoneLines(overview, sectionPattern);
+        sow.put("overview", trimBlankLines(overview));
+    }
+
+    private String stripInlineOverviewMilestoneSentence(String overview) {
+        if (overview == null || overview.isBlank()) {
+            return overview;
+        }
+        Pattern headerPattern = Pattern.compile("(?i)(recommended|suggested|proposed)\\s+milestones?\\s*:");
+        java.util.regex.Matcher headerMatcher = headerPattern.matcher(overview);
+        if (!headerMatcher.find()) {
+            return overview;
+        }
+
+        String prefix = overview.substring(0, headerMatcher.start()).trim();
+        String suffix = overview.substring(headerMatcher.end());
+        Pattern itemPattern = Pattern.compile(
+                "\\s*\\d+\\.\\s*.*?(?:\\.(?=\\s+[A-Z])|(?=\\s*\\d+\\.\\s*)|$)",
+                Pattern.DOTALL);
+        java.util.regex.Matcher itemMatcher = itemPattern.matcher(suffix);
+        int cursor = 0;
+        boolean consumedAnyItem = false;
+        while (cursor < suffix.length()) {
+            itemMatcher.region(cursor, suffix.length());
+            if (!itemMatcher.lookingAt()) {
+                break;
+            }
+            consumedAnyItem = true;
+            cursor = itemMatcher.end();
+        }
+        if (!consumedAnyItem) {
+            return overview;
+        }
+
+        String remaining = suffix.substring(Math.min(cursor, suffix.length())).trim();
+        return (prefix + " " + remaining).replaceAll("\\s{2,}", " ").trim();
+    }
+
+    private String stripOverviewMilestoneLines(String overview, Pattern sectionPattern) {
+        String[] lines = overview.split("(?:\\\\n|\\R)", -1);
+        List<String> cleaned = new ArrayList<>();
+        boolean inMilestoneSection = false;
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (sectionPattern.matcher(trimmed).find()) {
+                inMilestoneSection = true;
+                continue;
+            }
+            if (inMilestoneSection) {
+                if (!trimmed.isBlank() && !isMilestoneListItem(trimmed)) {
+                    inMilestoneSection = false;
+                    cleaned.add(line);
+                }
+                continue;
+            }
+            cleaned.add(line);
+        }
+        return String.join("\n", cleaned);
     }
 
     private void stripFromTextField(ObjectNode sow, String fieldName, Pattern sectionPattern) {
@@ -230,12 +302,13 @@ public class AiSowGenerationService {
         boolean inMilestoneSection = false;
         for (JsonNode item : items) {
             String text = item.isTextual() ? item.asText() : "";
-            if (sectionPattern.matcher(text).find()) {
+            String trimmed = text.trim();
+            if (sectionPattern.matcher(trimmed).find()) {
                 inMilestoneSection = true;
                 continue;
             }
             if (inMilestoneSection) {
-                if (!text.isBlank() && !isMilestoneListItem(text)) {
+                if (!trimmed.isBlank() && !isMilestoneListItem(trimmed)) {
                     inMilestoneSection = false;
                     cleaned.add(text);
                 }
@@ -619,5 +692,11 @@ public class AiSowGenerationService {
             return value;
         }
         return value.substring(0, maxLength).trim() + "...";
+    }
+    private String trimBlankLines(String text) {
+        String normalized = text == null ? "" : text;
+        return normalized
+                .replaceAll("(?m)^[ \\t]*\\r?\\n", "")
+                .trim();
     }
 }

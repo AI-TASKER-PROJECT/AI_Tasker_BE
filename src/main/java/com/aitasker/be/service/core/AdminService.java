@@ -262,7 +262,14 @@ public class AdminService {
             account.setRole(role);
         }
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            account.setStatus(normalizeStatus(request.getStatus()));
+            String newStatus = normalizeStatus(request.getStatus());
+            account.setStatus(newStatus);
+            if ("Lock".equals(newStatus)) {
+                account.setLockReason("ADMIN_LOCKED");
+            } else {
+                account.setLockReason(null);
+                account.setStatusBeforeLock(null);
+            }
         }
         AccountEntity saved = accountRepository.save(account);
         if (hasRole(saved.getRole(), "STAFF")) {
@@ -291,6 +298,12 @@ public class AdminService {
         AccountEntity account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
         account.setStatus(normalizedStatus);
+        if ("Lock".equals(normalizedStatus)) {
+            account.setLockReason("ADMIN_LOCKED");
+        } else {
+            account.setLockReason(null);
+            account.setStatusBeforeLock(null);
+        }
         AccountEntity saved = accountRepository.save(account);
         auditLogService.record(AuditLogService.ACTION_CHANGE_ACCOUNT_STATUS, "account", String.valueOf(accountId), actor.getAccountId());
         return toAccountResponse(saved);
@@ -300,7 +313,20 @@ public class AdminService {
     @Transactional
     // Note: Hàm `setAccountActive` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public AccountResponse setAccountActive(Integer accountId, boolean active) {
-        return setAccountStatus(accountId, active ? "Approved" : "Lock");
+        AccountEntity account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
+        if (active) {
+            account.setStatus("Approved");
+            account.setLockReason(null);
+            account.setStatusBeforeLock(null);
+        } else {
+            account.setStatus("Lock");
+            account.setLockReason("ADMIN_LOCKED");
+        }
+        AccountEntity saved = accountRepository.save(account);
+        accessService.requireRole("ADMIN");
+        auditLogService.record(AuditLogService.ACTION_CHANGE_ACCOUNT_STATUS, "account", String.valueOf(accountId), accessService.currentAccount().getAccountId());
+        return toAccountResponse(saved);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.

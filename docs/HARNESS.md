@@ -368,6 +368,42 @@ A task is done only when:
   `scripts/bin/harness-cli backlog add`.
 - The final response says what changed and what was not attempted.
 
+## Implemented Story Gate
+
+Agents must not mark a story `implemented`, set proof booleans to passing, or
+describe a task as complete when any required proof surface is still partial.
+This gate applies before `scripts/bin/harness-cli story update --status
+implemented`, before setting any proof column to `1`, and before the final
+response claims completion.
+
+Before marking a story implemented:
+
+- The final trace for the task must have outcome `completed`. A `partial`,
+  `blocked`, or `failed` trace means the story is not implemented yet.
+- The durable matrix row must include non-empty evidence naming the exact
+  validation commands run and their results.
+- Story validation or evidence files must not contain placeholder proof such as
+  `TBD`, `add results after verification`, or equivalent unfinished text.
+- Public API changes must be reflected in Swagger/OpenAPI-facing docs and
+  manual test guides, or the story must remain partial with the doc gap named
+  in trace `errors` or `harness_friction`.
+- Every acceptance criterion in the active spec or story must map to proof,
+  a documented non-goal, or an explicit blocker. Missing proof keeps the story
+  partial.
+- If validation could not run, record the story as partial or blocked instead
+  of implemented, and leave the matrix proof value as `0`.
+
+Use these checks as a local gate before finalizing implementation work:
+
+```bash
+scripts/bin/harness-cli query matrix --numeric
+scripts/bin/harness-cli query traces
+rg -n "TBD|add results after verification|Acceptance Evidence" docs/stories
+```
+
+For public API changes, also verify the new or changed route appears in the
+relevant API docs and test guides.
+
 ## Future Validation Ladder
 
 No validation scripts exist yet. When implementation begins, the expected ladder

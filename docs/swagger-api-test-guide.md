@@ -152,6 +152,35 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
   - `400`: Loi validation hoac business rule theo state du lieu hien tai trong database.
   - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
 
+### POST `/api/auth/forgot-password`
+- Giai thich: Yeu cau gui email dat lai mat khau.
+- Huong dan test: Khong can token, nhap email da ton tai, kiem tra response luon tra `success: true` kem message "Neu email ton tai...". Khong duoc tiet lo email co ton tai hay khong.
+- Body raw:
+```json
+{
+  "email": "business@aitasker.local"
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong, ke ca khi email khong ton tai.
+  - `400`: Loi validation hoac business rule theo state du lieu hien tai trong database.
+  - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
+
+### POST `/api/auth/reset-password`
+- Giai thich: Dat lai mat khau bang token tu email.
+- Huong dan test: Khong can token, lay token tu email hoac Redis, dan body raw rieng ben duoi. Token het han sau 15 phut va chi dung mot lan.
+- Body raw:
+```json
+{
+  "token": "opaque-reset-token-from-email",
+  "newPassword": "newPassword123"
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong. Message thuong gap: `Dat lai mat khau thanh cong`.
+  - `400`: Loi validation hoac token khong hop le/het han.
+  - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
+
 ## Profile Verification Flow
 
 - Muc tieu flow: Business/Expert profile, portfolio, file profile va luong duyet KYC/KYB.

@@ -333,6 +333,41 @@ POST {{baseUrl}}/api/auth/login
 }
 ```
 
+#### 21b. POST /api/auth/forgot-password
+
+```http
+POST {{baseUrl}}/api/auth/forgot-password
+```
+
+- Muc dich: Yeu cau gui email reset link dat lai mat khau.
+- Phuc vu: Quen mat khau, tu phuc hoi tai khoan khong can Admin.
+- Token: Khong can token.
+- Body raw mau:
+```json
+{
+  "email": "business@aitasker.local"
+}
+```
+- Luu y: Response luon tra `{ "success": true, "message": "Neu email ton tai..." }` du email co ton tai hay khong. Rate limit 1 request/60 giay.
+
+#### 21c. POST /api/auth/reset-password
+
+```http
+POST {{baseUrl}}/api/auth/reset-password
+```
+
+- Muc dich: Dat lai mat khau bang token tu email reset link.
+- Phuc vu: Quen mat khau, tu phuc hoi tai khoan khong can Admin.
+- Token: Khong can token.
+- Body raw mau:
+```json
+{
+  "token": "opaque-reset-token-from-email",
+  "newPassword": "newPassword123"
+}
+```
+- Luu y: Token het han sau 15 phut, chi dung mot lan. Neu account bi Lock do sai mat khau nhieu lan, reset thanh cong se mo khoa.
+
 ### catalog-controller
 
 #### 22. GET /api/v1/jobs/{jobId}/technologies

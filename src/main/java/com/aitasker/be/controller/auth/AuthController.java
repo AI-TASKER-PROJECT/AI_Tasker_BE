@@ -16,9 +16,11 @@ import org.springframework.web.bind.annotation.*;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.config.OpenApiConfig;
 import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.ForgotPasswordRequest;
 import com.aitasker.be.dto.auth.GoogleAuthRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
+import com.aitasker.be.dto.auth.ResetPasswordRequest;
 import com.aitasker.be.service.auth.AuthService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -76,5 +78,17 @@ public class AuthController {
     // Note: Hàm `me` trả lại thông tin tài khoản mới nhất theo JWT để frontend cập nhật trạng thái duyệt khi reload.
     public ResponseEntity<ApiResponse<AuthResponse>> me() {
         return ResponseEntity.ok(ApiResponse.success("Current session", authService.currentSession()));
+    }
+
+    @PostMapping("/forgot-password")
+    @SecurityRequirements
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
+        return ResponseEntity.ok(authService.forgotPassword(req));
+    }
+
+    @PostMapping("/reset-password")
+    @SecurityRequirements
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest req) {
+        return ResponseEntity.ok(authService.resetPassword(req));
     }
 }

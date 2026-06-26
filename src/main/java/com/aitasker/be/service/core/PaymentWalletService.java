@@ -189,7 +189,7 @@ public class PaymentWalletService {
     public PaymentActionResponse<UserQuotaEntity> purchaseJobPostCredits(CreditPurchaseRequest request) {
         AccountEntity actor = requireApprovedRole(ROLE_BUSINESS);
         int quantity = requirePositiveQuantity(request);
-        BigDecimal requiredAmount = settingAmount("credit.job_post.price_vnd", BigDecimal.valueOf(100))
+        BigDecimal requiredAmount = settingAmount("credit.job_post.price_vnd", BigDecimal.valueOf(200))
                 .multiply(BigDecimal.valueOf(quantity));
         BigDecimal available = walletLedgerService.availableBalance(actor.getAccountId());
         if (available.compareTo(requiredAmount) < 0) {
@@ -215,7 +215,7 @@ public class PaymentWalletService {
     public PaymentActionResponse<UserQuotaEntity> purchaseProposalCredits(CreditPurchaseRequest request) {
         AccountEntity actor = requireApprovedRole(ROLE_EXPERT);
         int quantity = requirePositiveQuantity(request);
-        BigDecimal requiredAmount = settingAmount("credit.proposal.price_vnd", BigDecimal.valueOf(50))
+        BigDecimal requiredAmount = settingAmount("credit.proposal.price_vnd", BigDecimal.valueOf(100))
                 .multiply(BigDecimal.valueOf(quantity));
         BigDecimal available = walletLedgerService.availableBalance(actor.getAccountId());
         if (available.compareTo(requiredAmount) < 0) {

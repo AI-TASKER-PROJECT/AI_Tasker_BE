@@ -28,7 +28,7 @@ withdrawal request, business/expert profiles, accounts, and job rows.
 .\mvnw.cmd "-Dtest=PaymentWalletServiceTest,NotificationServiceTest,ContractExecutionServiceTest" test
 .\mvnw.cmd test
 .\mvnw.cmd -DskipTests compile
-.\scripts\bin\harness-cli.exe story verify US-032
+.\scripts\bin\harness-cli.exe story verify US-033
 ```
 
 ## Acceptance Evidence
@@ -37,9 +37,13 @@ withdrawal request, business/expert profiles, accounts, and job rows.
   passed on 2026-06-26: 49 tests, 0 failures.
 - `.\mvnw.cmd test` passed on 2026-06-26: 137 tests, 0 failures.
 - `.\mvnw.cmd -DskipTests compile` passed on 2026-06-26.
-- `.\scripts\bin\harness-cli.exe story verify US-032` passed on
+- `.\scripts\bin\harness-cli.exe story verify US-033` passed on
   2026-06-26.
 - `git diff --check` passed on 2026-06-26 with CRLF warnings only.
 - Text scan for active core websocket/audit strings found no remaining
   no-diacritic notification text; the remaining `Mua credit` occurrence is
   intentionally kept as a legacy audit translation input.
+- After resolving the pull conflict and renumbering this story from local
+  `US-032` to `US-033`, `.\mvnw.cmd -DskipTests compile` passed and
+  `.\scripts\bin\harness-cli.exe story verify US-033` passed again on
+  2026-06-26.

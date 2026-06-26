@@ -78,6 +78,9 @@ Requirements:
 - Implement the smallest vertical slice when implementation exists.
 - Record or update proof status with `scripts/bin/harness-cli story add` and
   `scripts/bin/harness-cli story update`.
+- Do not mark the story `implemented` until validation evidence is written,
+  the final trace outcome is `completed`, and every changed public contract is
+  reflected in the relevant docs or explicitly recorded as a blocker.
 
 ### High-Risk
 
@@ -94,6 +97,10 @@ Requirements:
   `docs/decisions/NNNN-*.md` file from `docs/templates/decision.md`, then add
   or refresh the durable row with `scripts/bin/harness-cli decision add`.
   Decision text in a trace is not a durable decision record.
+- Treat implementation status as gated by proof. A high-risk story remains
+  `partial` unless story validation evidence is filled in, matrix evidence
+  names the commands/results, the final trace is `completed`, and API or
+  user-visible contract docs are current.
 
 ## Risk Checklist
 
