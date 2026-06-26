@@ -6,7 +6,9 @@
 package com.aitasker.be.repository;
 
 import com.aitasker.be.entity.AccountEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,4 +30,8 @@ public interface AccountRepository extends JpaRepository<AccountEntity, Integer>
     @Query("select a from AccountEntity a join fetch a.role where lower(a.email) = lower(:email)")
     // Note: Hàm `findByEmailWithRole` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     Optional<AccountEntity> findByEmailWithRole(@Param("email") String email);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AccountEntity a join fetch a.role where lower(a.email) = lower(:email)")
+    Optional<AccountEntity> findByEmailWithRoleForUpdate(@Param("email") String email);
 }

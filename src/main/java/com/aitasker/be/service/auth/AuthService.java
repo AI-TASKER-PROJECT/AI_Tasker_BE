@@ -5,19 +5,23 @@
  */
 package com.aitasker.be.service.auth;
 
+import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.auth.AuthResponse;
+import com.aitasker.be.dto.auth.ForgotPasswordRequest;
 import com.aitasker.be.dto.auth.GoogleAuthRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
+import com.aitasker.be.dto.auth.ResetPasswordRequest;
 
 public interface AuthService {
-    // Note: Hàm `register` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     AuthResponse register(RegisterRequest req);
     AuthResponse googleLogin(GoogleAuthRequest req);
-    // Note: Hàm `login` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     AuthResponse login(LoginRequest req);
-    // Note: Hàm `currentSession` lấy lại thông tin tài khoản hiện tại từ database để frontend cập nhật status sau khi reload.
     AuthResponse currentSession();
 
     boolean emailExists(String email);
+
+    ApiResponse<Void> forgotPassword(ForgotPasswordRequest req);
+
+    ApiResponse<Void> resetPassword(ResetPasswordRequest req);
 }

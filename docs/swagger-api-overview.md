@@ -3,8 +3,8 @@
 Tai lieu nay liet ke API theo dung thu tu tag hien thi tren Swagger UI sau khi da sap xep lai theo luong nghiep vu.
 Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sorter=alpha`.
 
-- Tong so REST endpoint trong Swagger runtime: **130**.
-- Public endpoint: **20**.
+- Tong so REST endpoint trong Swagger runtime: **132**.
+- Public endpoint: **22**.
 - Endpoint can Bearer JWT: **110**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
@@ -30,6 +30,8 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 | 7 | POST | `/api/auth/google/register` | Public | Dang ky/dang nhap Google cho user moi. |
 | 8 | POST | `/api/auth/login` | Public | Dang nhap bang email/password de lay JWT. |
 | 9 | POST | `/api/auth/register` | Public | Dang ky account moi. |
+| 10 | POST | `/api/auth/forgot-password` | Public | Gui email reset link, khong tiet lo email co ton tai. |
+| 11 | POST | `/api/auth/reset-password` | Public | Dat lai mat khau bang token, mo khoa account bi lock do sai mat khau. |
 
 ## Profile Verification Flow
 

@@ -234,8 +234,8 @@ INSERT INTO system_settings (
     created_at,
     updated_at
 ) VALUES
-('credit.job_post.price_vnd', '100000', 'DECIMAL', 'Price for one Business job-post credit in VND.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('credit.proposal.price_vnd', '50000', 'DECIMAL', 'Price for one Expert proposal credit in VND.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+('credit.job_post.price_vnd', '200', 'DECIMAL', 'Price for one Business job-post credit in VND.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('credit.proposal.price_vnd', '100', 'DECIMAL', 'Price for one Expert proposal credit in VND.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (setting_key) DO UPDATE SET
     setting_value = EXCLUDED.setting_value,
     value_type = EXCLUDED.value_type,
