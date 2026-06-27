@@ -13,6 +13,7 @@ import com.aitasker.be.dto.auth.AuthResponse;
 import com.aitasker.be.dto.auth.ForgotPasswordRequest;
 import com.aitasker.be.dto.auth.GoogleAuthRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
+import com.aitasker.be.dto.auth.RefreshTokenRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.dto.auth.ResetPasswordRequest;
 import com.aitasker.be.entity.AccountEntity;
@@ -27,6 +28,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -413,6 +415,37 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse refreshToken(RefreshTokenRequest req) {
+        String refreshToken = req.getRefreshToken();
+        String email;
+        try {
+            email = jwtService.extractUsername(refreshToken);
+            if (email == null || email.isBlank()) {
+                throw new UnauthorizedException("Refresh token khong hop le");
+            }
+            if (!jwtService.isTokenValid(refreshToken, email) || !jwtService.isRefreshToken(refreshToken)) {
+                throw new UnauthorizedException("Refresh token khong hop le");
+            }
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw new UnauthorizedException("Refresh token khong hop le hoac da het han");
+        }
+
+        AccountEntity account = accountRepository.findByEmailWithRole(email)
+                .orElseThrow(() -> new UnauthorizedException("Tai khoan khong hop le"));
+        assertAccountCanReceiveToken(account);
+
+        return AuthResponse.builder()
+                .accessToken(jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName()))
+                .refreshToken(refreshToken)
+                .role(account.getRole().getRoleName())
+                .accountStatus(account.getStatus())
+                .email(account.getEmail())
+                .fullName(account.getFullName())
+                .build();
+    }
+
     // Note: Ham `createGoogleAccount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AuthResponse createGoogleAccount(GoogleAuthRequest req, String email, GoogleIdToken.Payload payload) {
         if (req.getRole() == null || req.getRole().isBlank()) {
@@ -455,12 +488,7 @@ public class AuthServiceImpl implements AuthService {
 
     // Note: Ham `buildAuthResponse` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private AuthResponse buildAuthResponse(AccountEntity account) {
-        if ("Lock".equalsIgnoreCase(account.getStatus())) {
-            if (LOCK_REASON_TOO_MANY_FAILED.equals(account.getLockReason())) {
-                throw new UnauthorizedException("Tai khoan da bi khoa, vui long dat lai mat khau");
-            }
-            throw new UnauthorizedException("Tai khoan da bi khoa");
-        }
+        assertAccountCanReceiveToken(account);
 
         String accessToken = jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName());
         String refreshToken = jwtService.generateRefreshToken(account.getEmail());
@@ -473,6 +501,15 @@ public class AuthServiceImpl implements AuthService {
                 .email(account.getEmail())
                 .fullName(account.getFullName())
                 .build();
+    }
+
+    private void assertAccountCanReceiveToken(AccountEntity account) {
+        if ("Lock".equalsIgnoreCase(account.getStatus())) {
+            if (LOCK_REASON_TOO_MANY_FAILED.equals(account.getLockReason())) {
+                throw new UnauthorizedException("Tai khoan da bi khoa, vui long dat lai mat khau");
+            }
+            throw new UnauthorizedException("Tai khoan da bi khoa");
+        }
     }
 
     // Note: Ham `verifyGoogleCredential` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.

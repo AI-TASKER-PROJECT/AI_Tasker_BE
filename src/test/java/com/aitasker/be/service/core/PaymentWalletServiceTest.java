@@ -500,12 +500,12 @@ class PaymentWalletServiceTest {
 
         assertEquals(1, history.size());
         WalletTransactionHistoryResponse item = history.get(0);
-        assertEquals("Nova Retail đã ký quỹ cho hợp đồng với Tran Hoang Nam", item.getTitle());
+        assertEquals("Nova Retail đã ký quỹ cho hợp đồng \"AI Sales Assistant\"", item.getTitle());
         assertEquals("hợp đồng \"AI Sales Assistant\"", item.getContractTitle());
         assertEquals("Nova Retail", item.getBusinessName());
         assertEquals("Tran Hoang Nam", item.getExpertName());
         assertEquals("Build AI assistant", item.getJobTitle());
-        assertTrue(item.getDescription().contains("Đã giữ 200000 VND"));
+        assertTrue(item.getDescription().contains("Nova Retail đã ký quỹ 200000 VND"));
     }
 
     @Test
@@ -556,8 +556,96 @@ class PaymentWalletServiceTest {
         assertEquals("Yêu cầu rút tiền của Expert A bị từ chối", item.getTitle());
         assertEquals("VCB", item.getBankName());
         assertEquals("Admin One", item.getAdminName());
-        assertTrue(item.getDescription().contains("Lý do: Sai số tài khoản"));
+        assertTrue(item.getDescription().contains("Admin One đã từ chối yêu cầu rút 120000 VND của Expert A"));
+        assertTrue(item.getDescription().contains("Lý do: Sai số tài khoản."));
         assertEquals("Sai số tài khoản", item.getAdminNote());
+    }
+
+    @Test
+    void listPlatformWalletTransactions_shouldReturnVietnameseBusinessEventsForAdmin() {
+        AccountEntity businessAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Doanh nghiệp A")
+                .build();
+        AccountEntity expertAccount = AccountEntity.builder()
+                .accountId(11)
+                .fullName("Chuyên gia E")
+                .build();
+        LocalDateTime start = LocalDateTime.of(2026, 6, 27, 0, 0);
+        WalletTransactionEntity skippedWithdrawDebit = WalletTransactionEntity.builder()
+                .id(39L)
+                .accountId(11)
+                .transactionType("WITHDRAW_HOLD")
+                .direction("DEBIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("5000000"))
+                .description("Withdrawal request")
+                .build();
+        WalletTransactionEntity withdrawHold = WalletTransactionEntity.builder()
+                .id(40L)
+                .accountId(11)
+                .transactionType("WITHDRAW_HOLD")
+                .direction("HOLD")
+                .balanceType("HOLDING")
+                .amount(new BigDecimal("5000000"))
+                .description("Withdrawal request")
+                .build();
+        WalletTransactionEntity creditPurchase = WalletTransactionEntity.builder()
+                .id(50L)
+                .accountId(10)
+                .transactionType("CREDIT_PURCHASE")
+                .direction("DEBIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("100000"))
+                .description("Buy job-post credits: 10")
+                .build();
+        WalletTransactionEntity membershipPurchase = WalletTransactionEntity.builder()
+                .id(60L)
+                .accountId(10)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("DEBIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("500000"))
+                .referenceId(1L)
+                .description("Premium Business")
+                .build();
+        WithdrawalRequestEntity withdrawal = WithdrawalRequestEntity.builder()
+                .withdrawalId(90L)
+                .accountId(11)
+                .amount(new BigDecimal("5000000"))
+                .bankName("Vietcombank")
+                .bankAccountHolder("Nguyen Van E")
+                .holdTransactionId(40L)
+                .build();
+        MembershipPurchaseEntity purchase = MembershipPurchaseEntity.builder()
+                .purchaseId(70L)
+                .accountId(10)
+                .packageId(1L)
+                .walletTransactionId(60L)
+                .badgeStartAt(start)
+                .badgeEndAt(start.plusDays(30))
+                .build();
+        MembershipPackageEntity membershipPackage = packageEntity(1L, "BUSINESS_PREMIUM", "Premium Business", 30);
+
+        when(walletTransactionRepository.findAllByOrderByCreatedAtDesc())
+                .thenReturn(List.of(skippedWithdrawDebit, withdrawHold, creditPurchase, membershipPurchase));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(businessAccount));
+        when(accountRepository.findById(11)).thenReturn(Optional.of(expertAccount));
+        when(withdrawalRequestRepository.findByHoldTransactionId(40L)).thenReturn(Optional.of(withdrawal));
+        when(membershipPurchaseRepository.findByWalletTransactionId(60L)).thenReturn(Optional.of(purchase));
+        when(membershipPackageRepository.findById(1L)).thenReturn(Optional.of(membershipPackage));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listPlatformWalletTransactions();
+
+        assertEquals(3, history.size());
+        assertEquals("Chuyên gia E đã tạo yêu cầu rút tiền", history.get(0).getTitle());
+        assertEquals("Hệ thống đã tạm giữ 5000000 VND cho yêu cầu rút tiền của Chuyên gia E. Ngân hàng: Vietcombank, chủ tài khoản: Nguyen Van E.",
+                history.get(0).getDescription());
+        assertEquals("Doanh nghiệp A đã mua 10 lượt đăng job", history.get(1).getTitle());
+        assertEquals("Doanh nghiệp A thanh toán 100000 VND để mua 10 lượt đăng job.", history.get(1).getDescription());
+        assertEquals("Doanh nghiệp A đã mua gói Premium Business", history.get(2).getTitle());
+        assertEquals("Doanh nghiệp A thanh toán 500000 VND để mua gói Premium Business. Thời hạn từ 2026-06-27T00:00 đến 2026-07-27T00:00.",
+                history.get(2).getDescription());
     }
 
     private AccountEntity businessAccount() {

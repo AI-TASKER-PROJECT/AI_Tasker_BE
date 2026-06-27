@@ -19,6 +19,7 @@ import com.aitasker.be.dto.auth.AuthResponse;
 import com.aitasker.be.dto.auth.ForgotPasswordRequest;
 import com.aitasker.be.dto.auth.GoogleAuthRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
+import com.aitasker.be.dto.auth.RefreshTokenRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.dto.auth.ResetPasswordRequest;
 import com.aitasker.be.service.auth.AuthService;
@@ -70,6 +71,12 @@ public class AuthController {
     // Note: Hàm `login` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Login success", authService.login(req)));
+    }
+
+    @PostMapping("/refresh")
+    @SecurityRequirements
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Refresh token success", authService.refreshToken(req)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.

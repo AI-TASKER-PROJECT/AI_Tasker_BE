@@ -175,6 +175,9 @@ Important runtime notes:
 
 - Google auth endpoints exist under `/api/auth/google/login` and
   `/api/auth/google/register`.
+- Refresh-token renewal exists at `POST /api/auth/refresh`: it accepts only a
+  valid refresh JWT, reloads the account/role, rejects locked accounts, and
+  returns a new access token.
 - Expert candidate and recommendation endpoints exist under `/api/jobs/...`.
 - PayOS endpoints exist under `/api/payments/payos/...`.
 - Contract activation is now signature-driven through
@@ -344,6 +347,10 @@ Finance is partially MVP and partially integrated:
   presentation fields explaining top-up, membership, credit, contract-deposit,
   and withdrawal events with related business/expert/job/contract/bank/admin
   context where available.
+- `GET /api/v1/admin/wallet/transactions` returns the platform-wide admin view
+  of wallet history using the same transparent DTO. It filters duplicate
+  transfer ledger legs so each displayed row maps to a clear business event,
+  while keeping technical IDs for reconciliation.
 - Legacy transaction endpoints still model deposit, payout, refund, webhook,
   and status updates for contract/milestone flows.
 - Legacy invoice storage no longer exists in the active schema.

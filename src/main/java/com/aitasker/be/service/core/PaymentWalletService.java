@@ -545,6 +545,16 @@ public class PaymentWalletService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<WalletTransactionHistoryResponse> listPlatformWalletTransactions() {
+        accessService.requireRole("ADMIN");
+        return walletTransactionRepository.findAllByOrderByCreatedAtDesc()
+                .stream()
+                .filter(this::isPlatformHistoryEventRow)
+                .map(tx -> toWalletHistory(tx, null))
+                .toList();
+    }
+
     private WalletTransactionHistoryResponse toWalletHistory(WalletTransactionEntity tx, AccountEntity currentActor) {
         WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder = WalletTransactionHistoryResponse.builder()
                 .transactionId(tx.getId())
@@ -590,12 +600,14 @@ public class PaymentWalletService {
         order.ifPresent(paymentOrder -> builder
                 .paymentOrderId(paymentOrder.getId())
                 .providerOrderCode(paymentOrder.getProviderOrderCode())
-                .description("Mã thanh toán: " + safeNumber(paymentOrder.getProviderOrderCode()) + ". Số tiền: " + formatAmount(tx.getAmount()) + " VND."));
+                .description(actorName + " đã nạp " + formatAmount(tx.getAmount()) + " VND vào ví. Mã thanh toán: "
+                        + safeNumber(paymentOrder.getProviderOrderCode()) + "."));
         return builder
                 .title(actorName + " đã nạp tiền vào ví")
                 .description(order.isPresent()
-                        ? "Mã thanh toán: " + safeNumber(order.get().getProviderOrderCode()) + ". Số tiền: " + formatAmount(tx.getAmount()) + " VND."
-                        : "Số tiền nạp vào ví: " + formatAmount(tx.getAmount()) + " VND.")
+                        ? actorName + " đã nạp " + formatAmount(tx.getAmount()) + " VND vào ví. Mã thanh toán: "
+                                + safeNumber(order.get().getProviderOrderCode()) + "."
+                        : actorName + " đã nạp " + formatAmount(tx.getAmount()) + " VND vào ví.")
                 .build();
     }
 
@@ -611,8 +623,9 @@ public class PaymentWalletService {
                 .orElseGet(() -> nonBlank(tx.getDescription(), "gói thành viên"));
         builder.packageId(packageId).packageName(packageName);
         String description = purchase
-                .map(item -> "Thời hạn badge từ " + item.getBadgeStartAt() + " đến " + item.getBadgeEndAt() + ".")
-                .orElse("Giao dịch mua gói thành viên.");
+                .map(item -> actorName + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua gói "
+                        + packageName + ". Thời hạn từ " + item.getBadgeStartAt() + " đến " + item.getBadgeEndAt() + ".")
+                .orElse(actorName + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua gói " + packageName + ".");
         return builder
                 .title(actorName + " đã mua gói " + packageName)
                 .description(description)
@@ -625,11 +638,11 @@ public class PaymentWalletService {
             String actorName
     ) {
         String description = cleanLedgerDescription(tx);
-        String title = actorName + " đã mua credit";
+        String title = actorName + " đã mua lượt sử dụng";
         if (safe(tx.getDescription()).contains("job-post")) {
-            title = actorName + " đã mua lượt đăng job";
+            title = actorName + " đã mua " + creditQuantity(tx) + " lượt đăng job";
         } else if (safe(tx.getDescription()).contains("proposal")) {
-            title = actorName + " đã mua lượt nộp proposal";
+            title = actorName + " đã mua " + creditQuantity(tx) + " lượt nộp proposal";
         }
         return builder.title(title).description(description).build();
     }
@@ -655,15 +668,18 @@ public class PaymentWalletService {
         return switch (safe(tx.getTransactionType())) {
             case "CONTRACT_SECURITY_DEPOSIT_REFUND" -> builder
                     .title("Hoàn tiền ký quỹ cho " + businessName)
-                    .description("Admin đã hoàn " + formatAmount(tx.getAmount()) + " VND từ ký quỹ của " + contractTitle + detailAdminNote(deposit))
+                    .description(adminDisplay(deposit) + " đã hoàn " + formatAmount(tx.getAmount())
+                            + " VND từ ký quỹ của " + contractTitle + detailAdminNote(deposit))
                     .build();
             case "CONTRACT_SECURITY_DEPOSIT_RESOLVED" -> builder
-                    .title("Xử lý giữ lại tiền ký quỹ của " + businessName)
-                    .description("Admin đã xử lý giữ lại " + formatAmount(tx.getAmount()) + " VND từ ký quỹ của " + contractTitle + detailAdminNote(deposit))
+                    .title("Giữ lại tiền ký quỹ của " + businessName)
+                    .description(adminDisplay(deposit) + " đã xử lý giữ lại " + formatAmount(tx.getAmount())
+                            + " VND từ ký quỹ của " + contractTitle + detailAdminNote(deposit))
                     .build();
             default -> builder
-                    .title(businessName + " đã ký quỹ cho hợp đồng" + (expertName == null ? "" : " với " + expertName))
-                    .description("Đã giữ " + formatAmount(tx.getAmount()) + " VND để bảo đảm thực hiện " + contractTitle + ".")
+                    .title(businessName + " đã ký quỹ cho " + contractTitle)
+                    .description(businessName + " đã ký quỹ " + formatAmount(tx.getAmount()) + " VND cho "
+                            + contractTitle + (expertName == null ? "." : " với chuyên gia " + expertName + "."))
                     .build();
         };
     }
@@ -688,20 +704,26 @@ public class PaymentWalletService {
                 .map(item -> " Ngân hàng: " + item.getBankName() + ", chủ tài khoản: " + item.getBankAccountHolder() + ".")
                 .orElse("");
         String adminNote = withdrawal
-                .map(item -> item.getAdminNote() == null || item.getAdminNote().isBlank() ? "" : " Lý do: " + item.getAdminNote().trim())
+                .map(item -> item.getAdminNote() == null || item.getAdminNote().isBlank() ? "" : " Lý do: " + item.getAdminNote().trim() + ".")
                 .orElse("");
+        String adminName = withdrawal
+                .map(item -> item.getAdminId() == null ? "Admin" : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
+                .orElse("Admin");
         return switch (safe(tx.getTransactionType())) {
             case "WITHDRAW_APPROVED" -> builder
                     .title("Yêu cầu rút tiền của " + requesterName + " đã được duyệt")
-                    .description("Admin đã xác nhận rút " + formatAmount(tx.getAmount()) + " VND." + bankText)
+                    .description(adminName + " đã duyệt rút " + formatAmount(tx.getAmount()) + " VND cho "
+                            + requesterName + "." + bankText)
                     .build();
             case "WITHDRAW_REJECTED" -> builder
                     .title("Yêu cầu rút tiền của " + requesterName + " bị từ chối")
-                    .description("Admin đã từ chối yêu cầu rút " + formatAmount(tx.getAmount()) + " VND." + bankText + adminNote)
+                    .description(adminName + " đã từ chối yêu cầu rút " + formatAmount(tx.getAmount())
+                            + " VND của " + requesterName + "." + bankText + adminNote)
                     .build();
             default -> builder
                     .title(requesterName + " đã tạo yêu cầu rút tiền")
-                    .description("Đã tạm giữ " + formatAmount(tx.getAmount()) + " VND để chờ admin duyệt yêu cầu rút tiền." + bankText)
+                    .description("Hệ thống đã tạm giữ " + formatAmount(tx.getAmount()) + " VND cho yêu cầu rút tiền của "
+                            + requesterName + "." + bankText)
                     .build();
         };
     }
@@ -815,10 +837,14 @@ public class PaymentWalletService {
     private String cleanLedgerDescription(WalletTransactionEntity tx) {
         String description = safe(tx.getDescription());
         if (description.startsWith("Buy job-post credits:")) {
-            return "Số lượt đăng job đã mua: " + description.substring("Buy job-post credits:".length()).trim() + ".";
+            String quantity = description.substring("Buy job-post credits:".length()).trim();
+            return displayAccount(accountRepository.findById(tx.getAccountId()).orElse(null), tx.getAccountId())
+                    + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua " + quantity + " lượt đăng job.";
         }
         if (description.startsWith("Buy proposal credits:")) {
-            return "Số lượt nộp proposal đã mua: " + description.substring("Buy proposal credits:".length()).trim() + ".";
+            String quantity = description.substring("Buy proposal credits:".length()).trim();
+            return displayAccount(accountRepository.findById(tx.getAccountId()).orElse(null), tx.getAccountId())
+                    + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua " + quantity + " lượt nộp proposal.";
         }
         if ("Contract security deposit".equals(description)) {
             return "Ký quỹ bảo đảm thực hiện hợp đồng.";
@@ -846,6 +872,38 @@ public class PaymentWalletService {
                 .filter(note -> !note.isBlank())
                 .map(note -> " Ghi chú admin: " + note.trim() + ".")
                 .orElse(".");
+    }
+
+    private String adminDisplay(Optional<ContractDepositEntity> deposit) {
+        return deposit
+                .map(ContractDepositEntity::getAdminId)
+                .filter(Objects::nonNull)
+                .map(adminId -> displayAccount(accountRepository.findById(adminId).orElse(null), adminId))
+                .orElse("Admin");
+    }
+
+    private boolean isPlatformHistoryEventRow(WalletTransactionEntity tx) {
+        String type = safe(tx.getTransactionType());
+        String direction = safe(tx.getDirection());
+        String balanceType = safe(tx.getBalanceType());
+        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(type) || "WITHDRAW_HOLD".equals(type)) {
+            return "HOLD".equals(direction);
+        }
+        if ("CONTRACT_SECURITY_DEPOSIT_REFUND".equals(type) || "WITHDRAW_REJECTED".equals(type)) {
+            return "CREDIT".equals(direction) && "AVAILABLE".equals(balanceType);
+        }
+        return true;
+    }
+
+    private String creditQuantity(WalletTransactionEntity tx) {
+        String description = safe(tx.getDescription());
+        if (description.startsWith("Buy job-post credits:")) {
+            return description.substring("Buy job-post credits:".length()).trim();
+        }
+        if (description.startsWith("Buy proposal credits:")) {
+            return description.substring("Buy proposal credits:".length()).trim();
+        }
+        return "nhiều";
     }
 
     private String formatAmount(BigDecimal amount) {
