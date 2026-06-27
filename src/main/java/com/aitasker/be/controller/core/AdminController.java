@@ -9,15 +9,19 @@ import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.admin.AccountRequest;
 import com.aitasker.be.dto.admin.AccountResponse;
 import com.aitasker.be.dto.admin.StaffResponse;
+import com.aitasker.be.dto.payment.WalletTransactionHistoryResponse;
 import com.aitasker.be.entity.ReviewEntity;
 import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.entity.SystemWalletEntity;
 import com.aitasker.be.entity.SystemSettingEntity;
 import com.aitasker.be.service.core.AdminService;
+import com.aitasker.be.service.core.PaymentWalletService;
 import com.aitasker.be.service.core.SystemWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 // Note: Annotation này biến class thành REST controller để nhận request và trả JSON.
 @RestController
@@ -28,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
     private final AdminService adminService;
     private final SystemWalletService systemWalletService;
+    private final PaymentWalletService paymentWalletService;
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/reviews")
@@ -104,6 +109,12 @@ public class AdminController {
     // Note: Hàm `systemWallet` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<SystemWalletEntity>> systemWallet() {
         return ResponseEntity.ok(ApiResponse.success("SYSTEM WALLET SUCCESS", systemWalletService.getWalletForAdmin()));
+    }
+
+    @GetMapping("/wallet/transactions")
+    public ResponseEntity<ApiResponse<List<WalletTransactionHistoryResponse>>> platformWalletTransactions() {
+        return ResponseEntity.ok(ApiResponse.success("PLATFORM WALLET TRANSACTIONS SUCCESS",
+                paymentWalletService.listPlatformWalletTransactions()));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

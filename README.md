@@ -138,6 +138,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `GET /api/v1/admin/staffs`
   - `POST /api/v1/admin/staffs`
   - `GET /api/v1/admin/analytics/overview`
+  - `GET /api/v1/admin/wallet/transactions`
 
 ## 8) Luu y nghiep vu
 - JWT da nang cap claim role thuc (`BUSINESS/EXPERT/ADMIN/STAFF`) de phuc vu RBAC.

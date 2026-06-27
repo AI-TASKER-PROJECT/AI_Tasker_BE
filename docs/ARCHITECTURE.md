@@ -347,6 +347,10 @@ Finance is partially MVP and partially integrated:
   presentation fields explaining top-up, membership, credit, contract-deposit,
   and withdrawal events with related business/expert/job/contract/bank/admin
   context where available.
+- `GET /api/v1/admin/wallet/transactions` returns the platform-wide admin view
+  of wallet history using the same transparent DTO. It filters duplicate
+  transfer ledger legs so each displayed row maps to a clear business event,
+  while keeping technical IDs for reconciliation.
 - Legacy transaction endpoints still model deposit, payout, refund, webhook,
   and status updates for contract/milestone flows.
 - Legacy invoice storage no longer exists in the active schema.

@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface WalletTransactionRepository extends JpaRepository<WalletTransactionEntity, Long> {
+    // Note: Ham `findAllByOrderByCreatedAtDesc` lay ledger toan he thong cho admin xem lich su vi nen tang.
+    List<WalletTransactionEntity> findAllByOrderByCreatedAtDesc();
+
     // Note: Ham `findByAccountIdOrderByCreatedAtDesc` truy cap hoac truy van du lieu phuc vu tang service.
     List<WalletTransactionEntity> findByAccountIdOrderByCreatedAtDesc(Integer accountId);
 

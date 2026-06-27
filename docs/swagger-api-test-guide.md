@@ -1731,6 +1731,17 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
   - `403`: Dang nhap roi nhung khong dung role/quyen/ownership theo service.
   - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
 
+### GET `/api/v1/admin/wallet/transactions`
+- Giai thich: Admin lay lich su giao dich vi nen tang rieng biet. Response tra cac dong lich su minh bach bang tieng Viet co dau cho `MEMBERSHIP_PURCHASE`, `CREDIT_PURCHASE`, `CONTRACT_SECURITY_DEPOSIT_HOLD`, `CONTRACT_SECURITY_DEPOSIT_REFUND`, `CONTRACT_SECURITY_DEPOSIT_RESOLVED`, `WITHDRAW_HOLD`, `WITHDRAW_APPROVED`, `WITHDRAW_REJECTED`, va `TOPUP`; dong chi tiet van giu `transactionId`, `accountId`, `packageId`, `contractId`, `jobId`, `withdrawalId`, `paymentOrderId` de doi soat.
+- Huong dan test: Dung token ADMIN, bam Execute, kiem tra `data[*].title` va `data[*].description` co dau ro rang, co `actorName`, `amount`, `createdAt`, va cac field lien quan nhu `packageName`, `contractTitle`, `jobTitle`, `bankName`, `bankAccountHolder`, `adminName`, `adminNote` khi co ngu canh.
+- Body raw: Khong co body raw.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong. Message thuong gap: `PLATFORM WALLET TRANSACTIONS SUCCESS`.
+  - `400`: Loi validation hoac business rule theo state du lieu hien tai trong database.
+  - `401`: Chua dang nhap, token het han hoac token khong hop le.
+  - `403`: Dang nhap roi nhung khong dung role/quyen/ownership theo service.
+  - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
+
 ### POST `/api/v1/admin/accounts`
 - Giai thich: Tao account moi tu trang quan tri.
 - Huong dan test: Dung token ADMIN/STAFF, dan body raw rieng ben duoi, kiem tra account moi duoc tao.

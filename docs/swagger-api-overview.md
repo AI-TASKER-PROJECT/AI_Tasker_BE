@@ -3,9 +3,9 @@
 Tai lieu nay liet ke API theo dung thu tu tag hien thi tren Swagger UI sau khi da sap xep lai theo luong nghiep vu.
 Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sorter=alpha`.
 
-- Tong so REST endpoint trong Swagger runtime: **132**.
+- Tong so REST endpoint trong Swagger runtime: **133**.
 - Public endpoint: **22**.
-- Endpoint can Bearer JWT: **110**.
+- Endpoint can Bearer JWT: **111**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -205,16 +205,17 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 | 5 | GET | `/api/v1/admin/settings` | Bearer JWT | Lay danh sach system settings. |
 | 6 | GET | `/api/v1/admin/staffs` | Bearer JWT | Lay danh sach staff. |
 | 7 | GET | `/api/v1/admin/wallet` | Bearer JWT | Lay system wallet cho admin. |
-| 8 | POST | `/api/v1/admin/accounts` | Bearer JWT | Tao account moi tu trang quan tri. |
-| 9 | POST | `/api/v1/admin/reviews` | Bearer JWT | Tao review cho contract. |
-| 10 | POST | `/api/v1/admin/staffs` | Bearer JWT | Tao staff profile gan voi account. |
-| 11 | POST | `/api/v1/admin/wallet/sync` | Bearer JWT | Dong bo/lazy-create system wallet. |
-| 12 | DELETE | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Vo hieu hoa account theo `accountId`. |
-| 13 | PATCH | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Cap nhat thong tin account. |
-| 14 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Bat/tat trang thai active cua account. |
-| 15 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Cap nhat status account bang query param. |
-| 16 | PATCH | `/api/v1/admin/settings/{key}` | Bearer JWT | Cap nhat value hoac trang thai active cua system setting. |
-| 17 | PATCH | `/api/v1/admin/staffs/{staffId}` | Bearer JWT | Cap nhat ho so staff. |
+| 8 | GET | `/api/v1/admin/wallet/transactions` | Bearer JWT | Admin lay lich su giao dich vi nen tang minh bach bang tieng Viet co dau, gom thong tin goi, credit, ky quy, rut tien, nap vi va ID doi soat. |
+| 9 | POST | `/api/v1/admin/accounts` | Bearer JWT | Tao account moi tu trang quan tri. |
+| 10 | POST | `/api/v1/admin/reviews` | Bearer JWT | Tao review cho contract. |
+| 11 | POST | `/api/v1/admin/staffs` | Bearer JWT | Tao staff profile gan voi account. |
+| 12 | POST | `/api/v1/admin/wallet/sync` | Bearer JWT | Dong bo/lazy-create system wallet. |
+| 13 | DELETE | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Vo hieu hoa account theo `accountId`. |
+| 14 | PATCH | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Cap nhat thong tin account. |
+| 15 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Bat/tat trang thai active cua account. |
+| 16 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Cap nhat status account bang query param. |
+| 17 | PATCH | `/api/v1/admin/settings/{key}` | Bearer JWT | Cap nhat value hoac trang thai active cua system setting. |
+| 18 | PATCH | `/api/v1/admin/staffs/{staffId}` | Bearer JWT | Cap nhat ho so staff. |
 
 ## System & Test Flow
 
