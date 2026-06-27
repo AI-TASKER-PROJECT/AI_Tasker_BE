@@ -29,9 +29,10 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 | 6 | POST | `/api/auth/google/login` | Public | Dang nhap bang Google credential. |
 | 7 | POST | `/api/auth/google/register` | Public | Dang ky/dang nhap Google cho user moi. |
 | 8 | POST | `/api/auth/login` | Public | Dang nhap bang email/password de lay JWT. |
-| 9 | POST | `/api/auth/register` | Public | Dang ky account moi. |
-| 10 | POST | `/api/auth/forgot-password` | Public | Gui email reset link, khong tiet lo email co ton tai. |
-| 11 | POST | `/api/auth/reset-password` | Public | Dat lai mat khau bang token, mo khoa account bi lock do sai mat khau. |
+| 9 | POST | `/api/auth/refresh` | Public | Dung refresh token con han de cap access token moi khi access token het han. |
+| 10 | POST | `/api/auth/register` | Public | Dang ky account moi. |
+| 11 | POST | `/api/auth/forgot-password` | Public | Gui email reset link, khong tiet lo email co ton tai. |
+| 12 | POST | `/api/auth/reset-password` | Public | Dat lai mat khau bang token, mo khoa account bi lock do sai mat khau. |
 
 ## Profile Verification Flow
 

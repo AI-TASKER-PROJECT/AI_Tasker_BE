@@ -69,6 +69,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
 - Auth/Security:
   - `POST /api/auth/register`
   - `POST /api/auth/login`
+  - `POST /api/auth/refresh`
   - `POST /api/auth/forgot-password`
   - `POST /api/auth/reset-password`
   - `POST /api/auth/google/login`

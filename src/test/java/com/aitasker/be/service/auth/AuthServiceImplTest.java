@@ -5,6 +5,7 @@ import com.aitasker.be.common.exception.UnauthorizedException;
 import com.aitasker.be.dto.auth.AuthResponse;
 import com.aitasker.be.dto.auth.ForgotPasswordRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
+import com.aitasker.be.dto.auth.RefreshTokenRequest;
 import com.aitasker.be.dto.auth.ResetPasswordRequest;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.entity.AccountEntity;
@@ -194,6 +195,57 @@ class AuthServiceImplTest {
         UnauthorizedException ex = assertThrows(UnauthorizedException.class,
                 () -> authService.login(loginRequest));
         assertEquals("Tai khoan da bi khoa, vui long dat lai mat khau", ex.getMessage());
+    }
+
+    @Test
+    void refreshToken_withValidRefreshToken_shouldIssueNewAccessToken() {
+        RefreshTokenRequest req = new RefreshTokenRequest();
+        req.setRefreshToken("refresh-token");
+
+        when(jwtService.extractUsername("refresh-token")).thenReturn("test@mail.com");
+        when(jwtService.isTokenValid("refresh-token", "test@mail.com")).thenReturn(true);
+        when(jwtService.isRefreshToken("refresh-token")).thenReturn(true);
+        when(jwtService.generateAccessToken("test@mail.com", "BUSINESS")).thenReturn("new-access-token");
+
+        AuthResponse response = authService.refreshToken(req);
+
+        assertEquals("new-access-token", response.getAccessToken());
+        assertEquals("refresh-token", response.getRefreshToken());
+        assertEquals("BUSINESS", response.getRole());
+        assertEquals("Approved", response.getAccountStatus());
+        verify(jwtService, never()).generateRefreshToken(anyString());
+    }
+
+    @Test
+    void refreshToken_withAccessToken_shouldReject() {
+        RefreshTokenRequest req = new RefreshTokenRequest();
+        req.setRefreshToken("access-token");
+
+        when(jwtService.extractUsername("access-token")).thenReturn("test@mail.com");
+        when(jwtService.isTokenValid("access-token", "test@mail.com")).thenReturn(true);
+        when(jwtService.isRefreshToken("access-token")).thenReturn(false);
+
+        UnauthorizedException ex = assertThrows(UnauthorizedException.class,
+                () -> authService.refreshToken(req));
+        assertEquals("Refresh token khong hop le", ex.getMessage());
+        verify(jwtService, never()).generateAccessToken(anyString(), anyString());
+    }
+
+    @Test
+    void refreshToken_withLockedAccount_shouldReject() {
+        testAccount.setStatus("Lock");
+        testAccount.setLockReason("TOO_MANY_FAILED_LOGIN_ATTEMPTS");
+        RefreshTokenRequest req = new RefreshTokenRequest();
+        req.setRefreshToken("refresh-token");
+
+        when(jwtService.extractUsername("refresh-token")).thenReturn("test@mail.com");
+        when(jwtService.isTokenValid("refresh-token", "test@mail.com")).thenReturn(true);
+        when(jwtService.isRefreshToken("refresh-token")).thenReturn(true);
+
+        UnauthorizedException ex = assertThrows(UnauthorizedException.class,
+                () -> authService.refreshToken(req));
+        assertEquals("Tai khoan da bi khoa, vui long dat lai mat khau", ex.getMessage());
+        verify(jwtService, never()).generateAccessToken(anyString(), anyString());
     }
 
     @Test

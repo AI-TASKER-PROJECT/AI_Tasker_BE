@@ -27,7 +27,7 @@ public class JwtService {
     private String jwtSecret;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
-    @Value("${app.jwt.access-expiration-ms:900000}")
+    @Value("${app.jwt.access-expiration-ms:10800000}")
     private long accessExpirationMs;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -61,6 +61,10 @@ public class JwtService {
     // Note: Hàm `extractRole` phục vụ xác thực/phân quyền, xử lý JWT hoặc lấy thông tin người dùng hiện tại.
     public String extractRole(String token) {
         return extractClaim(token, claims -> claims.get("role", String.class));
+    }
+
+    public boolean isRefreshToken(String token) {
+        return Boolean.TRUE.equals(extractClaim(token, claims -> "refresh".equals(claims.get("type", String.class))));
     }
 
     // Note: Hàm `generateToken` phục vụ xác thực/phân quyền, xử lý JWT hoặc lấy thông tin người dùng hiện tại.

@@ -121,7 +121,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### POST `/api/auth/login`
 - Giai thich: Dang nhap bang email/password de lay JWT.
-- Huong dan test: Khong can token, dan body raw rieng ben duoi, copy `accessToken` trong response de Authorize cac API private.
+- Huong dan test: Khong can token, dan body raw rieng ben duoi, copy `accessToken` trong response de Authorize cac API private. `accessToken` mac dinh het han sau 3 tieng, `refreshToken` het han sau 7 ngay.
 - Body raw:
 ```json
 {
@@ -132,6 +132,20 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `Login success`.
   - `400`: Loi validation hoac business rule theo state du lieu hien tai trong database.
+  - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
+
+### POST `/api/auth/refresh`
+- Giai thich: Cap access token moi bang refresh token con han.
+- Huong dan test: Khong can Authorize token. Lay `refreshToken` tu response login/register/google login, dan body raw rieng ben duoi, kiem tra response co `accessToken` moi.
+- Body raw:
+```json
+{
+  "refreshToken": "refresh-token-from-login-response"
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong. Message thuong gap: `Refresh token success`.
+  - `401`: Refresh token sai, het han, khong phai token refresh, hoac account da bi khoa.
   - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
 
 ### POST `/api/auth/register`

@@ -175,6 +175,9 @@ Important runtime notes:
 
 - Google auth endpoints exist under `/api/auth/google/login` and
   `/api/auth/google/register`.
+- Refresh-token renewal exists at `POST /api/auth/refresh`: it accepts only a
+  valid refresh JWT, reloads the account/role, rejects locked accounts, and
+  returns a new access token.
 - Expert candidate and recommendation endpoints exist under `/api/jobs/...`.
 - PayOS endpoints exist under `/api/payments/payos/...`.
 - Contract activation is now signature-driven through

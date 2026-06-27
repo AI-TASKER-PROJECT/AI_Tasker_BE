@@ -10,6 +10,7 @@ import com.aitasker.be.dto.auth.AuthResponse;
 import com.aitasker.be.dto.auth.ForgotPasswordRequest;
 import com.aitasker.be.dto.auth.GoogleAuthRequest;
 import com.aitasker.be.dto.auth.LoginRequest;
+import com.aitasker.be.dto.auth.RefreshTokenRequest;
 import com.aitasker.be.dto.auth.RegisterRequest;
 import com.aitasker.be.dto.auth.ResetPasswordRequest;
 
@@ -17,6 +18,7 @@ public interface AuthService {
     AuthResponse register(RegisterRequest req);
     AuthResponse googleLogin(GoogleAuthRequest req);
     AuthResponse login(LoginRequest req);
+    AuthResponse refreshToken(RefreshTokenRequest req);
     AuthResponse currentSession();
 
     boolean emailExists(String email);
