@@ -242,13 +242,17 @@ Current rules to preserve:
 - Public `GET /api/v1/jobs` returns only `OPEN` jobs.
 - Public `GET /api/v1/jobs/{jobId}/milestones` is readable for `OPEN` jobs.
 - Public `GET /api/v1/profiles/business/{businessId}` is Guest-readable without
-  JWT (US-017); it returns the business profile with `fullName` and `404` when
-  not found. Sibling routes `/business/me`, `/business/by-job/{jobId}`, and
-  `/business` remain protected by their service-layer role/ownership checks.
+  JWT (US-017); it returns the business profile with `fullName`, `email`, and
+  `phone`, and `404` when not found. Sibling routes `/business/me` and
+  `/business` remain protected by their service-layer role checks.
 - Public `GET /api/v1/profiles/business/by-job/{jobId}` is Guest-readable without
-  JWT (US-018) only for `OPEN` jobs; the service layer
+  JWT (US-018) only for `OPEN` jobs; it returns the Business profile with
+  `fullName`, `email`, and `phone`. The service layer
   `businessProfileByJob(jobId)` still requires `STAFF/ADMIN/BUSINESS` for
   non-`OPEN` jobs. `/business/me` and `/business` remain private.
+- Profile read APIs enrich account-derived contact fields from `account`:
+  Business profile reads return `fullName`, `email`, `phone`; Expert profile
+  reads return `fullName`, `email`, `phone`, and `title` where applicable.
 - Business dashboard behavior that needs draft/open/closed jobs uses
   `GET /api/v1/jobs/my`.
 - A proposal can move into contract creation only after it is `Accepted`.

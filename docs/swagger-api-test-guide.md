@@ -201,7 +201,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### GET `/api/v1/profiles/business`
 - Giai thich: Lay danh sach business profiles cho operator.
-- Huong dan test: Dung token STAFF/ADMIN, bam Execute, kiem tra danh sach KYB.
+- Huong dan test: Dung token STAFF, bam Execute, kiem tra tung item co `fullName`, `email`, `phone` de mo panel/lien he.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `LIST BUSINESS PROFILE SUCCESS`.
@@ -212,7 +212,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### GET `/api/v1/profiles/business/by-job/{jobId}`
 - Giai thich: Public lay business profile theo job OPEN.
-- Huong dan test: Khong can token voi job OPEN, nhap `jobId`, kiem tra non-OPEN bi gate theo service rule.
+- Huong dan test: Khong can token voi job OPEN, nhap `jobId`, kiem tra `fullName`, `email`, `phone`; non-OPEN bi gate theo service rule.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `GET BUSINESS PROFILE BY JOB SUCCESS`.
@@ -221,7 +221,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### GET `/api/v1/profiles/business/me`
 - Giai thich: Lay KYB profile cua business dang dang nhap.
-- Huong dan test: Dung token BUSINESS, bam Execute, kiem tra profile hien tai.
+- Huong dan test: Dung token BUSINESS, bam Execute, kiem tra profile hien tai co `fullName`, `email`, `phone`.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `GET MY BUSINESS PROFILE SUCCESS`.
@@ -232,7 +232,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### GET `/api/v1/profiles/business/{businessId}`
 - Giai thich: Public lay business profile theo id.
-- Huong dan test: Khong can token, nhap `businessId`, kiem tra profile va fullName; id khong ton tai tra loi ro.
+- Huong dan test: Khong can token, nhap `businessId`, kiem tra profile co `fullName`, `email`, `phone`; id khong ton tai tra loi ro.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `GET BUSINESS PROFILE BY ID SUCCESS`.
@@ -241,7 +241,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### GET `/api/v1/profiles/expert`
 - Giai thich: Lay danh sach expert profiles cho operator.
-- Huong dan test: Dung token STAFF/ADMIN, bam Execute, kiem tra danh sach KYC.
+- Huong dan test: Dung token STAFF hoac BUSINESS, bam Execute, kiem tra tung item co `fullName`, `email`, `phone`, `title`.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `LIST EXPERT PROFILE SUCCESS`.
@@ -252,7 +252,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### GET `/api/v1/profiles/expert/me`
 - Giai thich: Lay KYC profile cua expert dang dang nhap.
-- Huong dan test: Dung token EXPERT, bam Execute, kiem tra profile hien tai.
+- Huong dan test: Dung token EXPERT, bam Execute, kiem tra profile hien tai co `fullName`, `email`, `phone`, `title`.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `GET MY EXPERT PROFILE SUCCESS`.
@@ -263,7 +263,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ### GET `/api/v1/profiles/expert/{expertId}`
 - Giai thich: Lay expert profile theo id.
-- Huong dan test: Dung token hop le, nhap `expertId`, kiem tra profile/portfolio URL.
+- Huong dan test: Dung token EXPERT/BUSINESS/STAFF/ADMIN, nhap `expertId`, kiem tra profile/portfolio URL va `fullName`, `email`, `phone`, `title`.
 - Body raw: Khong co body raw.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong. Message thuong gap: `GET EXPERT PROFILE BY ID SUCCESS`.

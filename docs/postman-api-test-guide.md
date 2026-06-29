@@ -1447,9 +1447,9 @@ GET {{baseUrl}}/api/v1/profiles/business/{businessId}
 
 - Mục đích: Lấy thông tin business profile theo ID để xem trang cá nhân doanh nghiệp.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Không cần JWT (US-017). Route public cho Guest; trả kèm `fullName`, `404` khi không tìm thấy. Các route `/me`, `/by-job/{jobId}`, `/business` vẫn yêu cầu Bearer token theo role.
+- Token: Không cần JWT (US-017). Route public cho Guest; trả kèm `fullName`, `email`, `phone`, `404` khi không tìm thấy. Route `/me` và `/business` vẫn yêu cầu Bearer token theo role.
 - Body: Không có.
-- Thử nhanh (Guest): `GET {{baseUrl}}/api/v1/profiles/business/1` không kèm header `Authorization` kỳ vọng `200` với `data.fullName`; `businessId` không tồn tại kỳ vọng `404`.
+- Thử nhanh (Guest): `GET {{baseUrl}}/api/v1/profiles/business/1` không kèm header `Authorization` kỳ vọng `200` với `data.fullName`, `data.email`, `data.phone`; `businessId` không tồn tại kỳ vọng `404`.
 
 #### 94. GET /api/v1/profiles/expert/{expertId}
 
@@ -1459,7 +1459,7 @@ GET {{baseUrl}}/api/v1/profiles/expert/{expertId}
 
 - Mục đích: Lấy thông tin expert profile theo ID để xem trang cá nhân chuyên gia.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Cần Bearer token EXPERT/BUSINESS/STAFF/ADMIN.
 - Body: Không có.
 
 #### 95. GET /api/v1/profiles/portfolio/me
@@ -1470,7 +1470,7 @@ GET {{baseUrl}}/api/v1/profiles/portfolio/me
 
 - Mục đích: Lấy thông tin của account đang đăng nhập.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Cần Bearer token EXPERT; response có `fullName`, `email`, `phone`, `title`.
 - Body: Không có.
 
 #### 96. GET /api/v1/profiles/files/view-url
@@ -1492,7 +1492,7 @@ GET {{baseUrl}}/api/v1/profiles/expert/me
 
 - Mục đích: Lấy thông tin của account đang đăng nhập.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Cần Bearer token theo role phù hợp.
+- Token: Cần Bearer token BUSINESS; response có `fullName`, `email`, `phone`.
 - Body: Không có.
 
 #### 98. GET /api/v1/profiles/business/me
@@ -1514,7 +1514,7 @@ GET {{baseUrl}}/api/v1/profiles/business/by-job/{jobId}
 
 - Mục đích: Xem thông tin business theo job để chuyên gia xem chi tiết doanh nghiệp của job.
 - Phục vụ: Hồ sơ business, expert, portfolio và file Firebase.
-- Token: Không cần JWT (US-018) khi job `OPEN`; route public cho Guest. Job chưa public (`non-OPEN`) vẫn yêu cầu Bearer token STAFF/ADMIN/BUSINESS theo luật service. `/me` và `/business` vẫn yêu cầu Bearer token theo role.
+- Token: Không cần JWT (US-018) khi job `OPEN`; route public cho Guest và trả kèm `fullName`, `email`, `phone`. Job chưa public (`non-OPEN`) vẫn yêu cầu Bearer token STAFF/ADMIN/BUSINESS theo luật service. `/me` và `/business` vẫn yêu cầu Bearer token theo role.
 - Body: Không có.
 - Thử nhanh (Guest): `GET {{baseUrl}}/api/v1/profiles/business/by-job/1` không kèm header `Authorization` với job `OPEN` kỳ vọng `200`; job `non-OPEN` không có token kỳ vọng `401/403`; `jobId` không tồn tại kỳ vọng `404`.
 

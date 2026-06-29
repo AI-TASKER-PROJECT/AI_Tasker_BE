@@ -4,7 +4,7 @@ Date: 2026-06-22
 
 ## Status
 
-Accepted
+Superseded in part by decision 0021 for contact-field exposure
 
 ## Context
 
@@ -85,3 +85,10 @@ Tradeoffs:
   `rejectionReason` and `businessLicenseUrl` should be hidden from Guests.
 - Add a dedicated security/integration test for anonymous profile reads when
   lightweight security test coverage is introduced or expanded.
+
+## Supersession Note
+
+Decision 0021 intentionally changes the response enrichment rule: public
+Business profile reads now include account `email` and `phone` to support
+profile/contact views. The regex route-boundary decision in this record remains
+accepted.

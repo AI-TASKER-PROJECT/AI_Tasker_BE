@@ -43,4 +43,6 @@ public class BusinessProfileEntity {
 
     // Note: Annotation này đánh dấu dữ liệu chỉ dùng để trả response, không lưu xuống bảng business_profiles.
     @Transient private String fullName;
+    @Transient private String email;
+    @Transient private String phone;
 }

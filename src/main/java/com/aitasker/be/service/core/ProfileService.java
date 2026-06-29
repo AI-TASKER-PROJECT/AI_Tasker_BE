@@ -136,6 +136,7 @@ public class ProfileService {
         accessService.requireRole("BUSINESS");
         Integer accountId = accessService.currentAccount().getAccountId();
         return businessProfileRepository.findByAccountId(accountId)
+                .map(this::attachBusinessAccountInfo)
                 .orElseThrow(() -> new NotFoundException("CHUA CO BUSINESS PROFILE"));
     }
 
@@ -155,6 +156,7 @@ public class ProfileService {
             accessService.requireRole("STAFF", "ADMIN", "BUSINESS");
         }
         return businessProfileRepository.findById(job.getBusinessId())
+                .map(this::attachBusinessAccountInfo)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
     }
 
@@ -195,7 +197,12 @@ public class ProfileService {
         return firebaseStorageService.createReadUrl(path);
     }
 
-    public List<BusinessProfileEntity> allBusinessProfiles() { accessService.requireRole("STAFF"); return businessProfileRepository.findAll(); }
+    public List<BusinessProfileEntity> allBusinessProfiles() {
+        accessService.requireRole("STAFF");
+        return businessProfileRepository.findAll().stream()
+                .map(this::attachBusinessAccountInfo)
+                .toList();
+    }
     // Note: Hàm `allExpertProfiles` cho STAFF quản trị hồ sơ và BUSINESS đọc thông tin expert khi xem proposal.
     public List<ExpertProfileEntity> allExpertProfiles() {
         accessService.requireRole("STAFF", "BUSINESS");
@@ -268,8 +275,11 @@ public class ProfileService {
 
     // Note: Hàm `attachBusinessAccountInfo` gắn thông tin tài khoản đọc được vào response business để trang cá nhân hiển thị đầy đủ.
     private BusinessProfileEntity attachBusinessAccountInfo(BusinessProfileEntity business) {
-        accountRepository.findById(business.getAccountId()).ifPresent(account ->
-                business.setFullName(account.getFullName()));
+        accountRepository.findById(business.getAccountId()).ifPresent(account -> {
+            business.setFullName(account.getFullName());
+            business.setEmail(account.getEmail());
+            business.setPhone(account.getPhone());
+        });
         return business;
     }
 
@@ -277,6 +287,8 @@ public class ProfileService {
     private ExpertProfileEntity attachExpertPublicAccountInfo(ExpertProfileEntity expert) {
         accountRepository.findById(expert.getAccountId()).ifPresent(account -> {
             expert.setFullName(account.getFullName());
+            expert.setEmail(account.getEmail());
+            expert.setPhone(account.getPhone());
             expert.setTitle("Chuyên gia AI");
         });
         return expert;
@@ -286,6 +298,7 @@ public class ProfileService {
     private ExpertProfileEntity attachExpertAccountInfo(ExpertProfileEntity expert) {
         accountRepository.findById(expert.getAccountId()).ifPresent(account -> {
             expert.setFullName(account.getFullName());
+            expert.setEmail(account.getEmail());
             expert.setPhone(account.getPhone());
             expert.setTitle("Chuyên gia AI");
         });
