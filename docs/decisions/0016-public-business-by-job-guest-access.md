@@ -65,6 +65,8 @@ Tradeoffs:
 - Public surface area of the API increases by one route.
 - `rejectionReason` and `businessLicenseUrl` remain on the preserved entity
   surface (same tradeoff as decision 0015; follow-up public-DTO candidate).
+- Decision 0021 now also exposes account `email` and `phone` on this public
+  Business profile read for `OPEN` jobs.
 
 ## Follow-Up
 

@@ -41,6 +41,7 @@ public class ExpertProfileEntity {
 
     // Note: Annotation này đánh dấu dữ liệu chỉ dùng để trả response, không lưu xuống bảng expert_profiles.
     @Transient private String fullName;
+    @Transient private String email;
     // Note: Annotation này đánh dấu dữ liệu chỉ dùng để trả response, không lưu xuống bảng expert_profiles.
     @Transient private String phone;
     // Note: Annotation này đánh dấu dữ liệu chỉ dùng để trả response, không lưu xuống bảng expert_profiles.

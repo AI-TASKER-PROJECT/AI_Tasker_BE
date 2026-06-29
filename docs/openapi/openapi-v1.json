@@ -3962,6 +3962,9 @@
           "fullName": {
             "type": "string"
           },
+          "email": {
+            "type": "string"
+          },
           "phone": {
             "type": "string"
           },
@@ -4028,6 +4031,15 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
           }
         }
       },

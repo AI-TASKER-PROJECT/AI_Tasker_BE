@@ -3,8 +3,8 @@
 Tai lieu nay liet ke API theo dung thu tu tag hien thi tren Swagger UI sau khi da sap xep lai theo luong nghiep vu.
 Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sorter=alpha`.
 
-- Tong so REST endpoint trong Swagger runtime: **133**.
-- Public endpoint: **22**.
+- Tong so REST endpoint trong Swagger runtime: **134**.
+- Public endpoint: **23**.
 - Endpoint can Bearer JWT: **111**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
@@ -40,13 +40,13 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/api/v1/profiles/business` | Bearer JWT | Lay danh sach business profiles cho operator. |
-| 2 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Public | Public lay business profile theo job OPEN. |
-| 3 | GET | `/api/v1/profiles/business/me` | Bearer JWT | Lay KYB profile cua business dang dang nhap. |
-| 4 | GET | `/api/v1/profiles/business/{businessId}` | Public | Public lay business profile theo id. |
-| 5 | GET | `/api/v1/profiles/expert` | Bearer JWT | Lay danh sach expert profiles cho operator. |
-| 6 | GET | `/api/v1/profiles/expert/me` | Bearer JWT | Lay KYC profile cua expert dang dang nhap. |
-| 7 | GET | `/api/v1/profiles/expert/{expertId}` | Bearer JWT | Lay expert profile theo id. |
+| 1 | GET | `/api/v1/profiles/business` | Bearer JWT | STAFF lay danh sach business profiles, tra kem `fullName`, `email`, `phone`. |
+| 2 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Public | Public lay business profile theo job OPEN, tra kem `fullName`, `email`, `phone`. |
+| 3 | GET | `/api/v1/profiles/business/me` | Bearer JWT | BUSINESS lay KYB profile cua minh, tra kem `fullName`, `email`, `phone`. |
+| 4 | GET | `/api/v1/profiles/business/{businessId}` | Public | Public lay business profile theo id, tra kem `fullName`, `email`, `phone`. |
+| 5 | GET | `/api/v1/profiles/expert` | Bearer JWT | STAFF/BUSINESS lay danh sach expert profiles, tra kem `fullName`, `email`, `phone`, `title`. |
+| 6 | GET | `/api/v1/profiles/expert/me` | Bearer JWT | EXPERT lay KYC profile cua minh, tra kem `fullName`, `email`, `phone`, `title`. |
+| 7 | GET | `/api/v1/profiles/expert/{expertId}` | Bearer JWT | EXPERT/BUSINESS/STAFF/ADMIN lay expert profile theo id, tra kem `fullName`, `email`, `phone`, `title`. |
 | 8 | GET | `/api/v1/profiles/files/view-url` | Bearer JWT | Tao signed/view URL cho file Firebase/storage. |
 | 9 | GET | `/api/v1/profiles/portfolio` | Bearer JWT | Lay danh sach portfolio cho operator. |
 | 10 | GET | `/api/v1/profiles/portfolio/me` | Bearer JWT | Lay portfolio cua expert dang dang nhap. |

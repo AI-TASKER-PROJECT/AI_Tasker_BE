@@ -170,7 +170,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void businessProfileById_shouldReturnProfileWithFullNameOnly() {
+    void businessProfileById_shouldReturnProfileWithContactInfo() {
         Integer businessId = 1;
         Integer accountId = 10;
         BusinessProfileEntity profile = BusinessProfileEntity.builder()
@@ -186,9 +186,30 @@ class ProfileServiceTest {
 
         BusinessProfileEntity result = profileService.businessProfileById(businessId);
 
-        assertEquals("Owner Name", result.getFullName());
+        assertBusinessContact(result, "Owner Name", "e@x.com", "090");
         assertEquals("Test Corp", result.getCompanyName());
         verifyNoInteractions(accessService);
+    }
+
+    @Test
+    void currentBusinessProfile_shouldReturnOwnProfileWithContactInfo() {
+        Integer accountId = 10;
+        BusinessProfileEntity profile = BusinessProfileEntity.builder()
+                .businessId(1).accountId(accountId)
+                .companyName("My Corp").taxCode("1234567890")
+                .kybStatus("Approved").build();
+        AccountEntity account = AccountEntity.builder()
+                .accountId(accountId).fullName("Business Owner").email("owner@x.com").phone("091")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+        BusinessProfileEntity result = profileService.currentBusinessProfile();
+
+        assertBusinessContact(result, "Business Owner", "owner@x.com", "091");
+        verify(accessService).requireRole("BUSINESS");
     }
 
     @Test
@@ -200,7 +221,7 @@ class ProfileServiceTest {
                 .build();
 
         when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
-        when(accountRepository.findById(anyInt())).thenReturn(Optional.of(AccountEntity.builder().fullName("N").build()));
+        when(accountRepository.findById(anyInt())).thenReturn(Optional.of(AccountEntity.builder().fullName("N").email("n@x.com").phone("090").build()));
 
         profileService.businessProfileById(businessId);
 
@@ -217,10 +238,13 @@ class ProfileServiceTest {
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
         when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(AccountEntity.builder()
+                .accountId(10).fullName("Open Owner").email("open@corp.com").phone("092").build()));
 
         BusinessProfileEntity result = profileService.businessProfileByJob(jobId);
 
         assertEquals(businessId, result.getBusinessId());
+        assertBusinessContact(result, "Open Owner", "open@corp.com", "092");
         verifyNoInteractions(accessService);
     }
 
@@ -235,11 +259,35 @@ class ProfileServiceTest {
         doNothing().when(accessService).requireRole(anyString(), anyString(), anyString());
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
         when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(11)).thenReturn(Optional.of(AccountEntity.builder()
+                .accountId(11).fullName("Closed Owner").email("closed@corp.com").phone("093").build()));
 
         BusinessProfileEntity result = profileService.businessProfileByJob(jobId);
 
         assertEquals(businessId, result.getBusinessId());
+        assertBusinessContact(result, "Closed Owner", "closed@corp.com", "093");
         verify(accessService).requireRole("STAFF", "ADMIN", "BUSINESS");
+    }
+
+    @Test
+    void allBusinessProfiles_shouldReturnListWithContactInfo() {
+        BusinessProfileEntity first = BusinessProfileEntity.builder()
+                .businessId(1).accountId(10).companyName("A").taxCode("t1").kybStatus("Approved").build();
+        BusinessProfileEntity second = BusinessProfileEntity.builder()
+                .businessId(2).accountId(11).companyName("B").taxCode("t2").kybStatus("Pending").build();
+
+        when(businessProfileRepository.findAll()).thenReturn(List.of(first, second));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(AccountEntity.builder()
+                .accountId(10).fullName("Owner A").email("a@corp.com").phone("090").build()));
+        when(accountRepository.findById(11)).thenReturn(Optional.of(AccountEntity.builder()
+                .accountId(11).fullName("Owner B").email("b@corp.com").phone("091").build()));
+
+        List<BusinessProfileEntity> result = profileService.allBusinessProfiles();
+
+        assertEquals(2, result.size());
+        assertBusinessContact(result.get(0), "Owner A", "a@corp.com", "090");
+        assertBusinessContact(result.get(1), "Owner B", "b@corp.com", "091");
+        verify(accessService).requireRole("STAFF");
     }
 
     @Test
@@ -266,7 +314,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void expertProfileById_shouldReturnProfileWithPublicAccountInfoOnly() {
+    void expertProfileById_shouldReturnProfileWithContactInfo() {
         Integer expertId = 2;
         Integer accountId = 20;
         ExpertProfileEntity profile = ExpertProfileEntity.builder()
@@ -283,9 +331,7 @@ class ProfileServiceTest {
 
         ExpertProfileEntity result = profileService.expertProfileById(expertId);
 
-        assertEquals("Expert Name", result.getFullName());
-        assertEquals("Chuyên gia AI", result.getTitle());
-        assertNull(result.getPhone());
+        assertExpertContact(result, "Expert Name", "expert@test.com", "091");
         assertEquals(5, result.getYearsOfExperience());
     }
 
@@ -299,11 +345,55 @@ class ProfileServiceTest {
 
         doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
         when(expertProfileRepository.findById(expertId)).thenReturn(Optional.of(profile));
-        when(accountRepository.findById(anyInt())).thenReturn(Optional.of(AccountEntity.builder().fullName("N").build()));
+        when(accountRepository.findById(anyInt())).thenReturn(Optional.of(AccountEntity.builder().fullName("N").email("n@x.com").phone("090").build()));
 
         profileService.expertProfileById(expertId);
 
         verify(accessService).requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
+    }
+
+    @Test
+    void currentExpertProfile_shouldReturnOwnProfileWithEmail() {
+        Integer accountId = 20;
+        AccountEntity account = AccountEntity.builder()
+                .accountId(accountId).fullName("Expert Self").email("self@expert.com").phone("094")
+                .build();
+        ExpertProfileEntity profile = ExpertProfileEntity.builder()
+                .expertId(2).accountId(accountId).nationalId("0123456789")
+                .portfolioUrl("https://portfolio.example.com")
+                .yearsOfExperience(4).kycStatus("Approved").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(expertProfileRepository.findByAccountId(accountId)).thenReturn(Optional.of(profile));
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+        ExpertProfileEntity result = profileService.currentExpertProfile();
+
+        assertExpertContact(result, "Expert Self", "self@expert.com", "094");
+        verify(accessService).requireRole("EXPERT");
+    }
+
+    @Test
+    void allExpertProfiles_shouldReturnListWithEmail() {
+        ExpertProfileEntity first = ExpertProfileEntity.builder()
+                .expertId(1).accountId(20).nationalId("n1").portfolioUrl("p1")
+                .yearsOfExperience(3).kycStatus("Approved").build();
+        ExpertProfileEntity second = ExpertProfileEntity.builder()
+                .expertId(2).accountId(21).nationalId("n2").portfolioUrl("p2")
+                .yearsOfExperience(5).kycStatus("Pending").build();
+
+        when(expertProfileRepository.findAll()).thenReturn(List.of(first, second));
+        when(accountRepository.findById(20)).thenReturn(Optional.of(AccountEntity.builder()
+                .accountId(20).fullName("Expert A").email("a@expert.com").phone("095").build()));
+        when(accountRepository.findById(21)).thenReturn(Optional.of(AccountEntity.builder()
+                .accountId(21).fullName("Expert B").email("b@expert.com").phone("096").build()));
+
+        List<ExpertProfileEntity> result = profileService.allExpertProfiles();
+
+        assertEquals(2, result.size());
+        assertExpertContact(result.get(0), "Expert A", "a@expert.com", "095");
+        assertExpertContact(result.get(1), "Expert B", "b@expert.com", "096");
+        verify(accessService).requireRole("STAFF", "BUSINESS");
     }
 
     @Test
@@ -399,5 +489,18 @@ class ProfileServiceTest {
         assertNull(saved.getRejectionReason());
         verify(accountRepository).save(argThat(account -> "Approved".equals(account.getStatus())));
         verify(notificationService).notifyProfileReviewed(profileAccountId, staffAccountId, "BUSINESS", "Approved");
+    }
+
+    private void assertBusinessContact(BusinessProfileEntity result, String fullName, String email, String phone) {
+        assertEquals(fullName, result.getFullName());
+        assertEquals(email, result.getEmail());
+        assertEquals(phone, result.getPhone());
+    }
+
+    private void assertExpertContact(ExpertProfileEntity result, String fullName, String email, String phone) {
+        assertEquals(fullName, result.getFullName());
+        assertEquals(email, result.getEmail());
+        assertEquals(phone, result.getPhone());
+        assertNotNull(result.getTitle());
     }
 }

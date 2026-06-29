@@ -111,12 +111,12 @@ docker compose up -d
 4. EXPERT XEM TRANG CA NHAN DOANH NGHIEP
 - `GET {{base_url}}/api/v1/profiles/business/{businessId}`
 - AUTH: `{{expert_token}}`
-- EXPECT: `200`, tra ve `BusinessProfileEntity` kem `fullName`
+- EXPECT: `200`, tra ve `BusinessProfileEntity` kem `fullName`, `email`, `phone`
 
 5. BUSINESS XEM TRANG CA NHAN CHUYEN GIA
 - `GET {{base_url}}/api/v1/profiles/expert/{expertId}`
 - AUTH: `{{business_token}}`
-- EXPECT: `200`, tra ve `ExpertProfileEntity` kem `fullName`, `title`, khong tra `phone`
+- EXPECT: `200`, tra ve `ExpertProfileEntity` kem `fullName`, `email`, `phone`, `title`
 
 6. ADMIN/STAFF DUYET HO SO  
 - `POST {{base_url}}/api/v1/profiles/approve/BUSINESS/{id}?status=Approved`  
