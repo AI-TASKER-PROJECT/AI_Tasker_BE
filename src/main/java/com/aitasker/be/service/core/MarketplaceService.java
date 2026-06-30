@@ -52,7 +52,6 @@ public class MarketplaceService {
     private final TechnologyRepository technologyRepository;
     private final JobTechnologyRepository jobTechnologyRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
-    private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     private final PaymentWalletService paymentWalletService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
@@ -336,7 +335,7 @@ public class MarketplaceService {
             milestone.setContractId(null);
             if (milestone.getStatus() == null) milestone.setStatus("PENDING");
             MilestoneEntity saved = milestoneRepository.save(milestone);
-            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getCriteriaIds());
+            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getAcceptanceCriteria());
             defaultOrderIndex++;
         }
     }
@@ -344,7 +343,6 @@ public class MarketplaceService {
     private void replaceDraftMilestones(JobEntity job, List<MilestoneEntity> milestones) {
         List<MilestoneEntity> existing = milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId());
         for (MilestoneEntity old : existing) {
-            milestoneCriteriaRepository.deleteByIdMilestoneId(old.getMilestoneId());
             milestoneRepository.delete(old);
         }
         milestoneRepository.flush();
@@ -362,7 +360,7 @@ public class MarketplaceService {
             milestone.setContractId(null);
             if (milestone.getStatus() == null) milestone.setStatus("PENDING");
             MilestoneEntity saved = milestoneRepository.save(milestone);
-            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getCriteriaIds());
+            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getAcceptanceCriteria());
             defaultOrderIndex++;
         }
     }
@@ -519,32 +517,28 @@ public class MarketplaceService {
     }
 
     private MilestoneEntity attachMilestoneCriteria(MilestoneEntity milestone) {
-        List<Integer> criteriaIds = milestoneCriteriaRepository.findByIdMilestoneId(milestone.getMilestoneId()).stream()
-                .map(item -> item.getId().getCriteriaId())
-                .toList();
-        milestone.setCriteriaIds(criteriaIds);
-        if (criteriaIds.isEmpty()) {
-            milestone.setCriteria(List.of());
-            return milestone;
-        }
-        Map<Integer, AcceptanceCriteriaEntity> criteriaById = criteriaRepository.findAllById(criteriaIds).stream()
-                .collect(Collectors.toMap(AcceptanceCriteriaEntity::getCriteriaId, item -> item));
-        milestone.setCriteria(criteriaIds.stream()
-                .map(criteriaById::get)
-                .filter(Objects::nonNull)
+        List<AcceptanceCriteriaEntity> criteria = criteriaRepository
+                .findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(milestone.getMilestoneId());
+        milestone.setCriteria(criteria);
+        milestone.setAcceptanceCriteria(criteria.stream()
+                .map(AcceptanceCriteriaEntity::getDescription)
                 .toList());
         return milestone;
     }
 
-    private void replaceMilestoneCriteria(Integer milestoneId, List<Integer> criteriaIds) {
-        milestoneCriteriaRepository.deleteByIdMilestoneId(milestoneId);
-        if (criteriaIds == null || criteriaIds.isEmpty()) return;
-        for (Integer criteriaId : new LinkedHashSet<>(criteriaIds)) {
-            AcceptanceCriteriaEntity criteria = criteriaRepository.findById(criteriaId)
-                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCEPTANCE CRITERIA " + criteriaId));
-            if (!Boolean.TRUE.equals(criteria.getIsActive())) throw new AppException("ACCEPTANCE CRITERIA KHONG CON HOAT DONG " + criteriaId);
-            milestoneCriteriaRepository.save(MilestoneAcceptanceCriteriaEntity.builder()
-                    .id(new MilestoneAcceptanceCriteriaId(milestoneId, criteriaId))
+    private void replaceMilestoneCriteria(Integer milestoneId, List<String> descriptions) {
+        criteriaRepository.deleteByMilestoneId(milestoneId);
+        if (descriptions == null || descriptions.isEmpty()) return;
+        LinkedHashSet<String> unique = new LinkedHashSet<>();
+        int sortOrder = 1;
+        for (String description : descriptions) {
+            if (description == null || description.isBlank()) continue;
+            String normalized = description.trim();
+            if (!unique.add(normalized.toLowerCase(java.util.Locale.ROOT))) continue;
+            criteriaRepository.save(AcceptanceCriteriaEntity.builder()
+                    .milestoneId(milestoneId)
+                    .description(normalized)
+                    .sortOrder(sortOrder++)
                     .build());
         }
     }

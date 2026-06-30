@@ -86,7 +86,11 @@ public class AiSowGenerationService {
         return response != null
                 && response.getSow() != null
                 && response.getMilestones() != null
-                && !response.getMilestones().isEmpty();
+                && !response.getMilestones().isEmpty()
+                && response.getMilestones().stream()
+                .allMatch(milestone -> milestone.getAcceptanceCriteria() != null
+                        && milestone.getAcceptanceCriteria().stream()
+                        .anyMatch(criterion -> criterion != null && !criterion.isBlank()));
     }
 
     // Note: Hàm chuẩn hóa cuối cùng: questions tối đa 3, needMoreInfo theo questions, assumptions không null,
@@ -104,8 +108,24 @@ public class AiSowGenerationService {
         }
 
         normalizeAssumptions(response.getSow());
+        response.getMilestones().forEach(this::normalizeAcceptanceCriteria);
         normalizeMilestoneDuration(response, request.getDuration(), request.getDurationUnit());
         normalizeMilestoneBudget(response, request.getBudget());
+    }
+
+    private void normalizeAcceptanceCriteria(MilestoneDto milestone) {
+        if (milestone == null || milestone.getAcceptanceCriteria() == null) {
+            return;
+        }
+        LinkedHashMap<String, String> unique = new LinkedHashMap<>();
+        for (String criterion : milestone.getAcceptanceCriteria()) {
+            if (criterion == null || criterion.isBlank()) {
+                continue;
+            }
+            String trimmed = criterion.trim();
+            unique.putIfAbsent(trimmed.toLowerCase(java.util.Locale.ROOT), trimmed);
+        }
+        milestone.setAcceptanceCriteria(new ArrayList<>(unique.values()));
     }
 
     // Note: Hàm lọc bỏ câu hỏi null/rỗng và câu hỏi trùng (không phân biệt hoa thường/khoảng trắng),
@@ -185,7 +205,11 @@ public class AiSowGenerationService {
                    hoi thi needMoreInfo=false va questions=[].
                 6. Khong bao gio bo sot sow hay milestones vi co questions.
                 7. Khong trung lap thong tin milestone guidance vao cac field sow.
-                8. Neu du thong tin:
+                8. Voi MOI milestone, bat buoc sinh danh sach acceptanceCriteria
+                   rieng gom cac dieu kien nghiem thu cu the, do duoc va phu hop
+                   voi san pham ban giao cua milestone do. Khong dung catalog hoac
+                   danh sach tieu chi mac dinh giong nhau cho moi milestone.
+                9. Neu du thong tin:
                    - Viet Statement of Work chuyen nghiep.
                    - Chia milestone.
                    - Uoc luong thoi luong.
@@ -195,8 +219,9 @@ public class AiSowGenerationService {
                         BUOC PHUC HOI NOI BO: Phan hinh truoc chi co questions va thieu
                         sow/milestones. Lan nay bat buoc sinh ngay SoW day du va
                         milestones khong rong, ghi cac gia dinh suy luan vao
-                        sow.assumptions, va chi tra toi da 3 cau hoi optional. Khong
-                        duoc tra phan hinh question-only mot lan nua.
+                        sow.assumptions, sinh acceptanceCriteria rieng cho tung
+                        milestone, va chi tra toi da 3 cau hoi optional. Khong duoc
+                        tra phan hinh question-only mot lan nua.
                         """ : "") + """
 
                 Bat buoc tra ve JSON hop le, khong markdown, khong giai thich ngoai JSON.
@@ -220,7 +245,10 @@ public class AiSowGenerationService {
                       "description": "string",
                       "duration": 1,
                       "durationUnit": "tuan",
-                      "budget": 30000000
+                      "budget": 30000000,
+                      "acceptanceCriteria": [
+                        "string"
+                      ]
                     }
                   ]
                 }
@@ -280,6 +308,15 @@ public class AiSowGenerationService {
             normalizeArrayField(sow, "assumptions");
             normalizeArrayField(sow, "outOfScope");
             ensureAssumptionsArray(sow);
+        }
+
+        JsonNode milestonesNode = response.get("milestones");
+        if (milestonesNode instanceof ArrayNode milestones) {
+            for (JsonNode milestoneNode : milestones) {
+                if (milestoneNode instanceof ObjectNode milestone) {
+                    normalizeArrayField(milestone, "acceptanceCriteria");
+                }
+            }
         }
     }
 

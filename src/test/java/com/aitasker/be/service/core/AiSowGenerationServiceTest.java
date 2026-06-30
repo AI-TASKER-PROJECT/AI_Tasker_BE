@@ -173,6 +173,8 @@ class AiSowGenerationServiceTest {
         assertTrue(prompt.contains("needMoreInfo=true Chi khi questions khong rong"));
         // Khong bo sot sow/milestones vi co questions
         assertTrue(prompt.contains("Khong bao gio bo sot sow hay milestones vi co questions"));
+        assertTrue(prompt.contains("acceptanceCriteria"));
+        assertTrue(prompt.contains("Khong dung catalog"));
     }
 
     @Test
@@ -341,6 +343,7 @@ class AiSowGenerationServiceTest {
                               "duration": 1,
                               "durationUnit": "tuan",
                               "budget": 50,
+                              "acceptanceCriteria": ["Bot tra loi dung du lieu"],
                               "tasks": []
                             },
                             {
@@ -349,6 +352,7 @@ class AiSowGenerationServiceTest {
                               "duration": 1,
                               "durationUnit": "tuan",
                               "budget": 50,
+                              "acceptanceCriteria": ["Bot duoc trien khai thanh cong"],
                               "tasks": []
                             }
                           ]
@@ -456,7 +460,8 @@ class AiSowGenerationServiceTest {
                               "description": "Develop bot",
                               "duration": 3,
                               "durationUnit": "tuan",
-                              "budget": 100
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot API hoat dong dung contract"]
                             }
                           ]
                         }
@@ -470,6 +475,8 @@ class AiSowGenerationServiceTest {
         assertEquals(1, response.getMilestones().size());
         assertEquals("AI support bot", response.getSow().getTitle());
         assertEquals(List.of("API don hang da co san"), response.getSow().getAssumptions());
+        assertEquals(List.of("Bot API hoat dong dung contract"),
+                response.getMilestones().get(0).getAcceptanceCriteria());
     }
 
     @Test
@@ -498,7 +505,8 @@ class AiSowGenerationServiceTest {
                               "description": "Develop bot",
                               "duration": 1,
                               "durationUnit": "tuan",
-                              "budget": 100
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot tra loi dung knowledge base"]
                             }
                           ]
                         }
@@ -542,7 +550,8 @@ class AiSowGenerationServiceTest {
                               "description": "Build ETL",
                               "duration": 1,
                               "durationUnit": "tuan",
-                              "budget": 100
+                              "budget": 100,
+                              "acceptanceCriteria": ["Pipeline xu ly du lieu hang ngay"]
                             }
                           ]
                         }
@@ -584,7 +593,8 @@ class AiSowGenerationServiceTest {
                               "description": "Develop bot",
                               "duration": 1,
                               "durationUnit": "tuan",
-                              "budget": 100
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot API hoat dong dung contract"]
                             }
                           ]
                         }
@@ -633,7 +643,8 @@ class AiSowGenerationServiceTest {
                               "description": "Develop bot",
                               "duration": 1,
                               "durationUnit": "tuan",
-                              "budget": 100
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot API hoat dong dung contract"]
                             }
                           ]
                         }
@@ -684,7 +695,8 @@ class AiSowGenerationServiceTest {
                       "description": "Develop bot",
                       "duration": 1,
                       "durationUnit": "tuan",
-                      "budget": 100
+                      "budget": 100,
+                      "acceptanceCriteria": ["Bot API hoat dong dung contract"]
                     }
                   ]
                 }

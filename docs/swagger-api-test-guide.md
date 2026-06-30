@@ -479,7 +479,10 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
       "status": "PENDING",
       "duration": 5,
       "durationUnit": "DAY",
-      "criteriaIds": [1, 2]
+      "acceptanceCriteria": [
+        "Tai lieu Swagger duoc cap nhat",
+        "Tat ca API trong pham vi co test pass"
+      ]
     }
   ]
 }
@@ -607,7 +610,7 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
       "status": "PENDING",
       "duration": 3,
       "durationUnit": "DAY",
-      "criteriaIds": [1]
+      "acceptanceCriteria": ["Milestone dat ket qua da mo ta"]
     }
   ]
 }
@@ -1164,16 +1167,14 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
   - `403`: Dang nhap roi nhung khong dung role/quyen/ownership theo service.
   - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
 
-### POST `/api/v1/criteria`
-- Giai thich: Tao acceptance criteria.
-- Huong dan test: Dung token ADMIN/STAFF hoac role duoc service cho phep, doi `criteriaCode` moi, dan body raw rieng ben duoi.
+### POST `/api/v1/milestones/{milestoneId}/criteria`
+- Giai thich: Business them acceptance criteria rieng cho milestone.
+- Huong dan test: Dung token Business so huu job, nhap `milestoneId` chua co contract.
 - Body raw:
 ```json
 {
-  "criteriaCode": "API_DOC_COMPLETE",
   "description": "Swagger docs da day du va endpoint test pass",
-  "isActive": true,
-  "sortOrder": 10
+  "sortOrder": 1
 }
 ```
 - Ma phan hoi thuong gap:
@@ -1182,6 +1183,20 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
   - `401`: Chua dang nhap, token het han hoac token khong hop le.
   - `403`: Dang nhap roi nhung khong dung role/quyen/ownership theo service.
   - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
+
+### PUT `/api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+- Giai thich: Business sua noi dung hoac thu tu mot acceptance criteria.
+- Body raw:
+```json
+{
+  "description": "Swagger docs day du va integration test pass",
+  "sortOrder": 2
+}
+```
+
+### DELETE `/api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+- Giai thich: Business xoa mot acceptance criteria truoc khi job co contract.
+- Body raw: Khong co body raw.
 
 ### POST `/api/v1/deliverables`
 - Giai thich: Expert submit deliverable cho milestone.
@@ -1260,7 +1275,10 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
   "status": "PENDING",
   "duration": 7,
   "durationUnit": "DAY",
-  "criteriaIds": [1, 2]
+  "acceptanceCriteria": [
+    "San pham dung mo ta",
+    "Kiem thu nghiem thu thanh cong"
+  ]
 }
 ```
 - Ma phan hoi thuong gap:
@@ -1360,7 +1378,10 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
   "status": "IN_PROGRESS",
   "duration": 10,
   "durationUnit": "DAY",
-  "criteriaIds": [1, 2]
+  "acceptanceCriteria": [
+    "San pham dung mo ta",
+    "Kiem thu nghiem thu thanh cong"
+  ]
 }
 ```
 - Ma phan hoi thuong gap:
@@ -1431,16 +1452,8 @@ Tai lieu nay huong dan test API truc tiep tren Swagger UI theo dung thu tu flow 
 
 ## Catalog & Reference Flow
 
-- Muc tieu flow: Domain, skill, technology va acceptance criteria.
-
-### GET `/api/v1/acceptance-criteria`
-- Giai thich: Lay danh muc acceptance criteria.
-- Huong dan test: Khong can token, query `activeOnly=true`, kiem tra chi tra criteria active.
-- Body raw: Khong co body raw.
-- Ma phan hoi thuong gap:
-  - `200`: Thanh cong, tra ve du lieu dung voi schema dang hien thi tren Swagger.
-  - `400`: Loi validation hoac business rule theo state du lieu hien tai trong database.
-  - `500`: Loi he thong, parse du lieu hoac du lieu nen khong dong nhat.
+- Muc tieu flow: Domain, skill va technology. Acceptance criteria khong con la
+  catalog; chung thuoc rieng tung milestone.
 
 ### GET `/api/v1/domains`
 - Giai thich: Lay danh muc domain.

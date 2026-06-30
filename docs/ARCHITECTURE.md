@@ -33,7 +33,8 @@ Current product domains:
 - Business KYB and expert KYC profiles.
 - Expert portfolio and certificate/license file handling.
 - Marketplace jobs, proposals, and proposal review.
-- Domain, skill, technology, and acceptance-criteria catalogs.
+- Domain, skill, and technology catalogs.
+- AI-generated, Business-editable acceptance criteria owned by milestones.
 - AI SoW generation and job assistant support.
 - Expert candidate recommendation, matching, and Business-selected expert
   invitation notifications.
@@ -120,8 +121,8 @@ The following service boundaries are established and should be preserved:
   certificate, and expert portfolio file uploads.
 - `service/core/MarketplaceService`: job lifecycle, proposal submission, and
   proposal review.
-- `service/core/CatalogService`: domain, skill, technology, acceptance criteria,
-  and job metadata mappings.
+- `service/core/CatalogService`: domain, skill, technology, and job metadata
+  mappings.
 - `service/core/ContractExecutionService`: contract draft/signature,
   NDA, milestones, criteria, deliverables, finance-adjacent legacy
   transactions, disputes, and SLA simulation.
@@ -203,7 +204,7 @@ Core data concepts include:
 - `jobs`, `proposals`
 - `domains`, `skills`, `technologies`
 - `job_domains`, `job_skills`, `job_technologies`
-- `sows`, `acceptance_criteria`, `milestone_acceptance_criteria`
+- `sows`, `acceptance_criteria` (milestone-owned)
 - `contracts`, `contract_change_requests`, `milestones`,
   `contract_milestones`, `deliverables`
 - `transactions`, `payment_orders`, `wallet_transactions`, `system_wallets`,
@@ -253,6 +254,9 @@ Current rules to preserve:
   operations must check participant or operator access.
 - Business users can create deposit transactions for their own eligible
   workflow.
+- AI generates acceptance criteria separately for every milestone. The owning
+  Business can add, update, delete, or reorder them before a contract exists.
+  Criteria are not selected from a global catalog.
 - Payout/refund/system finance operations are admin/staff responsibilities.
 - Catalog creation/update is admin-only.
 - Job catalog assignments can be changed by admin or the owning business.

@@ -138,7 +138,7 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 | 13 | POST | `/api/v1/contracts/{contractId}/reject` | Bearer JWT | Expert reject contract draft/pending. |
 | 14 | POST | `/api/v1/contracts/{contractId}/sign` | Bearer JWT | Ky hop dong cho business hoac expert. |
 | 15 | POST | `/api/v1/contracts/{contractId}/terminate` | Bearer JWT | Ket thuc contract co ly do. |
-| 16 | POST | `/api/v1/criteria` | Bearer JWT | Tao acceptance criteria. |
+| 16 | POST | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Business them acceptance criteria cho milestone. |
 | 17 | POST | `/api/v1/deliverables` | Bearer JWT | Expert submit deliverable cho milestone. |
 | 18 | POST | `/api/v1/disputes` | Bearer JWT | Tao dispute cho contract/milestone. |
 | 19 | POST | `/api/v1/disputes/{disputeId}/demo-testing` | Bearer JWT | Ghi nhan ket qua demo testing cho dispute. |
@@ -152,6 +152,8 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 | 27 | PATCH | `/api/v1/disputes/{disputeId}/resolve` | Bearer JWT | Resolve dispute bang proposed action. |
 | 28 | PATCH | `/api/v1/milestones/{milestoneId}` | Bearer JWT | Cap nhat milestone. |
 | 29 | PATCH | `/api/v1/transactions/{transactionId}/status` | Bearer JWT | Cap nhat status transaction legacy. |
+| 30 | PUT | `/api/v1/milestones/{milestoneId}/criteria/{criteriaId}` | Bearer JWT | Business sua acceptance criteria cua milestone. |
+| 31 | DELETE | `/api/v1/milestones/{milestoneId}/criteria/{criteriaId}` | Bearer JWT | Business xoa acceptance criteria cua milestone. |
 
 ## Notification Flow
 
@@ -166,20 +168,19 @@ Thu tu hien tai duoc khoa trong `OpenApiConfig` va khong con phu thuoc `tags-sor
 
 ## Catalog & Reference Flow
 
-- Giai thich flow: Domain, skill, technology va acceptance criteria.
+- Giai thich flow: Domain, skill va technology.
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/api/v1/acceptance-criteria` | Public | Lay danh muc acceptance criteria. |
-| 2 | GET | `/api/v1/domains` | Public | Lay danh muc domain. |
-| 3 | GET | `/api/v1/skills` | Public | Lay danh muc skill. |
-| 4 | GET | `/api/v1/technologies` | Bearer JWT | Lay danh muc technology. |
-| 5 | POST | `/api/v1/domains` | Bearer JWT | Tao domain moi. |
-| 6 | POST | `/api/v1/skills` | Bearer JWT | Tao skill moi. |
-| 7 | POST | `/api/v1/technologies` | Bearer JWT | Tao technology moi. |
-| 8 | PATCH | `/api/v1/domains/{domainId}` | Bearer JWT | Cap nhat domain. |
-| 9 | PATCH | `/api/v1/skills/{skillId}` | Bearer JWT | Cap nhat skill. |
-| 10 | PATCH | `/api/v1/technologies/{technologyId}` | Bearer JWT | Cap nhat technology. |
+| 1 | GET | `/api/v1/domains` | Public | Lay danh muc domain. |
+| 2 | GET | `/api/v1/skills` | Public | Lay danh muc skill. |
+| 3 | GET | `/api/v1/technologies` | Bearer JWT | Lay danh muc technology. |
+| 4 | POST | `/api/v1/domains` | Bearer JWT | Tao domain moi. |
+| 5 | POST | `/api/v1/skills` | Bearer JWT | Tao skill moi. |
+| 6 | POST | `/api/v1/technologies` | Bearer JWT | Tao technology moi. |
+| 7 | PATCH | `/api/v1/domains/{domainId}` | Bearer JWT | Cap nhat domain. |
+| 8 | PATCH | `/api/v1/skills/{skillId}` | Bearer JWT | Cap nhat skill. |
+| 9 | PATCH | `/api/v1/technologies/{technologyId}` | Bearer JWT | Cap nhat technology. |
 
 ## AI & Matching Flow
 

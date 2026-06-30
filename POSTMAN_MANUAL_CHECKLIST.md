@@ -193,15 +193,17 @@ docker compose up -d
 - LAY `milestoneId` -> ENV `milestone_id`
 
 6. TAO ACCEPTANCE CRITERIA  
-- `POST {{base_url}}/api/v1/criteria`  
+- `POST {{base_url}}/api/v1/milestones/{{milestone_id}}/criteria`
 - AUTH: `{{business_token}}
 ```json
 {
-  "milestoneId": {{milestone_id}},
   "description": "MODEL DAT DO CHINH XAC TOI THIEU 92% TREN TAP KIEM THU",
-  "isPassed": false
+  "sortOrder": 1
 }
 ```
+
+- Sua: `PUT {{base_url}}/api/v1/milestones/{{milestone_id}}/criteria/{criteriaId}`
+- Xoa: `DELETE {{base_url}}/api/v1/milestones/{{milestone_id}}/criteria/{criteriaId}`
 
 7. SUBMIT DELIVERABLE  
 - `POST {{base_url}}/api/v1/deliverables`  

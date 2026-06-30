@@ -87,7 +87,7 @@ Alternate exits:
   `contract_milestones`. Displayed status comes from the live `milestones` table
   (via `job_milestone_id` lookup), falling back to `contract_milestones.status`
   when the linked milestone is missing. `criteriaSnapshot` is built from the
-  milestone's active acceptance criteria descriptions at contract creation time,
+  milestone-owned acceptance criteria descriptions at contract creation time,
   joined by newlines. `deliverableExpectation` is copied from the milestone
   `description` at contract creation time. Both snapshot fields stay stable after
   contract creation even if the source milestone or its acceptance criteria are
@@ -106,6 +106,10 @@ Alternate exits:
 - `POST /api/v1/deliverables`
 - `POST /api/v1/milestones/{milestoneId}/complete`
 - `POST /api/v1/milestones/sla-auto-approve`
+- `GET /api/v1/milestones/{milestoneId}/criteria`
+- `POST /api/v1/milestones/{milestoneId}/criteria`
+- `PUT /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+- `DELETE /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
 
 ## Notifications And Audit
 

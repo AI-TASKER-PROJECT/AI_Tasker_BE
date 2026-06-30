@@ -72,8 +72,7 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/v1/jobs",
                                 "/api/v1/domains",
-                                "/api/v1/skills",
-                                "/api/v1/acceptance-criteria"
+                                "/api/v1/skills"
                         ).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+")).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+/milestones")).permitAll()

@@ -6,6 +6,7 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
@@ -83,11 +84,36 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("CREATE MILESTONE SUCCESS", service.createMilestone(request)));
     }
 
-    // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
-    @PostMapping("/criteria")
-    // Note: Hàm `createCriteria` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<AcceptanceCriteriaEntity>> createCriteria(@RequestBody AcceptanceCriteriaEntity request) {
-        return ResponseEntity.ok(ApiResponse.success("CREATE ACCEPTANCE CRITERIA SUCCESS", service.createCriteria(request)));
+    @PostMapping("/milestones/{milestoneId}/criteria")
+    public ResponseEntity<ApiResponse<AcceptanceCriteriaEntity>> createCriteria(
+            @PathVariable Integer milestoneId,
+            @RequestBody AcceptanceCriteriaRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "CREATE ACCEPTANCE CRITERIA SUCCESS",
+                service.createCriteria(milestoneId, request)
+        ));
+    }
+
+    @PutMapping("/milestones/{milestoneId}/criteria/{criteriaId}")
+    public ResponseEntity<ApiResponse<AcceptanceCriteriaEntity>> updateCriteria(
+            @PathVariable Integer milestoneId,
+            @PathVariable Integer criteriaId,
+            @RequestBody AcceptanceCriteriaRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "UPDATE ACCEPTANCE CRITERIA SUCCESS",
+                service.updateCriteria(milestoneId, criteriaId, request)
+        ));
+    }
+
+    @DeleteMapping("/milestones/{milestoneId}/criteria/{criteriaId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCriteria(
+            @PathVariable Integer milestoneId,
+            @PathVariable Integer criteriaId
+    ) {
+        service.deleteCriteria(milestoneId, criteriaId);
+        return ResponseEntity.ok(ApiResponse.success("DELETE ACCEPTANCE CRITERIA SUCCESS", null));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

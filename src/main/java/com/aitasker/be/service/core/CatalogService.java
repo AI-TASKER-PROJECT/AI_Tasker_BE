@@ -36,7 +36,6 @@ public class CatalogService {
     private final JobDomainRepository jobDomainRepository;
     private final JobSkillRepository jobSkillRepository;
     private final JobTechnologyRepository jobTechnologyRepository;
-    private final AcceptanceCriteriaRepository acceptanceCriteriaRepository;
 
     // Note: Hàm `listDomains` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<DomainEntity> listDomains(Boolean activeOnly) {
@@ -54,12 +53,6 @@ public class CatalogService {
     public List<TechnologyEntity> listTechnologies(Boolean activeOnly) {
         if (Boolean.TRUE.equals(activeOnly)) return technologyRepository.findByIsActiveTrueOrderBySortOrderAscTechnologyNameAsc();
         return technologyRepository.findAll();
-    }
-
-    // Note: Hàm `listAcceptanceCriteria` trả danh mục tiêu chí nghiệm thu do nền tảng cung cấp để business chọn cho milestone.
-    public List<AcceptanceCriteriaEntity> listAcceptanceCriteria(Boolean activeOnly) {
-        if (Boolean.TRUE.equals(activeOnly)) return acceptanceCriteriaRepository.findByIsActiveTrueOrderBySortOrderAscCriteriaIdAsc();
-        return acceptanceCriteriaRepository.findAllByOrderBySortOrderAscCriteriaIdAsc();
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
