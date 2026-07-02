@@ -40,7 +40,7 @@ docker compose up -d
   reject acceptance-criteria changes after a contract has been created.
 - `.\mvnw.cmd -DskipTests compile` passed.
 - A fresh PostgreSQL database `aitasker_us033_test` applied 42 migrations
-  through `V45__milestone_owned_acceptance_criteria.sql`.
+  through `V48__milestone_owned_acceptance_criteria.sql`.
 - Hibernate `ddl-auto=validate` initialized successfully against the V45 schema.
 - Database readback showed four migrated criteria across three milestones,
   zero unowned criteria, and no `milestone_acceptance_criteria` table.

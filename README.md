@@ -54,7 +54,7 @@ Swagger/OpenAPI:
 - Da bo sung migration `V37__business_initial_quota_and_recommendation_selection.sql`
   de cap 3 job-post quota mien phi cho Business va luu trang thai Business
   chon expert duoc AI recommend.
-- Da bo sung migration `V45__milestone_owned_acceptance_criteria.sql` de bo
+- Da bo sung migration `V48__milestone_owned_acceptance_criteria.sql` de bo
   catalog 26 tieu chi co dinh, chuyen du lieu cu thanh tieu chi thuoc tung
   milestone va cho AI/Business quan ly noi dung rieng theo moc.
 - KHONG SUA migration cu, chi THEM migration moi.

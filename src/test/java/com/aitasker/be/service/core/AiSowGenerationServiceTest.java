@@ -157,9 +157,6 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
-<<<<<<< HEAD
-    void parseAiResponse_shouldStripRecommendedMilestonesBlockFromAllSowFields() {
-=======
     void buildPrompt_shouldAlwaysRequireDraftAndAllowAtMostThreeOptionalQuestions() {
         String prompt = service.buildPrompt(buildRequest(), "RAG context");
 
@@ -191,8 +188,7 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
-    void parseAiResponse_shouldStripRecommendedMilestonesBlockFromScopeOfWorkAndDeliverables() {
->>>>>>> feat/week7-be-SOW
+    void parseAiResponse_shouldStripRecommendedMilestonesBlockFromAllSowFields() {
         GenerateSowResponse response = service.parseAiResponse("""
                 {
                   "needMoreInfo": false,
