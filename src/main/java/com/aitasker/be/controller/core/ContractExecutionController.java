@@ -76,6 +76,11 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("TERMINATE CONTRACT SUCCESS", service.terminateContract(contractId, reason)));
     }
 
+    @PostMapping("/admin/contracts/{contractId}/termination/execute")
+    public ResponseEntity<ApiResponse<ContractEntity>> executeTermination(@PathVariable Integer contractId, @RequestParam(required = false) String adminNote) {
+        return ResponseEntity.ok(ApiResponse.success("EXECUTE TERMINATION SUCCESS", service.executeTermination(contractId, adminNote)));
+    }
+
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/milestones")
     // Note: Hàm `createMilestone` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
@@ -100,6 +105,21 @@ public class ContractExecutionController {
     @PostMapping("/milestones/{milestoneId}/complete")
     public ResponseEntity<ApiResponse<MilestoneEntity>> completeMilestone(@PathVariable Integer milestoneId) {
         return ResponseEntity.ok(ApiResponse.success("COMPLETE MILESTONE SUCCESS", service.completeMilestone(milestoneId)));
+    }
+
+    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/escrow/deposit")
+    public ResponseEntity<ApiResponse<MilestoneEntity>> depositMilestoneEscrow(@PathVariable Integer contractId, @PathVariable Integer milestoneId) {
+        return ResponseEntity.ok(ApiResponse.success("DEPOSIT MILESTONE ESCROW SUCCESS", service.depositMilestoneEscrow(contractId, milestoneId)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/approve")
+    public ResponseEntity<ApiResponse<MilestoneEntity>> approveMilestone(@PathVariable Integer milestoneId) {
+        return ResponseEntity.ok(ApiResponse.success("APPROVE MILESTONE SUCCESS", service.approveMilestone(milestoneId)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/reject")
+    public ResponseEntity<ApiResponse<MilestoneEntity>> rejectMilestone(@PathVariable Integer milestoneId, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("REJECT MILESTONE SUCCESS", service.rejectMilestone(milestoneId, reason)));
     }
 
     @PatchMapping("/milestones/{milestoneId}")
@@ -140,6 +160,31 @@ public class ContractExecutionController {
     // Note: Hàm `resolveDispute` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<DisputeEntity>> resolveDispute(@PathVariable Integer disputeId, @RequestParam String proposedAction) {
         return ResponseEntity.ok(ApiResponse.success("RESOLVE DISPUTE SUCCESS", service.resolveDispute(disputeId, proposedAction)));
+    }
+
+    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/disputes/initiate")
+    public ResponseEntity<ApiResponse<DisputeEntity>> initiateDispute(@PathVariable Integer contractId, @PathVariable Integer milestoneId, @RequestParam String initiatedBy) {
+        return ResponseEntity.ok(ApiResponse.success("INITIATE DISPUTE SUCCESS", service.initiateDispute(contractId, milestoneId, initiatedBy)));
+    }
+
+    @PostMapping("/disputes/{disputeId}/escalate")
+    public ResponseEntity<ApiResponse<DisputeEntity>> escalateDispute(@PathVariable Integer disputeId, @RequestParam(required = false) String reason, @RequestParam(required = false) String evidenceFile) {
+        return ResponseEntity.ok(ApiResponse.success("ESCALATE DISPUTE SUCCESS", service.escalateDispute(disputeId, reason, evidenceFile)));
+    }
+
+    @PostMapping("/admin/disputes/{disputeId}/intervention/reject")
+    public ResponseEntity<ApiResponse<DisputeEntity>> rejectIntervention(@PathVariable Integer disputeId) {
+        return ResponseEntity.ok(ApiResponse.success("REJECT INTERVENTION SUCCESS", service.rejectIntervention(disputeId)));
+    }
+
+    @PostMapping("/admin/disputes/{disputeId}/staff-decision")
+    public ResponseEntity<ApiResponse<DisputeEntity>> staffDecide(@PathVariable Integer disputeId, @RequestParam Integer expertPercent, @RequestParam(required = false) String note) {
+        return ResponseEntity.ok(ApiResponse.success("STAFF DECISION SUCCESS", service.staffDecide(disputeId, expertPercent, note)));
+    }
+
+    @PostMapping("/admin/disputes/{disputeId}/settlement/execute")
+    public ResponseEntity<ApiResponse<DisputeEntity>> executeDisputeSettlement(@PathVariable Integer disputeId) {
+        return ResponseEntity.ok(ApiResponse.success("EXECUTE DISPUTE SETTLEMENT SUCCESS", service.executeDisputeSettlement(disputeId)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

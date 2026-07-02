@@ -19,6 +19,17 @@ import java.util.List;
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class ContractEntity {
+    // ─────────────────────────────────────────────────────────────────
+    // Valid contract statuses (v2 milestone escrow model)
+    // ─────────────────────────────────────────────────────────────────
+    public static final String STATUS_DRAFT = "DRAFT";
+    public static final String STATUS_PENDING = "PENDING";
+    public static final String STATUS_ACTIVE = "ACTIVE";
+    public static final String STATUS_COMPLETED = "COMPLETED";
+    public static final String STATUS_CANCELLED = "CANCELLED";
+    public static final String STATUS_TERMINATION_PENDING = "TERMINATION_PENDING";
+    public static final String STATUS_TERMINATED = "TERMINATED";
+
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
@@ -45,6 +56,9 @@ public class ContractEntity {
     @Column(name = "business_nda_signed_at") private LocalDateTime businessNdaSignedAt;
     @Column(name = "expert_nda_signed_at") private LocalDateTime expertNdaSignedAt;
     @Column(name = "activated_at") private LocalDateTime activatedAt;
+    @Column(name = "termination_reason") private String terminationReason;
+    @Column(name = "termination_note") private String terminationNote;
+    @Column(name = "terminated_at") private LocalDateTime terminatedAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

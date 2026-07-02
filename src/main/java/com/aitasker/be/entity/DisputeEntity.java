@@ -18,6 +18,12 @@ import java.time.LocalDateTime;
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class DisputeEntity {
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+    public static final String STATUS_PENDING_SELF_RESOLVE = "PENDING_SELF_RESOLVE";
+    public static final String STATUS_ESCALATION_REQUESTED = "ESCALATION_REQUESTED";
+    public static final String STATUS_STAFF_REVIEWING = "STAFF_REVIEWING";
+    public static final String STATUS_STAFF_DECIDED = "STAFF_DECIDED";
+    public static final String STATUS_INTERVENTION_REJECTED = "INTERVENTION_REJECTED";
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "dispute_id") private Integer disputeId;
@@ -36,6 +42,12 @@ public class DisputeEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "status", nullable = false, length = 50) private String status;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
+    @Column(name = "initiated_by", length = 20) private String initiatedBy;
+    @Column(name = "escalation_reason") private String escalationReason;
+    @Column(name = "escalation_evidence_file", length = 255) private String escalationEvidenceFile;
+    @Column(name = "staff_decision_percentage") private Integer staffDecisionPercentage;
+    @Column(name = "staff_decision_note") private String staffDecisionNote;
+
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
