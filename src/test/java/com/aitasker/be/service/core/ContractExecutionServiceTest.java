@@ -6,6 +6,7 @@
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.AcceptanceCriteriaEntity;
@@ -16,8 +17,6 @@ import com.aitasker.be.entity.DeliverableEntity;
 import com.aitasker.be.entity.DisputeEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
-import com.aitasker.be.entity.MilestoneAcceptanceCriteriaEntity;
-import com.aitasker.be.entity.MilestoneAcceptanceCriteriaId;
 import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.ProposalEntity;
 import com.aitasker.be.entity.RoleEntity;
@@ -64,7 +63,6 @@ class ContractExecutionServiceTest {
     @Mock private ContractMilestoneRepository contractMilestoneRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private MilestoneRepository milestoneRepository;
-    @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private AcceptanceCriteriaRepository criteriaRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -511,12 +509,9 @@ class ContractExecutionServiceTest {
                 .fundsAllocated(BigDecimal.valueOf(500)).orderIndex(1)
                 .status("PENDING").duration(7).durationUnit("DAY")
                 .build();
-        MilestoneAcceptanceCriteriaEntity link = MilestoneAcceptanceCriteriaEntity.builder()
-                .id(new MilestoneAcceptanceCriteriaId(200, 301))
-                .build();
         AcceptanceCriteriaEntity criteria = AcceptanceCriteriaEntity.builder()
-                .criteriaId(301).criteriaCode("CODE_301")
-                .description("Criteria snapshot text").isActive(true).sortOrder(1)
+                .criteriaId(301).milestoneId(200)
+                .description("Criteria snapshot text").sortOrder(1)
                 .build();
 
         when(accessService.currentAccount()).thenReturn(
@@ -527,8 +522,8 @@ class ContractExecutionServiceTest {
         when(contractRepository.existsByProposalId(50)).thenReturn(false);
         when(jobRepository.findById(2)).thenReturn(Optional.of(job));
         when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(2)).thenReturn(List.of(milestone));
-        when(milestoneCriteriaRepository.findByIdMilestoneId(200)).thenReturn(List.of(link));
-        when(criteriaRepository.findById(301)).thenReturn(Optional.of(criteria));
+        when(criteriaRepository.findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(200))
+                .thenReturn(List.of(criteria));
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> {
             ContractEntity saved = invocation.getArgument(0);
             saved.setContractId(1);
@@ -655,6 +650,102 @@ class ContractExecutionServiceTest {
 
         AppException ex = assertThrows(AppException.class, () -> contractExecutionService.updateMilestone(1, input));
         assertEquals("KHONG THE SUA MILESTONE DA THUOC CONTRACT", ex.getMessage());
+    }
+
+    @Test
+    void updateMilestone_whenReplacingCriteriaAfterContractCreation_shouldRejectMutation() {
+        MilestoneEntity existing = MilestoneEntity.builder()
+                .milestoneId(5).jobId(1).milestoneName("M1")
+                .fundsAllocated(BigDecimal.TEN).status("PENDING").build();
+        MilestoneEntity input = MilestoneEntity.builder()
+                .acceptanceCriteria(List.of("Changed after snapshot")).build();
+        JobEntity job = JobEntity.builder()
+                .jobId(1).businessId(10).status("OPEN").build();
+        AccountEntity actor = AccountEntity.builder()
+                .accountId(99)
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+
+        when(milestoneRepository.findById(5)).thenReturn(Optional.of(existing));
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(jobRepository.findById(1)).thenReturn(Optional.of(job));
+        when(businessProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractRepository.findByJobId(1)).thenReturn(Optional.of(
+                ContractEntity.builder().contractId(3).jobId(1).build()));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.updateMilestone(5, input));
+
+        assertEquals("JOB DA CO CONTRACT, KHONG DUOC SUA TIEU CHI NGHIEM THU", ex.getMessage());
+        verify(milestoneRepository, org.mockito.Mockito.never()).save(any(MilestoneEntity.class));
+    }
+
+    @Test
+    void criterionCrud_shouldRequireOwnedPreContractMilestoneAndPersistChanges() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(5).jobId(1).milestoneName("M1").build();
+        JobEntity job = JobEntity.builder()
+                .jobId(1).businessId(10).status("DRAFT").build();
+        AccountEntity actor = AccountEntity.builder()
+                .accountId(99)
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        AcceptanceCriteriaEntity existing = AcceptanceCriteriaEntity.builder()
+                .criteriaId(7).milestoneId(5).description("Old").sortOrder(1).build();
+
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(milestoneRepository.findById(5)).thenReturn(Optional.of(milestone));
+        when(jobRepository.findById(1)).thenReturn(Optional.of(job));
+        when(businessProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractRepository.findByJobId(1)).thenReturn(Optional.empty());
+        when(criteriaRepository.findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(5))
+                .thenReturn(List.of(existing));
+        when(criteriaRepository.findById(7)).thenReturn(Optional.of(existing));
+        when(criteriaRepository.save(any(AcceptanceCriteriaEntity.class))).thenAnswer(invocation -> {
+            AcceptanceCriteriaEntity saved = invocation.getArgument(0);
+            if (saved.getCriteriaId() == null) saved.setCriteriaId(8);
+            return saved;
+        });
+
+        AcceptanceCriteriaEntity created = contractExecutionService.createCriteria(
+                5, new AcceptanceCriteriaRequest("New criterion", null));
+        AcceptanceCriteriaEntity updated = contractExecutionService.updateCriteria(
+                5, 7, new AcceptanceCriteriaRequest("Updated criterion", 2));
+        contractExecutionService.deleteCriteria(5, 7);
+
+        assertEquals(5, created.getMilestoneId());
+        assertEquals(2, created.getSortOrder());
+        assertEquals("Updated criterion", updated.getDescription());
+        assertEquals(2, updated.getSortOrder());
+        verify(criteriaRepository).delete(existing);
+    }
+
+    @Test
+    void createCriterion_whenJobHasContract_shouldRejectMutation() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(5).jobId(1).milestoneName("M1").build();
+        JobEntity job = JobEntity.builder()
+                .jobId(1).businessId(10).status("OPEN").build();
+        AccountEntity actor = AccountEntity.builder()
+                .accountId(99)
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(milestoneRepository.findById(5)).thenReturn(Optional.of(milestone));
+        when(jobRepository.findById(1)).thenReturn(Optional.of(job));
+        when(businessProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractRepository.findByJobId(1)).thenReturn(Optional.of(
+                ContractEntity.builder().contractId(3).jobId(1).build()));
+
+        AppException ex = assertThrows(AppException.class, () ->
+                contractExecutionService.createCriteria(
+                        5, new AcceptanceCriteriaRequest("Should fail", 1)));
+
+        assertEquals("JOB DA CO CONTRACT, KHONG DUOC SUA TIEU CHI NGHIEM THU", ex.getMessage());
     }
 
     @Test

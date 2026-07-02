@@ -45,6 +45,8 @@ public class MilestoneEntity {
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
-    @Transient private List<Integer> criteriaIds;
+    // Note: Chuỗi tiêu chí từ AI hoặc frontend, dùng khi tạo/cập nhật cả milestone.
+    @Transient private List<String> acceptanceCriteria;
+    // Note: Bản ghi đã persist có id để frontend sửa/xóa từng tiêu chí.
     @Transient private List<AcceptanceCriteriaEntity> criteria;
 }

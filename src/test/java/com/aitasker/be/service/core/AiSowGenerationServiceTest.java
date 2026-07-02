@@ -21,13 +21,15 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AiSowGenerationServiceTest {
@@ -155,7 +157,42 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
+<<<<<<< HEAD
     void parseAiResponse_shouldStripRecommendedMilestonesBlockFromAllSowFields() {
+=======
+    void buildPrompt_shouldAlwaysRequireDraftAndAllowAtMostThreeOptionalQuestions() {
+        String prompt = service.buildPrompt(buildRequest(), "RAG context");
+
+        // Luon sinh draft + milestones khong rong
+        assertTrue(prompt.contains("Luon sinh draft SoW day du"));
+        assertTrue(prompt.contains("milestones khong"));
+        // Bat buoc suy luan gia dinh vao sow.assumptions
+        assertTrue(prompt.contains("sow.assumptions"));
+        assertTrue(prompt.contains("SUY LUAN gia dinh"));
+        // Cho phep toi da 3 cau hoi optional, advisory, khong chặn
+        assertTrue(prompt.contains("TOI DA 3 cau hoi"));
+        assertTrue(prompt.contains("advisory"));
+        // needMoreInfo=true chi khi questions khong rong
+        assertTrue(prompt.contains("needMoreInfo=true Chi khi questions khong rong"));
+        // Khong bo sot sow/milestones vi co questions
+        assertTrue(prompt.contains("Khong bao gio bo sot sow hay milestones vi co questions"));
+        assertTrue(prompt.contains("acceptanceCriteria"));
+        assertTrue(prompt.contains("Khong dung catalog"));
+    }
+
+    @Test
+    void buildRecoveryPrompt_shouldForceCompleteDraftAndNotRepeatQuestionOnlyResponse() {
+        String prompt = service.buildRecoveryPrompt(buildRequest(), "RAG context");
+
+        assertTrue(prompt.contains("BUOC PHUC HOI NOI BO"));
+        assertTrue(prompt.contains("bat buoc sinh ngay SoW day du"));
+        assertTrue(prompt.contains("sow.assumptions"));
+        assertTrue(prompt.contains("toi da 3 cau hoi optional"));
+    }
+
+    @Test
+    void parseAiResponse_shouldStripRecommendedMilestonesBlockFromScopeOfWorkAndDeliverables() {
+>>>>>>> feat/week7-be-SOW
         GenerateSowResponse response = service.parseAiResponse("""
                 {
                   "needMoreInfo": false,
@@ -343,6 +380,7 @@ class AiSowGenerationServiceTest {
                               "duration": 1,
                               "durationUnit": "tuan",
                               "budget": 50,
+                              "acceptanceCriteria": ["Bot tra loi dung du lieu"],
                               "tasks": []
                             },
                             {
@@ -351,6 +389,7 @@ class AiSowGenerationServiceTest {
                               "duration": 1,
                               "durationUnit": "tuan",
                               "budget": 50,
+                              "acceptanceCriteria": ["Bot duoc trien khai thanh cong"],
                               "tasks": []
                             }
                           ]
@@ -432,7 +471,7 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
-    void generateSow_whenNeedMoreInfo_shouldClearSowAndMilestones() {
+    void generateSow_whenNeedMoreInfoTrue_shouldKeepSowMilestonesAndQuestionBatch() {
         RestTemplate restTemplate = mock(RestTemplate.class);
         OpenAiProperties openAiProperties = new OpenAiProperties();
         openAiProperties.setApiKey("test-key");
@@ -444,7 +483,13 @@ class AiSowGenerationServiceTest {
                           "needMoreInfo": true,
                           "questions": ["Can bo sung API don hang?"],
                           "sow": {
-                            "title": "AI support bot"
+                            "title": "AI support bot",
+                            "overview": "Build bot",
+                            "objectives": ["Answer customer questions"],
+                            "scopeOfWork": ["Design", "Develop"],
+                            "deliverables": ["Bot API"],
+                            "assumptions": ["API don hang da co san"],
+                            "outOfScope": ["CRM rebuild"]
                           },
                           "milestones": [
                             {
@@ -452,7 +497,141 @@ class AiSowGenerationServiceTest {
                               "description": "Develop bot",
                               "duration": 3,
                               "durationUnit": "tuan",
-                              "budget": 100
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot API hoat dong dung contract"]
+                            }
+                          ]
+                        }
+                        """)));
+
+        GenerateSowResponse response = localService.generateSow(buildRequest());
+
+        // needMoreInfo=true advisory nhung van giu nguyen sow + milestones + question batch
+        assertTrue(response.getNeedMoreInfo());
+        assertEquals(1, response.getQuestions().size());
+        assertEquals(1, response.getMilestones().size());
+        assertEquals("AI support bot", response.getSow().getTitle());
+        assertEquals(List.of("API don hang da co san"), response.getSow().getAssumptions());
+        assertEquals(List.of("Bot API hoat dong dung contract"),
+                response.getMilestones().get(0).getAcceptanceCriteria());
+    }
+
+    @Test
+    void generateSow_whenSowAssumptionsMissing_shouldNormalizeToEmptyList() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
+                        {
+                          "needMoreInfo": false,
+                          "questions": [],
+                          "sow": {
+                            "title": "AI support bot",
+                            "overview": "Build bot",
+                            "objectives": ["Answer customer questions"],
+                            "scopeOfWork": ["Design"],
+                            "deliverables": ["Bot API"],
+                            "outOfScope": []
+                          },
+                          "milestones": [
+                            {
+                              "name": "Build",
+                              "description": "Develop bot",
+                              "duration": 1,
+                              "durationUnit": "tuan",
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot tra loi dung knowledge base"]
+                            }
+                          ]
+                        }
+                        """)));
+
+        GenerateSowResponse response = localService.generateSow(buildRequest());
+
+        assertFalse(response.getNeedMoreInfo());
+        assertNotNull(response.getSow().getAssumptions());
+        assertTrue(response.getSow().getAssumptions().isEmpty());
+    }
+
+    @Test
+    void generateSow_shouldPreserveDomainSpecificAssumptionsFromModel() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
+                        {
+                          "needMoreInfo": false,
+                          "questions": [],
+                          "sow": {
+                            "title": "Data pipeline",
+                            "overview": "ETL pipeline",
+                            "objectives": ["Ingest daily"],
+                            "scopeOfWork": ["Design schema"],
+                            "deliverables": ["ETL service"],
+                            "assumptions": [
+                              "Du lieu nguon cap nhat hang ngay",
+                              "Storage dung PostgreSQL",
+                              "Monitoring dung log co ban"
+                            ],
+                            "outOfScope": []
+                          },
+                          "milestones": [
+                            {
+                              "name": "Pipeline",
+                              "description": "Build ETL",
+                              "duration": 1,
+                              "durationUnit": "tuan",
+                              "budget": 100,
+                              "acceptanceCriteria": ["Pipeline xu ly du lieu hang ngay"]
+                            }
+                          ]
+                        }
+                        """)));
+
+        GenerateSowResponse response = localService.generateSow(buildRequest());
+
+        assertEquals(List.of(
+                "Du lieu nguon cap nhat hang ngay",
+                "Storage dung PostgreSQL",
+                "Monitoring dung log co ban"
+        ), response.getSow().getAssumptions());
+    }
+
+    @Test
+    void generateSow_whenModelReturnsMoreThanThreeQuestions_shouldLimitToThree() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
+                        {
+                          "needMoreInfo": true,
+                          "questions": ["Q1?", "Q2?", "Q3?", "Q4?", "Q5?"],
+                          "sow": {
+                            "title": "AI support bot",
+                            "overview": "Build bot",
+                            "objectives": ["Answer"],
+                            "scopeOfWork": ["Design"],
+                            "deliverables": ["Bot API"],
+                            "assumptions": [],
+                            "outOfScope": []
+                          },
+                          "milestones": [
+                            {
+                              "name": "Build",
+                              "description": "Develop bot",
+                              "duration": 1,
+                              "durationUnit": "tuan",
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot API hoat dong dung contract"]
                             }
                           ]
                         }
@@ -461,9 +640,144 @@ class AiSowGenerationServiceTest {
         GenerateSowResponse response = localService.generateSow(buildRequest());
 
         assertTrue(response.getNeedMoreInfo());
-        assertEquals(1, response.getQuestions().size());
-        assertEquals(0, response.getMilestones().size());
-        assertNull(response.getSow());
+        assertEquals(3, response.getQuestions().size());
+        assertEquals(List.of("Q1?", "Q2?", "Q3?"), response.getQuestions());
+    }
+
+    @Test
+    void generateSow_shouldDropNullBlankAndDuplicateQuestionsBeforeLimitingToThree() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
+                        {
+                          "needMoreInfo": true,
+                          "questions": [
+                            null,
+                            "  ",
+                            "Can bo sung API don hang?",
+                            "Can bo sung API don hang?",
+                            "CAN BO SUNG API DON HANG?",
+                            "He thong ho tro bao nhieu ngon ngu?",
+                            "Q4?",
+                            "Q5?"
+                          ],
+                          "sow": {
+                            "title": "AI support bot",
+                            "overview": "Build bot",
+                            "objectives": ["Answer"],
+                            "scopeOfWork": ["Design"],
+                            "deliverables": ["Bot API"],
+                            "assumptions": [],
+                            "outOfScope": []
+                          },
+                          "milestones": [
+                            {
+                              "name": "Build",
+                              "description": "Develop bot",
+                              "duration": 1,
+                              "durationUnit": "tuan",
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot API hoat dong dung contract"]
+                            }
+                          ]
+                        }
+                        """)));
+
+        GenerateSowResponse response = localService.generateSow(buildRequest());
+
+        // Bo null, rong/blank, va trung nhau (khong phan biet hoa/khoang trang).
+        // Con lai 3 duy nhat: 1 cau API don hang + 1 cau ngon ngu + Q4, Q5 bi gioi han.
+        assertTrue(response.getNeedMoreInfo());
+        assertEquals(3, response.getQuestions().size());
+        assertEquals("Can bo sung API don hang?", response.getQuestions().get(0));
+        assertEquals("He thong ho tro bao nhieu ngon ngu?", response.getQuestions().get(1));
+        assertEquals("Q4?", response.getQuestions().get(2));
+    }
+
+    @Test
+    void generateSow_whenQuestionOnlyFirstResponse_shouldRecoverOnSingleInternalRetry() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+
+        String questionOnly = """
+                {
+                  "needMoreInfo": true,
+                  "questions": ["Can bo sung API don hang?"],
+                  "sow": null,
+                  "milestones": []
+                }
+                """;
+        String recoveredDraft = """
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "sow": {
+                    "title": "AI support bot",
+                    "overview": "Build bot",
+                    "objectives": ["Answer customer questions"],
+                    "scopeOfWork": ["Design", "Develop"],
+                    "deliverables": ["Bot API"],
+                    "assumptions": ["API don hang da co san"],
+                    "outOfScope": []
+                  },
+                  "milestones": [
+                    {
+                      "name": "Build",
+                      "description": "Develop bot",
+                      "duration": 1,
+                      "durationUnit": "tuan",
+                      "budget": 100,
+                      "acceptanceCriteria": ["Bot API hoat dong dung contract"]
+                    }
+                  ]
+                }
+                """;
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(questionOnly)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(recoveredDraft)));
+
+        GenerateSowResponse response = localService.generateSow(buildRequest());
+
+        // Dung 2 lan goi AI (1 ban dau + 1 recovery), khong loop
+        verify(restTemplate, times(2)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class));
+        assertFalse(response.getNeedMoreInfo());
+        assertEquals("AI support bot", response.getSow().getTitle());
+        assertEquals(1, response.getMilestones().size());
+        assertEquals(List.of("API don hang da co san"), response.getSow().getAssumptions());
+    }
+
+    @Test
+    void generateSow_whenRecoveryRetryStillFails_shouldThrowAndNotLoop() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+
+        String questionOnly = """
+                {
+                  "needMoreInfo": true,
+                  "questions": ["Can bo sung API don hang?"],
+                  "sow": null,
+                  "milestones": []
+                }
+                """;
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(questionOnly)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(questionOnly)));
+
+        AppException ex = assertThrows(AppException.class, () -> localService.generateSow(buildRequest()));
+
+        // Dung 2 lan goi AI roi dung, khong retry vo tan
+        verify(restTemplate, times(2)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class));
+        assertTrue(ex.getMessage().contains("AI response thieu thong tin sow hoac milestones sau recovery"));
     }
 
     @Test

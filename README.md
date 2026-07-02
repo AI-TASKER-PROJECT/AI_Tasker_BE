@@ -54,6 +54,9 @@ Swagger/OpenAPI:
 - Da bo sung migration `V37__business_initial_quota_and_recommendation_selection.sql`
   de cap 3 job-post quota mien phi cho Business va luu trang thai Business
   chon expert duoc AI recommend.
+- Da bo sung migration `V45__milestone_owned_acceptance_criteria.sql` de bo
+  catalog 26 tieu chi co dinh, chuyen du lieu cu thanh tieu chi thuoc tung
+  milestone va cho AI/Business quan ly noi dung rieng theo moc.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.
@@ -102,7 +105,10 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
   - `POST /api/v1/milestones`
   - `POST /api/v1/milestones/{milestoneId}/complete`
-  - `POST /api/v1/criteria`
+  - `GET /api/v1/milestones/{milestoneId}/criteria`
+  - `POST /api/v1/milestones/{milestoneId}/criteria`
+  - `PUT /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+  - `DELETE /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
   - `POST /api/v1/deliverables`
   - `POST /api/v1/transactions`
   - `POST /api/v1/transactions/{transactionId}/webhook?paymentStatus=Success|Failed&bankTxCode=...&receiptImgUrl=...`

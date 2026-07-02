@@ -7,6 +7,7 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
@@ -19,12 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 // Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
@@ -40,7 +38,6 @@ public class ContractExecutionService {
     private final ContractMilestoneRepository contractMilestoneRepository;
     private final MilestoneRepository milestoneRepository;
     private final AcceptanceCriteriaRepository criteriaRepository;
-    private final MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     private final DeliverableRepository deliverableRepository;
     private final TransactionRepository transactionRepository;
     private final DisputeRepository disputeRepository;
@@ -209,20 +206,13 @@ public class ContractExecutionService {
 
     // Note: Hàm `buildCriteriaSnapshot` dựng văn bản tiêu chí nghiệm thu tại thời điểm tạo contract để snapshot không bị thay đổi sau này.
     private String buildCriteriaSnapshot(Integer milestoneId) {
-        List<MilestoneAcceptanceCriteriaEntity> links = milestoneCriteriaRepository.findByIdMilestoneId(milestoneId);
-        if (links == null || links.isEmpty()) return null;
-        StringBuilder sb = new StringBuilder();
-        for (MilestoneAcceptanceCriteriaEntity link : links) {
-            if (link.getId() == null || link.getId().getCriteriaId() == null) continue;
-            criteriaRepository.findById(link.getId().getCriteriaId())
-                    .filter(AcceptanceCriteriaEntity::getIsActive)
-                    .map(AcceptanceCriteriaEntity::getDescription)
-                    .ifPresent(description -> {
-                        if (sb.length() > 0) sb.append("\n");
-                        sb.append(description);
-                    });
-        }
-        return sb.length() > 0 ? sb.toString() : null;
+        List<AcceptanceCriteriaEntity> criteria = criteriaRepository
+                .findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(milestoneId);
+        if (criteria == null || criteria.isEmpty()) return null;
+        return criteria.stream()
+                .map(AcceptanceCriteriaEntity::getDescription)
+                .filter(description -> description != null && !description.isBlank())
+                .collect(java.util.stream.Collectors.joining("\n"));
     }
 
     // Note: Hàm `applyContractMilestoneBudgets` cập nhật ngân sách chốt từ contract_milestones về milestone thật khi contract active.
@@ -421,7 +411,7 @@ public class ContractExecutionService {
         if (input.getStatus() == null) input.setStatus("PENDING");
         if (input.getDurationUnit() != null) input.setDurationUnit(input.getDurationUnit().trim().toUpperCase());
         MilestoneEntity saved = milestoneRepository.save(input);
-        replaceMilestoneCriteria(saved.getMilestoneId(), input.getCriteriaIds());
+        replaceMilestoneCriteria(saved.getMilestoneId(), input.getAcceptanceCriteria());
         auditLogService.record(AuditLogService.ACTION_CREATE_MILESTONE, "milestones", String.valueOf(saved.getMilestoneId()), accessService.currentAccount().getAccountId());
         return attachCriteria(saved);
     }
@@ -451,25 +441,63 @@ public class ContractExecutionService {
             existing.setDuration(input.getDuration());
             existing.setDurationUnit(input.getDurationUnit().trim().toUpperCase());
         }
+        if (input.getAcceptanceCriteria() != null) {
+            if (contractRepository.findByJobId(existing.getJobId()).isPresent()) {
+                throw new AppException("JOB DA CO CONTRACT, KHONG DUOC SUA TIEU CHI NGHIEM THU");
+            }
+        }
         MilestoneEntity saved = milestoneRepository.save(existing);
+        if (input.getAcceptanceCriteria() != null) {
+            replaceMilestoneCriteria(milestoneId, input.getAcceptanceCriteria());
+        }
         auditLogService.record(AuditLogService.ACTION_UPDATE_MILESTONE, "milestones", String.valueOf(milestoneId), accessService.currentAccount().getAccountId());
         return attachCriteria(saved);
     }
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
-    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
-    @Transactional public AcceptanceCriteriaEntity createCriteria(AcceptanceCriteriaEntity input) {
-        accessService.requireRole("ADMIN");
-        if (input.getCriteriaCode() == null || input.getCriteriaCode().isBlank()) throw new AppException("CRITERIA CODE KHONG DUOC DE TRONG");
-        if (input.getDescription() == null || input.getDescription().isBlank()) throw new AppException("CRITERIA DESCRIPTION KHONG DUOC DE TRONG");
-        String code = input.getCriteriaCode().trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "").toUpperCase();
-        criteriaRepository.findByCriteriaCode(code).ifPresent(existing -> { throw new AppException("CRITERIA CODE DA TON TAI"); });
-        input.setCriteriaId(null);
-        input.setCriteriaCode(code);
-        input.setIsActive(input.getIsActive() == null || input.getIsActive());
-        input.setSortOrder(input.getSortOrder() == null ? 0 : input.getSortOrder());
-        AcceptanceCriteriaEntity saved = criteriaRepository.save(input);
-        auditLogService.record(AuditLogService.ACTION_CREATE_ACCEPTANCE_CRITERIA, "acceptance_criteria", String.valueOf(saved.getCriteriaId()), accessService.currentAccount().getAccountId());
+
+    @Transactional
+    public AcceptanceCriteriaEntity createCriteria(Integer milestoneId, AcceptanceCriteriaRequest request) {
+        MilestoneEntity milestone = requireEditableCriteriaMilestone(milestoneId);
+        validateCriteriaRequest(request);
+        List<AcceptanceCriteriaEntity> existing = criteriaRepository
+                .findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(milestoneId);
+        int sortOrder = request.getSortOrder() == null
+                ? existing.stream().map(AcceptanceCriteriaEntity::getSortOrder).filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo).orElse(0) + 1
+                : request.getSortOrder();
+        AcceptanceCriteriaEntity saved = criteriaRepository.save(AcceptanceCriteriaEntity.builder()
+                .milestoneId(milestone.getMilestoneId())
+                .description(request.getDescription().trim())
+                .sortOrder(sortOrder)
+                .build());
+        auditLogService.record(AuditLogService.ACTION_CREATE_ACCEPTANCE_CRITERIA, "acceptance_criteria",
+                String.valueOf(saved.getCriteriaId()), accessService.currentAccount().getAccountId());
         return saved;
+    }
+
+    @Transactional
+    public AcceptanceCriteriaEntity updateCriteria(
+            Integer milestoneId,
+            Integer criteriaId,
+            AcceptanceCriteriaRequest request
+    ) {
+        requireEditableCriteriaMilestone(milestoneId);
+        validateCriteriaRequest(request);
+        AcceptanceCriteriaEntity criteria = requireOwnedCriteria(milestoneId, criteriaId);
+        criteria.setDescription(request.getDescription().trim());
+        if (request.getSortOrder() != null) criteria.setSortOrder(request.getSortOrder());
+        AcceptanceCriteriaEntity saved = criteriaRepository.save(criteria);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_ACCEPTANCE_CRITERIA, "acceptance_criteria",
+                String.valueOf(saved.getCriteriaId()), accessService.currentAccount().getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public void deleteCriteria(Integer milestoneId, Integer criteriaId) {
+        requireEditableCriteriaMilestone(milestoneId);
+        AcceptanceCriteriaEntity criteria = requireOwnedCriteria(milestoneId, criteriaId);
+        criteriaRepository.delete(criteria);
+        auditLogService.record(AuditLogService.ACTION_DELETE_ACCEPTANCE_CRITERIA, "acceptance_criteria",
+                String.valueOf(criteriaId), accessService.currentAccount().getAccountId());
     }
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Transactional public DeliverableEntity submitDeliverable(DeliverableEntity input) {
@@ -760,7 +788,7 @@ public class ContractExecutionService {
     public List<AcceptanceCriteriaEntity> listCriteriaByMilestone(Integer milestoneId) {
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         requireJobParticipantOrOwner(milestone.getJobId());
-        return attachCriteria(milestone).getCriteria();
+        return criteriaRepository.findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(milestoneId);
     }
     // Note: Hàm `listDeliverablesByMilestone` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<DeliverableEntity> listDeliverablesByMilestone(Integer milestoneId) {
@@ -1052,35 +1080,62 @@ public class ContractExecutionService {
 
     private MilestoneEntity attachCriteria(MilestoneEntity milestone) {
         if (milestone == null || milestone.getMilestoneId() == null) return milestone;
-        List<Integer> criteriaIds = milestoneCriteriaRepository.findByIdMilestoneId(milestone.getMilestoneId()).stream()
-                .map(item -> item.getId().getCriteriaId())
-                .toList();
-        milestone.setCriteriaIds(criteriaIds);
-        if (criteriaIds.isEmpty()) {
-            milestone.setCriteria(List.of());
-            return milestone;
-        }
-        Map<Integer, AcceptanceCriteriaEntity> criteriaById = criteriaRepository.findAllById(criteriaIds).stream()
-                .collect(Collectors.toMap(AcceptanceCriteriaEntity::getCriteriaId, item -> item));
-        milestone.setCriteria(criteriaIds.stream()
-                .map(criteriaById::get)
-                .filter(Objects::nonNull)
+        List<AcceptanceCriteriaEntity> criteria = criteriaRepository
+                .findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(milestone.getMilestoneId());
+        milestone.setCriteria(criteria);
+        milestone.setAcceptanceCriteria(criteria.stream()
+                .map(AcceptanceCriteriaEntity::getDescription)
                 .toList());
         return milestone;
     }
 
-    private void replaceMilestoneCriteria(Integer milestoneId, List<Integer> criteriaIds) {
-        milestoneCriteriaRepository.deleteByIdMilestoneId(milestoneId);
-        if (criteriaIds == null || criteriaIds.isEmpty()) return;
-        for (Integer criteriaId : new LinkedHashSet<>(criteriaIds)) {
-            AcceptanceCriteriaEntity criteria = criteriaRepository.findById(criteriaId)
-                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCEPTANCE CRITERIA " + criteriaId));
-            if (!Boolean.TRUE.equals(criteria.getIsActive())) {
-                throw new AppException("ACCEPTANCE CRITERIA KHONG CON HOAT DONG " + criteriaId);
-            }
-            milestoneCriteriaRepository.save(MilestoneAcceptanceCriteriaEntity.builder()
-                    .id(new MilestoneAcceptanceCriteriaId(milestoneId, criteriaId))
+    private void replaceMilestoneCriteria(Integer milestoneId, List<String> descriptions) {
+        criteriaRepository.deleteByMilestoneId(milestoneId);
+        if (descriptions == null || descriptions.isEmpty()) return;
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        int sortOrder = 1;
+        for (String description : descriptions) {
+            if (description == null || description.isBlank()) continue;
+            String normalized = description.trim();
+            if (!unique.add(normalized.toLowerCase(java.util.Locale.ROOT))) continue;
+            criteriaRepository.save(AcceptanceCriteriaEntity.builder()
+                    .milestoneId(milestoneId)
+                    .description(normalized)
+                    .sortOrder(sortOrder++)
                     .build());
+        }
+    }
+
+    private MilestoneEntity requireEditableCriteriaMilestone(Integer milestoneId) {
+        accessService.requireRole("BUSINESS");
+        accessService.requireApprovedAccount();
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        JobEntity job = requireBusinessOwnedJob(milestone.getJobId());
+        if (!List.of("DRAFT", "OPEN").contains(job.getStatus())) {
+            throw new AppException("JOB KHONG CHO PHEP SUA TIEU CHI NGHIEM THU");
+        }
+        if (contractRepository.findByJobId(job.getJobId()).isPresent()) {
+            throw new AppException("JOB DA CO CONTRACT, KHONG DUOC SUA TIEU CHI NGHIEM THU");
+        }
+        return milestone;
+    }
+
+    private AcceptanceCriteriaEntity requireOwnedCriteria(Integer milestoneId, Integer criteriaId) {
+        AcceptanceCriteriaEntity criteria = criteriaRepository.findById(criteriaId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCEPTANCE CRITERIA"));
+        if (!milestoneId.equals(criteria.getMilestoneId())) {
+            throw new AppException("TIEU CHI NGHIEM THU KHONG THUOC MILESTONE");
+        }
+        return criteria;
+    }
+
+    private void validateCriteriaRequest(AcceptanceCriteriaRequest request) {
+        if (request == null || request.getDescription() == null || request.getDescription().isBlank()) {
+            throw new AppException("CRITERIA DESCRIPTION KHONG DUOC DE TRONG");
+        }
+        if (request.getSortOrder() != null && request.getSortOrder() <= 0) {
+            throw new AppException("CRITERIA SORT ORDER PHAI LON HON 0");
         }
     }
 

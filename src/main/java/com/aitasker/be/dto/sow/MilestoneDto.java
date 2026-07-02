@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 // Note: Annotation này giúp Lombok sinh getter, setter và các hàm tiện ích cho DTO.
 @Data
@@ -26,4 +27,5 @@ public class MilestoneDto {
     private Integer duration;
     private String durationUnit;
     private BigDecimal budget;
+    private List<String> acceptanceCriteria;
 }

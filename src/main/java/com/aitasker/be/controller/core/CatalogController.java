@@ -58,13 +58,6 @@ public class CatalogController {
         return ResponseEntity.ok(ApiResponse.success("LIST SKILLS SUCCESS", catalogService.listSkills(activeOnly)));
     }
 
-    // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
-    @GetMapping("/acceptance-criteria")
-    @SecurityRequirements
-    public ResponseEntity<ApiResponse<Object>> listAcceptanceCriteria(@RequestParam(defaultValue = "true") Boolean activeOnly) {
-        return ResponseEntity.ok(ApiResponse.success("LIST ACCEPTANCE CRITERIA SUCCESS", catalogService.listAcceptanceCriteria(activeOnly)));
-    }
-
     @GetMapping("/technologies")
     public ResponseEntity<ApiResponse<Object>> listTechnologies(@RequestParam(defaultValue = "false") Boolean activeOnly) {
         return ResponseEntity.ok(ApiResponse.success("LIST TECHNOLOGIES SUCCESS", catalogService.listTechnologies(activeOnly)));

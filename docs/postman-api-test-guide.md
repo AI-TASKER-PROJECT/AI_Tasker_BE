@@ -436,17 +436,6 @@ GET {{baseUrl}}/api/v1/domains
 - Token: Cần Bearer token theo role phù hợp.
 - Body: Không có.
 
-#### 28. GET /api/v1/acceptance-criteria
-
-```http
-GET {{baseUrl}}/api/v1/acceptance-criteria
-```
-
-- Mục đích: Lấy dữ liệu hoặc danh sách theo endpoint này.
-- Phục vụ: Danh mục lĩnh vực, kỹ năng, công nghệ và tiêu chí nghiệm thu.
-- Token: Cần Bearer token theo role phù hợp.
-- Body: Không có.
-
 #### 29. PATCH /api/v1/technologies/{technologyId}
 
 ```http
@@ -835,9 +824,9 @@ POST {{baseUrl}}/api/v1/milestones
   "fundsAllocated": 20000000,
   "orderIndex": 3,
   "status": "Pending",
-  "criteriaIds": [
-    1,
-    2
+  "acceptanceCriteria": [
+    "Milestone dat ket qua da mo ta",
+    "Kiem thu nghiem thu thanh cong"
   ]
 }
 ```
@@ -914,23 +903,33 @@ POST {{baseUrl}}/api/v1/deliverables
 }
 ```
 
-#### 60. POST /api/v1/criteria
+#### 60. POST /api/v1/milestones/{milestoneId}/criteria
 
 ```http
-POST {{baseUrl}}/api/v1/criteria
+POST {{baseUrl}}/api/v1/milestones/{milestoneId}/criteria
 ```
 
-- Mục đích: Tạo mới dữ liệu hoặc thực hiện hành động theo endpoint này.
+- Mục đích: Business thêm tiêu chí nghiệm thu riêng cho milestone.
 - Phục vụ: Hợp đồng, milestone, deliverable, tranh chấp và giao dịch.
 - Token: Cần Bearer token theo role phù hợp.
 - Body raw mẫu:
 ```json
 {
-  "criteriaCode": "RAG_ANSWER_QUALITY",
   "description": "Chatbot trả lời đúng tối thiểu 80% bộ câu hỏi kiểm thử.",
-  "isActive": true,
   "sortOrder": 1
 }
+```
+
+Sua tieu chi:
+
+```http
+PUT {{baseUrl}}/api/v1/milestones/{milestoneId}/criteria/{criteriaId}
+```
+
+Xoa tieu chi:
+
+```http
+DELETE {{baseUrl}}/api/v1/milestones/{milestoneId}/criteria/{criteriaId}
 ```
 
 #### 61. POST /api/v1/contracts/{contractId}/terminate
@@ -1230,9 +1229,9 @@ POST {{baseUrl}}/api/v1/jobs
       "description": "Khảo sát FAQ, thiết kế luồng dữ liệu và kiến trúc retrieval.",
       "fundsAllocated": 30000000,
       "orderIndex": 1,
-      "criteriaIds": [
-        1,
-        2
+      "acceptanceCriteria": [
+        "Tai lieu yeu cau duoc xac nhan",
+        "Thiet ke duoc Business chap nhan"
       ]
     },
     {
@@ -1240,9 +1239,9 @@ POST {{baseUrl}}/api/v1/jobs
       "description": "Xây dựng API, giao diện chat, kiểm thử và tài liệu bàn giao.",
       "fundsAllocated": 60000000,
       "orderIndex": 2,
-      "criteriaIds": [
-        3,
-        4
+      "acceptanceCriteria": [
+        "API hoat dong dung contract",
+        "Integration test thanh cong"
       ]
     }
   ]
