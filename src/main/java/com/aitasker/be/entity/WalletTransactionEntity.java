@@ -27,6 +27,20 @@ import java.time.LocalDateTime;
 // Note: Annotation nay giup Lombok sinh constructor nhan day du field.
 @AllArgsConstructor
 public class WalletTransactionEntity {
+    // ─────────────────────────────────────────────────────────────────
+    // Escrow transaction types (v2 milestone escrow model)
+    // ─────────────────────────────────────────────────────────────────
+    public static final String TX_ESCROW_DEPOSIT = "MILESTONE_ESCROW_DEPOSIT";
+    public static final String TX_ESCROW_RELEASE = "MILESTONE_ESCROW_RELEASE";
+    public static final String TX_ESCROW_REFUND = "MILESTONE_ESCROW_REFUND";
+    public static final String TX_ESCROW_SETTLEMENT_PAYOUT = "MILESTONE_ESCROW_SETTLEMENT_PAYOUT";
+    public static final String TX_ESCROW_SETTLEMENT_REFUND = "MILESTONE_ESCROW_SETTLEMENT_REFUND";
+
+    // ─────────────────────────────────────────────────────────────────
+    // Wallet transaction status (always POSTED per V31 constraint)
+    // ─────────────────────────────────────────────────────────────────
+    public static final String STATUS_POSTED = "POSTED";
+
     // Note: Annotation nay danh dau khoa chinh cua entity.
     @Id
     // Note: Annotation nay cau hinh cach database/JPA sinh gia tri khoa chinh.
