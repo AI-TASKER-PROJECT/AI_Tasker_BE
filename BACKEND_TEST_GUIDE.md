@@ -64,7 +64,9 @@ docker compose up -d
 - `POST /api/v1/contracts/{contractId}/activate`
 4. Tao milestone, criteria, deliverable:
 - `POST /api/v1/milestones`
-- `POST /api/v1/criteria`
+- `POST /api/v1/milestones/{milestoneId}/criteria`
+- `PUT /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+- `DELETE /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
 - `POST /api/v1/deliverables`
 5. EXPERT ky NDA khi contract active:
 - `POST /api/v1/contracts/{contractId}/nda-sign`

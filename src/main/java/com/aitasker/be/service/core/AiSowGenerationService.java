@@ -11,6 +11,7 @@ import com.aitasker.be.config.OpenAiProperties;
 import com.aitasker.be.dto.sow.GenerateSowRequest;
 import com.aitasker.be.dto.sow.GenerateSowResponse;
 import com.aitasker.be.dto.sow.MilestoneDto;
+import com.aitasker.be.dto.sow.SowDto;
 import com.aitasker.be.service.ai.RagRetrievalService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -52,22 +53,52 @@ public class AiSowGenerationService {
     private final ObjectMapper objectMapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    // Note: Hàm chính của luồng generate SoW; kiểm tra cấu hình AI, lấy RAG context, gọi AI và chuẩn hóa kết quả.
+    // Note: Hàm chính của luồng generate SoW; kiểm tra cấu hình AI, lấy RAG context, gọi AI và
+    // chuẩn hóa kết quả. Luôn trả draft + milestones; clarification là advisory, không chặn flow.
     public GenerateSowResponse generateSow(GenerateSowRequest request) {
         if (openAiProperties.getApiKey() == null || openAiProperties.getApiKey().isBlank()) {
             throw new BadGatewayException("Chua cau hinh OPENAI_API_KEY");
         }
 
         String ragContext = ragRetrievalService.retrieveContext(request);
-        String aiResponse = callAi(buildPrompt(request, ragContext));
-        GenerateSowResponse response = parseAiResponse(aiResponse);
+        GenerateSowResponse response = callAndParse(buildPrompt(request, ragContext));
 
-        if (Boolean.TRUE.equals(response.getNeedMoreInfo())) {
-            response.setQuestions(defaultList(response.getQuestions()));
-            response.setSow(null);
-            response.setMilestones(new ArrayList<>());
-            return response;
+        // Recovery retry nội bộ: nếu model chỉ trả questions mà thiếu SoW/milestone, retry đúng 1 lần.
+        if (!hasValidDraft(response)) {
+            GenerateSowResponse retry = callAndParse(buildRecoveryPrompt(request, ragContext));
+            if (!hasValidDraft(retry)) {
+                throw new AppException("AI response thieu thong tin sow hoac milestones sau recovery");
+            }
+            response = retry;
         }
+
+        finalizeResponse(response, request);
+        return response;
+    }
+
+    // Note: Hàm gọi AI và parse kết quả thành response DTO.
+    private GenerateSowResponse callAndParse(String prompt) {
+        return parseAiResponse(callAi(prompt));
+    }
+
+    // Note: Hàm kiểm tra response có SoW và milestones hợp lệ để sử dụng ngay.
+    private boolean hasValidDraft(GenerateSowResponse response) {
+        return response != null
+                && response.getSow() != null
+                && response.getMilestones() != null
+                && !response.getMilestones().isEmpty()
+                && response.getMilestones().stream()
+                .allMatch(milestone -> milestone.getAcceptanceCriteria() != null
+                        && milestone.getAcceptanceCriteria().stream()
+                        .anyMatch(criterion -> criterion != null && !criterion.isBlank()));
+    }
+
+    // Note: Hàm chuẩn hóa cuối cùng: questions tối đa 3, needMoreInfo theo questions, assumptions không null,
+    // và ngân sách/thời lượng milestone khớp yêu cầu. Không xóa sow hay milestones khi có questions.
+    private void finalizeResponse(GenerateSowResponse response, GenerateSowRequest request) {
+        List<String> questions = limitQuestions(defaultList(response.getQuestions()));
+        response.setQuestions(questions);
+        response.setNeedMoreInfo(!questions.isEmpty());
 
         if (response.getSow() == null) {
             throw new AppException("AI response thieu thong tin sow");
@@ -76,16 +107,74 @@ public class AiSowGenerationService {
             throw new AppException("AI response thieu milestones");
         }
 
-        response.setNeedMoreInfo(false);
-        response.setQuestions(defaultList(response.getQuestions()));
+        normalizeAssumptions(response.getSow());
+        response.getMilestones().forEach(this::normalizeAcceptanceCriteria);
         normalizeMilestoneDuration(response, request.getDuration(), request.getDurationUnit());
         normalizeMilestoneBudget(response, request.getBudget());
-        return response;
+    }
+
+    private void normalizeAcceptanceCriteria(MilestoneDto milestone) {
+        if (milestone == null || milestone.getAcceptanceCriteria() == null) {
+            return;
+        }
+        LinkedHashMap<String, String> unique = new LinkedHashMap<>();
+        for (String criterion : milestone.getAcceptanceCriteria()) {
+            if (criterion == null || criterion.isBlank()) {
+                continue;
+            }
+            String trimmed = criterion.trim();
+            unique.putIfAbsent(trimmed.toLowerCase(java.util.Locale.ROOT), trimmed);
+        }
+        milestone.setAcceptanceCriteria(new ArrayList<>(unique.values()));
+    }
+
+    // Note: Hàm lọc bỏ câu hỏi null/rỗng và câu hỏi trùng (không phân biệt hoa thường/khoảng trắng),
+    // sau đó giới hạn batch clarification thành tối đa 3 câu hỏi ngắn gọn.
+    private List<String> limitQuestions(List<String> questions) {
+        if (questions == null) {
+            return new ArrayList<>();
+        }
+        List<String> cleaned = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (String question : questions) {
+            if (question == null) {
+                continue;
+            }
+            String trimmed = question.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            String key = trimmed.toLowerCase(java.util.Locale.ROOT);
+            if (!seen.add(key)) {
+                continue;
+            }
+            cleaned.add(trimmed);
+        }
+        if (cleaned.size() <= 3) {
+            return cleaned;
+        }
+        return new ArrayList<>(cleaned.subList(0, 3));
+    }
+
+    // Note: Hàm đảm bảo sow.assumptions không null: model omit/null -> [].
+    private void normalizeAssumptions(SowDto sow) {
+        if (sow.getAssumptions() == null) {
+            sow.setAssumptions(new ArrayList<>());
+        }
     }
 
     // Note: Hàm dựng prompt đầy đủ từ yêu cầu dự án và RAG context để AI trả về JSON đúng cấu trúc hệ thống.
     public String buildPrompt(GenerateSowRequest request, String ragContext) {
-        return """
+        return buildPromptInternal(request, ragContext, false);
+    }
+
+    // Note: Hàm dựng prompt cho lần recovery retry nội bộ khi model chỉ trả questions mà thiếu SoW/milestone.
+    public String buildRecoveryPrompt(GenerateSowRequest request, String ragContext) {
+        return buildPromptInternal(request, ragContext, true);
+    }
+
+    private String buildPromptInternal(GenerateSowRequest request, String ragContext, boolean recovery) {
+        String template = """
                 Ban la Senior AI Solution Architect.
 
                 Su dung RAG CONTEXT ben duoi de tao SoW dung nghiep vu he thong.
@@ -102,12 +191,38 @@ public class AiSowGenerationService {
 
                 Nhiem vu:
                 1. Phan tich yeu cau tho.
-                2. Neu thieu thong tin hay dat cau hoi.
-                3. Neu du thong tin:
+                2. Luon sinh draft SoW day du usable va danh sach milestones khong
+                   rong tu thong tin da nhap, ke ca khi con thieu thong tin.
+                3. Khi thieu thong tin, hay SUY LUAN gia dinh hop ly, de dang theo
+                   nghiep vu (domain-appropriate) va ghi tung gia dinh do vao
+                   sow.assumptions. Khong bao gio de viec thieu thong tin lam bo
+                   sot sow hay milestones.
+                4. Neu con thieu thong tin material co the lam ban draft tot hon,
+                   tra TOI DA 3 cau hoi ngan gon, khong trung thong tin da co trong
+                   input. Cau hoi chi la de xuat (advisory), khong bat buoc nguoi dung
+                   tra loi. Khong bien domain checklist thanh form phai dien day du.
+                5. needMoreInfo=true Chi khi questions khong rong; neu khong can cau
+                   hoi thi needMoreInfo=false va questions=[].
+                6. Khong bao gio bo sot sow hay milestones vi co questions.
+                7. Khong trung lap thong tin milestone guidance vao cac field sow.
+                8. Voi MOI milestone, bat buoc sinh danh sach acceptanceCriteria
+                   rieng gom cac dieu kien nghiem thu cu the, do duoc va phu hop
+                   voi san pham ban giao cua milestone do. Khong dung catalog hoac
+                   danh sach tieu chi mac dinh giong nhau cho moi milestone.
+                9. Neu du thong tin:
                    - Viet Statement of Work chuyen nghiep.
                    - Chia milestone.
                    - Uoc luong thoi luong.
                    - Phan bo ngan sach theo milestone.
+                """ + (recovery ? """
+
+                        BUOC PHUC HOI NOI BO: Phan hinh truoc chi co questions va thieu
+                        sow/milestones. Lan nay bat buoc sinh ngay SoW day du va
+                        milestones khong rong, ghi cac gia dinh suy luan vao
+                        sow.assumptions, sinh acceptanceCriteria rieng cho tung
+                        milestone, va chi tra toi da 3 cau hoi optional. Khong duoc
+                        tra phan hinh question-only mot lan nua.
+                        """ : "") + """
 
                 Bat buoc tra ve JSON hop le, khong markdown, khong giai thich ngoai JSON.
 
@@ -130,7 +245,10 @@ public class AiSowGenerationService {
                       "description": "string",
                       "duration": 1,
                       "durationUnit": "tuan",
-                      "budget": 30000000
+                      "budget": 30000000,
+                      "acceptanceCriteria": [
+                        "string"
+                      ]
                     }
                   ]
                 }
@@ -142,7 +260,8 @@ public class AiSowGenerationService {
                 Duration: %s %s
                 Support fields: %s
                 Required skills: %s
-                """.formatted(
+                """;
+        return template.formatted(
                 ragContext == null ? "" : ragContext,
                 request.getProjectTitle(),
                 request.getRawRequirement(),
@@ -188,7 +307,16 @@ public class AiSowGenerationService {
             normalizeArrayField(sow, "deliverables");
             normalizeArrayField(sow, "assumptions");
             normalizeArrayField(sow, "outOfScope");
+            ensureAssumptionsArray(sow);
+        }
 
+        JsonNode milestonesNode = response.get("milestones");
+        if (milestonesNode instanceof ArrayNode milestones) {
+            for (JsonNode milestoneNode : milestones) {
+                if (milestoneNode instanceof ObjectNode milestone) {
+                    normalizeArrayField(milestone, "acceptanceCriteria");
+                }
+            }
         }
     }
 
@@ -206,6 +334,14 @@ public class AiSowGenerationService {
             values.add(field.toString());
         }
         node.set(fieldName, values);
+    }
+
+    // Note: Hàm đảm bảo sow.assumptions là array: nếu model omit/null thì set [].
+    private void ensureAssumptionsArray(ObjectNode sow) {
+        JsonNode assumptions = sow.get("assumptions");
+        if (assumptions == null || assumptions.isNull()) {
+            sow.set("assumptions", objectMapper.createArrayNode());
+        }
     }
 
     private void stripMilestoneGuidanceFromSow(JsonNode responseNode) {

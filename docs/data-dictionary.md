@@ -58,7 +58,8 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 - Quan hệ chính: `job_id -> Jobs.job_id`; `contract_id -> Contracts.contract_id` khi milestone đã gắn hợp đồng.
 
 ### AcceptanceCriteria
-- Mục đích: Tiêu chí nghiệm thu chi tiết theo milestone.
+- Mục đích: Tiêu chí nghiệm thu do AI sinh hoặc Business chỉnh sửa, thuộc riêng
+  một milestone và có thứ tự hiển thị.
 - Quan hệ chính: `milestone_id -> Milestones.milestone_id`.
 
 ### Deliverables

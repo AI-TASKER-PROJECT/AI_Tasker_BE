@@ -59,7 +59,6 @@ class MarketplaceServiceTest {
     @Mock private NotificationService notificationService;
     @Mock private FirebaseStorageService firebaseStorageService;
     @Mock private AcceptanceCriteriaRepository criteriaRepository;
-    @Mock private MilestoneAcceptanceCriteriaRepository milestoneCriteriaRepository;
     @Mock private AuditLogService auditLogService;
 
     // Note: Annotation nÃ y cung cáº¥p metadata Ä‘á»ƒ Spring, JPA, Lombok, validation hoáº·c test xá»­ lÃ½ tá»± Ä‘á»™ng.
@@ -347,6 +346,71 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void createJob_shouldPersistAiGeneratedCriteriaForEachMilestone() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneName("Build API")
+                .description("Implement API")
+                .fundsAllocated(BigDecimal.TEN)
+                .orderIndex(1)
+                .duration(1)
+                .durationUnit("WEEK")
+                .acceptanceCriteria(List.of(
+                        "API tra dung schema",
+                        "Kiem thu tich hop thanh cong"
+                ))
+                .build();
+        JobEntity input = JobEntity.builder()
+                .title("AI JOB")
+                .rawRequirements("REQ")
+                .budget(BigDecimal.TEN)
+                .plannedDurationValue(1)
+                .plannedDurationUnit("WEEK")
+                .milestones(List.of(milestone))
+                .build();
+        AccountEntity account = AccountEntity.builder()
+                .accountId(10)
+                .status("Approved")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder()
+                .businessId(20)
+                .accountId(10)
+                .kybStatus("Approved")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.save(any(JobEntity.class))).thenAnswer(invocation -> {
+            JobEntity saved = invocation.getArgument(0);
+            saved.setJobId(99);
+            return saved;
+        });
+        when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> {
+            MilestoneEntity saved = invocation.getArgument(0);
+            saved.setMilestoneId(100);
+            return saved;
+        });
+        when(criteriaRepository.findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(100)).thenReturn(List.of());
+        when(sowRepository.findByJobId(99)).thenReturn(Optional.empty());
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(99)).thenReturn(List.of(milestone));
+        when(jobDomainRepository.findByIdJobId(99)).thenReturn(List.of());
+        when(jobSkillRepository.findByIdJobId(99)).thenReturn(List.of());
+        when(jobTechnologyRepository.findByIdJobId(99)).thenReturn(List.of());
+
+        marketplaceService.createJob(input);
+
+        ArgumentCaptor<com.aitasker.be.entity.AcceptanceCriteriaEntity> captor =
+                ArgumentCaptor.forClass(com.aitasker.be.entity.AcceptanceCriteriaEntity.class);
+        verify(criteriaRepository, times(2)).save(captor.capture());
+        assertEquals(List.of("API tra dung schema", "Kiem thu tich hop thanh cong"),
+                captor.getAllValues().stream()
+                        .map(com.aitasker.be.entity.AcceptanceCriteriaEntity::getDescription)
+                        .toList());
+        assertTrue(captor.getAllValues().stream()
+                .allMatch(item -> item.getMilestoneId().equals(100)));
+    }
+
+    @Test
     void updateJobStatus_shouldThrowWhenStatusInvalid() {
         AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateJobStatus(1, "INVALID"));
         assertEquals("STATUS JOB KHONG HOP LE", ex.getMessage());
@@ -360,7 +424,7 @@ class MarketplaceServiceTest {
         assertEquals("STATUS PROPOSAL KHONG HOP LE", ex.getMessage());
     }
     @Test
-    void createJobPayload_shouldAcceptGeneratedSowShapeWithSelectedCriteriaIds() throws Exception {
+    void createJobPayload_shouldAcceptGeneratedSowShapeWithAcceptanceCriteria() throws Exception {
         String payload = """
                 {
                   "title": "Xay dung tro ly AI cham soc khach hang da kenh",
@@ -392,7 +456,10 @@ class MarketplaceServiceTest {
                       "name": "Discovery & Solution Design",
                       "description": "Phan tich yeu cau va thiet ke giai phap",
                       "budget": 30000000,
-                      "criteriaIds": [1, 3, 10]
+                      "acceptanceCriteria": [
+                        "Pham vi duoc Business xac nhan",
+                        "Tai lieu thiet ke duoc ban giao"
+                      ]
                     }
                   ]
                 }
@@ -412,6 +479,9 @@ class MarketplaceServiceTest {
         assertEquals(List.of(1, 2, 3), request.getTechnologyIds());
         assertEquals("Discovery & Solution Design", milestone.getMilestoneName());
         assertEquals(new BigDecimal("30000000"), milestone.getFundsAllocated());
-        assertEquals(List.of(1, 3, 10), milestone.getCriteriaIds());
+        assertEquals(List.of(
+                "Pham vi duoc Business xac nhan",
+                "Tai lieu thiet ke duoc ban giao"
+        ), milestone.getAcceptanceCriteria());
     }
 }

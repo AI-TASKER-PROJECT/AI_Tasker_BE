@@ -52,7 +52,7 @@ public class OpenApiConfig {
             new Tag().name(WALLET_FLOW).description("Wallet, top-up, membership, credits, quota va withdrawal."),
             new Tag().name(CONTRACT_FLOW).description("Contract, milestone, deliverable, dispute va transaction."),
             new Tag().name(NOTIFICATION_FLOW).description("Thong bao trong he thong."),
-            new Tag().name(CATALOG_FLOW).description("Danh muc domain, skill, technology va acceptance criteria."),
+            new Tag().name(CATALOG_FLOW).description("Danh muc domain, skill va technology."),
             new Tag().name(AI_FLOW).description("Chatbot va cac endpoint AI ho tro nghiep vu."),
             new Tag().name(ADMIN_FLOW).description("Quan tri account, settings, analytics, reviews va wallet system."),
             new Tag().name(SYSTEM_FLOW).description("Health check va endpoint test ky thuat.")
@@ -137,7 +137,6 @@ public class OpenApiConfig {
                 || path.startsWith("/api/v1/milestones")
                 || path.startsWith("/api/v1/disputes")
                 || path.startsWith("/api/v1/transactions")
-                || path.equals("/api/v1/criteria")
                 || path.equals("/api/v1/deliverables")
                 || path.startsWith("/api/v1/admin/contracts")) {
             return CONTRACT_FLOW;
@@ -150,7 +149,6 @@ public class OpenApiConfig {
         if (path.equals("/api/v1/domains")
                 || path.equals("/api/v1/skills")
                 || path.equals("/api/v1/technologies")
-                || path.equals("/api/v1/acceptance-criteria")
                 || path.startsWith("/api/v1/domains/{")
                 || path.startsWith("/api/v1/skills/{")
                 || path.startsWith("/api/v1/technologies/{")) {
