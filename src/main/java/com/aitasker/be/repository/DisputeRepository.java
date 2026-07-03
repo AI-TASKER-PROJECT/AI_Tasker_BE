@@ -12,4 +12,5 @@ public interface DisputeRepository extends JpaRepository<DisputeEntity, Integer>
     List<DisputeEntity> findByContractId(Integer contractId);
     // Note: Hàm `findByAssignedStaffId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<DisputeEntity> findByAssignedStaffId(Integer assignedStaffId);
+    List<DisputeEntity> findByMilestoneIdAndStatusIn(Integer milestoneId, List<String> statuses);
 }

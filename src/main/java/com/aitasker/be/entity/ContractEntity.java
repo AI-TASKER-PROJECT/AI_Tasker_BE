@@ -25,10 +25,11 @@ public class ContractEntity {
     public static final String STATUS_DRAFT = "DRAFT";
     public static final String STATUS_PENDING = "PENDING";
     public static final String STATUS_ACTIVE = "ACTIVE";
-    public static final String STATUS_COMPLETED = "COMPLETED";
-    public static final String STATUS_CANCELLED = "CANCELLED";
     public static final String STATUS_TERMINATION_PENDING = "TERMINATION_PENDING";
+    public static final String STATUS_COMPLETED = "COMPLETED";
     public static final String STATUS_TERMINATED = "TERMINATED";
+    public static final String STATUS_CLOSED = "CLOSED";
+    public static final String STATUS_CANCELLED = "CANCELLED";
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

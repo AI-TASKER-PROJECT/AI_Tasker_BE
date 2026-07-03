@@ -41,6 +41,9 @@ public class MilestoneEntity {
     @Column(name = "status", nullable = false, length = 50) private String status;
     @Column(name = "duration") private Integer duration;
     @Column(name = "duration_unit", length = 20) private String durationUnit;
+    @Column(name = "escrow_released_at") private LocalDateTime escrowReleasedAt;
+    @Column(name = "settlement_source_type", length = 50) private String settlementSourceType;
+    @Column(name = "settlement_source_id") private Long settlementSourceId;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

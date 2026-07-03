@@ -20,6 +20,9 @@ import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.ProposalEntity;
 import com.aitasker.be.entity.RoleEntity;
+import com.aitasker.be.entity.StaffEntity;
+import com.aitasker.be.entity.TerminationRequestEntity;
+import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,12 +74,16 @@ class ContractExecutionServiceTest {
     @Mock private TransactionRepository transactionRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private DisputeRepository disputeRepository;
+    @Mock private TerminationRequestRepository terminationRequestRepository;
+    @Mock private CaseAttachmentRepository caseAttachmentRepository;
+    @Mock private WalletTransactionRepository walletTransactionRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private StaffRepository staffRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private SystemSettingRepository systemSettingRepository;
     @Mock private SystemWalletService systemWalletService;
     @Mock private WalletLedgerService walletLedgerService;
+    @Mock private PaymentWalletService paymentWalletService;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
 
@@ -273,6 +280,13 @@ class ContractExecutionServiceTest {
         when(accessService.currentAccount()).thenReturn(businessAccount);
         when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
         when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.empty());
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of());
+        when(terminationRequestRepository.findByContractIdAndStatusIn(eq(1), any())).thenReturn(List.of());
+        when(terminationRequestRepository.save(any(TerminationRequestEntity.class))).thenAnswer(invocation -> {
+            TerminationRequestEntity request = invocation.getArgument(0);
+            request.setTerminationRequestId(1L);
+            return request;
+        });
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ContractEntity result = contractExecutionService.terminateContract(1, "Business changes scope");
@@ -919,8 +933,9 @@ class ContractExecutionServiceTest {
 
         verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any());
         verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any());
-        assertEquals("APPROVED", result.getStatus());
-        assertEquals("APPROVED", cm.getStatus());
+        assertEquals("COMPLETED", result.getStatus());
+        assertEquals("COMPLETED", cm.getStatus());
+        assertNotNull(cm.getEscrowReleasedAt());
     }
 
     @Test
@@ -944,15 +959,15 @@ class ContractExecutionServiceTest {
         MilestoneEntity result = contractExecutionService.rejectMilestone(200, "Not good enough");
 
         assertEquals(Integer.valueOf(1), cm.getResubmitCount());
-        assertEquals("REJECTED", result.getStatus());
+        assertEquals("DISPUTED", result.getStatus());
     }
 
     @Test
     void initiateDispute_shouldCreateDisputeAndSetMilestoneDisputed() {
         ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2).businessId(10).expertId(5).status("ACTIVE").build();
-        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).jobId(2).contractId(1).status("REJECTED").build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).jobId(2).contractId(1).status("IN_PROGRESS").build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
-                .contractMilestoneId(100).contractId(1).jobMilestoneId(200).status("REJECTED")
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(200).status("IN_PROGRESS")
                 .build();
         DisputeEntity savedDispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(200).initiatedBy("BUSINESS").status("PENDING_SELF_RESOLVE").build();
 
@@ -963,6 +978,7 @@ class ContractExecutionServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(200), any())).thenReturn(List.of());
         when(disputeRepository.save(any())).thenReturn(savedDispute);
 
         DisputeEntity result = contractExecutionService.initiateDispute(1, 200, "BUSINESS");
@@ -995,7 +1011,7 @@ class ContractExecutionServiceTest {
     @Test
     void staffDecide_shouldSettleEscrowProportionally() {
         ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").build();
-        DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(200).status("STAFF_REVIEWING").build();
+        DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(200).assignedStaffId(9).status("STAFF_REVIEWING").build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
                 .contractMilestoneId(100).contractId(1).jobMilestoneId(200)
                 .finalBudget(BigDecimal.valueOf(1000)).status("DISPUTED")
@@ -1005,8 +1021,9 @@ class ContractExecutionServiceTest {
         ExpertProfileEntity expert = ExpertProfileEntity.builder().expertId(5).accountId(60).build();
 
         when(accessService.currentAccount()).thenReturn(
-                AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build()
+                AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("STAFF").build()).build()
         );
+        when(staffRepository.findByAccountId(1)).thenReturn(Optional.of(StaffEntity.builder().staffId(9).build()));
         when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
@@ -1061,23 +1078,30 @@ class ContractExecutionServiceTest {
         when(accessService.currentAccount()).thenReturn(businessActor);
         when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
         when(expertProfileRepository.findByAccountId(50)).thenReturn(Optional.empty());
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of());
+        when(terminationRequestRepository.findByContractIdAndStatusIn(eq(1), any())).thenReturn(List.of());
+        when(terminationRequestRepository.save(any(TerminationRequestEntity.class))).thenAnswer(invocation -> {
+            TerminationRequestEntity request = invocation.getArgument(0);
+            request.setTerminationRequestId(1L);
+            return request;
+        });
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(i -> i.getArgument(0));
 
         ContractEntity result = contractExecutionService.requestTermination(1, "Scope changed");
 
         assertEquals(ContractEntity.STATUS_TERMINATION_PENDING, result.getStatus());
         assertEquals("Scope changed", result.getTerminationReason());
-        verify(auditLogService).record(AuditLogService.ACTION_TERMINATE_CONTRACT, "contracts", "1", 50);
+        verify(auditLogService).record("TERMINATION_REQUESTED", "termination_requests", "1", 50);
     }
 
     @Test
     void executeTermination_refundsEscrowAndCancelsActiveMilestones() {
         ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_TERMINATION_PENDING).build();
         BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(10).accountId(50).build();
-        ContractMilestoneEntity deposited = ContractMilestoneEntity.builder().contractMilestoneId(101).contractId(1).finalBudget(BigDecimal.valueOf(100)).status(ContractMilestoneEntity.STATUS_DEPOSITED).build();
-        ContractMilestoneEntity inProgress = ContractMilestoneEntity.builder().contractMilestoneId(102).contractId(1).finalBudget(BigDecimal.valueOf(200)).status(ContractMilestoneEntity.STATUS_IN_PROGRESS).build();
-        ContractMilestoneEntity underReview = ContractMilestoneEntity.builder().contractMilestoneId(103).contractId(1).finalBudget(BigDecimal.valueOf(300)).status(ContractMilestoneEntity.STATUS_UNDER_REVIEW).build();
-        ContractMilestoneEntity disputed = ContractMilestoneEntity.builder().contractMilestoneId(104).contractId(1).finalBudget(BigDecimal.valueOf(400)).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+        ContractMilestoneEntity deposited = ContractMilestoneEntity.builder().contractMilestoneId(101).contractId(1).jobMilestoneId(201).finalBudget(BigDecimal.valueOf(100)).status(ContractMilestoneEntity.STATUS_DEPOSITED).build();
+        ContractMilestoneEntity inProgress = ContractMilestoneEntity.builder().contractMilestoneId(102).contractId(1).jobMilestoneId(202).finalBudget(BigDecimal.valueOf(200)).status(ContractMilestoneEntity.STATUS_IN_PROGRESS).build();
+        ContractMilestoneEntity underReview = ContractMilestoneEntity.builder().contractMilestoneId(103).contractId(1).jobMilestoneId(203).finalBudget(BigDecimal.valueOf(300)).status(ContractMilestoneEntity.STATUS_UNDER_REVIEW).build();
+        ContractMilestoneEntity disputed = ContractMilestoneEntity.builder().contractMilestoneId(104).contractId(1).jobMilestoneId(204).finalBudget(BigDecimal.valueOf(400)).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
 
         when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
@@ -1088,10 +1112,10 @@ class ContractExecutionServiceTest {
 
         ContractEntity result = contractExecutionService.executeTermination(1, "Admin approved closure");
 
-        verify(walletLedgerService).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(100)), eq("MILESTONE_ESCROW_REFUND"), eq("CONTRACT_MILESTONE"), eq(101L), eq("Refund escrow on contract termination"));
-        verify(walletLedgerService).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(200)), eq("MILESTONE_ESCROW_REFUND"), eq("CONTRACT_MILESTONE"), eq(102L), eq("Refund escrow on contract termination"));
-        verify(walletLedgerService).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(300)), eq("MILESTONE_ESCROW_REFUND"), eq("CONTRACT_MILESTONE"), eq(103L), eq("Refund escrow on contract termination"));
-        verify(walletLedgerService).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(400)), eq("MILESTONE_ESCROW_REFUND"), eq("CONTRACT_MILESTONE"), eq(104L), eq("Refund escrow on contract termination"));
+        verify(walletLedgerService).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(100)), eq("MILESTONE_ESCROW_REFUND"), eq("MILESTONE"), eq(201L), eq("Refund escrow on contract termination"));
+        verify(walletLedgerService).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(200)), eq("MILESTONE_ESCROW_REFUND"), eq("MILESTONE"), eq(202L), eq("Refund escrow on contract termination"));
+        verify(walletLedgerService).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(300)), eq("MILESTONE_ESCROW_REFUND"), eq("MILESTONE"), eq(203L), eq("Refund escrow on contract termination"));
+        verify(walletLedgerService, never()).releaseEscrowToAvailable(eq(50), eq(BigDecimal.valueOf(400)), any(), any(), any(), any());
         verify(contractMilestoneRepository, times(4)).save(any(ContractMilestoneEntity.class));
         assertEquals(ContractMilestoneEntity.STATUS_CANCELLED, deposited.getStatus());
         assertEquals(ContractMilestoneEntity.STATUS_CANCELLED, inProgress.getStatus());
@@ -1106,20 +1130,20 @@ class ContractExecutionServiceTest {
     void executeTermination_doesNotRefundApprovedOrCompletedMilestones() {
         ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_ACTIVE).build();
         BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(10).accountId(50).build();
-        ContractMilestoneEntity approved = ContractMilestoneEntity.builder().contractMilestoneId(101).contractId(1).finalBudget(BigDecimal.valueOf(100)).status(ContractMilestoneEntity.STATUS_APPROVED).build();
+        ContractMilestoneEntity cancelled = ContractMilestoneEntity.builder().contractMilestoneId(101).contractId(1).finalBudget(BigDecimal.valueOf(100)).status(ContractMilestoneEntity.STATUS_CANCELLED).build();
         ContractMilestoneEntity completed = ContractMilestoneEntity.builder().contractMilestoneId(102).contractId(1).finalBudget(BigDecimal.valueOf(200)).status(ContractMilestoneEntity.STATUS_COMPLETED).build();
 
         when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(business));
-        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(approved, completed));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cancelled, completed));
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(i -> i.getArgument(0));
 
         ContractEntity result = contractExecutionService.executeTermination(1, "Completed work preserved");
 
         verify(walletLedgerService, never()).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any());
         verify(contractMilestoneRepository, never()).save(any(ContractMilestoneEntity.class));
-        assertEquals(ContractMilestoneEntity.STATUS_APPROVED, approved.getStatus());
+        assertEquals(ContractMilestoneEntity.STATUS_CANCELLED, cancelled.getStatus());
         assertEquals(ContractMilestoneEntity.STATUS_COMPLETED, completed.getStatus());
         assertEquals(ContractEntity.STATUS_TERMINATED, result.getStatus());
     }
@@ -1134,5 +1158,100 @@ class ContractExecutionServiceTest {
         verify(accessService).requireRole("ADMIN");
         verify(contractRepository, never()).findById(any());
         verify(walletLedgerService, never()).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void startMilestone_shouldMoveDepositedToInProgress() {
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).contractId(1).status(ContractMilestoneEntity.STATUS_DEPOSITED).build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_ACTIVE).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(200).status(ContractMilestoneEntity.STATUS_DEPOSITED).build();
+        AccountEntity expert = AccountEntity.builder().accountId(90).role(RoleEntity.builder().roleName("EXPERT").build()).build();
+
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(accessService.currentAccount()).thenReturn(expert);
+        when(expertProfileRepository.findByAccountId(90)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(contractMilestone));
+        when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        MilestoneEntity result = contractExecutionService.startMilestone(200);
+
+        assertEquals(ContractMilestoneEntity.STATUS_IN_PROGRESS, result.getStatus());
+        assertEquals(ContractMilestoneEntity.STATUS_IN_PROGRESS, contractMilestone.getStatus());
+        verify(auditLogService).record("MILESTONE_STARTED", "milestones", "200", 90);
+    }
+
+    @Test
+    void cancelDispute_byInitiatorRestoresPreviousStatus() {
+        DisputeEntity dispute = DisputeEntity.builder()
+                .disputeId(1)
+                .contractId(1)
+                .milestoneId(200)
+                .initiatedBy("BUSINESS")
+                .previousMilestoneStatus(ContractMilestoneEntity.STATUS_UNDER_REVIEW)
+                .status(DisputeEntity.STATUS_ESCALATION_REQUESTED)
+                .build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(200).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+        AccountEntity business = AccountEntity.builder().accountId(50).role(RoleEntity.builder().roleName("BUSINESS").build()).build();
+
+        when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
+        when(accessService.currentAccount()).thenReturn(business);
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(expertProfileRepository.findByAccountId(50)).thenReturn(Optional.empty());
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(contractMilestone));
+        when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        DisputeEntity result = contractExecutionService.cancelDispute(1, "Self resolved");
+
+        assertEquals(DisputeEntity.STATUS_CANCELLED, result.getStatus());
+        assertEquals(DisputeEntity.RESOLUTION_CANCELLED_BY_INITIATOR, result.getResolutionType());
+        assertEquals(ContractMilestoneEntity.STATUS_UNDER_REVIEW, milestone.getStatus());
+        assertEquals(ContractMilestoneEntity.STATUS_UNDER_REVIEW, contractMilestone.getStatus());
+    }
+
+    @Test
+    void executeTerminationSettlement_shouldSplitEscrowAndAwaitDepositRefund() {
+        TerminationRequestEntity request = TerminationRequestEntity.builder()
+                .terminationRequestId(9L)
+                .contractId(1)
+                .currentMilestoneId(200)
+                .assignedStaffId(8)
+                .status(TerminationRequestEntity.STATUS_AWAITING_SETTLEMENT_EXECUTION)
+                .expertPayoutPercentage(BigDecimal.valueOf(25))
+                .build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_TERMINATION_PENDING).build();
+        ContractMilestoneEntity current = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(200).status(ContractMilestoneEntity.STATUS_IN_PROGRESS).finalBudget(BigDecimal.valueOf(400)).build();
+        ContractMilestoneEntity future = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(201).status(ContractMilestoneEntity.STATUS_PENDING).finalBudget(BigDecimal.valueOf(100)).build();
+        WalletTransactionEntity debit = WalletTransactionEntity.builder().id(77L).build();
+
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
+        when(terminationRequestRepository.findById(9L)).thenReturn(Optional.of(request));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(50).build()));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(current, future));
+        when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(400)), any(), any(), any(), any())).thenReturn(debit);
+        when(walletLedgerService.creditAvailable(eq(60), eq(BigDecimal.valueOf(100).setScale(2)), any(), any(), any(), any())).thenReturn(WalletTransactionEntity.builder().id(78L).build());
+        when(walletLedgerService.creditAvailable(eq(50), eq(BigDecimal.valueOf(300).setScale(2)), any(), any(), any(), any())).thenReturn(WalletTransactionEntity.builder().id(79L).build());
+        when(walletTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(contractRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(terminationRequestRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        TerminationRequestEntity result = contractExecutionService.executeTerminationSettlement(9L);
+
+        assertEquals(TerminationRequestEntity.STATUS_AWAITING_DEPOSIT_REFUND, result.getStatus());
+        assertEquals(BigDecimal.valueOf(100).setScale(2), result.getExpertPayoutAmount());
+        assertEquals(BigDecimal.valueOf(300).setScale(2), result.getBusinessRefundAmount());
+        assertEquals(77L, result.getSettlementWalletTransactionId());
+        assertEquals(ContractMilestoneEntity.STATUS_COMPLETED, current.getStatus());
+        assertEquals(ContractMilestoneEntity.STATUS_CANCELLED, future.getStatus());
+        assertEquals(ContractEntity.STATUS_TERMINATED, contract.getStatus());
+        verify(walletTransactionRepository, times(3)).save(any(WalletTransactionEntity.class));
     }
 }

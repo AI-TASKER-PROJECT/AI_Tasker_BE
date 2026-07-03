@@ -364,7 +364,7 @@ public class PaymentWalletService {
         accessService.requireRole("ADMIN");
         ContractEntity contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new NotFoundException("CONTRACT_NOT_FOUND"));
-        if (!List.of("COMPLETED", "CANCELLED").contains(contract.getStatus())) {
+        if (!List.of(ContractEntity.STATUS_COMPLETED, ContractEntity.STATUS_TERMINATED).contains(contract.getStatus())) {
             throw new AppException("CONTRACT_INVALID_STATUS");
         }
         ContractDepositEntity deposit = contractDepositRepository.findByContractId(contractId)
@@ -415,7 +415,7 @@ public class PaymentWalletService {
         deposit.setStatus(refundStatus(refundAmount, resolvedAmount));
         ContractDepositEntity saved = contractDepositRepository.save(deposit);
 
-        contract.setStatus("COMPLETED");
+        contract.setStatus(ContractEntity.STATUS_CLOSED);
         contractRepository.save(contract);
         auditLogService.record(ACTION_REFUND_CONTRACT_DEPOSIT, "contract_deposits",
                 String.valueOf(saved.getDepositId()), admin.getAccountId());

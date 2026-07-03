@@ -70,15 +70,35 @@ Alternate exits:
 - Deliverables can be submitted only by the contract expert while the contract
   is `ACTIVE` and both NDA signatures exist; submission moves the milestone to
   `UNDER_REVIEW`.
-- The owning business can complete a milestone only from `UNDER_REVIEW`.
+- The owning business can deposit milestone escrow only from `PENDING`, then
+  the expert starts execution from `DEPOSITED` to `IN_PROGRESS` and can submit
+  deliverables from active execution states. A Business approval from
+  `UNDER_REVIEW` releases the escrow once, marks the milestone `COMPLETED`, and
+  resolves any self-resolve dispute with
+  `BUSINESS_APPROVED_AFTER_SELF_RESOLVE`.
+- A Business rejection from `UNDER_REVIEW` creates or updates a single active
+  `PENDING_SELF_RESOLVE` dispute and moves the milestone to `DISPUTED`.
+- Staff decision is separate from settlement execution: assigned Staff moves a
+  dispute to `STAFF_DECIDED`; Admin settlement execution then splits escrow,
+  marks the milestone `COMPLETED`, sets the dispute `RESOLVED`, and records the
+  settlement guard. Participants can cancel a self-resolve/escalation dispute
+  before Staff review; Admin can cancel invalid active disputes.
 - When every contract milestone is `COMPLETED`, the system moves the contract
   to `COMPLETED` and the job to `CLOSED`.
 - SLA auto-approval of an overdue reviewed milestone uses the same finalization
   rule: if the auto-approved milestone completes the last remaining contract
   milestone, the contract becomes `COMPLETED` and the job becomes `CLOSED`.
-- Admin deposit refund/resolution leaves completed contracts `COMPLETED`;
-  cancelled contracts remain `CANCELLED`.
-- `COMPLETED` and `CANCELLED` contracts cannot be terminated again.
+- Termination requests move eligible active contracts to
+  `TERMINATION_PENDING`. Admin assigns Staff review; assigned Staff approves or
+  rejects. Approved requests either await milestone escrow settlement or move
+  directly to deposit refund. Termination settlement is blocked while any
+  dispute is still active, can split the current milestone escrow between
+  Business and Expert, cancels unfinished milestones, and moves the contract to
+  `TERMINATED`.
+- Admin security-deposit refund is the gate from `COMPLETED` or `TERMINATED`
+  to `CLOSED`. Reviews are available only after `CLOSED`.
+- `COMPLETED`, `TERMINATED`, `CLOSED`, and `CANCELLED` contracts cannot start
+  new milestone work.
 
 - `GET /api/v1/contracts/{contractId}/milestones` returns contract milestones as
   `ContractMilestoneViewResponse` DTOs. Snapshot fields (`milestoneName`,
@@ -103,8 +123,32 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/reject`
 - `GET /api/v1/contracts/{contractId}/milestones`
 - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
+- `POST /api/v1/contracts/{contractId}/termination-requests`
+- `GET /api/v1/contracts/{contractId}/termination-requests`
+- `GET /api/v1/termination-requests/{terminationRequestId}`
+- `POST /api/v1/termination-requests/{terminationRequestId}/assign-staff`
+- `POST /api/v1/termination-requests/{terminationRequestId}/approve`
+- `POST /api/v1/termination-requests/{terminationRequestId}/reject`
+- `POST /api/v1/termination-requests/{terminationRequestId}/partial-evidence`
+- `POST /api/v1/termination-requests/{terminationRequestId}/execute-settlement`
+- `POST /api/v1/termination-requests/{terminationRequestId}/refund-deposit`
+- `POST /api/v1/termination-requests/{terminationRequestId}/withdraw`
 - `POST /api/v1/deliverables`
+- `POST /api/v1/milestones/{milestoneId}/deliverables`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
+- `POST /api/v1/milestones/{milestoneId}/start`
 - `POST /api/v1/milestones/{milestoneId}/complete`
+- `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...`
+- `POST /api/v1/disputes/{disputeId}/escalation-request`
+- `POST /api/v1/disputes/{disputeId}/assign-staff`
+- `POST /api/v1/disputes/{disputeId}/reject-intervention`
+- `POST /api/v1/disputes/{disputeId}/staff-decision`
+- `POST /api/v1/disputes/{disputeId}/execute-settlement`
+- `POST /api/v1/disputes/{disputeId}/cancel`
+- `POST /api/v1/case-attachments`
+- `GET /api/v1/case-attachments?ownerType=...&ownerId=...`
+- `POST /api/v1/contracts/{contractId}/reviews`
+- `GET /api/v1/contracts/{contractId}/reviews`
 - `POST /api/v1/milestones/sla-auto-approve`
 - `GET /api/v1/milestones/{milestoneId}/criteria`
 - `POST /api/v1/milestones/{milestoneId}/criteria`
@@ -114,5 +158,6 @@ Alternate exits:
 ## Notifications And Audit
 
 The backend records audit events for draft creation, signing, NDA signing,
-deposit activation, rejection, milestone completion, contract completion,
+deposit activation, milestone start/completion, dispute cancellation and
+settlement, termination request review/settlement/refund, contract completion,
 deliverable submission, and termination.

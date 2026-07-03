@@ -11,6 +11,7 @@ import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.*;
+import com.aitasker.be.service.core.AdminService;
 import com.aitasker.be.service.core.ContractExecutionService;
 import com.aitasker.be.service.core.PaymentWalletService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class ContractExecutionController {
     private final ContractExecutionService service;
     private final PaymentWalletService paymentWalletService;
+    private final AdminService adminService;
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/contracts/from-proposals/{proposalId}")
@@ -138,6 +140,22 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("DEPOSIT MILESTONE ESCROW SUCCESS", service.depositMilestoneEscrow(contractId, milestoneId)));
     }
 
+    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/deposit")
+    public ResponseEntity<ApiResponse<MilestoneEntity>> depositMilestone(@PathVariable Integer contractId, @PathVariable Integer milestoneId) {
+        return ResponseEntity.ok(ApiResponse.success("DEPOSIT MILESTONE SUCCESS", service.depositMilestoneEscrow(contractId, milestoneId)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/start")
+    public ResponseEntity<ApiResponse<MilestoneEntity>> startMilestone(@PathVariable Integer milestoneId) {
+        return ResponseEntity.ok(ApiResponse.success("START MILESTONE SUCCESS", service.startMilestone(milestoneId)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/deliverables")
+    public ResponseEntity<ApiResponse<DeliverableEntity>> submitMilestoneDeliverable(@PathVariable Integer milestoneId, @RequestBody DeliverableEntity request) {
+        request.setMilestoneId(milestoneId);
+        return ResponseEntity.ok(ApiResponse.success("SUBMIT DELIVERABLE SUCCESS", service.submitDeliverable(request)));
+    }
+
     @PostMapping("/milestones/{milestoneId}/approve")
     public ResponseEntity<ApiResponse<MilestoneEntity>> approveMilestone(@PathVariable Integer milestoneId) {
         return ResponseEntity.ok(ApiResponse.success("APPROVE MILESTONE SUCCESS", service.approveMilestone(milestoneId)));
@@ -193,13 +211,33 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("INITIATE DISPUTE SUCCESS", service.initiateDispute(contractId, milestoneId, initiatedBy)));
     }
 
+    @PostMapping("/milestones/{milestoneId}/disputes")
+    public ResponseEntity<ApiResponse<DisputeEntity>> initiateMilestoneDispute(@PathVariable Integer milestoneId, @RequestParam Integer contractId, @RequestParam(required = false) String initiatedBy) {
+        return ResponseEntity.ok(ApiResponse.success("INITIATE DISPUTE SUCCESS", service.initiateDispute(contractId, milestoneId, initiatedBy)));
+    }
+
     @PostMapping("/disputes/{disputeId}/escalate")
     public ResponseEntity<ApiResponse<DisputeEntity>> escalateDispute(@PathVariable Integer disputeId, @RequestParam(required = false) String reason, @RequestParam(required = false) String evidenceFile) {
         return ResponseEntity.ok(ApiResponse.success("ESCALATE DISPUTE SUCCESS", service.escalateDispute(disputeId, reason, evidenceFile)));
     }
 
+    @PostMapping("/disputes/{disputeId}/escalation-request")
+    public ResponseEntity<ApiResponse<DisputeEntity>> requestEscalation(@PathVariable Integer disputeId, @RequestParam(required = false) String reason, @RequestParam(required = false) String evidenceFile) {
+        return ResponseEntity.ok(ApiResponse.success("ESCALATION REQUEST SUCCESS", service.escalateDispute(disputeId, reason, evidenceFile)));
+    }
+
+    @PostMapping("/disputes/{disputeId}/assign-staff")
+    public ResponseEntity<ApiResponse<DisputeEntity>> assignDisputeStaff(@PathVariable Integer disputeId, @RequestParam Integer staffId) {
+        return ResponseEntity.ok(ApiResponse.success("ASSIGN DISPUTE STAFF SUCCESS", service.assignDispute(disputeId, staffId)));
+    }
+
     @PostMapping("/admin/disputes/{disputeId}/intervention/reject")
     public ResponseEntity<ApiResponse<DisputeEntity>> rejectIntervention(@PathVariable Integer disputeId) {
+        return ResponseEntity.ok(ApiResponse.success("REJECT INTERVENTION SUCCESS", service.rejectIntervention(disputeId)));
+    }
+
+    @PostMapping("/disputes/{disputeId}/reject-intervention")
+    public ResponseEntity<ApiResponse<DisputeEntity>> rejectInterventionAlias(@PathVariable Integer disputeId) {
         return ResponseEntity.ok(ApiResponse.success("REJECT INTERVENTION SUCCESS", service.rejectIntervention(disputeId)));
     }
 
@@ -208,9 +246,64 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("STAFF DECISION SUCCESS", service.staffDecide(disputeId, expertPercent, note)));
     }
 
+    @PostMapping("/disputes/{disputeId}/staff-decision")
+    public ResponseEntity<ApiResponse<DisputeEntity>> staffDecideAlias(@PathVariable Integer disputeId, @RequestParam Integer expertPercent, @RequestParam(required = false) String note) {
+        return ResponseEntity.ok(ApiResponse.success("STAFF DECISION SUCCESS", service.staffDecide(disputeId, expertPercent, note)));
+    }
+
     @PostMapping("/admin/disputes/{disputeId}/settlement/execute")
     public ResponseEntity<ApiResponse<DisputeEntity>> executeDisputeSettlement(@PathVariable Integer disputeId) {
         return ResponseEntity.ok(ApiResponse.success("EXECUTE DISPUTE SETTLEMENT SUCCESS", service.executeDisputeSettlement(disputeId)));
+    }
+
+    @PostMapping("/disputes/{disputeId}/execute-settlement")
+    public ResponseEntity<ApiResponse<DisputeEntity>> executeDisputeSettlementAlias(@PathVariable Integer disputeId) {
+        return ResponseEntity.ok(ApiResponse.success("EXECUTE DISPUTE SETTLEMENT SUCCESS", service.executeDisputeSettlement(disputeId)));
+    }
+
+    @PostMapping("/disputes/{disputeId}/cancel")
+    public ResponseEntity<ApiResponse<DisputeEntity>> cancelDispute(@PathVariable Integer disputeId, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("CANCEL DISPUTE SUCCESS", service.cancelDispute(disputeId, reason)));
+    }
+
+    @PostMapping("/contracts/{contractId}/termination-requests")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> requestTermination(@PathVariable Integer contractId, @RequestBody TerminationRequestEntity request) {
+        return ResponseEntity.ok(ApiResponse.success("REQUEST TERMINATION SUCCESS", service.requestTerminationRequest(contractId, request)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/assign-staff")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> assignTerminationStaff(@PathVariable Long terminationRequestId, @RequestParam Integer staffId) {
+        return ResponseEntity.ok(ApiResponse.success("ASSIGN TERMINATION STAFF SUCCESS", service.assignTerminationStaff(terminationRequestId, staffId)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/reject")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> rejectTermination(@PathVariable Long terminationRequestId, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("REJECT TERMINATION SUCCESS", service.rejectTermination(terminationRequestId, reason)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/approve")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> approveTermination(@PathVariable Long terminationRequestId, @RequestBody(required = false) TerminationRequestEntity request) {
+        return ResponseEntity.ok(ApiResponse.success("APPROVE TERMINATION SUCCESS", service.approveTermination(terminationRequestId, request)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/partial-evidence")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> submitPartialEvidence(@PathVariable Long terminationRequestId, @RequestBody TerminationRequestEntity request) {
+        return ResponseEntity.ok(ApiResponse.success("SUBMIT PARTIAL EVIDENCE SUCCESS", service.submitPartialEvidence(terminationRequestId, request)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/execute-settlement")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> executeTerminationSettlement(@PathVariable Long terminationRequestId) {
+        return ResponseEntity.ok(ApiResponse.success("EXECUTE TERMINATION SETTLEMENT SUCCESS", service.executeTerminationSettlement(terminationRequestId)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/withdraw")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> withdrawTermination(@PathVariable Long terminationRequestId, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("WITHDRAW TERMINATION SUCCESS", service.withdrawTerminationRequest(terminationRequestId, reason)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/refund-deposit")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> refundTerminationDeposit(@PathVariable Long terminationRequestId, @RequestBody DepositRefundRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("REFUND TERMINATION DEPOSIT SUCCESS", service.refundDepositAfterTermination(terminationRequestId, request)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
@@ -291,6 +384,37 @@ public class ContractExecutionController {
     public ResponseEntity<ApiResponse<DisputeEntity>> getDispute(@PathVariable Integer disputeId) { return ResponseEntity.ok(ApiResponse.success("GET DISPUTE SUCCESS", service.getDispute(disputeId))); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
+    @GetMapping("/contracts/{contractId}/termination-requests")
+    public ResponseEntity<ApiResponse<List<TerminationRequestEntity>>> listTerminationRequests(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("LIST TERMINATION REQUESTS SUCCESS", service.listTerminationRequestsByContract(contractId)));
+    }
+
+    @GetMapping("/termination-requests/{terminationRequestId}")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> getTerminationRequest(@PathVariable Long terminationRequestId) {
+        return ResponseEntity.ok(ApiResponse.success("GET TERMINATION REQUEST SUCCESS", service.getTerminationRequest(terminationRequestId)));
+    }
+
+    @PostMapping("/case-attachments")
+    public ResponseEntity<ApiResponse<CaseAttachmentEntity>> createCaseAttachment(@RequestBody CaseAttachmentEntity request) {
+        return ResponseEntity.ok(ApiResponse.success("CREATE CASE ATTACHMENT SUCCESS", service.createCaseAttachment(request)));
+    }
+
+    @GetMapping("/case-attachments")
+    public ResponseEntity<ApiResponse<List<CaseAttachmentEntity>>> listCaseAttachments(@RequestParam String ownerType, @RequestParam Long ownerId) {
+        return ResponseEntity.ok(ApiResponse.success("LIST CASE ATTACHMENTS SUCCESS", service.listCaseAttachments(ownerType, ownerId)));
+    }
+
+    @PostMapping("/contracts/{contractId}/reviews")
+    public ResponseEntity<ApiResponse<ReviewEntity>> createContractReview(@PathVariable Integer contractId, @RequestBody ReviewEntity request) {
+        request.setContractId(contractId);
+        return ResponseEntity.ok(ApiResponse.success("CREATE REVIEW SUCCESS", adminService.createReview(request)));
+    }
+
+    @GetMapping("/contracts/{contractId}/reviews")
+    public ResponseEntity<ApiResponse<Object>> listContractReviews(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("LIST REVIEWS SUCCESS", adminService.listReviewsByContract(contractId)));
+    }
+
     @GetMapping("/jobs/{jobId}/matching")
     public ResponseEntity<ApiResponse<Object>> matching(@PathVariable Integer jobId) { return ResponseEntity.ok(ApiResponse.success("MATCHING SUCCESS", service.matchingByKeyword(jobId))); }
 }

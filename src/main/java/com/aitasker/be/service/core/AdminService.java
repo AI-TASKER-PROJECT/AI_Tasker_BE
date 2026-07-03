@@ -56,7 +56,7 @@ public class AdminService {
             throw new AppException("RATING PHAI NAM TRONG KHOANG 1 DEN 5");
         }
         ContractEntity contract = contractRepository.findById(input.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
-        if (!List.of("COMPLETED", "CANCELLED").contains(contract.getStatus())) {
+        if (!ContractEntity.STATUS_CLOSED.equals(contract.getStatus())) {
             throw new AppException("CHI DUOC DANH GIA KHI CONTRACT DA KET THUC");
         }
         AccountEntity actor = accessService.currentAccount();

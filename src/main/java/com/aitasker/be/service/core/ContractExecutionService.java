@@ -9,6 +9,7 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
+import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -41,10 +43,14 @@ public class ContractExecutionService {
     private final DeliverableRepository deliverableRepository;
     private final TransactionRepository transactionRepository;
     private final DisputeRepository disputeRepository;
+    private final TerminationRequestRepository terminationRequestRepository;
+    private final CaseAttachmentRepository caseAttachmentRepository;
+    private final WalletTransactionRepository walletTransactionRepository;
     private final StaffRepository staffRepository;
     private final SystemSettingRepository systemSettingRepository;
     private final SystemWalletService systemWalletService;
     private final WalletLedgerService walletLedgerService;
+    private final PaymentWalletService paymentWalletService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -326,24 +332,46 @@ public class ContractExecutionService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     public ContractEntity requestTermination(Integer contractId, String reason) {
+        requestTerminationRequest(contractId, TerminationRequestEntity.builder().requestReason(reason).build());
+        return contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+    }
+
+    @Transactional
+    public TerminationRequestEntity requestTerminationRequest(Integer contractId, TerminationRequestEntity request) {
         accessService.requireRole("BUSINESS", "EXPERT");
         accessService.requireApprovedAccount();
+        String reason = request == null ? null : request.getRequestReason();
         if (reason == null || reason.isBlank()) throw new AppException("LY DO CHAM DUT KHONG DUOC DE TRONG");
         ContractEntity contract = contractRepository.findById(contractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
         AccountEntity actor = accessService.currentAccount();
-        Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId()).map(BusinessProfileEntity::getBusinessId).orElse(null);
-        Integer expertId = expertProfileRepository.findByAccountId(actor.getAccountId()).map(ExpertProfileEntity::getExpertId).orElse(null);
-        boolean isParticipant = (businessId != null && businessId.equals(contract.getBusinessId()))
-                || (expertId != null && expertId.equals(contract.getExpertId()));
-        if (!isParticipant) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
-        if (!List.of(ContractEntity.STATUS_ACTIVE, ContractEntity.STATUS_TERMINATION_PENDING).contains(contract.getStatus())) {
+        String role = actor.getRole().getRoleName();
+        requireParticipant(contract, actor);
+        if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) {
             throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP YEU CAU CHAM DUT");
         }
+        if (!activeTerminationRequests(contractId).isEmpty()) {
+            throw new AppException("CONTRACT DA CO YEU CAU CHAM DUT DANG HOAT DONG");
+        }
+        Integer currentMilestoneId = request == null ? null : request.getCurrentMilestoneId();
+        if (currentMilestoneId == null) currentMilestoneId = currentExecutionMilestone(contractId).map(ContractMilestoneEntity::getJobMilestoneId).orElse(null);
+        LocalDateTime now = LocalDateTime.now();
         contract.setStatus(ContractEntity.STATUS_TERMINATION_PENDING);
         contract.setTerminationReason(reason.trim());
-        contract.setUpdatedAt(LocalDateTime.now());
-        ContractEntity saved = contractRepository.save(contract);
-        auditLogService.record(AuditLogService.ACTION_TERMINATE_CONTRACT, "contracts", String.valueOf(contractId), actor.getAccountId());
+        contract.setUpdatedAt(now);
+        contractRepository.save(contract);
+        TerminationRequestEntity saved = terminationRequestRepository.save(TerminationRequestEntity.builder()
+                .contractId(contractId)
+                .currentMilestoneId(currentMilestoneId)
+                .requestedByAccountId(actor.getAccountId())
+                .requestedByRole(role)
+                .requestReason(reason.trim())
+                .requestFileUrl(request == null ? null : request.getRequestFileUrl())
+                .status(TerminationRequestEntity.STATUS_REQUESTED)
+                .partialEvidenceRequired(false)
+                .depositRefundRequired(true)
+                .build());
+        auditLogService.record("TERMINATION_REQUESTED", "termination_requests", String.valueOf(saved.getTerminationRequestId()), actor.getAccountId());
+        saveAttachmentIfPresent(CaseAttachmentEntity.OWNER_TERMINATION_REQUEST, saved.getTerminationRequestId(), request == null ? null : request.getRequestFileUrl(), null, null, reason);
         return saved;
     }
 
@@ -355,28 +383,39 @@ public class ContractExecutionService {
         if (!List.of(ContractEntity.STATUS_ACTIVE, ContractEntity.STATUS_TERMINATION_PENDING).contains(contract.getStatus())) {
             throw new AppException("CONTRACT KHONG O TRANG THAI CHO PHEP CHAM DUT");
         }
+        if (hasActiveDispute(contractId)) {
+            throw new AppException("KHONG THE SETTLE TERMINATION KHI CONTRACT CON DISPUTE DANG HOAT DONG");
+        }
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId())
                 .map(BusinessProfileEntity::getAccountId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         List<String> refundableStatuses = List.of(
                 ContractMilestoneEntity.STATUS_DEPOSITED,
                 ContractMilestoneEntity.STATUS_IN_PROGRESS,
-                ContractMilestoneEntity.STATUS_UNDER_REVIEW,
-                ContractMilestoneEntity.STATUS_DISPUTED
+                ContractMilestoneEntity.STATUS_UNDER_REVIEW
         );
         List<ContractMilestoneEntity> contractMilestones = contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contractId);
         for (ContractMilestoneEntity milestone : contractMilestones) {
-            if (!refundableStatuses.contains(milestone.getStatus())) continue;
-            walletLedgerService.releaseEscrowToAvailable(
-                    businessAccountId,
-                    milestone.getFinalBudget(),
-                    "MILESTONE_ESCROW_REFUND",
-                    "CONTRACT_MILESTONE",
-                    milestone.getContractMilestoneId().longValue(),
-                    "Refund escrow on contract termination"
-            );
+            if (refundableStatuses.contains(milestone.getStatus())) {
+                ensureEscrowNotReleased(milestone);
+                walletLedgerService.releaseEscrowToAvailable(
+                        businessAccountId,
+                        milestone.getFinalBudget(),
+                        WalletTransactionEntity.TX_ESCROW_REFUND,
+                        "MILESTONE",
+                        milestone.getJobMilestoneId().longValue(),
+                        "Refund escrow on contract termination"
+                );
+                markEscrowReleased(milestone, "TERMINATION", contractId.longValue());
+            }
+            if (List.of(ContractMilestoneEntity.STATUS_COMPLETED, ContractMilestoneEntity.STATUS_CANCELLED).contains(milestone.getStatus())) continue;
             milestone.setStatus(ContractMilestoneEntity.STATUS_CANCELLED);
             contractMilestoneRepository.save(milestone);
+            milestoneRepository.findById(milestone.getJobMilestoneId()).ifPresent(jobMilestone -> {
+                jobMilestone.setStatus(ContractMilestoneEntity.STATUS_CANCELLED);
+                jobMilestone.setUpdatedAt(LocalDateTime.now());
+                milestoneRepository.save(jobMilestone);
+            });
         }
         LocalDateTime now = LocalDateTime.now();
         contract.setStatus(ContractEntity.STATUS_TERMINATED);
@@ -509,7 +548,7 @@ public class ContractExecutionService {
         if (contract.getBusinessNdaSignedAt() == null || contract.getExpertNdaSignedAt() == null) {
             throw new AppException("HAI BEN PHAI KY NDA TRUOC KHI BAN GIAO");
         }
-        if (!List.of(ContractMilestoneEntity.STATUS_DEPOSITED, ContractMilestoneEntity.STATUS_REJECTED).contains(milestone.getStatus())) {
+        if (!List.of(ContractMilestoneEntity.STATUS_DEPOSITED, ContractMilestoneEntity.STATUS_DISPUTED).contains(milestone.getStatus())) {
             throw new AppException("MILESTONE CHUA SAN SANG DE SUBMIT DELIVERABLE");
         }
         ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestone.getMilestoneId());
@@ -544,13 +583,39 @@ public class ContractExecutionService {
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         if (milestone.getContractId() != null && !contractId.equals(milestone.getContractId())) throw new AppException("MILESTONE KHONG THUOC CONTRACT NAY");
         ContractMilestoneEntity contractMilestone = findContractMilestone(contractId, milestoneId);
+        if (!ContractMilestoneEntity.STATUS_PENDING.equals(contractMilestone.getStatus())) {
+            throw new AppException("MILESTONE KHONG O TRANG THAI PENDING DE DEPOSIT");
+        }
+        ensureEscrowNotReleased(contractMilestone);
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
-        walletLedgerService.holdEscrowFromAvailable(businessAccountId, contractMilestone.getFinalBudget(), "MILESTONE_ESCROW_DEPOSIT", "MILESTONE", milestoneId.longValue(), "Deposit milestone escrow");
+        enrichLedger(walletLedgerService.holdEscrowFromAvailable(businessAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_DEPOSIT, "MILESTONE", milestoneId.longValue(), "Deposit milestone escrow"),
+                contractId, milestoneId, walletMetadata("MILESTONE_ESCROW_DEPOSIT", null, null, accessService.currentAccount().getAccountId(), businessAccountId, null, null, contractMilestone.getFinalBudget(), BigDecimal.ZERO));
         milestone.setStatus(ContractMilestoneEntity.STATUS_DEPOSITED);
         milestone.setUpdatedAt(LocalDateTime.now());
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_DEPOSITED);
         contractMilestoneRepository.save(contractMilestone);
         return milestoneRepository.save(milestone);
+    }
+
+    @Transactional
+    public MilestoneEntity startMilestone(Integer milestoneId) {
+        accessService.requireRole("EXPERT");
+        accessService.requireApprovedAccount();
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        ContractEntity contract = requireExpertOwnedContract(Optional.ofNullable(milestone.getContractId()).orElseGet(() -> contractRepository.findByJobId(milestone.getJobId()).map(ContractEntity::getContractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA MILESTONE"))));
+        if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) throw new AppException("CHI DUOC BAT DAU MILESTONE KHI CONTRACT ACTIVE");
+        ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestoneId);
+        if (!ContractMilestoneEntity.STATUS_DEPOSITED.equals(contractMilestone.getStatus())) {
+            throw new AppException("MILESTONE PHAI DUOC DEPOSIT TRUOC KHI BAT DAU");
+        }
+        ensureEscrowNotReleased(contractMilestone);
+        milestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
+        milestone.setUpdatedAt(LocalDateTime.now());
+        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
+        contractMilestoneRepository.save(contractMilestone);
+        MilestoneEntity saved = milestoneRepository.save(milestone);
+        auditLogService.record("MILESTONE_STARTED", "milestones", String.valueOf(milestoneId), accessService.currentAccount().getAccountId());
+        return saved;
     }
 
     @Transactional
@@ -561,14 +626,23 @@ public class ContractExecutionService {
         ContractEntity contract = requireBusinessOwnedContract(Optional.ofNullable(milestone.getContractId()).orElseGet(() -> contractRepository.findByJobId(milestone.getJobId()).map(ContractEntity::getContractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA MILESTONE"))));
         if (!ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(milestone.getStatus())) throw new AppException("MILESTONE CHUA O TRANG THAI CHO DUYET");
         ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestoneId);
+        ensureEscrowNotReleased(contractMilestone);
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId()).map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
-        walletLedgerService.debitEscrow(businessAccountId, contractMilestone.getFinalBudget(), "MILESTONE_APPROVE", "MILESTONE", milestoneId.longValue(), "Release approved milestone escrow");
-        walletLedgerService.creditAvailable(expertAccountId, contractMilestone.getFinalBudget(), "MILESTONE_PAYOUT", "MILESTONE", milestoneId.longValue(), "Milestone approved payout");
-        milestone.setStatus(ContractMilestoneEntity.STATUS_APPROVED);
-        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_APPROVED);
+        String metadata = walletMetadata("BUSINESS_APPROVAL", null, null, accessService.currentAccount().getAccountId(), businessAccountId, expertAccountId, BigDecimal.valueOf(100), contractMilestone.getFinalBudget(), BigDecimal.ZERO);
+        enrichLedger(walletLedgerService.debitEscrow(businessAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE", milestoneId.longValue(), "Release approved milestone escrow"), contract.getContractId(), milestoneId, metadata);
+        enrichLedger(walletLedgerService.creditAvailable(expertAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE", milestoneId.longValue(), "Milestone approved payout"), contract.getContractId(), milestoneId, metadata);
+        markEscrowReleased(contractMilestone, "BUSINESS_APPROVAL", milestoneId.longValue());
+        milestone.setEscrowReleasedAt(contractMilestone.getEscrowReleasedAt());
+        milestone.setSettlementSourceType(contractMilestone.getSettlementSourceType());
+        milestone.setSettlementSourceId(contractMilestone.getSettlementSourceId());
+        milestone.setStatus(ContractMilestoneEntity.STATUS_COMPLETED);
+        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_COMPLETED);
         contractMilestoneRepository.save(contractMilestone);
-        return milestoneRepository.save(milestone);
+        resolveActiveDisputeByBusinessApproval(milestoneId);
+        MilestoneEntity saved = milestoneRepository.save(milestone);
+        tryCompleteContract(contract, accessService.currentAccount().getAccountId());
+        return saved;
     }
 
     @Transactional
@@ -577,12 +651,16 @@ public class ContractExecutionService {
         accessService.requireApprovedAccount();
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
         ContractEntity contract = requireBusinessOwnedContract(Optional.ofNullable(milestone.getContractId()).orElseGet(() -> contractRepository.findByJobId(milestone.getJobId()).map(ContractEntity::getContractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA MILESTONE"))));
+        if (!ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(milestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA O TRANG THAI CHO TU CHOI");
+        }
         ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestoneId);
         contractMilestone.setResubmitCount((contractMilestone.getResubmitCount() == null ? 0 : contractMilestone.getResubmitCount()) + 1);
-        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_REJECTED);
-        milestone.setStatus(ContractMilestoneEntity.STATUS_REJECTED);
+        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_DISPUTED);
+        milestone.setStatus(ContractMilestoneEntity.STATUS_DISPUTED);
         milestone.setUpdatedAt(LocalDateTime.now());
         contractMilestoneRepository.save(contractMilestone);
+        createOrUpdateBusinessRejectionDispute(contract, milestoneId, reason);
         return milestoneRepository.save(milestone);
     }
 
@@ -591,15 +669,25 @@ public class ContractExecutionService {
         requireApprovedForBusinessOrExpert();
         ContractEntity contract = requireContractParticipantOrOperator(contractId);
         MilestoneEntity milestone = milestoneRepository.findById(milestoneId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
-        if (!ContractMilestoneEntity.STATUS_REJECTED.equals(milestone.getStatus())) {
-            throw new AppException("CHI DUOC KHOI TAO DISPUTE KHI MILESTONE DA BI TU CHOI");
+        if (!List.of(ContractMilestoneEntity.STATUS_IN_PROGRESS, ContractMilestoneEntity.STATUS_UNDER_REVIEW, ContractMilestoneEntity.STATUS_DISPUTED).contains(milestone.getStatus())) {
+            throw new AppException("MILESTONE KHONG O TRANG THAI CHO PHEP KHOI TAO DISPUTE");
+        }
+        if (!activeDisputesForMilestone(milestoneId).isEmpty()) {
+            throw new AppException("MILESTONE DA CO DISPUTE DANG HOAT DONG");
         }
         ContractMilestoneEntity contractMilestone = findContractMilestone(contractId, milestoneId);
+        String previousStatus = milestone.getStatus();
         milestone.setStatus(ContractMilestoneEntity.STATUS_DISPUTED);
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_DISPUTED);
         milestoneRepository.save(milestone);
         contractMilestoneRepository.save(contractMilestone);
-        DisputeEntity dispute = DisputeEntity.builder().contractId(contract.getContractId()).milestoneId(milestoneId).initiatedBy(initiatedBy).status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE).build();
+        DisputeEntity dispute = DisputeEntity.builder()
+                .contractId(contract.getContractId())
+                .milestoneId(milestoneId)
+                .initiatedBy(normalizeInitiator(initiatedBy))
+                .previousMilestoneStatus(previousStatus)
+                .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE)
+                .build();
         return disputeRepository.save(dispute);
     }
 
@@ -933,6 +1021,81 @@ public class ContractExecutionService {
         return Optional.empty();
     }
 
+    private List<String> activeDisputeStatuses() {
+        return List.of(
+                DisputeEntity.STATUS_PENDING_SELF_RESOLVE,
+                DisputeEntity.STATUS_ESCALATION_REQUESTED,
+                DisputeEntity.STATUS_STAFF_REVIEWING,
+                DisputeEntity.STATUS_STAFF_DECIDED
+        );
+    }
+
+    private List<DisputeEntity> activeDisputesForMilestone(Integer milestoneId) {
+        return disputeRepository.findByMilestoneIdAndStatusIn(milestoneId, activeDisputeStatuses());
+    }
+
+    private boolean hasActiveDispute(Integer contractId) {
+        return disputeRepository.findByContractId(contractId).stream()
+                .anyMatch(dispute -> activeDisputeStatuses().contains(dispute.getStatus()));
+    }
+
+    private void ensureEscrowNotReleased(ContractMilestoneEntity milestone) {
+        if (milestone.getEscrowReleasedAt() != null) {
+            throw new AppException("MILESTONE_ESCROW_DA_DUOC_RELEASE");
+        }
+    }
+
+    private void markEscrowReleased(ContractMilestoneEntity milestone, String sourceType, Long sourceId) {
+        milestone.setEscrowReleasedAt(LocalDateTime.now());
+        milestone.setSettlementSourceType(sourceType);
+        milestone.setSettlementSourceId(sourceId);
+    }
+
+    private String normalizeInitiator(String initiatedBy) {
+        if (initiatedBy == null || initiatedBy.isBlank()) {
+            String role = accessService.currentAccount().getRole().getRoleName();
+            if ("BUSINESS".equals(role) || "EXPERT".equals(role)) return role;
+            return "OTHER";
+        }
+        String normalized = initiatedBy.trim().toUpperCase();
+        if (!List.of("BUSINESS", "EXPERT", "OTHER").contains(normalized)) {
+            throw new AppException("INITIATED_BY KHONG HOP LE");
+        }
+        return normalized;
+    }
+
+    private void createOrUpdateBusinessRejectionDispute(ContractEntity contract, Integer milestoneId, String reason) {
+        List<DisputeEntity> active = activeDisputesForMilestone(milestoneId);
+        if (!active.isEmpty()) {
+            DisputeEntity dispute = active.get(0);
+            String newReason = reason == null || reason.isBlank() ? "Business rejected deliverable again" : reason.trim();
+            String existing = dispute.getEvidenceReport();
+            dispute.setEvidenceReport(existing == null || existing.isBlank() ? newReason : existing + "\n" + newReason);
+            dispute.setStatus(DisputeEntity.STATUS_PENDING_SELF_RESOLVE);
+            disputeRepository.save(dispute);
+            return;
+        }
+        DisputeEntity dispute = DisputeEntity.builder()
+                .contractId(contract.getContractId())
+                .milestoneId(milestoneId)
+                .initiatedBy("BUSINESS")
+                .previousMilestoneStatus(ContractMilestoneEntity.STATUS_UNDER_REVIEW)
+                .evidenceReport(reason)
+                .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE)
+                .build();
+        disputeRepository.save(dispute);
+    }
+
+    private void resolveActiveDisputeByBusinessApproval(Integer milestoneId) {
+        for (DisputeEntity dispute : activeDisputesForMilestone(milestoneId)) {
+            if (!DisputeEntity.STATUS_PENDING_SELF_RESOLVE.equals(dispute.getStatus())) continue;
+            dispute.setStatus(DisputeEntity.STATUS_RESOLVED);
+            dispute.setResolutionType(DisputeEntity.RESOLUTION_BUSINESS_APPROVED_AFTER_SELF_RESOLVE);
+            dispute.setResolvedAt(LocalDateTime.now());
+            disputeRepository.save(dispute);
+        }
+    }
+
     private ContractMilestoneEntity findContractMilestone(Integer contractId, Integer milestoneId) {
         return contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contractId).stream()
                 .filter(item -> milestoneId.equals(item.getJobMilestoneId()))
@@ -956,22 +1119,25 @@ public class ContractExecutionService {
 
     @Transactional
     public DisputeEntity rejectIntervention(Integer disputeId) {
-        accessService.requireRole("ADMIN");
+        accessService.requireRole("STAFF");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requireAssignedStaff(dispute);
         if (!DisputeEntity.STATUS_STAFF_REVIEWING.equals(dispute.getStatus())) {
             throw new AppException("DISPUTE KHONG O TRANG THAI STAFF_REVIEWING");
         }
-        dispute.setStatus(DisputeEntity.STATUS_INTERVENTION_REJECTED);
+        dispute.setStaffDecisionNote("INTERVENTION_REJECTED");
+        dispute.setStatus(DisputeEntity.STATUS_PENDING_SELF_RESOLVE);
         return disputeRepository.save(dispute);
     }
 
     @Transactional
     public DisputeEntity staffDecide(Integer disputeId, Integer expertPercent, String note) {
-        accessService.requireRole("ADMIN");
+        accessService.requireRole("STAFF");
         if (expertPercent == null || expertPercent < 0 || expertPercent > 100) {
             throw new AppException("EXPERT PERCENT PHAI TU 0 DEN 100");
         }
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requireAssignedStaff(dispute);
         if (!DisputeEntity.STATUS_STAFF_REVIEWING.equals(dispute.getStatus())) {
             throw new AppException("CHI DUOC RA QUYET DINH KHI DISPUTE O TRANG THAI STAFF_REVIEWING");
         }
@@ -997,26 +1163,288 @@ public class ContractExecutionService {
         if (!ContractMilestoneEntity.STATUS_DISPUTED.equals(contractMilestone.getStatus())) {
             throw new AppException("MILESTONE KHONG O TRANG THAI DISPUTED DE SETTLEMENT");
         }
+        ensureEscrowNotReleased(contractMilestone);
         BigDecimal escrowAmount = contractMilestone.getFinalBudget();
         BigDecimal expertPayout = escrowAmount.multiply(BigDecimal.valueOf(dispute.getStaffDecisionPercentage())).divide(BigDecimal.valueOf(100));
         BigDecimal businessRefund = escrowAmount.subtract(expertPayout);
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId()).map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
-        walletLedgerService.debitEscrow(businessAccountId, escrowAmount, "DISPUTE_SETTLEMENT", "DISPUTE", disputeId.longValue(), "Dispute settlement debit");
+        String metadata = walletMetadata("DISPUTE", disputeId, null, accessService.currentAccount().getAccountId(), businessAccountId, expertAccountId, BigDecimal.valueOf(dispute.getStaffDecisionPercentage()), expertPayout, businessRefund);
+        enrichLedger(walletLedgerService.debitEscrow(businessAccountId, escrowAmount, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "DISPUTE", disputeId.longValue(), "Dispute settlement debit"), contract.getContractId(), dispute.getMilestoneId(), metadata);
         if (expertPayout.signum() > 0) {
-            walletLedgerService.creditAvailable(expertAccountId, expertPayout, "DISPUTE_EXPERT_PAYOUT", "DISPUTE", disputeId.longValue(), "Dispute expert payout");
+            enrichLedger(walletLedgerService.creditAvailable(expertAccountId, expertPayout, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "DISPUTE", disputeId.longValue(), "Dispute expert payout"), contract.getContractId(), dispute.getMilestoneId(), metadata);
         }
         if (businessRefund.signum() > 0) {
-            walletLedgerService.creditAvailable(businessAccountId, businessRefund, "DISPUTE_BUSINESS_REFUND", "DISPUTE", disputeId.longValue(), "Dispute business refund");
+            enrichLedger(walletLedgerService.creditAvailable(businessAccountId, businessRefund, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_REFUND, "DISPUTE", disputeId.longValue(), "Dispute business refund"), contract.getContractId(), dispute.getMilestoneId(), metadata);
         }
+        markEscrowReleased(contractMilestone, "DISPUTE", disputeId.longValue());
         milestoneRepository.findById(dispute.getMilestoneId()).ifPresent(milestone -> {
             milestone.setStatus(ContractMilestoneEntity.STATUS_COMPLETED);
+            milestone.setEscrowReleasedAt(contractMilestone.getEscrowReleasedAt());
+            milestone.setSettlementSourceType(contractMilestone.getSettlementSourceType());
+            milestone.setSettlementSourceId(contractMilestone.getSettlementSourceId());
             milestone.setUpdatedAt(LocalDateTime.now());
             milestoneRepository.save(milestone);
         });
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_COMPLETED);
         contractMilestoneRepository.save(contractMilestone);
-        return dispute;
+        dispute.setStatus(DisputeEntity.STATUS_RESOLVED);
+        dispute.setResolutionType(DisputeEntity.RESOLUTION_STAFF_DECISION_SETTLEMENT);
+        dispute.setResolvedAt(LocalDateTime.now());
+        DisputeEntity saved = disputeRepository.save(dispute);
+        tryCompleteContract(contract, accessService.currentAccount().getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public DisputeEntity cancelDispute(Integer disputeId, String reason) {
+        DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        AccountEntity actor = accessService.currentAccount();
+        String role = actor.getRole().getRoleName();
+        boolean admin = "ADMIN".equals(role);
+        if (!admin) {
+            requireApprovedForBusinessOrExpert();
+            ContractEntity contract = requireContractParticipantOrOperator(dispute.getContractId());
+            boolean requester = role.equals(dispute.getInitiatedBy());
+            if (!requester || !isParticipant(contract, actor)) {
+                throw new AppException("CHI NGUOI TAO DISPUTE HOAC ADMIN MOI DUOC HUY");
+            }
+            if (!List.of(DisputeEntity.STATUS_PENDING_SELF_RESOLVE, DisputeEntity.STATUS_ESCALATION_REQUESTED).contains(dispute.getStatus())) {
+                throw new AppException("CHI DUOC HUY DISPUTE TRUOC KHI STAFF REVIEW");
+            }
+        }
+        if (!activeDisputeStatuses().contains(dispute.getStatus())) {
+            throw new AppException("DISPUTE KHONG O TRANG THAI CO THE HUY");
+        }
+        if (dispute.getMilestoneId() != null && !DisputeEntity.STATUS_STAFF_REVIEWING.equals(dispute.getStatus()) && !DisputeEntity.STATUS_STAFF_DECIDED.equals(dispute.getStatus())) {
+            String restoredStatus = dispute.getPreviousMilestoneStatus() == null ? ContractMilestoneEntity.STATUS_IN_PROGRESS : dispute.getPreviousMilestoneStatus();
+            milestoneRepository.findById(dispute.getMilestoneId()).ifPresent(milestone -> {
+                milestone.setStatus(restoredStatus);
+                milestone.setUpdatedAt(LocalDateTime.now());
+                milestoneRepository.save(milestone);
+            });
+            contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(dispute.getContractId()).stream()
+                    .filter(item -> dispute.getMilestoneId().equals(item.getJobMilestoneId()))
+                    .findFirst()
+                    .ifPresent(item -> {
+                        item.setStatus(restoredStatus);
+                        contractMilestoneRepository.save(item);
+                    });
+        }
+        dispute.setStatus(DisputeEntity.STATUS_CANCELLED);
+        dispute.setResolutionType(admin ? DisputeEntity.RESOLUTION_CANCELLED_BY_ADMIN : DisputeEntity.RESOLUTION_CANCELLED_BY_INITIATOR);
+        dispute.setStaffDecisionNote(reason);
+        dispute.setCancelledAt(LocalDateTime.now());
+        DisputeEntity saved = disputeRepository.save(dispute);
+        auditLogService.record("DISPUTE_CANCELLED", "disputes", String.valueOf(disputeId), actor.getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public TerminationRequestEntity assignTerminationStaff(Long terminationRequestId, Integer staffId) {
+        accessService.requireRole("ADMIN");
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        if (!TerminationRequestEntity.STATUS_REQUESTED.equals(request.getStatus())) {
+            throw new AppException("YEU CAU CHAM DUT KHONG O TRANG THAI REQUESTED");
+        }
+        staffRepository.findById(staffId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY STAFF"));
+        request.setAssignedStaffId(staffId);
+        request.setStatus(TerminationRequestEntity.STATUS_STAFF_REVIEWING);
+        request.setStaffReviewStartedAt(LocalDateTime.now());
+        TerminationRequestEntity saved = terminationRequestRepository.save(request);
+        auditLogService.record("TERMINATION_STAFF_ASSIGNED", "termination_requests", String.valueOf(terminationRequestId), accessService.currentAccount().getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public TerminationRequestEntity rejectTermination(Long terminationRequestId, String reason) {
+        accessService.requireRole("STAFF");
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        requireAssignedTerminationStaff(request);
+        if (!TerminationRequestEntity.STATUS_STAFF_REVIEWING.equals(request.getStatus())) {
+            throw new AppException("YEU CAU CHAM DUT KHONG O TRANG THAI STAFF_REVIEWING");
+        }
+        ContractEntity contract = contractRepository.findById(request.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        request.setStatus(TerminationRequestEntity.STATUS_STAFF_REJECTED);
+        request.setStaffDecisionReason(reason);
+        request.setStaffDecidedAt(LocalDateTime.now());
+        contract.setStatus(ContractEntity.STATUS_ACTIVE);
+        contract.setUpdatedAt(LocalDateTime.now());
+        contractRepository.save(contract);
+        auditLogService.record("TERMINATION_REJECTED", "termination_requests", String.valueOf(terminationRequestId), accessService.currentAccount().getAccountId());
+        return terminationRequestRepository.save(request);
+    }
+
+    @Transactional
+    public TerminationRequestEntity approveTermination(Long terminationRequestId, TerminationRequestEntity input) {
+        accessService.requireRole("STAFF");
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        requireAssignedTerminationStaff(request);
+        if (!TerminationRequestEntity.STATUS_STAFF_REVIEWING.equals(request.getStatus())) {
+            throw new AppException("YEU CAU CHAM DUT KHONG O TRANG THAI STAFF_REVIEWING");
+        }
+        BigDecimal percent = input == null || input.getExpertPayoutPercentage() == null ? BigDecimal.ZERO : input.getExpertPayoutPercentage();
+        if (percent.compareTo(BigDecimal.ZERO) < 0 || percent.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new AppException("TY LE THANH TOAN CHO EXPERT PHAI TU 0 DEN 100");
+        }
+        request.setExpertPayoutPercentage(percent);
+        request.setStaffDecisionReason(input == null ? null : input.getStaffDecisionReason());
+        request.setStaffReport(input == null ? null : input.getStaffReport());
+        request.setPartialEvidenceRequired(input != null && Boolean.TRUE.equals(input.getPartialEvidenceRequired()));
+        request.setStaffDecidedAt(LocalDateTime.now());
+        request.setStatus(terminationNeedsSettlement(request) ? TerminationRequestEntity.STATUS_AWAITING_SETTLEMENT_EXECUTION : TerminationRequestEntity.STATUS_AWAITING_DEPOSIT_REFUND);
+        ContractEntity contract = contractRepository.findById(request.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        contract.setStatus(ContractEntity.STATUS_TERMINATION_PENDING);
+        contract.setTerminationNote(request.getStaffDecisionReason());
+        contract.setUpdatedAt(LocalDateTime.now());
+        contractRepository.save(contract);
+        if (request.getStaffReport() != null && !request.getStaffReport().isBlank()) {
+            saveAttachmentIfPresent(CaseAttachmentEntity.OWNER_STAFF_REPORT, terminationRequestId, input == null ? null : input.getRequestFileUrl(), null, null, request.getStaffReport());
+        }
+        auditLogService.record("TERMINATION_APPROVED", "termination_requests", String.valueOf(terminationRequestId), accessService.currentAccount().getAccountId());
+        return terminationRequestRepository.save(request);
+    }
+
+    @Transactional
+    public TerminationRequestEntity submitPartialEvidence(Long terminationRequestId, TerminationRequestEntity input) {
+        accessService.requireRole("EXPERT");
+        accessService.requireApprovedAccount();
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        ContractEntity contract = requireExpertOwnedContract(request.getContractId());
+        if (!isParticipant(contract, accessService.currentAccount())) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        if (!List.of(TerminationRequestEntity.STATUS_STAFF_REVIEWING, TerminationRequestEntity.STATUS_AWAITING_SETTLEMENT_EXECUTION).contains(request.getStatus())) {
+            throw new AppException("YEU CAU CHAM DUT KHONG NHAN PARTIAL EVIDENCE O TRANG THAI HIEN TAI");
+        }
+        if (input == null || input.getPartialEvidenceUrl() == null || input.getPartialEvidenceUrl().isBlank()) {
+            throw new AppException("PARTIAL EVIDENCE URL KHONG DUOC DE TRONG");
+        }
+        request.setPartialEvidenceUrl(input.getPartialEvidenceUrl());
+        request.setPartialEvidenceNote(input.getPartialEvidenceNote());
+        request.setPartialEvidenceSubmittedAt(LocalDateTime.now());
+        TerminationRequestEntity saved = terminationRequestRepository.save(request);
+        saveAttachmentIfPresent(CaseAttachmentEntity.OWNER_PARTIAL_EVIDENCE, terminationRequestId, input.getPartialEvidenceUrl(), null, null, input.getPartialEvidenceNote());
+        auditLogService.record("TERMINATION_PARTIAL_EVIDENCE_SUBMITTED", "termination_requests", String.valueOf(terminationRequestId), accessService.currentAccount().getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public TerminationRequestEntity executeTerminationSettlement(Long terminationRequestId) {
+        accessService.requireRole("ADMIN");
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        if (!List.of(TerminationRequestEntity.STATUS_STAFF_APPROVED, TerminationRequestEntity.STATUS_AWAITING_SETTLEMENT_EXECUTION).contains(request.getStatus())) {
+            throw new AppException("YEU CAU CHAM DUT CHUA SAN SANG SETTLEMENT");
+        }
+        ContractEntity contract = contractRepository.findById(request.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        if (hasActiveDispute(contract.getContractId())) {
+            throw new AppException("KHONG THE SETTLE TERMINATION KHI CONTRACT CON DISPUTE DANG HOAT DONG");
+        }
+        Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
+        Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId()).map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
+        BigDecimal expertPercent = request.getExpertPayoutPercentage() == null ? BigDecimal.ZERO : request.getExpertPayoutPercentage();
+        BigDecimal expertPayout = BigDecimal.ZERO;
+        BigDecimal businessRefund = BigDecimal.ZERO;
+        ContractMilestoneEntity current = request.getCurrentMilestoneId() == null ? null : findContractMilestone(contract.getContractId(), request.getCurrentMilestoneId());
+        if (current != null && List.of(ContractMilestoneEntity.STATUS_DEPOSITED, ContractMilestoneEntity.STATUS_IN_PROGRESS, ContractMilestoneEntity.STATUS_UNDER_REVIEW, ContractMilestoneEntity.STATUS_DISPUTED).contains(current.getStatus())) {
+            ensureEscrowNotReleased(current);
+            BigDecimal escrowAmount = current.getFinalBudget();
+            expertPayout = escrowAmount.multiply(expertPercent).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            businessRefund = escrowAmount.subtract(expertPayout);
+            String metadata = walletMetadata("TERMINATION_REQUEST", null, terminationRequestId, accessService.currentAccount().getAccountId(), businessAccountId, expertAccountId, expertPercent, expertPayout, businessRefund);
+            WalletTransactionEntity settlementDebit = enrichLedger(walletLedgerService.debitEscrow(businessAccountId, escrowAmount, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "TERMINATION_REQUEST", terminationRequestId, "Termination settlement debit"), contract.getContractId(), current.getJobMilestoneId(), metadata);
+            if (expertPayout.signum() > 0) {
+                enrichLedger(walletLedgerService.creditAvailable(expertAccountId, expertPayout, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "TERMINATION_REQUEST", terminationRequestId, "Termination expert payout"), contract.getContractId(), current.getJobMilestoneId(), metadata);
+            }
+            if (businessRefund.signum() > 0) {
+                enrichLedger(walletLedgerService.creditAvailable(businessAccountId, businessRefund, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_REFUND, "TERMINATION_REQUEST", terminationRequestId, "Termination business refund"), contract.getContractId(), current.getJobMilestoneId(), metadata);
+            }
+            markEscrowReleased(current, "TERMINATION_REQUEST", terminationRequestId);
+            current.setStatus(expertPayout.signum() > 0 ? ContractMilestoneEntity.STATUS_COMPLETED : ContractMilestoneEntity.STATUS_CANCELLED);
+            contractMilestoneRepository.save(current);
+            request.setSettlementWalletTransactionId(settlementDebit == null ? null : settlementDebit.getId());
+            syncLiveMilestoneFromContractMilestone(current);
+        }
+        cancelRemainingMilestones(contract.getContractId(), request.getCurrentMilestoneId());
+        contract.setStatus(ContractEntity.STATUS_TERMINATED);
+        contract.setTerminatedAt(LocalDateTime.now());
+        contract.setUpdatedAt(LocalDateTime.now());
+        contractRepository.save(contract);
+        request.setExpertPayoutAmount(expertPayout);
+        request.setBusinessRefundAmount(businessRefund);
+        request.setSettlementExecutedAt(LocalDateTime.now());
+        request.setStatus(TerminationRequestEntity.STATUS_AWAITING_DEPOSIT_REFUND);
+        auditLogService.record("TERMINATION_SETTLEMENT_EXECUTED", "termination_requests", String.valueOf(terminationRequestId), accessService.currentAccount().getAccountId());
+        return terminationRequestRepository.save(request);
+    }
+
+    @Transactional
+    public TerminationRequestEntity withdrawTerminationRequest(Long terminationRequestId, String reason) {
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        AccountEntity actor = accessService.currentAccount();
+        boolean admin = "ADMIN".equals(actor.getRole().getRoleName());
+        if (!admin && !actor.getAccountId().equals(request.getRequestedByAccountId())) {
+            throw new AppException("CHI NGUOI TAO YEU CAU HOAC ADMIN MOI DUOC HUY");
+        }
+        if (!List.of(TerminationRequestEntity.STATUS_REQUESTED, TerminationRequestEntity.STATUS_STAFF_REVIEWING).contains(request.getStatus())) {
+            throw new AppException("YEU CAU CHAM DUT DA QUA BUOC CO THE HUY");
+        }
+        ContractEntity contract = contractRepository.findById(request.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        request.setStatus(TerminationRequestEntity.STATUS_CANCELLED);
+        request.setCancelledAt(LocalDateTime.now());
+        request.setCancelledByAccountId(actor.getAccountId());
+        request.setCancellationReason(reason);
+        contract.setStatus(ContractEntity.STATUS_ACTIVE);
+        contract.setUpdatedAt(LocalDateTime.now());
+        contractRepository.save(contract);
+        auditLogService.record("TERMINATION_CANCELLED", "termination_requests", String.valueOf(terminationRequestId), actor.getAccountId());
+        return terminationRequestRepository.save(request);
+    }
+
+    @Transactional
+    public TerminationRequestEntity refundDepositAfterTermination(Long terminationRequestId, DepositRefundRequest refundRequest) {
+        accessService.requireRole("ADMIN");
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        if (!TerminationRequestEntity.STATUS_AWAITING_DEPOSIT_REFUND.equals(request.getStatus())) {
+            throw new AppException("YEU CAU CHAM DUT CHUA SAN SANG HOAN KY QUY");
+        }
+        ContractDepositEntity deposit = paymentWalletService.refundContractDeposit(request.getContractId(), refundRequest);
+        request.setDepositRefundedAt(LocalDateTime.now());
+        request.setDepositRefundTransactionId(deposit.getRefundTransactionId());
+        request.setStatus(TerminationRequestEntity.STATUS_COMPLETED);
+        auditLogService.record("TERMINATION_DEPOSIT_REFUNDED", "termination_requests", String.valueOf(terminationRequestId), accessService.currentAccount().getAccountId());
+        return terminationRequestRepository.save(request);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TerminationRequestEntity> listTerminationRequestsByContract(Integer contractId) {
+        requireContractParticipantOrOperator(contractId);
+        return terminationRequestRepository.findByContractIdOrderByCreatedAtDesc(contractId);
+    }
+
+    @Transactional(readOnly = true)
+    public TerminationRequestEntity getTerminationRequest(Long terminationRequestId) {
+        TerminationRequestEntity request = requireTerminationRequest(terminationRequestId);
+        requireContractParticipantOrOperator(request.getContractId());
+        return request;
+    }
+
+    @Transactional
+    public CaseAttachmentEntity createCaseAttachment(CaseAttachmentEntity input) {
+        if (input == null || input.getOwnerType() == null || input.getOwnerId() == null || input.getFileUrl() == null || input.getFileUrl().isBlank()) {
+            throw new AppException("ATTACHMENT KHONG HOP LE");
+        }
+        requireAttachmentAccess(input.getOwnerType(), input.getOwnerId());
+        input.setAttachmentId(null);
+        input.setOwnerType(input.getOwnerType().trim().toUpperCase());
+        input.setUploadedByAccountId(accessService.currentAccount().getAccountId());
+        CaseAttachmentEntity saved = caseAttachmentRepository.save(input);
+        auditLogService.record("CASE_ATTACHMENT_CREATED", "case_attachments", String.valueOf(saved.getAttachmentId()), input.getUploadedByAccountId());
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CaseAttachmentEntity> listCaseAttachments(String ownerType, Long ownerId) {
+        requireAttachmentAccess(ownerType, ownerId);
+        return caseAttachmentRepository.findByOwnerTypeAndOwnerIdOrderByCreatedAtAsc(ownerType.trim().toUpperCase(), ownerId);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -1149,6 +1577,137 @@ public class ContractExecutionService {
     }
 
     // Note: Hàm `requireBusinessOwnedJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    private List<TerminationRequestEntity> activeTerminationRequests(Integer contractId) {
+        return terminationRequestRepository.findByContractIdAndStatusIn(contractId, List.of(
+                TerminationRequestEntity.STATUS_REQUESTED,
+                TerminationRequestEntity.STATUS_STAFF_REVIEWING,
+                TerminationRequestEntity.STATUS_STAFF_APPROVED,
+                TerminationRequestEntity.STATUS_AWAITING_SETTLEMENT_EXECUTION,
+                TerminationRequestEntity.STATUS_AWAITING_DEPOSIT_REFUND
+        ));
+    }
+
+    private Optional<ContractMilestoneEntity> currentExecutionMilestone(Integer contractId) {
+        return contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contractId).stream()
+                .filter(item -> !List.of(ContractMilestoneEntity.STATUS_COMPLETED, ContractMilestoneEntity.STATUS_CANCELLED).contains(item.getStatus()))
+                .findFirst();
+    }
+
+    private void requireParticipant(ContractEntity contract, AccountEntity actor) {
+        if (!isParticipant(contract, actor)) throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+    }
+
+    private boolean isParticipant(ContractEntity contract, AccountEntity actor) {
+        Integer businessId = businessProfileRepository.findByAccountId(actor.getAccountId()).map(BusinessProfileEntity::getBusinessId).orElse(null);
+        Integer expertId = expertProfileRepository.findByAccountId(actor.getAccountId()).map(ExpertProfileEntity::getExpertId).orElse(null);
+        return (businessId != null && businessId.equals(contract.getBusinessId()))
+                || (expertId != null && expertId.equals(contract.getExpertId()));
+    }
+
+    private TerminationRequestEntity requireTerminationRequest(Long terminationRequestId) {
+        return terminationRequestRepository.findById(terminationRequestId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY YEU CAU CHAM DUT"));
+    }
+
+    private void requireAssignedTerminationStaff(TerminationRequestEntity request) {
+        Integer staffId = getCurrentStaffId(accessService.currentAccount());
+        if (request.getAssignedStaffId() == null || !staffId.equals(request.getAssignedStaffId())) {
+            throw new AppException("STAFF CHI DUOC XU LY YEU CAU CHAM DUT DUOC GAN");
+        }
+    }
+
+    private boolean terminationNeedsSettlement(TerminationRequestEntity request) {
+        if (request.getCurrentMilestoneId() == null) return false;
+        return contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(request.getContractId()).stream()
+                .filter(item -> request.getCurrentMilestoneId().equals(item.getJobMilestoneId()))
+                .findFirst()
+                .filter(item -> item.getEscrowReleasedAt() == null)
+                .filter(item -> List.of(ContractMilestoneEntity.STATUS_DEPOSITED, ContractMilestoneEntity.STATUS_IN_PROGRESS, ContractMilestoneEntity.STATUS_UNDER_REVIEW, ContractMilestoneEntity.STATUS_DISPUTED).contains(item.getStatus()))
+                .isPresent();
+    }
+
+    private void cancelRemainingMilestones(Integer contractId, Integer currentMilestoneId) {
+        for (ContractMilestoneEntity item : contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contractId)) {
+            if (List.of(ContractMilestoneEntity.STATUS_COMPLETED, ContractMilestoneEntity.STATUS_CANCELLED).contains(item.getStatus())) continue;
+            if (currentMilestoneId != null && currentMilestoneId.equals(item.getJobMilestoneId()) && item.getEscrowReleasedAt() != null) continue;
+            item.setStatus(ContractMilestoneEntity.STATUS_CANCELLED);
+            contractMilestoneRepository.save(item);
+            syncLiveMilestoneFromContractMilestone(item);
+        }
+    }
+
+    private void syncLiveMilestoneFromContractMilestone(ContractMilestoneEntity item) {
+        milestoneRepository.findById(item.getJobMilestoneId()).ifPresent(milestone -> {
+            milestone.setStatus(item.getStatus());
+            milestone.setEscrowReleasedAt(item.getEscrowReleasedAt());
+            milestone.setSettlementSourceType(item.getSettlementSourceType());
+            milestone.setSettlementSourceId(item.getSettlementSourceId());
+            milestone.setUpdatedAt(LocalDateTime.now());
+            milestoneRepository.save(milestone);
+        });
+    }
+
+    private void saveAttachmentIfPresent(String ownerType, Long ownerId, String fileUrl, String fileName, String fileType, String note) {
+        if (fileUrl == null || fileUrl.isBlank()) return;
+        caseAttachmentRepository.save(CaseAttachmentEntity.builder()
+                .ownerType(ownerType)
+                .ownerId(ownerId)
+                .uploadedByAccountId(accessService.currentAccount().getAccountId())
+                .fileUrl(fileUrl.trim())
+                .fileName(fileName)
+                .fileType(fileType)
+                .note(note)
+                .build());
+    }
+
+    private void requireAttachmentAccess(String ownerType, Long ownerId) {
+        if (ownerType == null || ownerId == null) throw new AppException("ATTACHMENT OWNER KHONG HOP LE");
+        String normalized = ownerType.trim().toUpperCase();
+        if (CaseAttachmentEntity.OWNER_DISPUTE.equals(normalized)) {
+            DisputeEntity dispute = disputeRepository.findById(ownerId.intValue()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+            requireContractParticipantOrOperator(dispute.getContractId());
+            return;
+        }
+        if (List.of(CaseAttachmentEntity.OWNER_TERMINATION_REQUEST, CaseAttachmentEntity.OWNER_PARTIAL_EVIDENCE, CaseAttachmentEntity.OWNER_STAFF_REPORT).contains(normalized)) {
+            TerminationRequestEntity request = requireTerminationRequest(ownerId);
+            requireContractParticipantOrOperator(request.getContractId());
+            return;
+        }
+        if (CaseAttachmentEntity.OWNER_DELIVERABLE_REJECTION.equals(normalized)) {
+            requireApprovedForBusinessOrExpert();
+            return;
+        }
+        throw new AppException("ATTACHMENT OWNER TYPE KHONG HOP LE");
+    }
+
+    private WalletTransactionEntity enrichLedger(WalletTransactionEntity tx, Integer contractId, Integer milestoneId, String metadata) {
+        if (tx == null) return null;
+        tx.setContractId(contractId);
+        tx.setMilestoneId(milestoneId);
+        tx.setMetadata(metadata);
+        return walletTransactionRepository.save(tx);
+    }
+
+    private String walletMetadata(String sourceType, Integer disputeId, Long terminationRequestId, Integer actorAccountId,
+                                  Integer businessAccountId, Integer expertAccountId, BigDecimal expertPercent,
+                                  BigDecimal expertPayout, BigDecimal businessRefund) {
+        try {
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("sourceType", sourceType);
+            metadata.put("disputeId", disputeId);
+            metadata.put("terminationRequestId", terminationRequestId);
+            metadata.put("actorAccountId", actorAccountId);
+            metadata.put("businessAccountId", businessAccountId);
+            metadata.put("expertAccountId", expertAccountId);
+            metadata.put("expertPayoutPercentage", expertPercent);
+            metadata.put("expertPayoutAmount", expertPayout);
+            metadata.put("businessRefundAmount", businessRefund);
+            return objectMapper.writeValueAsString(metadata);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
     private JobEntity requireBusinessOwnedJob(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         Integer businessId = businessProfileRepository.findByAccountId(accessService.currentAccount().getAccountId())

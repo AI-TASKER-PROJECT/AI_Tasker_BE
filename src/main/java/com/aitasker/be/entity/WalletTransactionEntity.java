@@ -8,6 +8,8 @@ package com.aitasker.be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -96,6 +98,16 @@ public class WalletTransactionEntity {
     // Note: Annotation nay cau hinh cot database tuong ung voi field entity.
     @Column(name = "reference_id")
     private Long referenceId;
+
+    @Column(name = "contract_id")
+    private Integer contractId;
+
+    @Column(name = "milestone_id")
+    private Integer milestoneId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata", columnDefinition = "jsonb")
+    private String metadata;
 
     // Note: Annotation nay cau hinh cot database tuong ung voi field entity.
     @Column(name = "description", columnDefinition = "TEXT")

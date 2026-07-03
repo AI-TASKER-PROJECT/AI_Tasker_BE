@@ -24,8 +24,6 @@ public class ContractMilestoneEntity {
     public static final String STATUS_DEPOSITED = "DEPOSITED";
     public static final String STATUS_IN_PROGRESS = "IN_PROGRESS";
     public static final String STATUS_UNDER_REVIEW = "UNDER_REVIEW";
-    public static final String STATUS_APPROVED = "APPROVED";
-    public static final String STATUS_REJECTED = "REJECTED";
     public static final String STATUS_DISPUTED = "DISPUTED";
     public static final String STATUS_COMPLETED = "COMPLETED";
     public static final String STATUS_CANCELLED = "CANCELLED";
@@ -45,6 +43,9 @@ public class ContractMilestoneEntity {
     @Column(name = "criteria_snapshot") private String criteriaSnapshot;
     @Column(name = "deliverable_expectation") private String deliverableExpectation;
     @Column(name = "resubmit_count") private Integer resubmitCount;
+    @Column(name = "escrow_released_at") private LocalDateTime escrowReleasedAt;
+    @Column(name = "settlement_source_type", length = 50) private String settlementSourceType;
+    @Column(name = "settlement_source_id") private Long settlementSourceId;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
 

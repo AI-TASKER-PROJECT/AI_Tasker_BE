@@ -23,6 +23,12 @@ public class DisputeEntity {
     public static final String STATUS_STAFF_REVIEWING = "STAFF_REVIEWING";
     public static final String STATUS_STAFF_DECIDED = "STAFF_DECIDED";
     public static final String STATUS_INTERVENTION_REJECTED = "INTERVENTION_REJECTED";
+    public static final String STATUS_RESOLVED = "RESOLVED";
+    public static final String STATUS_CANCELLED = "CANCELLED";
+    public static final String RESOLUTION_BUSINESS_APPROVED_AFTER_SELF_RESOLVE = "BUSINESS_APPROVED_AFTER_SELF_RESOLVE";
+    public static final String RESOLUTION_STAFF_DECISION_SETTLEMENT = "STAFF_DECISION_SETTLEMENT";
+    public static final String RESOLUTION_CANCELLED_BY_INITIATOR = "CANCELLED_BY_INITIATOR";
+    public static final String RESOLUTION_CANCELLED_BY_ADMIN = "CANCELLED_BY_ADMIN";
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
@@ -47,6 +53,10 @@ public class DisputeEntity {
     @Column(name = "escalation_evidence_file", length = 255) private String escalationEvidenceFile;
     @Column(name = "staff_decision_percentage") private Integer staffDecisionPercentage;
     @Column(name = "staff_decision_note") private String staffDecisionNote;
+    @Column(name = "previous_milestone_status", length = 50) private String previousMilestoneStatus;
+    @Column(name = "resolution_type", length = 50) private String resolutionType;
+    @Column(name = "resolved_at") private LocalDateTime resolvedAt;
+    @Column(name = "cancelled_at") private LocalDateTime cancelledAt;
 
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
