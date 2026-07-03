@@ -49,6 +49,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -509,6 +510,126 @@ class PaymentWalletServiceTest {
     }
 
     @Test
+    void listCurrentWalletTransactions_shouldCollapsePendingWithdrawalLedgerEntries() {
+        AccountEntity expertAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Expert A")
+                .role(RoleEntity.builder().roleName("EXPERT").build())
+                .build();
+        LocalDateTime requestedAt = LocalDateTime.of(2026, 7, 3, 10, 0);
+        WalletTransactionEntity debitTx = WalletTransactionEntity.builder()
+                .id(90L)
+                .accountId(10)
+                .transactionType("WITHDRAW_HOLD")
+                .direction("DEBIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("120000"))
+                .status("POSTED")
+                .createdAt(requestedAt)
+                .build();
+        WalletTransactionEntity holdTx = WalletTransactionEntity.builder()
+                .id(91L)
+                .accountId(10)
+                .transactionType("WITHDRAW_HOLD")
+                .direction("HOLD")
+                .balanceType("HOLDING")
+                .amount(new BigDecimal("120000"))
+                .status("POSTED")
+                .createdAt(requestedAt.plusSeconds(1))
+                .build();
+        WithdrawalRequestEntity withdrawal = WithdrawalRequestEntity.builder()
+                .withdrawalId(100L)
+                .accountId(10)
+                .amount(new BigDecimal("120000"))
+                .bankName("VCB")
+                .bankAccountHolder("Expert A")
+                .status("PENDING")
+                .holdTransactionId(91L)
+                .requestedAt(requestedAt)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(expertAccount);
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10))
+                .thenReturn(List.of(holdTx, debitTx));
+        when(withdrawalRequestRepository.findByHoldTransactionId(91L)).thenReturn(Optional.of(withdrawal));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals(100L, item.getWithdrawalId());
+        assertEquals("WITHDRAW_HOLD", item.getTransactionType());
+        assertEquals("Yêu cầu rút tiền đang chờ duyệt", item.getTitle());
+        assertEquals(requestedAt, item.getCreatedAt());
+        verify(withdrawalRequestRepository, never()).findById(100L);
+    }
+
+    @Test
+    void listCurrentWalletTransactions_shouldCollapseApprovedWithdrawalLedgerEntries() {
+        AccountEntity expertAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Expert A")
+                .role(RoleEntity.builder().roleName("EXPERT").build())
+                .build();
+        AccountEntity adminAccount = AccountEntity.builder()
+                .accountId(1)
+                .fullName("Admin One")
+                .build();
+        LocalDateTime requestedAt = LocalDateTime.of(2026, 7, 3, 10, 0);
+        LocalDateTime reviewedAt = requestedAt.plusHours(1);
+        WalletTransactionEntity holdTx = WalletTransactionEntity.builder()
+                .id(91L)
+                .accountId(10)
+                .transactionType("WITHDRAW_HOLD")
+                .direction("HOLD")
+                .balanceType("HOLDING")
+                .amount(new BigDecimal("120000"))
+                .status("POSTED")
+                .createdAt(requestedAt)
+                .build();
+        WalletTransactionEntity approvedTx = WalletTransactionEntity.builder()
+                .id(92L)
+                .accountId(10)
+                .transactionType("WITHDRAW_APPROVED")
+                .direction("DEBIT")
+                .balanceType("HOLDING")
+                .amount(new BigDecimal("120000"))
+                .status("POSTED")
+                .createdAt(reviewedAt)
+                .build();
+        WithdrawalRequestEntity withdrawal = WithdrawalRequestEntity.builder()
+                .withdrawalId(100L)
+                .accountId(10)
+                .amount(new BigDecimal("120000"))
+                .bankName("VCB")
+                .bankAccountHolder("Expert A")
+                .status("APPROVED")
+                .holdTransactionId(91L)
+                .reviewTransactionId(92L)
+                .adminId(1)
+                .requestedAt(requestedAt)
+                .reviewedAt(reviewedAt)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(expertAccount);
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10))
+                .thenReturn(List.of(approvedTx, holdTx));
+        when(withdrawalRequestRepository.findByReviewTransactionId(92L)).thenReturn(Optional.of(withdrawal));
+        when(withdrawalRequestRepository.findByHoldTransactionId(91L)).thenReturn(Optional.of(withdrawal));
+        when(accountRepository.findById(1)).thenReturn(Optional.of(adminAccount));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals(100L, item.getWithdrawalId());
+        assertEquals("WITHDRAW_APPROVED", item.getTransactionType());
+        assertEquals("Rút tiền thành công", item.getTitle());
+        assertEquals(reviewedAt, item.getCreatedAt());
+        verify(withdrawalRequestRepository, never()).findById(100L);
+    }
+
+    @Test
     void listCurrentWalletTransactions_shouldReturnTransparentRejectedWithdrawalHistory() {
         AccountEntity expertAccount = AccountEntity.builder()
                 .accountId(10)
@@ -541,24 +662,28 @@ class PaymentWalletServiceTest {
                 .bankAccountHolder("Expert A")
                 .adminId(1)
                 .adminNote("Sai số tài khoản")
+                .status("REJECTED")
                 .reviewTransactionId(91L)
+                .requestedAt(LocalDateTime.of(2026, 7, 3, 10, 0))
+                .reviewedAt(LocalDateTime.of(2026, 7, 3, 11, 0))
                 .build();
 
         when(accessService.currentAccount()).thenReturn(expertAccount);
         when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10)).thenReturn(List.of(tx));
         when(withdrawalRequestRepository.findByReviewTransactionId(91L)).thenReturn(Optional.of(withdrawal));
-        when(accountRepository.findById(10)).thenReturn(Optional.of(expertAccount));
         when(accountRepository.findById(1)).thenReturn(Optional.of(adminAccount));
 
         List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
 
+        assertEquals(1, history.size());
         WalletTransactionHistoryResponse item = history.get(0);
-        assertEquals("Yêu cầu rút tiền của Expert A bị từ chối", item.getTitle());
+        assertEquals("Yêu cầu rút tiền bị từ chối", item.getTitle());
         assertEquals("VCB", item.getBankName());
         assertEquals("Admin One", item.getAdminName());
-        assertTrue(item.getDescription().contains("Admin One đã từ chối yêu cầu rút 120000 VND của Expert A"));
+        assertTrue(item.getDescription().contains("bị từ chối bởi Admin One"));
         assertTrue(item.getDescription().contains("Lý do: Sai số tài khoản."));
         assertEquals("Sai số tài khoản", item.getAdminNote());
+        verify(withdrawalRequestRepository, never()).findById(90L);
     }
 
     @Test
