@@ -10,9 +10,10 @@ Flyway migrations, and tests.
 - Business creates draft contracts, signs contracts, signs NDA, pays deposits,
   terminates eligible contracts, and completes reviewed milestones.
 - Expert reviews draft contracts, signs contracts, signs NDA, rejects eligible
-  contracts, and submits deliverables.
+  contracts, starts funded milestones, submits progress reports, and submits
+  deliverables.
 - Admin can terminate eligible contracts and resolve deposit handling.
-- Staff participates only through dispute handling.
+- Staff participates through dispute handling and termination-request review.
 
 ## Lifecycle
 
@@ -35,7 +36,7 @@ Alternate exits:
 - Contracts: `DRAFT`, `PENDING`, `ACTIVE`, `COMPLETED`, `CANCELLED`.
 - Jobs: `DRAFT`, `OPEN`, `IN_PROGRESS`, `CLOSED`.
 - Milestones: `PENDING`, `DEPOSITED`, `IN_PROGRESS`, `UNDER_REVIEW`,
-  `DISPUTED`, `COMPLETED`.
+  `DISPUTED`, `COMPLETED`, `CANCELLED`.
 - Wallet transactions: `POSTED`.
 
 ## Rules
@@ -68,14 +69,19 @@ Alternate exits:
 - Expert rejection is allowed only from `DRAFT` or `PENDING`; it moves the
   contract to `CANCELLED` and the job back to `OPEN`.
 - Deliverables can be submitted only by the contract expert while the contract
-  is `ACTIVE` and both NDA signatures exist; submission moves the milestone to
-  `UNDER_REVIEW`.
+  is `ACTIVE`, both NDA signatures exist, and the milestone is `IN_PROGRESS`.
+  Resubmission while `DISPUTED` is allowed only when the active dispute is still
+  `PENDING_SELF_RESOLVE`. Submission moves the milestone to `UNDER_REVIEW`.
 - The owning business can deposit milestone escrow only from `PENDING`, then
-  the expert starts execution from `DEPOSITED` to `IN_PROGRESS` and can submit
-  deliverables from active execution states. A Business approval from
+  the expert starts execution from `DEPOSITED` to `IN_PROGRESS`. A Business approval from
   `UNDER_REVIEW` releases the escrow once, marks the milestone `COMPLETED`, and
   resolves any self-resolve dispute with
   `BUSINESS_APPROVED_AFTER_SELF_RESOLVE`.
+- While a milestone is `IN_PROGRESS`, the Expert can submit progress reports at
+  `MIDPOINT` and `PRE_DEADLINE` checkpoints for Business review. These reports
+  are progress tracking records only; they are not dispute evidence and are not
+  stored as case attachments. If milestone duration or start timestamp is
+  missing, the report is accepted with no checkpoint assignment.
 - A Business rejection from `UNDER_REVIEW` creates or updates a single active
   `PENDING_SELF_RESOLVE` dispute and moves the milestone to `DISPUTED`.
 - Staff decision is separate from settlement execution: assigned Staff moves a
@@ -122,7 +128,6 @@ Alternate exits:
 - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
 - `POST /api/v1/contracts/{contractId}/reject`
 - `GET /api/v1/contracts/{contractId}/milestones`
-- `POST /api/v1/contracts/{contractId}/terminate?reason=...`
 - `POST /api/v1/contracts/{contractId}/termination-requests`
 - `GET /api/v1/contracts/{contractId}/termination-requests`
 - `GET /api/v1/termination-requests/{terminationRequestId}`
@@ -133,11 +138,16 @@ Alternate exits:
 - `POST /api/v1/termination-requests/{terminationRequestId}/execute-settlement`
 - `POST /api/v1/termination-requests/{terminationRequestId}/refund-deposit`
 - `POST /api/v1/termination-requests/{terminationRequestId}/withdraw`
-- `POST /api/v1/deliverables`
 - `POST /api/v1/milestones/{milestoneId}/deliverables`
+- `GET /api/v1/milestones/{milestoneId}/deliverables`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+- `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/milestones/{milestoneId}/start`
-- `POST /api/v1/milestones/{milestoneId}/complete`
+- `POST /api/v1/milestones/{milestoneId}/approve`
+- `POST /api/v1/milestones/{milestoneId}/reject?reason=...`
+- `POST /api/v1/milestones/{milestoneId}/complete` (compatibility alias for
+  approval/release)
 - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...`
 - `POST /api/v1/disputes/{disputeId}/escalation-request`
 - `POST /api/v1/disputes/{disputeId}/assign-staff`
@@ -149,7 +159,6 @@ Alternate exits:
 - `GET /api/v1/case-attachments?ownerType=...&ownerId=...`
 - `POST /api/v1/contracts/{contractId}/reviews`
 - `GET /api/v1/contracts/{contractId}/reviews`
-- `POST /api/v1/milestones/sla-auto-approve`
 - `GET /api/v1/milestones/{milestoneId}/criteria`
 - `POST /api/v1/milestones/{milestoneId}/criteria`
 - `PUT /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`

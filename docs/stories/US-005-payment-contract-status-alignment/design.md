@@ -28,7 +28,7 @@ Affected endpoints:
 - `POST /api/v1/contracts/{contractId}/terminate`
 - `POST /api/v1/contracts/{contractId}/deposit/pay`
 - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
-- `POST /api/v1/deliverables`
+- `POST /api/v1/milestones/{milestoneId}/deliverables`
 - `POST /api/v1/milestones/{milestoneId}/complete`
 - `POST /api/v1/milestones/sla-auto-approve`
 

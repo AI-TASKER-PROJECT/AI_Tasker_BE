@@ -44,6 +44,9 @@ public class MilestoneEntity {
     @Column(name = "escrow_released_at") private LocalDateTime escrowReleasedAt;
     @Column(name = "settlement_source_type", length = 50) private String settlementSourceType;
     @Column(name = "settlement_source_id") private Long settlementSourceId;
+    // Note: Nguon settlement dong milestone (spec 13.3.2, migration V50): dispute hoac termination request.
+    @Column(name = "resolved_by_dispute_id") private Integer resolvedByDisputeId;
+    @Column(name = "resolved_by_termination_request_id") private Long resolvedByTerminationRequestId;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

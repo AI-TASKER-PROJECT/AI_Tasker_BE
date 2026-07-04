@@ -98,28 +98,54 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `PATCH /api/v1/jobs/{jobId}/status?status=DRAFT|OPEN|IN_PROGRESS|CLOSED`
   - `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted|Rejected`
 - Contract/Execution/Finance/Dispute:
+  - `GET /api/v1/contracts`
+  - `GET /api/v1/contracts/{contractId}`
   - `POST /api/v1/contracts/from-proposals/{proposalId}`
   - `POST /api/v1/contracts/{contractId}/sign`
   - `POST /api/v1/contracts/{contractId}/nda-sign`
   - `POST /api/v1/contracts/{contractId}/reject`
-  - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
+  - `POST /api/v1/contracts/{contractId}/deposit/pay`
+  - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
+  - `GET /api/v1/contracts/{contractId}/milestones`
   - `POST /api/v1/milestones`
-  - `POST /api/v1/milestones/{milestoneId}/complete`
+  - `PATCH /api/v1/milestones/{milestoneId}`
+  - `GET /api/v1/jobs/{jobId}/milestones`
   - `GET /api/v1/milestones/{milestoneId}/criteria`
   - `POST /api/v1/milestones/{milestoneId}/criteria`
   - `PUT /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
   - `DELETE /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
-  - `POST /api/v1/deliverables`
-  - `POST /api/v1/transactions`
-  - `POST /api/v1/transactions/{transactionId}/webhook?paymentStatus=Success|Failed&bankTxCode=...&receiptImgUrl=...`
-  - `POST /api/v1/invoices`
-  - `POST /api/v1/disputes`
-  - `PATCH /api/v1/transactions/{transactionId}/status?status=Pending|Success|Failed`
-  - `PATCH /api/v1/disputes/{disputeId}/assign?staffId=...`
-  - `PATCH /api/v1/disputes/{disputeId}/resolve?proposedAction=...`
-  - `POST /api/v1/milestones/sla-auto-approve`
-  - `POST /api/v1/disputes/{disputeId}/demo-testing?testResult=...`
-  - `POST /api/v1/disputes/{disputeId}/technical-report?reportContent=...&proposedAction=...`
+  - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
+  - `POST /api/v1/milestones/{milestoneId}/start`
+  - `POST /api/v1/milestones/{milestoneId}/deliverables`
+  - `GET /api/v1/milestones/{milestoneId}/deliverables`
+  - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+  - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+  - `POST /api/v1/milestones/{milestoneId}/approve`
+  - `POST /api/v1/milestones/{milestoneId}/reject?reason=...`
+  - `POST /api/v1/milestones/{milestoneId}/complete`
+  - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...&initiatedBy=...&initiationType=...`
+  - `GET /api/v1/contracts/{contractId}/disputes`
+  - `GET /api/v1/disputes/{disputeId}`
+  - `POST /api/v1/disputes/{disputeId}/escalation-request?reason=...&evidenceFile=...`
+  - `POST /api/v1/disputes/{disputeId}/assign-staff?staffId=...`
+  - `POST /api/v1/disputes/{disputeId}/reject-intervention?reason=...`
+  - `POST /api/v1/disputes/{disputeId}/staff-decision?expertPercent=...&note=...&staffReport=...`
+  - `POST /api/v1/disputes/{disputeId}/execute-settlement`
+  - `POST /api/v1/disputes/{disputeId}/cancel?reason=...`
+  - `POST /api/v1/contracts/{contractId}/termination-requests`
+  - `GET /api/v1/contracts/{contractId}/termination-requests`
+  - `GET /api/v1/termination-requests/{terminationRequestId}`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/assign-staff?staffId=...`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/reject?reason=...`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/approve`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/partial-evidence`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/execute-settlement`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/withdraw?reason=...`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/refund-deposit`
+  - `POST /api/v1/case-attachments`
+  - `GET /api/v1/case-attachments?ownerType=...&ownerId=...`
+  - `POST /api/v1/contracts/{contractId}/reviews`
+  - `GET /api/v1/contracts/{contractId}/reviews`
   - `GET /api/wallet/current`
   - `GET /api/wallet/transactions`
   - `GET /api/membership/packages`

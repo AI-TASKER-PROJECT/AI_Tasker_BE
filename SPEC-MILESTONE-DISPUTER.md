@@ -252,6 +252,7 @@ It is not:
 - A milestone escrow.
 - A platform penalty by default.
 - Automatically confiscated.
+- Partially refundable. Admin refund action is binary: refund the full held amount (100%), or withhold the full held amount (0%). There is no percentage-based split, deduction, or partial confiscation of the contract security deposit. This is different from milestone escrow, which Staff may split by percentage during dispute resolution (10.9); the contract deposit has no equivalent Staff-decision mechanism, so no partial-amount authority exists for it.
 
 ### 4.2 Milestone Escrow
 
@@ -394,7 +395,7 @@ CANCELLED
 |---|---|
 | `PENDING` | Milestone exists but Business has not deposited milestone budget yet. |
 | `DEPOSITED` | Business has deposited full milestone budget into escrow. Expert can start. |
-| `IN_PROGRESS` | Expert is working on the milestone. |
+| `IN_PROGRESS` | Expert is working on the milestone. Expert submits progress reports during this state per `9.2A`; reports do not change milestone status. |
 | `UNDER_REVIEW` | Expert submitted deliverable; Business is reviewing. |
 | `DISPUTED` | There is an active dispute on the milestone. Contract is blocked. |
 | `COMPLETED` | Milestone is closed and escrow settlement is done. |
@@ -652,6 +653,37 @@ System behavior:
 2. Write audit log.
 3. Notify Business.
 
+### 9.2A Submit Milestone Progress Report
+
+Actor: Expert
+
+Purpose: while a milestone is in progress, Expert reports current status so Business can monitor project health. This is an informational channel — it does not gate, block, or replace any other milestone transition (Expert can still submit the deliverable regardless of report state).
+
+Checkpoints (mandatory, non-blocking):
+
+- `MIDPOINT` — due at 50% of the milestone's declared timeline, measured from `contract_milestones.in_progress_started_at`.
+- `PRE_DEADLINE` — due at 80% of the milestone's declared timeline (i.e. some time before the deadline).
+- Timeline length in days is derived from `contract_milestones.duration` + `duration_unit` (`DAY` = 1, `WEEK` = 7, `MONTH` = 30), matching the existing conversion used for job/milestone duration elsewhere in the spec.
+- "Mandatory" means tracked and visible, not a hard gate: there is no automatic escalation, block, or dispute trigger if Expert misses a checkpoint, consistent with `2.2` excluding automatic deadline escalation from scope. Business sees checkpoint compliance (on time / late / missing) when viewing the milestone workspace and may use it as informal signal — including as a factor if Business later chooses to open a dispute for unresponsiveness — but the report itself is not linked to any dispute record.
+- Each report submission is tagged with the earliest checkpoint not yet fulfilled (`MIDPOINT` first, then `PRE_DEADLINE`). Once both checkpoints have at least one report, further voluntary submissions are recorded with no checkpoint tag.
+- If `duration`/`duration_unit` is not set on the milestone, checkpoint due dates cannot be computed; reports are still accepted and stored with `checkpoint_type = NULL`, `is_late = false`.
+
+Preconditions:
+
+- Contract status is `ACTIVE`.
+- Milestone status is `IN_PROGRESS`.
+- Expert is assigned to contract.
+
+System behavior:
+
+1. Compute the next unfulfilled checkpoint type for this milestone (`MIDPOINT`, then `PRE_DEADLINE`, then `NULL`).
+2. Compute `is_late` by comparing now to the checkpoint's due date (only when a checkpoint type and `in_progress_started_at` are available).
+3. Insert `milestone_progress_reports` row (`content`, optional `percent_complete`, optional `attachment_url`, `checkpoint_type`, `is_late`).
+4. Write audit log.
+5. Notify Business (one-way; no acknowledgement required or recorded).
+
+Business view: `GET` list of all progress reports for a milestone, ordered oldest first. Read-only for Business and Staff/Admin; Expert can also view their own submissions.
+
 ### 9.3 Submit Deliverable
 
 Actor: Expert
@@ -802,7 +834,7 @@ System behavior:
 
 1. Lock contract deposit row.
 2. Lock relevant wallets.
-3. Refund 20% contract deposit to Business available balance.
+3. Refund 20% contract deposit to Business available balance. Refund amount must equal exactly `contract_deposits.held_amount` (100%). Partial refund percentages are not supported (see 4.1); Admin may only choose refund or withhold, never a fraction.
 4. Write `wallet_transactions` with `transaction_type = CONTRACT_DEPOSIT_REFUND`.
 5. Update `contract_deposits.status = REFUNDED`.
 6. Set `contract_deposits.refunded_at = now()`.
@@ -848,8 +880,8 @@ System behavior:
 
 1. Create dispute.
 2. Set `initiated_by_account_id = expertAccountId`.
-3. Set `initiated_by_role = EXPERT`.
-4. Set valid `initiation_type`.
+3. Set `initiated_by = EXPERT`.
+4. Set `initiation_type` to one of `EXPERT_SCOPE_CONCERN`, `EXPERT_NO_REVIEW_RESPONSE`, `EXPERT_BAD_FAITH_REJECTION`, or `OTHER` (see 7.5).
 5. Store reason/evidence.
 6. Store `previous_milestone_status` from milestone current status.
 7. Set dispute status `PENDING_SELF_RESOLVE`.
@@ -1291,7 +1323,7 @@ System behavior:
 
 1. Lock contract deposit row.
 2. Lock Business wallet.
-3. Refund 20% contract security deposit to Business available balance.
+3. Refund 20% contract security deposit to Business available balance. Refund amount must equal exactly `contract_deposits.held_amount` (100%). Partial refund percentages are not supported (see 4.1); Admin may only choose refund or withhold, never a fraction.
 4. Write wallet ledger entry.
 5. Update contract deposit status `REFUNDED`.
 6. Set `contract_deposits.refunded_at = now()`.
@@ -1403,12 +1435,9 @@ Add status:
 CANCELLED
 ```
 
-Add fields:
+`escrow_released_at`, `settlement_source_type`, and `settlement_source_id` already exist on `MilestoneEntity`/`milestones`. Add the two still-missing fields (required by 10.10 step 12 and 11.7 step 13, which set them):
 
 ```sql
-escrow_released_at TIMESTAMP NULL,
-settlement_source_type VARCHAR(50) NULL,
-settlement_source_id BIGINT NULL,
 resolved_by_dispute_id BIGINT NULL,
 resolved_by_termination_request_id BIGINT NULL
 ```
@@ -1442,6 +1471,14 @@ CANCELLED
 
 Do not add settlement audit fields here for MVP. Settlement source of truth is `milestones`.
 
+Add field (checkpoint anchor for `9.2A` progress reports):
+
+```sql
+in_progress_started_at TIMESTAMP NULL
+```
+
+Set when milestone transitions `DEPOSITED -> IN_PROGRESS` (`9.2`). Backfill existing `IN_PROGRESS` rows from `updated_at` since no earlier signal exists.
+
 #### 13.3.4 `disputes`
 
 Replace or expand status values to:
@@ -1456,18 +1493,30 @@ RESOLVED
 CANCELLED
 ```
 
-Add fields:
+The following already exist on `DisputeEntity`/`disputes` and cover the equivalent proposed field below (names differ, no action needed):
+
+```text
+initiated_by            (existing) covers initiated_by_role
+escalation_reason       (existing)
+escalation_evidence_file (existing) covers escalation_file_url
+staff_decision_percentage (existing) covers staff_proposed_expert_percentage
+staff_decision_note     (existing) covers staff_decision_reason
+previous_milestone_status (existing)
+resolution_type         (existing)
+resolved_at             (existing)
+cancelled_at            (existing)
+```
+
+Correction: an earlier pass of this section mistakenly claimed `initiation_type` had no defined enum and dropped it. That was wrong — 7.5 "Dispute Initiation Types" defines a required 5-value enum (`BUSINESS_REJECTED_DELIVERABLE`, `EXPERT_SCOPE_CONCERN`, `EXPERT_NO_REVIEW_RESPONSE`, `EXPERT_BAD_FAITH_REJECTION`, `OTHER`), distinct from `initiated_by` (which only says Business vs Expert, not the reason category). 9.5.1 step 3 and 10.2 step 4 both set it. It must be added.
+
+Add the remaining fields — each is set by a concrete system-behavior step (9.5, 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 11.x) that current code cannot fully execute without them:
 
 ```sql
 initiated_by_account_id BIGINT NULL,
-initiated_by_role VARCHAR(20) NULL,
 initiation_type VARCHAR(80) NULL,
-previous_milestone_status VARCHAR(50) NULL,
 
 escalation_requested_by_account_id BIGINT NULL,
 escalation_requested_at TIMESTAMP NULL,
-escalation_reason TEXT NULL,
-escalation_file_url TEXT NULL,
 
 staff_review_started_at TIMESTAMP NULL,
 staff_decided_at TIMESTAMP NULL,
@@ -1475,17 +1524,12 @@ intervention_rejected_at TIMESTAMP NULL,
 intervention_rejection_reason TEXT NULL,
 
 staff_report TEXT NULL,
-staff_decision_reason TEXT NULL,
-staff_proposed_expert_percentage DECIMAL(5,2) NULL,
 staff_proposed_expert_amount DECIMAL(19,2) NULL,
 business_refund_amount DECIMAL(19,2) NULL,
 
 settlement_executed_at TIMESTAMP NULL,
 settlement_wallet_transaction_id BIGINT NULL,
 
-resolution_type VARCHAR(80) NULL,
-resolved_at TIMESTAMP NULL,
-cancelled_at TIMESTAMP NULL,
 cancelled_by_account_id BIGINT NULL,
 cancellation_reason TEXT NULL
 ```
@@ -1557,14 +1601,17 @@ Metadata standard:
 
 #### 13.3.6 `reviews`
 
-Add unique index:
+Uniqueness (one review per reviewer per contract, see 12.2) is enforced at service level for MVP, not by a DB constraint. `AdminService.createReview` already guards this via `existsByContractIdAndReviewerId(contractId, reviewerId)`. Since a contract has exactly one Business and one Expert, checking `(contract_id, reviewer_id)` is equivalent to checking `(contract_id, reviewer_id, reviewee_id)` — no separate `reviewee_id` check is needed.
+
+A DB unique index is optional / nice-to-have, not required for MVP:
 
 ```sql
+-- Optional. Only add after confirming no duplicate rows exist.
 CREATE UNIQUE INDEX uq_reviews_one_per_pair_per_contract
 ON reviews(contract_id, reviewer_id, reviewee_id);
 ```
 
-If duplicates exist, migration must not fail silently. Either clean duplicates in dev/test or defer unique index with clear note.
+If added later, the migration must not fail silently on duplicates. Either clean duplicates in dev/test first or defer the index with a clear note.
 
 #### 13.3.7 `deliverables` Recommended
 
@@ -1586,6 +1633,31 @@ SUPERSEDED
 ```
 
 If not implemented, service must derive latest deliverable by `created_at` and count re-submits through dispute logs/attachments.
+
+#### 13.3.8 Required New Table: `milestone_progress_reports`
+
+Create table for `9.2A`:
+
+```sql
+CREATE TABLE milestone_progress_reports (
+    progress_report_id BIGSERIAL PRIMARY KEY,
+    contract_id INT NOT NULL REFERENCES contracts(contract_id),
+    milestone_id INT NOT NULL REFERENCES milestones(milestone_id),
+    submitted_by_account_id INT NOT NULL REFERENCES account(account_id),
+    checkpoint_type VARCHAR(20) NULL,
+    content TEXT NOT NULL,
+    percent_complete INT NULL,
+    attachment_url TEXT NULL,
+    is_late BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_progress_report_checkpoint_type CHECK (checkpoint_type IN ('MIDPOINT', 'PRE_DEADLINE') OR checkpoint_type IS NULL),
+    CONSTRAINT chk_progress_report_percent CHECK (percent_complete IS NULL OR (percent_complete BETWEEN 0 AND 100))
+);
+
+CREATE INDEX idx_milestone_progress_reports_milestone ON milestone_progress_reports(milestone_id, created_at);
+```
+
+Not linked to `disputes` or `case_attachments` — kept as an independent, one-way informational log per `9.2A`.
 
 ### 13.4 Required New Table: `termination_requests`
 
@@ -1877,6 +1949,7 @@ Must log:
 ```text
 MILESTONE_ESCROW_DEPOSITED
 MILESTONE_STARTED
+PROGRESS_REPORT_SUBMITTED
 DELIVERABLE_SUBMITTED
 MILESTONE_APPROVED
 MILESTONE_REJECTED
@@ -1923,6 +1996,8 @@ Agents must adapt route style to existing controller conventions.
 ```http
 POST /api/contracts/{contractId}/milestones/{milestoneId}/deposit
 POST /api/milestones/{milestoneId}/start
+POST /api/contracts/{contractId}/milestones/{milestoneId}/progress-reports
+GET  /api/contracts/{contractId}/milestones/{milestoneId}/progress-reports
 POST /api/milestones/{milestoneId}/deliverables
 POST /api/milestones/{milestoneId}/approve
 POST /api/milestones/{milestoneId}/reject
@@ -2010,6 +2085,7 @@ GET  /api/contracts/{contractId}/reviews
 12. Reviews open only when contract is `CLOSED`.
 13. No destructive data deletion is allowed by default in migrations.
 14. New v2 wallet movements must use `wallet_transactions`, not legacy `transactions`.
+15. Contract deposit refund is binary — 100% of `held_amount` or 0% — never a partial percentage (see 4.1, 9.7, 11.8).
 
 ---
 

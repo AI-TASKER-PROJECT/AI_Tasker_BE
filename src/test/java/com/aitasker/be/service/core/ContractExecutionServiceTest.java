@@ -6,6 +6,7 @@
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.entity.AccountEntity;
@@ -17,6 +18,7 @@ import com.aitasker.be.entity.DeliverableEntity;
 import com.aitasker.be.entity.DisputeEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
+import com.aitasker.be.entity.MilestoneProgressReportEntity;
 import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.ProposalEntity;
 import com.aitasker.be.entity.RoleEntity;
@@ -53,6 +55,7 @@ class ContractExecutionServiceTest {
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private AccessService accessService;
+    @Mock private AccountRepository accountRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private BusinessProfileRepository businessProfileRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -77,6 +80,7 @@ class ContractExecutionServiceTest {
     @Mock private TerminationRequestRepository terminationRequestRepository;
     @Mock private CaseAttachmentRepository caseAttachmentRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
+    @Mock private MilestoneProgressReportRepository milestoneProgressReportRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private StaffRepository staffRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -89,6 +93,11 @@ class ContractExecutionServiceTest {
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ContractExecutionService contractExecutionService;
+
+    private void mockLockedContractMilestone(Integer contractId, Integer milestoneId, ContractMilestoneEntity contractMilestone) {
+        when(contractMilestoneRepository.findByContractIdAndJobMilestoneIdForUpdate(contractId, milestoneId))
+                .thenReturn(Optional.of(contractMilestone));
+    }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
@@ -159,13 +168,25 @@ class ContractExecutionServiceTest {
                 .contractId(1)
                 .status("UNDER_REVIEW")
                 .build();
+        // completeMilestone giờ ủy quyền cho approveMilestone (release escrow) theo spec 9.4.
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(70).contractId(1).jobMilestoneId(7)
+                .finalBudget(BigDecimal.valueOf(1000)).status("UNDER_REVIEW")
+                .build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(10).accountId(50).build();
+        ExpertProfileEntity expert = ExpertProfileEntity.builder().expertId(5).accountId(60).build();
         JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("IN_PROGRESS").build();
         when(milestoneRepository.findById(7)).thenReturn(Optional.of(milestone));
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("BUSINESS").build()).build()
         );
-        when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(business));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(business));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(expert));
+        mockLockedContractMilestone(1, 7, cm);
+        when(contractMilestoneRepository.save(any(ContractMilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(7), any())).thenReturn(List.of());
         when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(milestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -176,6 +197,8 @@ class ContractExecutionServiceTest {
         assertEquals("COMPLETED", saved.getStatus());
         assertEquals("COMPLETED", contract.getStatus());
         assertEquals("CLOSED", job.getStatus());
+        verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(7L), any());
+        verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(1000)), any(), any(), eq(7L), any());
     }
 
     @Test
@@ -766,7 +789,7 @@ class ContractExecutionServiceTest {
     void submitDeliverable_shouldNotifyBusinessWithCorrectTargetUrl() {
         MilestoneEntity milestone = MilestoneEntity.builder()
                 .milestoneId(10).jobId(2).contractId(1)
-                .milestoneName("Milestone X").status("DEPOSITED")
+                .milestoneName("Milestone X").status("IN_PROGRESS")
                 .build();
         ContractEntity contract = ContractEntity.builder()
                 .contractId(1).jobId(2).businessId(10).expertId(5)
@@ -775,7 +798,7 @@ class ContractExecutionServiceTest {
                 .status("ACTIVE")
                 .build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
-                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("DEPOSITED")
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("IN_PROGRESS")
                 .build();
         DeliverableEntity input = DeliverableEntity.builder().milestoneId(10).build();
         DeliverableEntity saved = DeliverableEntity.builder()
@@ -810,7 +833,7 @@ class ContractExecutionServiceTest {
     void submitDeliverable_shouldSetMilestoneStatusToUnderReview() {
         MilestoneEntity milestone = MilestoneEntity.builder()
                 .milestoneId(10).jobId(2).contractId(1)
-                .milestoneName("Milestone X").status("DEPOSITED")
+                .milestoneName("Milestone X").status("IN_PROGRESS")
                 .build();
         ContractEntity contract = ContractEntity.builder()
                 .contractId(1).jobId(2).businessId(10).expertId(5)
@@ -819,7 +842,7 @@ class ContractExecutionServiceTest {
                 .status("ACTIVE")
                 .build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
-                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("DEPOSITED")
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("IN_PROGRESS")
                 .build();
         DeliverableEntity input = DeliverableEntity.builder().milestoneId(10).build();
         DeliverableEntity saved = DeliverableEntity.builder()
@@ -843,6 +866,74 @@ class ContractExecutionServiceTest {
         ArgumentCaptor<MilestoneEntity> captor = forClass(MilestoneEntity.class);
         verify(milestoneRepository).save(captor.capture());
         assertEquals("UNDER_REVIEW", captor.getValue().getStatus());
+    }
+
+    @Test
+    void submitDeliverable_shouldRejectDepositedMilestoneBeforeExpertStartsWork() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(10).jobId(2).contractId(1)
+                .milestoneName("Milestone X").status("DEPOSITED")
+                .build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).jobId(2).businessId(10).expertId(5)
+                .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .expertNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .status("ACTIVE")
+                .build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("DEPOSITED")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
+        );
+        when(milestoneRepository.findById(10)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findByJobId(2)).thenReturn(Optional.of(contract));
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.submitDeliverable(DeliverableEntity.builder().milestoneId(10).build()));
+
+        assertEquals("MILESTONE CHUA SAN SANG DE SUBMIT DELIVERABLE", ex.getMessage());
+        verify(deliverableRepository, never()).save(any());
+    }
+
+    @Test
+    void submitDeliverable_shouldAllowResubmissionDuringPendingSelfResolveDispute() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(10).jobId(2).contractId(1)
+                .milestoneName("Milestone X").status("DISPUTED")
+                .build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).jobId(2).businessId(10).expertId(5)
+                .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .expertNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .status("ACTIVE")
+                .build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("DISPUTED")
+                .build();
+        DisputeEntity dispute = DisputeEntity.builder()
+                .disputeId(1).contractId(1).milestoneId(10).status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE)
+                .build();
+        DeliverableEntity saved = DeliverableEntity.builder().deliverableId(100).milestoneId(10).build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
+        );
+        when(milestoneRepository.findById(10)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findByJobId(2)).thenReturn(Optional.of(contract));
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(10), any())).thenReturn(List.of(dispute));
+        when(deliverableRepository.save(any(DeliverableEntity.class))).thenReturn(saved);
+        when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(20).build()));
+
+        contractExecutionService.submitDeliverable(DeliverableEntity.builder().milestoneId(10).build());
+
+        assertEquals("UNDER_REVIEW", milestone.getStatus());
+        assertEquals("UNDER_REVIEW", cm.getStatus());
     }
 
     @Test
@@ -897,7 +988,7 @@ class ContractExecutionServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(business));
         when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
-        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        mockLockedContractMilestone(1, 200, cm);
         when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         MilestoneEntity result = contractExecutionService.depositMilestoneEscrow(1, 200);
@@ -926,7 +1017,7 @@ class ContractExecutionServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(business));
         when(expertProfileRepository.findById(5)).thenReturn(Optional.of(expert));
-        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        mockLockedContractMilestone(1, 200, cm);
         when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         MilestoneEntity result = contractExecutionService.approveMilestone(200);
@@ -955,6 +1046,7 @@ class ContractExecutionServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
         when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         MilestoneEntity result = contractExecutionService.rejectMilestone(200, "Not good enough");
 
@@ -981,12 +1073,78 @@ class ContractExecutionServiceTest {
         when(disputeRepository.findByMilestoneIdAndStatusIn(eq(200), any())).thenReturn(List.of());
         when(disputeRepository.save(any())).thenReturn(savedDispute);
 
-        DisputeEntity result = contractExecutionService.initiateDispute(1, 200, "BUSINESS");
+        DisputeEntity result = contractExecutionService.initiateDispute(1, 200, "BUSINESS", null);
 
         assertEquals("DISPUTED", milestone.getStatus());
         assertEquals("DISPUTED", cm.getStatus());
         assertEquals("BUSINESS", result.getInitiatedBy());
         assertEquals("PENDING_SELF_RESOLVE", result.getStatus());
+    }
+
+    @Test
+    void initiateDispute_shouldRejectSpoofedInitiatorWithoutChangingMilestoneStatus() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2).businessId(10).expertId(5).status("ACTIVE").build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).jobId(2).contractId(1).status("IN_PROGRESS").build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
+        );
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(200), any())).thenReturn(List.of());
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.initiateDispute(1, 200, "BUSINESS", null));
+
+        assertEquals("INITIATED_BY PHAI KHOP VOI VAI TRO NGUOI DUNG HIEN TAI", ex.getMessage());
+        assertEquals("IN_PROGRESS", milestone.getStatus());
+        verify(milestoneRepository, never()).save(any());
+        verify(disputeRepository, never()).save(any());
+    }
+
+    @Test
+    void submitProgressReport_shouldRejectMilestoneOutsideContract() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).contractId(2).status("IN_PROGRESS").build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
+        );
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of());
+
+        assertThrows(NotFoundException.class,
+                () -> contractExecutionService.submitProgressReport(1, 200, "Progress", 50, null));
+
+        verify(milestoneProgressReportRepository, never()).save(any());
+    }
+
+    @Test
+    void submitProgressReport_shouldUseNullCheckpointWhenDurationMissing() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).contractId(1).milestoneName("M1").status("IN_PROGRESS").build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractId(1).jobMilestoneId(200).status("IN_PROGRESS")
+                .inProgressStartedAt(LocalDateTime.now().minusDays(1))
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build()
+        );
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(milestoneProgressReportRepository.findByMilestoneIdOrderByCreatedAtAsc(200)).thenReturn(List.of());
+        when(milestoneProgressReportRepository.save(any(MilestoneProgressReportEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MilestoneProgressReportEntity result = contractExecutionService.submitProgressReport(1, 200, "Progress", 50, null);
+
+        assertNull(result.getCheckpointType());
+        assertFalse(result.getIsLate());
     }
 
     @Test
@@ -1027,6 +1185,7 @@ class ContractExecutionServiceTest {
         when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        mockLockedContractMilestone(1, 200, cm);
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(business));
         when(expertProfileRepository.findById(5)).thenReturn(Optional.of(expert));
         when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
@@ -1034,7 +1193,7 @@ class ContractExecutionServiceTest {
         when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         // 1. First, make the decision
-        DisputeEntity decisionResult = contractExecutionService.staffDecide(1, 60, "Partial fault");
+        DisputeEntity decisionResult = contractExecutionService.staffDecide(1, 60, "Partial fault", null);
 
         assertEquals("STAFF_DECIDED", decisionResult.getStatus());
         assertEquals(Integer.valueOf(60), decisionResult.getStaffDecisionPercentage());
@@ -1171,7 +1330,7 @@ class ContractExecutionServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(accessService.currentAccount()).thenReturn(expert);
         when(expertProfileRepository.findByAccountId(90)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
-        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(contractMilestone));
+        mockLockedContractMilestone(1, 200, contractMilestone);
         when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -1215,6 +1374,56 @@ class ContractExecutionServiceTest {
     }
 
     @Test
+    void cancelDispute_byAdminDuringStaffReviewRestoresPreviousStatus() {
+        DisputeEntity dispute = DisputeEntity.builder()
+                .disputeId(1)
+                .contractId(1)
+                .milestoneId(200)
+                .initiatedBy("BUSINESS")
+                .previousMilestoneStatus(ContractMilestoneEntity.STATUS_UNDER_REVIEW)
+                .status(DisputeEntity.STATUS_STAFF_REVIEWING)
+                .build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(200).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+
+        when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build()
+        );
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(contractMilestone));
+        when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        DisputeEntity result = contractExecutionService.cancelDispute(1, "Duplicate case");
+
+        assertEquals(DisputeEntity.STATUS_CANCELLED, result.getStatus());
+        assertEquals(DisputeEntity.RESOLUTION_CANCELLED_BY_ADMIN, result.getResolutionType());
+        assertEquals(ContractMilestoneEntity.STATUS_UNDER_REVIEW, milestone.getStatus());
+        assertEquals(ContractMilestoneEntity.STATUS_UNDER_REVIEW, contractMilestone.getStatus());
+    }
+
+    @Test
+    void executeTerminationSettlement_shouldRequirePartialEvidenceWhenRequested() {
+        TerminationRequestEntity request = TerminationRequestEntity.builder()
+                .terminationRequestId(9L)
+                .contractId(1)
+                .currentMilestoneId(200)
+                .assignedStaffId(8)
+                .status(TerminationRequestEntity.STATUS_AWAITING_SETTLEMENT_EXECUTION)
+                .expertPayoutPercentage(BigDecimal.valueOf(25))
+                .partialEvidenceRequired(true)
+                .build();
+
+        when(terminationRequestRepository.findById(9L)).thenReturn(Optional.of(request));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.executeTerminationSettlement(9L));
+
+        assertEquals("CAN NOP PARTIAL EVIDENCE TRUOC KHI SETTLEMENT", ex.getMessage());
+        verify(walletLedgerService, never()).debitEscrow(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void executeTerminationSettlement_shouldSplitEscrowAndAwaitDepositRefund() {
         TerminationRequestEntity request = TerminationRequestEntity.builder()
                 .terminationRequestId(9L)
@@ -1235,6 +1444,7 @@ class ContractExecutionServiceTest {
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(50).build()));
         when(expertProfileRepository.findById(5)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(current, future));
+        mockLockedContractMilestone(1, 200, current);
         when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(400)), any(), any(), any(), any())).thenReturn(debit);
         when(walletLedgerService.creditAvailable(eq(60), eq(BigDecimal.valueOf(100).setScale(2)), any(), any(), any(), any())).thenReturn(WalletTransactionEntity.builder().id(78L).build());
         when(walletLedgerService.creditAvailable(eq(50), eq(BigDecimal.valueOf(300).setScale(2)), any(), any(), any(), any())).thenReturn(WalletTransactionEntity.builder().id(79L).build());

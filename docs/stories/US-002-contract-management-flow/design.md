@@ -44,7 +44,7 @@ Existing routes preserved:
 - `POST /api/v1/contracts/{contractId}/sign`
 - `POST /api/v1/contracts/{contractId}/nda-sign`
 - `POST /api/v1/contracts/{contractId}/terminate`
-- `POST /api/v1/deliverables`
+- `POST /api/v1/milestones/{milestoneId}/deliverables`
 
 ## Data Model
 

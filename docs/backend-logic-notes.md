@@ -72,19 +72,26 @@ Luu y:
 - Change request reset acceptance/NDA cua hai ben va dua contract ve `Negotiating`.
 - Business va expert deu phai ky NDA truoc khi contract active.
 - Business chi tao milestone/criteria cho contract cua minh.
-- Expert chi submit deliverable cho contract cua minh, contract phai `Active` va co du NDA cua business/expert.
-- Khi submit deliverable, milestone duoc chuyen sang `Under Review`.
-- Business chi tao transaction loai `Deposit`; `Payout`/`Refund` danh cho `ADMIN`/`STAFF`.
-- Tao invoice truc tiep chi cho `ADMIN`/`STAFF`.
-- List contract/milestone/criteria/deliverable/transaction/dispute deu check participant hoac operator.
+- Expert chi submit deliverable cho contract cua minh, contract phai `Active`,
+  co du NDA cua business/expert, va milestone phai dang `IN_PROGRESS`.
+- Neu milestone dang `DISPUTED`, Expert chi duoc resubmit deliverable khi
+  dispute dang `PENDING_SELF_RESOLVE`.
+- Khi submit deliverable, milestone duoc chuyen sang `UNDER_REVIEW`.
+- Expert co the nop bao cao tien do milestone dang `IN_PROGRESS` tai cac moc
+  `MIDPOINT` va `PRE_DEADLINE`; bao cao nay chi de Business review tien do,
+  khong phai evidence dispute/case attachment.
+- List contract/milestone/criteria/deliverable/progress-report/dispute/termination
+  deu check participant hoac operator.
 
 API doc them de FE dung du lieu that:
 
 - `GET /api/v1/milestones/{milestoneId}/deliverables`
-- `GET /api/v1/milestones/{milestoneId}/transactions`
-- `GET /api/v1/transactions/{transactionId}/invoice`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+- `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `GET /api/v1/contracts/{contractId}/disputes`
 - `GET /api/v1/disputes/{disputeId}`
+- `GET /api/v1/contracts/{contractId}/termination-requests`
+- `GET /api/v1/termination-requests/{terminationRequestId}`
 
 ## 5) DB migration moi
 
@@ -111,7 +118,8 @@ Nhung phan sau chua phai production:
 - Firebase/file upload chua that; deliverable/license/receipt van la URL text.
 - NDA PDF chua generate/upload.
 - SLA auto approve co API manual, chua co scheduler chay dinh ky.
-- Dispute chua khoa dong tien/snapshot/refund/penalty that.
+- Dispute va termination da dung wallet escrow ledger cho cac settlement chinh;
+  cac penalty/rule phat phuc tap van chua phai production.
 - Notification/WebSocket chua co.
 - Audit log chua phu het moi thao tac nhay cam.
 
@@ -121,7 +129,7 @@ Uu tien de ket noi FE voi DB that hon:
 
 1. Them `GET /api/v1/jobs/mine` cho business dashboard.
 2. Them public expert directory aggregate tu `expert_profiles`, `portfolios`, `reviews`.
-3. Them API list `audit_logs` va ghi audit cho setting/staff/contract/dispute/transaction.
+3. Them API list `audit_logs` va ghi audit cho setting/staff/contract/dispute/wallet.
 4. Tach bang hoac cot rieng cho dispute evidence, demo testing result, technical report.
 5. Them payment service rieng cho VNPay va escrow ledger.
 6. Them scheduler cho SLA auto approve.

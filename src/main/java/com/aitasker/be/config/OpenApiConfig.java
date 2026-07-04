@@ -50,7 +50,7 @@ public class OpenApiConfig {
             new Tag().name(JOB_FLOW).description("Tao draft, cap nhat, gan taxonomy, sinh SoW va publish job."),
             new Tag().name(PROPOSAL_FLOW).description("Submit proposal, review proposal, matching va de xuat expert."),
             new Tag().name(WALLET_FLOW).description("Wallet, top-up, membership, credits, quota va withdrawal."),
-            new Tag().name(CONTRACT_FLOW).description("Contract, milestone, deliverable, dispute va transaction."),
+            new Tag().name(CONTRACT_FLOW).description("Contract, milestone, deliverable, dispute, termination va review."),
             new Tag().name(NOTIFICATION_FLOW).description("Thong bao trong he thong."),
             new Tag().name(CATALOG_FLOW).description("Danh muc domain, skill va technology."),
             new Tag().name(AI_FLOW).description("Chatbot va cac endpoint AI ho tro nghiep vu."),
@@ -136,8 +136,8 @@ public class OpenApiConfig {
         if (path.startsWith("/api/v1/contracts")
                 || path.startsWith("/api/v1/milestones")
                 || path.startsWith("/api/v1/disputes")
-                || path.startsWith("/api/v1/transactions")
-                || path.equals("/api/v1/deliverables")
+                || path.startsWith("/api/v1/termination-requests")
+                || path.startsWith("/api/v1/case-attachments")
                 || path.startsWith("/api/v1/admin/contracts")) {
             return CONTRACT_FLOW;
         }

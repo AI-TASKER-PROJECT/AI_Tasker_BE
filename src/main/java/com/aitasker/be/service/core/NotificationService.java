@@ -172,6 +172,24 @@ public class NotificationService {
         );
     }
 
+    public void notifyProgressReportSubmitted(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Integer milestoneId, String milestoneName, boolean isLate) {
+        Map<String, Object> metadata = Map.of(
+                "contractId", contractId,
+                "milestoneId", milestoneId,
+                "isLate", isLate
+        );
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "PROGRESS_REPORT_SUBMITTED",
+                "Có báo cáo tiến độ mới",
+                "Chuyên gia vừa nộp báo cáo tiến độ cho milestone \"" + safeText(milestoneName, "không tên") + "\"" + (isLate ? " (nộp trễ)." : "."),
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                metadata
+        );
+    }
+
     public void notifyContractEvent(Integer receiverAccountId, Integer actorAccountId, String type, String title, String message, Integer contractId) {
         createAndPush(
                 receiverAccountId,
@@ -301,6 +319,153 @@ public class NotificationService {
                 "Admin vừa gán một tranh chấp cho bạn xử lý.",
                 "/staff/disputes/" + disputeId
         );
+    }
+
+    // ===== Flow 4 — Milestone execution =====
+
+    // Note: Báo cho chuyên gia khi doanh nghiệp ký quỹ milestone để có thể bắt đầu thực hiện.
+    public void notifyMilestoneEscrowDeposited(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, String milestoneName) {
+        createAndPush(receiverAccountId, actorAccountId, "MILESTONE_ESCROW_DEPOSITED",
+                "Doanh nghiệp đã ký quỹ milestone",
+                "Doanh nghiệp vừa ký quỹ cho milestone \"" + safeText(milestoneName, "không tên") + "\". Bạn có thể bắt đầu thực hiện.",
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId));
+    }
+
+    // Note: Báo cho chuyên gia khi doanh nghiệp duyệt milestone và tiền ký quỹ được giải ngân.
+    public void notifyMilestoneApproved(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, String milestoneName) {
+        createAndPush(receiverAccountId, actorAccountId, "MILESTONE_APPROVED",
+                "Milestone đã được duyệt",
+                "Doanh nghiệp đã duyệt milestone \"" + safeText(milestoneName, "không tên") + "\" và tiền ký quỹ đã được giải ngân cho bạn.",
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId));
+    }
+
+    // Note: Báo cho chuyên gia khi doanh nghiệp từ chối sản phẩm bàn giao của milestone.
+    public void notifyMilestoneRejected(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, String milestoneName, String reason) {
+        String message = "Doanh nghiệp đã từ chối sản phẩm bàn giao của milestone \"" + safeText(milestoneName, "không tên") + "\".";
+        if (reason != null && !reason.isBlank()) {
+            message += " Lý do: " + reason.trim();
+        }
+        createAndPush(receiverAccountId, actorAccountId, "MILESTONE_REJECTED",
+                "Sản phẩm milestone bị từ chối",
+                message,
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId, "reason", safeText(reason, "")));
+    }
+
+    // ===== Flow 5 — Dispute =====
+
+    // Note: Báo cho bên còn lại khi đối tác khởi tạo tranh chấp mới cho milestone.
+    public void notifyDisputeInitiated(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_INITIATED",
+                "Có tranh chấp mới",
+                "Đối tác vừa khởi tạo một tranh chấp cho milestone của hợp đồng. Vui lòng vào xem và cùng tự giải quyết.",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId, "disputeId", disputeId));
+    }
+
+    // Note: Báo cho admin khi một bên yêu cầu staff can thiệp vào tranh chấp.
+    public void notifyDisputeEscalationRequested(Integer receiverAccountId, Integer actorAccountId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_ESCALATION_REQUESTED",
+                "Có yêu cầu can thiệp tranh chấp",
+                "Một bên vừa yêu cầu staff can thiệp vào tranh chấp. Admin cần phân công staff xử lý.",
+                "/admin/disputes/" + disputeId,
+                Map.of("disputeId", disputeId));
+    }
+
+    // Note: Báo cho hai bên khi admin đã phân công staff xem xét tranh chấp.
+    public void notifyDisputeUnderStaffReview(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_UNDER_REVIEW",
+                "Tranh chấp đang được staff xem xét",
+                "Admin đã phân công staff xem xét tranh chấp của hợp đồng. Vui lòng theo dõi kết quả.",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId));
+    }
+
+    // Note: Báo cho hai bên khi staff từ chối can thiệp và trả tranh chấp về giai đoạn tự giải quyết.
+    public void notifyDisputeInterventionRejected(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_INTERVENTION_REJECTED",
+                "Staff đã từ chối can thiệp",
+                "Staff đã từ chối can thiệp và trả tranh chấp về giai đoạn tự giải quyết. Hai bên vui lòng tiếp tục trao đổi.",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId));
+    }
+
+    // Note: Báo cho hai bên khi staff ra quyết định bắt buộc cho tranh chấp.
+    public void notifyDisputeStaffDecided(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_STAFF_DECIDED",
+                "Staff đã ra quyết định tranh chấp",
+                "Staff đã ra quyết định bắt buộc cho tranh chấp. Hệ thống sẽ thực thi quyết toán ký quỹ tương ứng.",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId));
+    }
+
+    // Note: Báo cho hai bên khi tranh chấp đã được giải quyết và quyết toán ký quỹ hoàn tất.
+    public void notifyDisputeResolved(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_RESOLVED",
+                "Tranh chấp đã được giải quyết",
+                "Tranh chấp của hợp đồng đã được giải quyết và quyết toán ký quỹ đã hoàn tất.",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId));
+    }
+
+    // ===== Flow 4b — Termination =====
+
+    // Note: Báo cho admin khi một bên gửi yêu cầu chấm dứt hợp đồng.
+    public void notifyTerminationRequested(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId) {
+        createAndPush(receiverAccountId, actorAccountId, "TERMINATION_REQUESTED",
+                "Có yêu cầu chấm dứt hợp đồng",
+                "Một bên vừa gửi yêu cầu chấm dứt hợp đồng. Admin cần phân công staff xem xét.",
+                "/admin/termination-requests/" + terminationRequestId,
+                Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
+    }
+
+    // Note: Báo cho staff khi admin gán yêu cầu chấm dứt cho staff xem xét.
+    public void notifyTerminationStaffAssigned(Integer receiverAccountId, Integer actorAccountId, Long terminationRequestId) {
+        createAndPush(receiverAccountId, actorAccountId, "TERMINATION_STAFF_ASSIGNED",
+                "Bạn được gán xử lý yêu cầu chấm dứt",
+                "Admin vừa gán một yêu cầu chấm dứt hợp đồng cho bạn xem xét.",
+                "/staff/termination-requests/" + terminationRequestId,
+                Map.of("terminationRequestId", terminationRequestId));
+    }
+
+    // Note: Báo cho hai bên kết quả staff xem xét yêu cầu chấm dứt (chấp thuận hoặc từ chối).
+    public void notifyTerminationReviewOutcome(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId, boolean approved) {
+        createAndPush(receiverAccountId, actorAccountId, approved ? "TERMINATION_APPROVED" : "TERMINATION_REJECTED",
+                approved ? "Yêu cầu chấm dứt được chấp thuận" : "Yêu cầu chấm dứt bị từ chối",
+                approved
+                        ? "Staff đã chấp thuận yêu cầu chấm dứt hợp đồng. Hệ thống sẽ tiến hành quyết toán và hoàn ký quỹ."
+                        : "Staff đã từ chối yêu cầu chấm dứt hợp đồng. Hợp đồng tiếp tục được thực hiện bình thường.",
+                "/contracts/" + contractId + "/termination-requests/" + terminationRequestId,
+                Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
+    }
+
+    // Note: Báo cho hai bên khi hệ thống đã quyết toán ký quỹ theo quyết định chấm dứt.
+    public void notifyTerminationSettlementExecuted(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId) {
+        createAndPush(receiverAccountId, actorAccountId, "TERMINATION_SETTLEMENT_EXECUTED",
+                "Đã quyết toán chấm dứt hợp đồng",
+                "Hệ thống đã quyết toán ký quỹ milestone theo quyết định chấm dứt. Hợp đồng chờ admin hoàn tiền ký quỹ.",
+                "/contracts/" + contractId + "/termination-requests/" + terminationRequestId,
+                Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
+    }
+
+    // Note: Báo cho các bên khi yêu cầu chấm dứt bị hủy/rút lại và hợp đồng trở lại bình thường.
+    public void notifyTerminationCancelled(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId) {
+        createAndPush(receiverAccountId, actorAccountId, "TERMINATION_CANCELLED",
+                "Yêu cầu chấm dứt đã được hủy",
+                "Yêu cầu chấm dứt hợp đồng đã được hủy. Hợp đồng tiếp tục được thực hiện bình thường.",
+                "/contracts/" + contractId + "/termination-requests/" + terminationRequestId,
+                Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
+    }
+
+    // Note: Báo cho hai bên khi admin đã hoàn tiền ký quỹ hợp đồng sau chấm dứt và hợp đồng đã đóng.
+    public void notifyTerminationDepositRefunded(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId) {
+        createAndPush(receiverAccountId, actorAccountId, "TERMINATION_DEPOSIT_REFUNDED",
+                "Đã hoàn tiền ký quỹ hợp đồng",
+                "Admin đã hoàn tiền ký quỹ hợp đồng sau khi chấm dứt. Hợp đồng đã đóng và bạn có thể đánh giá đối tác.",
+                "/contracts/" + contractId,
+                Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
     }
 
     // Note: Hàm `createAndPush` lưu thông báo vào database và đẩy realtime tới đúng tài khoản nhận qua WebSocket.

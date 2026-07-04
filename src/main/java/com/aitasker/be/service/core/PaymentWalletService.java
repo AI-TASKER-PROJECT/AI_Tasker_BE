@@ -373,10 +373,19 @@ public class PaymentWalletService {
             throw new AppException("DEPOSIT_INVALID_STATUS");
         }
 
-        BigDecimal refundAmount = money(request == null ? null : request.getRefundAmount());
+        // Spec 4.1 / 9.7 / 11.8 / invariant 15: hoan ky quy hop dong la nhi phan -
+        // hoac hoan 100% held_amount, hoac giu 0%. Khong cho hoan mot phan tuy y (chong tich thu ngam).
         BigDecimal heldAmount = money(deposit.getHeldAmount());
-        if (refundAmount.signum() < 0 || refundAmount.compareTo(heldAmount) > 0) {
-            throw new AppException("INVALID_REFUND_AMOUNT");
+        BigDecimal requested = request == null ? null : request.getRefundAmount();
+        BigDecimal refundAmount;
+        if (requested == null) {
+            // Mac dinh luong happy path (9.7 / 11.8): hoan toan bo.
+            refundAmount = heldAmount;
+        } else {
+            refundAmount = money(requested);
+            if (refundAmount.compareTo(BigDecimal.ZERO) != 0 && refundAmount.compareTo(heldAmount) != 0) {
+                throw new AppException("REFUND_MUST_BE_FULL_OR_ZERO");
+            }
         }
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId())
                 .map(BusinessProfileEntity::getAccountId)

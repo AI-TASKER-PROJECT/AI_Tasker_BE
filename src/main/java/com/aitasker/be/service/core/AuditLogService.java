@@ -60,6 +60,7 @@ public class AuditLogService {
     public static final String ACTION_UPDATE_ACCEPTANCE_CRITERIA = "Cập nhật tiêu chí nghiệm thu";
     public static final String ACTION_DELETE_ACCEPTANCE_CRITERIA = "Xóa tiêu chí nghiệm thu";
     public static final String ACTION_SUBMIT_DELIVERABLE = "Nộp sản phẩm bàn giao";
+    public static final String ACTION_SUBMIT_PROGRESS_REPORT = "Nộp báo cáo tiến độ";
     public static final String ACTION_CREATE_TRANSACTION = "Tạo giao dịch";
     public static final String ACTION_UPDATE_TRANSACTION_STATUS = "Cập nhật trạng thái giao dịch";
     public static final String ACTION_CREATE_DISPUTE = "Tạo tranh chấp";
@@ -70,6 +71,25 @@ public class AuditLogService {
     public static final String ACTION_RUN_SLA_AUTO_APPROVE = "Chạy tự động duyệt SLA";
     public static final String ACTION_PROCESS_PAYMENT_WEBHOOK = "Xử lý webhook thanh toán";
     public static final String ACTION_CREATE_REVIEW = "Gửi đánh giá";
+    // Note: Cac action tieng Viet cho luong milestone escrow / dispute / termination v2 (Flow 4 & 5).
+    public static final String ACTION_DEPOSIT_MILESTONE_ESCROW = "Ký quỹ milestone";
+    public static final String ACTION_START_MILESTONE = "Bắt đầu milestone";
+    public static final String ACTION_APPROVE_MILESTONE = "Duyệt milestone";
+    public static final String ACTION_REJECT_MILESTONE = "Từ chối sản phẩm milestone";
+    public static final String ACTION_ESCALATE_DISPUTE = "Yêu cầu can thiệp tranh chấp";
+    public static final String ACTION_REJECT_INTERVENTION = "Từ chối can thiệp tranh chấp";
+    public static final String ACTION_STAFF_DECIDE_DISPUTE = "Ra quyết định tranh chấp";
+    public static final String ACTION_EXECUTE_DISPUTE_SETTLEMENT = "Thực thi quyết toán tranh chấp";
+    public static final String ACTION_CANCEL_DISPUTE = "Hủy tranh chấp";
+    public static final String ACTION_REQUEST_TERMINATION = "Yêu cầu chấm dứt hợp đồng";
+    public static final String ACTION_ASSIGN_TERMINATION_STAFF = "Phân công staff xử lý chấm dứt";
+    public static final String ACTION_REJECT_TERMINATION = "Từ chối chấm dứt hợp đồng";
+    public static final String ACTION_APPROVE_TERMINATION = "Duyệt chấm dứt hợp đồng";
+    public static final String ACTION_SUBMIT_PARTIAL_EVIDENCE = "Nộp bằng chứng công việc khi chấm dứt";
+    public static final String ACTION_EXECUTE_TERMINATION_SETTLEMENT = "Thực thi quyết toán chấm dứt";
+    public static final String ACTION_CANCEL_TERMINATION = "Hủy yêu cầu chấm dứt";
+    public static final String ACTION_REFUND_TERMINATION_DEPOSIT = "Hoàn ký quỹ sau chấm dứt";
+    public static final String ACTION_CREATE_CASE_ATTACHMENT = "Thêm tệp đính kèm hồ sơ";
 
     public static final String REQUEST_ATTRIBUTE_LOGGED = "aitasker.audit.logged";
 
@@ -286,6 +306,27 @@ public class AuditLogService {
             case "APPROVE_EXPERT_PROFILE" -> ACTION_APPROVE_EXPERT_PROFILE;
             case "REJECT_EXPERT_PROFILE" -> ACTION_REJECT_EXPERT_PROFILE;
             case "ASSIGN_DISPUTE" -> ACTION_ASSIGN_DISPUTE;
+            // Milestone escrow / dispute / termination v2 (ma raw duoc chuan hoa sang tieng Viet khi hien thi).
+            case "MILESTONE_ESCROW_DEPOSITED" -> ACTION_DEPOSIT_MILESTONE_ESCROW;
+            case "MILESTONE_STARTED" -> ACTION_START_MILESTONE;
+            case "MILESTONE_APPROVED" -> ACTION_APPROVE_MILESTONE;
+            case "MILESTONE_REJECTED" -> ACTION_REJECT_MILESTONE;
+            case "DISPUTE_CREATED" -> ACTION_CREATE_DISPUTE;
+            case "DISPUTE_ESCALATION_REQUESTED" -> ACTION_ESCALATE_DISPUTE;
+            case "DISPUTE_STAFF_ASSIGNED" -> ACTION_ASSIGN_DISPUTE;
+            case "DISPUTE_INTERVENTION_REJECTED" -> ACTION_REJECT_INTERVENTION;
+            case "DISPUTE_STAFF_DECIDED" -> ACTION_STAFF_DECIDE_DISPUTE;
+            case "DISPUTE_SETTLEMENT_EXECUTED" -> ACTION_EXECUTE_DISPUTE_SETTLEMENT;
+            case "DISPUTE_CANCELLED" -> ACTION_CANCEL_DISPUTE;
+            case "TERMINATION_REQUESTED" -> ACTION_REQUEST_TERMINATION;
+            case "TERMINATION_STAFF_ASSIGNED" -> ACTION_ASSIGN_TERMINATION_STAFF;
+            case "TERMINATION_REJECTED" -> ACTION_REJECT_TERMINATION;
+            case "TERMINATION_APPROVED" -> ACTION_APPROVE_TERMINATION;
+            case "TERMINATION_PARTIAL_EVIDENCE_SUBMITTED" -> ACTION_SUBMIT_PARTIAL_EVIDENCE;
+            case "TERMINATION_SETTLEMENT_EXECUTED" -> ACTION_EXECUTE_TERMINATION_SETTLEMENT;
+            case "TERMINATION_CANCELLED" -> ACTION_CANCEL_TERMINATION;
+            case "TERMINATION_DEPOSIT_REFUNDED" -> ACTION_REFUND_TERMINATION_DEPOSIT;
+            case "CASE_ATTACHMENT_CREATED" -> ACTION_CREATE_CASE_ATTACHMENT;
             case "Mua goi thanh vien" -> "Mua gói thành viên";
             case "Mua credit" -> "Mua lượt sử dụng";
             case "Su dung quota" -> "Sử dụng quota";
