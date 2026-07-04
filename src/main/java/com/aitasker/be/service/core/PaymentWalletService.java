@@ -55,11 +55,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -548,10 +551,36 @@ public class PaymentWalletService {
     // Note: Ham `listCurrentWalletTransactions` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public List<WalletTransactionHistoryResponse> listCurrentWalletTransactions() {
         AccountEntity actor = accessService.currentAccount();
-        return walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(actor.getAccountId())
-                .stream()
+        List<WalletTransactionEntity> allTx = walletTransactionRepository
+                .findByAccountIdOrderByCreatedAtDesc(actor.getAccountId());
+
+        Set<String> withdrawalTypes = Set.of("WITHDRAW_HOLD", "WITHDRAW_APPROVED", "WITHDRAW_REJECTED");
+        Map<Long, WithdrawalHistoryEntry> latestByWithdrawalId = new LinkedHashMap<>();
+        List<WalletTransactionEntity> nonWithdrawalTx = new ArrayList<>();
+
+        for (WalletTransactionEntity tx : allTx) {
+            if (withdrawalTypes.contains(safe(tx.getTransactionType()))) {
+                withdrawalForTransaction(tx).ifPresent(withdrawal ->
+                        latestByWithdrawalId.putIfAbsent(
+                                withdrawal.getWithdrawalId(),
+                                new WithdrawalHistoryEntry(tx, withdrawal)
+                        ));
+            } else {
+                nonWithdrawalTx.add(tx);
+            }
+        }
+
+        List<WalletTransactionHistoryResponse> result = new ArrayList<>();
+        for (WithdrawalHistoryEntry entry : latestByWithdrawalId.values()) {
+            result.add(buildWithdrawalHistoryResponse(entry.transaction(), entry.withdrawal(), actor));
+        }
+
+        result.addAll(nonWithdrawalTx.stream()
                 .map(tx -> toWalletHistory(tx, actor))
-                .toList();
+                .toList());
+
+        result.sort(Comparator.comparing(WalletTransactionHistoryResponse::getCreatedAt).reversed());
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -733,6 +762,75 @@ public class PaymentWalletService {
                     .title(requesterName + " đã tạo yêu cầu rút tiền")
                     .description("Hệ thống đã tạm giữ " + formatAmount(tx.getAmount()) + " VND cho yêu cầu rút tiền của "
                             + requesterName + "." + bankText)
+                    .build();
+        };
+    }
+
+    private WalletTransactionHistoryResponse buildWithdrawalHistoryResponse(
+            WalletTransactionEntity tx,
+            WithdrawalRequestEntity withdrawal,
+            AccountEntity currentActor
+    ) {
+        String actorName = displayAccount(currentActor, tx.getAccountId());
+        String adminName = withdrawal.getAdminId() == null ? "Admin"
+                : displayAccount(accountRepository.findById(withdrawal.getAdminId()).orElse(null), withdrawal.getAdminId());
+        String bankText = " Ngân hàng: " + withdrawal.getBankName()
+                + ", chủ tài khoản: " + withdrawal.getBankAccountHolder() + ".";
+
+        WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder =
+                WalletTransactionHistoryResponse.builder()
+                        .transactionId(tx.getId())
+                        .accountId(tx.getAccountId())
+                        .amount(withdrawal.getAmount())
+                        .status(withdrawal.getStatus())
+                        .referenceType("WITHDRAW_REQUEST")
+                        .referenceId(withdrawal.getWithdrawalId())
+                        .actorName(actorName)
+                        .withdrawalId(withdrawal.getWithdrawalId())
+                        .bankName(withdrawal.getBankName())
+                        .bankAccountHolder(withdrawal.getBankAccountHolder())
+                        .adminId(withdrawal.getAdminId())
+                        .adminName(withdrawal.getAdminId() == null ? null : adminName)
+                        .adminNote(withdrawal.getAdminNote())
+                        .createdAt("PENDING".equals(withdrawal.getStatus())
+                                ? withdrawal.getRequestedAt()
+                                : withdrawal.getReviewedAt());
+
+        return switch (safe(withdrawal.getStatus())) {
+            case "APPROVED" -> builder
+                    .transactionType("WITHDRAW_APPROVED")
+                    .direction("DEBIT")
+                    .balanceType("HOLDING")
+                    .title("Rút tiền thành công")
+                    .description("Đã rút " + formatAmount(withdrawal.getAmount()) + " VND về" + bankText
+                            + " Được duyệt bởi " + adminName + ".")
+                    .build();
+            case "REJECTED" -> {
+                String adminNote = withdrawal.getAdminNote() == null || withdrawal.getAdminNote().isBlank()
+                        ? "" : " Lý do: " + withdrawal.getAdminNote().trim() + ".";
+                yield builder
+                        .transactionType("WITHDRAW_REJECTED")
+                        .direction("RELEASE")
+                        .balanceType("HOLDING")
+                        .title("Yêu cầu rút tiền bị từ chối")
+                        .description("Yêu cầu rút " + formatAmount(withdrawal.getAmount()) + " VND bị từ chối bởi "
+                                + adminName + "." + adminNote)
+                        .build();
+            }
+            case "CANCELLED" -> builder
+                    .transactionType("WITHDRAW_HOLD")
+                    .direction("DEBIT")
+                    .balanceType("AVAILABLE")
+                    .title("Yêu cầu rút tiền đã hủy")
+                    .description("Yêu cầu rút " + formatAmount(withdrawal.getAmount()) + " VND đã bị hủy.")
+                    .build();
+            default -> builder
+                    .transactionType("WITHDRAW_HOLD")
+                    .direction("DEBIT")
+                    .balanceType("AVAILABLE")
+                    .title("Yêu cầu rút tiền đang chờ duyệt")
+                    .description("Yêu cầu rút " + formatAmount(withdrawal.getAmount()) + " VND về" + bankText
+                            + " Đang chờ quản trị viên duyệt.")
                     .build();
         };
     }
@@ -1238,6 +1336,11 @@ public class PaymentWalletService {
     }
 
     private record ActivePackage(String code, String name) {}
+
+    private record WithdrawalHistoryEntry(
+            WalletTransactionEntity transaction,
+            WithdrawalRequestEntity withdrawal
+    ) {}
 
     // Note: Ham `money` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal money(BigDecimal value) {
