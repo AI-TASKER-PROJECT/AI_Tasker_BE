@@ -61,17 +61,17 @@ Alternate exits:
 
 - The contract moves to `PENDING` after business signature, expert signature,
   business NDA, and expert NDA are all present.
-- The owning business must pay the 20% wallet security deposit before execution
-  starts.
-- Deposit payment sets the contract to `ACTIVE`, applies final contract
-  milestone budgets back to job milestones, attaches the contract id to those
-  milestones, and moves the job to `IN_PROGRESS`.
+- The owning Business must hold 20% and the assigned Expert must separately
+  hold 10% of total contract value before execution starts.
+- Each deposit operation is idempotent. Only after both participant deposits
+  are held does the system set the contract to `ACTIVE`, apply final milestone
+  budgets, attach the contract id, and move the job to `IN_PROGRESS`.
 - Expert rejection is allowed only from `DRAFT` or `PENDING`; it moves the
   contract to `CANCELLED` and the job back to `OPEN`.
-- Deliverables can be submitted only by the contract expert while the contract
-  is `ACTIVE`, both NDA signatures exist, and the milestone is `IN_PROGRESS`.
-  Resubmission while `DISPUTED` is allowed only when the active dispute is still
-  `PENDING_SELF_RESOLVE`. Submission moves the milestone to `UNDER_REVIEW`.
+- Deliverables can be submitted only by the contract Expert while the contract
+  is `ACTIVE`, both NDA signatures exist, and the milestone is `IN_PROGRESS` or
+  `OVERDUE`. First submission and correction/resubmission use the same endpoint,
+  retain submission rounds, and move the milestone to `UNDER_REVIEW`.
 - The owning business can deposit milestone escrow only from `PENDING`, then
   the expert starts execution from `DEPOSITED` to `IN_PROGRESS`. A Business approval from
   `UNDER_REVIEW` releases the escrow once, marks the milestone `COMPLETED`, and
@@ -82,8 +82,14 @@ Alternate exits:
   are progress tracking records only; they are not dispute evidence and are not
   stored as case attachments. If milestone duration or start timestamp is
   missing, the report is accepted with no checkpoint assignment.
-- A Business rejection from `UNDER_REVIEW` creates or updates a single active
-  `PENDING_SELF_RESOLVE` dispute and moves the milestone to `DISPUTED`.
+- A Business rejection from `UNDER_REVIEW` marks the current deliverable
+  `REJECTED`, stores feedback, increments rejection history, and returns the
+  milestone to `IN_PROGRESS`. It never creates a dispute. Either participant
+  must explicitly invoke the dispute API for a genuine disagreement.
+- Business on-demand progress-report requests use a durable request history:
+  the first response SLA is 24 hours and later requests use 12 hours. Reports
+  and deliverables remain accepted in `OVERDUE`; missed deadlines do not move
+  money automatically.
 - Staff decision is separate from settlement execution: assigned Staff moves a
   dispute to `STAFF_DECIDED`; Admin settlement execution then splits escrow,
   marks the milestone `COMPLETED`, sets the dispute `RESOLVED`, and records the
@@ -101,8 +107,13 @@ Alternate exits:
   dispute is still active, can split the current milestone escrow between
   Business and Expert, cancels unfinished milestones, and moves the contract to
   `TERMINATED`.
-- Admin security-deposit refund is the gate from `COMPLETED` or `TERMINATED`
-  to `CLOSED`. Reviews are available only after `CLOSED`.
+- Standard termination supports Business-request Expert accept/dispute/three-day
+  timeout before optional Staff review. Immediate termination is a separate
+  guarded command: the initiator pays exactly 10% of total contract value from
+  its held deposit to the counterparty, without Staff review.
+- Admin participant-deposit refund is the gate from normal `COMPLETED` or
+  `TERMINATED` to `CLOSED`. Both deposits must be resolved. Reviews are
+  available only after `CLOSED`.
 - `COMPLETED`, `TERMINATED`, `CLOSED`, and `CANCELLED` contracts cannot start
   new milestone work.
 
@@ -125,10 +136,15 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/sign`
 - `POST /api/v1/contracts/{contractId}/nda-sign`
 - `POST /api/v1/contracts/{contractId}/deposit/pay`
-- `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
+- `POST /api/v1/contracts/{contractId}/expert-deposit/pay`
+- `POST /api/v1/admin/contracts/{contractId}/deposits/refund`
 - `POST /api/v1/contracts/{contractId}/reject`
 - `GET /api/v1/contracts/{contractId}/milestones`
 - `POST /api/v1/contracts/{contractId}/termination-requests`
+- `POST /api/v1/contracts/{contractId}/immediate-termination`
+- `POST /api/v1/termination-requests/{terminationRequestId}/accept`
+- `POST /api/v1/termination-requests/{terminationRequestId}/dispute`
+- `POST /api/v1/termination-requests/expire-awaiting-expert`
 - `GET /api/v1/contracts/{contractId}/termination-requests`
 - `GET /api/v1/termination-requests/{terminationRequestId}`
 - `POST /api/v1/termination-requests/{terminationRequestId}/assign-staff`
@@ -142,7 +158,11 @@ Alternate exits:
 - `GET /api/v1/milestones/{milestoneId}/deliverables`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback`
 - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+- `POST /api/v1/contracts/{contractId}/milestones/check-overdue`
+- `POST /api/v1/contracts/{contractId}/milestones/sla-auto-approve`
 - `POST /api/v1/milestones/{milestoneId}/start`
 - `POST /api/v1/milestones/{milestoneId}/approve`
 - `POST /api/v1/milestones/{milestoneId}/reject?reason=...`
@@ -151,10 +171,12 @@ Alternate exits:
 - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...`
 - `POST /api/v1/disputes/{disputeId}/escalation-request`
 - `POST /api/v1/disputes/{disputeId}/assign-staff`
+- `GET /api/v1/disputes/{disputeId}/staff-candidates`
 - `POST /api/v1/disputes/{disputeId}/reject-intervention`
 - `POST /api/v1/disputes/{disputeId}/staff-decision`
 - `POST /api/v1/disputes/{disputeId}/execute-settlement`
 - `POST /api/v1/disputes/{disputeId}/cancel`
+- `POST /api/v1/disputes/staff-sla-escalate`
 - `POST /api/v1/case-attachments`
 - `GET /api/v1/case-attachments?ownerType=...&ownerId=...`
 - `POST /api/v1/contracts/{contractId}/reviews`

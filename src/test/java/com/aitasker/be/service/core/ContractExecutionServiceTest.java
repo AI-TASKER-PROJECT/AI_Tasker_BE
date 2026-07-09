@@ -81,6 +81,7 @@ class ContractExecutionServiceTest {
     @Mock private CaseAttachmentRepository caseAttachmentRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private MilestoneProgressReportRepository milestoneProgressReportRepository;
+    @Mock private MilestoneProgressReportRequestRepository milestoneProgressReportRequestRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private StaffRepository staffRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -221,6 +222,9 @@ class ContractExecutionServiceTest {
                 .milestoneId(7)
                 .createdAt(LocalDateTime.now().minusDays(8))
                 .build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder()
+                .contractMilestoneId(70).contractId(1).jobMilestoneId(7)
+                .finalBudget(BigDecimal.valueOf(1000)).status("UNDER_REVIEW").build();
         JobEntity job = JobEntity.builder().jobId(2).businessId(10).status("IN_PROGRESS").build();
 
         when(systemSettingRepository.findById("default_sla_days")).thenReturn(Optional.empty());
@@ -228,6 +232,11 @@ class ContractExecutionServiceTest {
         when(deliverableRepository.findByMilestoneId(7)).thenReturn(List.of(deliverable));
         when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        mockLockedContractMilestone(1, 7, contractMilestone);
+        when(businessProfileRepository.findById(10))
+                .thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(50).build()));
+        when(expertProfileRepository.findById(5))
+                .thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
         when(milestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(jobRepository.findById(2)).thenReturn(Optional.of(job));
@@ -899,10 +908,10 @@ class ContractExecutionServiceTest {
     }
 
     @Test
-    void submitDeliverable_shouldAllowResubmissionDuringPendingSelfResolveDispute() {
+    void submitDeliverable_shouldAllowNormalResubmissionAfterRejection() {
         MilestoneEntity milestone = MilestoneEntity.builder()
                 .milestoneId(10).jobId(2).contractId(1)
-                .milestoneName("Milestone X").status("DISPUTED")
+                .milestoneName("Milestone X").status("IN_PROGRESS")
                 .build();
         ContractEntity contract = ContractEntity.builder()
                 .contractId(1).jobId(2).businessId(10).expertId(5)
@@ -911,10 +920,7 @@ class ContractExecutionServiceTest {
                 .status("ACTIVE")
                 .build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
-                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("DISPUTED")
-                .build();
-        DisputeEntity dispute = DisputeEntity.builder()
-                .disputeId(1).contractId(1).milestoneId(10).status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE)
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("IN_PROGRESS")
                 .build();
         DeliverableEntity saved = DeliverableEntity.builder().deliverableId(100).milestoneId(10).build();
 
@@ -925,7 +931,7 @@ class ContractExecutionServiceTest {
         when(contractRepository.findByJobId(2)).thenReturn(Optional.of(contract));
         when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
-        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(10), any())).thenReturn(List.of(dispute));
+        when(deliverableRepository.findByMilestoneIdOrderBySubmissionRoundDesc(10)).thenReturn(List.of());
         when(deliverableRepository.save(any(DeliverableEntity.class))).thenReturn(saved);
         when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(20).build()));
@@ -1037,6 +1043,8 @@ class ContractExecutionServiceTest {
                 .contractMilestoneId(100).contractId(1).jobMilestoneId(200)
                 .finalBudget(BigDecimal.valueOf(1000)).resubmitCount(0).status("UNDER_REVIEW")
                 .build();
+        DeliverableEntity deliverable = DeliverableEntity.builder()
+                .deliverableId(300).milestoneId(200).submissionRound(1).status("SUBMITTED").build();
 
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("BUSINESS").build()).build()
@@ -1045,13 +1053,18 @@ class ContractExecutionServiceTest {
         when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(deliverableRepository.findByMilestoneIdOrderBySubmissionRoundDesc(200)).thenReturn(List.of(deliverable));
+        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(200), any())).thenReturn(List.of());
+        when(deliverableRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         MilestoneEntity result = contractExecutionService.rejectMilestone(200, "Not good enough");
 
         assertEquals(Integer.valueOf(1), cm.getResubmitCount());
-        assertEquals("DISPUTED", result.getStatus());
+        assertEquals("IN_PROGRESS", result.getStatus());
+        assertEquals("REJECTED", deliverable.getStatus());
+        assertEquals("Not good enough", deliverable.getRejectionFeedback());
+        verify(disputeRepository, never()).save(any());
     }
 
     @Test

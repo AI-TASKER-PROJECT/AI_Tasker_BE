@@ -80,7 +80,10 @@ public class AdminService {
             input.setRevieweeId(targetAccountId);
         }
         ReviewEntity saved = reviewRepository.save(input);
-        auditLogService.record(AuditLogService.ACTION_CREATE_REVIEW, "reviews", String.valueOf(saved.getReviewId()), actor.getAccountId());
+        auditLogService.record("REVIEW_CREATED", "reviews", String.valueOf(saved.getReviewId()), actor.getAccountId());
+        notificationService.notifyContractEvent(saved.getRevieweeId(), actor.getAccountId(), "REVIEW_CREATED",
+                "Bạn nhận được đánh giá mới", "Một bên trong hợp đồng đã gửi đánh giá sau khi hợp đồng đóng.",
+                contract.getContractId());
         return saved;
     }
 

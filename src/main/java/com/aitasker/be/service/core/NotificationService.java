@@ -197,7 +197,8 @@ public class NotificationService {
                 type,
                 title,
                 message,
-                "/contracts/" + contractId
+                "/contracts/" + contractId,
+                Map.of("contractId", contractId)
         );
     }
 
@@ -465,6 +466,51 @@ public class NotificationService {
                 "Đã hoàn tiền ký quỹ hợp đồng",
                 "Admin đã hoàn tiền ký quỹ hợp đồng sau khi chấm dứt. Hợp đồng đã đóng và bạn có thể đánh giá đối tác.",
                 "/contracts/" + contractId,
+                Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
+    }
+
+    public void notifyProgressReportFeedbackRecorded(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Integer milestoneId, Long progressReportId) {
+        createAndPush(receiverAccountId, actorAccountId, "PROGRESS_REPORT_FEEDBACK_RECORDED",
+                "Doanh nghiệp đã phản hồi báo cáo tiến độ",
+                "Doanh nghiệp đã ghi nhận phản hồi cho báo cáo tiến độ của milestone.",
+                "/contracts/" + contractId + "/milestones/" + milestoneId + "/progress-reports/" + progressReportId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId, "progressReportId", progressReportId));
+    }
+
+    public void notifyMilestoneMarkedOverdue(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Integer milestoneId) {
+        createAndPush(receiverAccountId, actorAccountId, "MILESTONE_MARKED_OVERDUE",
+                "Milestone đã quá hạn",
+                "Một milestone trong hợp đồng đã được đánh dấu quá hạn.",
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId));
+    }
+
+    public void notifyDisputeStaffSlaEscalated(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_STAFF_SLA_ESCALATED",
+                "Tranh chấp quá hạn SLA Staff",
+                "Một tranh chấp đã quá hạn xử lý Staff SLA và cần được kiểm tra.",
+                "/admin/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId));
+    }
+
+    public void notifyDisputeCancelled(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Integer disputeId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_CANCELLED",
+                "Tranh chấp đã bị hủy",
+                "Tranh chấp trong hợp đồng đã bị hủy.",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId));
+    }
+
+    public void notifyTerminationAcceptedOrExpired(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Long terminationRequestId, String type) {
+        createAndPush(receiverAccountId, actorAccountId, type,
+                "Yêu cầu chấm dứt được chấp nhận",
+                "Yêu cầu chấm dứt tiêu chuẩn đã được chấp nhận và đang chờ hoàn ký quỹ.",
+                "/contracts/" + contractId + "/termination-requests/" + terminationRequestId,
                 Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
     }
 

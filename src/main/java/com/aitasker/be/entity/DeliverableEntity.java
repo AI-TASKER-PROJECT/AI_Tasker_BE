@@ -17,6 +17,10 @@ import java.time.LocalDateTime;
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class DeliverableEntity {
+    public static final String STATUS_SUBMITTED = "SUBMITTED";
+    public static final String STATUS_APPROVED = "APPROVED";
+    public static final String STATUS_REJECTED = "REJECTED";
+    public static final String STATUS_SUPERSEDED = "SUPERSEDED";
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
@@ -29,6 +33,10 @@ public class DeliverableEntity {
     @Column(name = "demo_link", length = 255) private String demoLink;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "submission_notes") private String submissionNotes;
+    @Column(name = "submission_round", nullable = false) private Integer submissionRound;
+    @Column(name = "status", nullable = false, length = 50) private String status;
+    @Column(name = "rejection_feedback") private String rejectionFeedback;
+    @Column(name = "rejected_at") private LocalDateTime rejectedAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

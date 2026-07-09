@@ -9,6 +9,9 @@ import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ProgressReportRequest;
+import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
+import com.aitasker.be.dto.core.ImmediateTerminationRequest;
+import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.*;
@@ -65,13 +68,21 @@ public class ContractExecutionController {
                 paymentWalletService.payContractDeposit(contractId)));
     }
 
-    @PostMapping("/admin/contracts/{contractId}/deposit/refund")
-    public ResponseEntity<ApiResponse<ContractDepositEntity>> refundContractDeposit(
-            @PathVariable Integer contractId,
-            @RequestBody DepositRefundRequest request
+    @PostMapping("/contracts/{contractId}/expert-deposit/pay")
+    public ResponseEntity<ApiResponse<PaymentActionResponse<ContractDepositEntity>>> payExpertContractDeposit(
+            @PathVariable Integer contractId
     ) {
-        return ResponseEntity.ok(ApiResponse.success("REFUND CONTRACT DEPOSIT SUCCESS",
-                paymentWalletService.refundContractDeposit(contractId, request)));
+        return ResponseEntity.ok(ApiResponse.success("PAY EXPERT CONTRACT DEPOSIT SUCCESS",
+                paymentWalletService.payExpertContractDeposit(contractId)));
+    }
+
+    @PostMapping("/admin/contracts/{contractId}/deposits/refund")
+    public ResponseEntity<ApiResponse<List<ContractDepositEntity>>> refundContractDeposits(
+            @PathVariable Integer contractId,
+            @RequestBody(required = false) DepositRefundRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("REFUND PARTICIPANT DEPOSITS SUCCESS",
+                paymentWalletService.refundParticipantDeposits(contractId, request)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
@@ -136,7 +147,27 @@ public class ContractExecutionController {
 
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports")
     public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> submitProgressReport(@PathVariable Integer contractId, @PathVariable Integer milestoneId, @RequestBody ProgressReportRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("SUBMIT PROGRESS REPORT SUCCESS", service.submitProgressReport(contractId, milestoneId, request.getContent(), request.getPercentComplete(), request.getAttachmentUrl())));
+        return ResponseEntity.ok(ApiResponse.success("SUBMIT PROGRESS REPORT SUCCESS", service.submitProgressReport(contractId, milestoneId, request)));
+    }
+
+    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-report-request")
+    public ResponseEntity<ApiResponse<MilestoneProgressReportRequestEntity>> requestProgressReport(
+            @PathVariable Integer contractId, @PathVariable Integer milestoneId) {
+        return ResponseEntity.ok(ApiResponse.success("REQUEST PROGRESS REPORT SUCCESS",
+                service.requestProgressReport(contractId, milestoneId)));
+    }
+
+    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback")
+    public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> feedbackProgressReport(
+            @PathVariable Integer contractId, @PathVariable Integer milestoneId,
+            @PathVariable Long progressReportId, @RequestBody ProgressReportFeedbackRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("PROGRESS REPORT FEEDBACK SUCCESS",
+                service.feedbackProgressReport(contractId, milestoneId, progressReportId, request)));
+    }
+
+    @PostMapping("/contracts/{contractId}/milestones/check-overdue")
+    public ResponseEntity<ApiResponse<List<MilestoneEntity>>> checkOverdue(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("CHECK OVERDUE SUCCESS", service.markOverdueMilestones(contractId)));
     }
 
     @GetMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports")
@@ -174,6 +205,13 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("ASSIGN DISPUTE STAFF SUCCESS", service.assignDispute(disputeId, staffId)));
     }
 
+    @GetMapping("/disputes/{disputeId}/staff-candidates")
+    public ResponseEntity<ApiResponse<List<StaffAssignmentCandidateResponse>>> listStaffCandidates(
+            @PathVariable Integer disputeId) {
+        return ResponseEntity.ok(ApiResponse.success("LIST STAFF CANDIDATES SUCCESS",
+                service.listStaffCandidates(disputeId)));
+    }
+
     @PostMapping("/disputes/{disputeId}/reject-intervention")
     public ResponseEntity<ApiResponse<DisputeEntity>> rejectInterventionAlias(@PathVariable Integer disputeId, @RequestParam(required = false) String reason) {
         return ResponseEntity.ok(ApiResponse.success("REJECT INTERVENTION SUCCESS", service.rejectIntervention(disputeId, reason)));
@@ -194,9 +232,47 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("CANCEL DISPUTE SUCCESS", service.cancelDispute(disputeId, reason)));
     }
 
+    @PostMapping("/disputes/staff-sla-escalate")
+    public ResponseEntity<ApiResponse<List<DisputeEntity>>> escalateOverdueStaffDisputes() {
+        return ResponseEntity.ok(ApiResponse.success("ESCALATE STAFF DISPUTE SLA SUCCESS",
+                service.escalateOverdueStaffDisputes()));
+    }
+
     @PostMapping("/contracts/{contractId}/termination-requests")
     public ResponseEntity<ApiResponse<TerminationRequestEntity>> requestTermination(@PathVariable Integer contractId, @RequestBody TerminationRequestEntity request) {
         return ResponseEntity.ok(ApiResponse.success("REQUEST TERMINATION SUCCESS", service.requestTerminationRequest(contractId, request)));
+    }
+
+    @PostMapping("/contracts/{contractId}/immediate-termination")
+    public ResponseEntity<ApiResponse<ContractEntity>> immediateTermination(
+            @PathVariable Integer contractId, @RequestBody ImmediateTerminationRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("IMMEDIATE TERMINATION SUCCESS",
+                service.immediateTerminate(contractId, request)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/accept")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> acceptTermination(
+            @PathVariable Long terminationRequestId) {
+        return ResponseEntity.ok(ApiResponse.success("ACCEPT TERMINATION SUCCESS",
+                service.acceptBusinessTermination(terminationRequestId)));
+    }
+
+    @PostMapping("/termination-requests/{terminationRequestId}/dispute")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> disputeTermination(
+            @PathVariable Long terminationRequestId, @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("DISPUTE TERMINATION SUCCESS",
+                service.disputeBusinessTermination(terminationRequestId, reason)));
+    }
+
+    @PostMapping("/termination-requests/expire-awaiting-expert")
+    public ResponseEntity<ApiResponse<List<TerminationRequestEntity>>> expireTerminationResponses() {
+        return ResponseEntity.ok(ApiResponse.success("EXPIRE TERMINATION RESPONSES SUCCESS",
+                service.expireAwaitingExpertTerminationResponses()));
+    }
+
+    @PostMapping("/contracts/{contractId}/milestones/sla-auto-approve")
+    public ResponseEntity<ApiResponse<List<MilestoneEntity>>> autoApproveReviewSla(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("SLA AUTO APPROVE SUCCESS", service.runSlaAutoApprove()));
     }
 
     @PostMapping("/termination-requests/{terminationRequestId}/assign-staff")

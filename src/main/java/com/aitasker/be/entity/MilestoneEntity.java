@@ -41,6 +41,8 @@ public class MilestoneEntity {
     @Column(name = "status", nullable = false, length = 50) private String status;
     @Column(name = "duration") private Integer duration;
     @Column(name = "duration_unit", length = 20) private String durationUnit;
+    @Column(name = "reject_count", nullable = false) private Integer rejectCount;
+    @Column(name = "last_rejection_feedback") private String lastRejectionFeedback;
     @Column(name = "escrow_released_at") private LocalDateTime escrowReleasedAt;
     @Column(name = "settlement_source_type", length = 50) private String settlementSourceType;
     @Column(name = "settlement_source_id") private Long settlementSourceId;

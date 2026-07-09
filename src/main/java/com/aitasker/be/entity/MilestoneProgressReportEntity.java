@@ -31,8 +31,29 @@ public class MilestoneProgressReportEntity {
     private Integer percentComplete;
     @Column(name = "attachment_url")
     private String attachmentUrl;
+    @Column(name = "source_code_url")
+    private String sourceCodeUrl;
+    @Column(name = "demo_link")
+    private String demoLink;
+    @Column(name = "submission_notes")
+    private String submissionNotes;
     @Column(name = "is_late", nullable = false)
     private Boolean isLate;
+    @Column(name = "business_feedback")
+    private String businessFeedback;
+    @Column(name = "feedback_category", length = 30)
+    private String feedbackCategory;
+    @Column(name = "feedback_severity", length = 20)
+    private String feedbackSeverity;
+    @Column(name = "feedback_dod_items", columnDefinition = "jsonb")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    private String feedbackDodItems;
+    @Column(name = "requires_adjustment", nullable = false)
+    private Boolean requiresAdjustment;
+    @Column(name = "feedback_by_account_id")
+    private Integer feedbackByAccountId;
+    @Column(name = "feedback_at")
+    private LocalDateTime feedbackAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

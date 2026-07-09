@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @Table(name = "termination_requests")
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class TerminationRequestEntity {
+    public static final String STATUS_AWAITING_EXPERT_RESPONSE = "AWAITING_EXPERT_RESPONSE";
     public static final String STATUS_REQUESTED = "REQUESTED";
     public static final String STATUS_STAFF_REVIEWING = "STAFF_REVIEWING";
     public static final String STATUS_STAFF_APPROVED = "STAFF_APPROVED";
@@ -80,6 +81,10 @@ public class TerminationRequestEntity {
     private Integer cancelledByAccountId;
     @Column(name = "cancellation_reason")
     private String cancellationReason;
+    @Column(name = "expert_response_due_at")
+    private LocalDateTime expertResponseDueAt;
+    @Column(name = "expert_responded_at")
+    private LocalDateTime expertRespondedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

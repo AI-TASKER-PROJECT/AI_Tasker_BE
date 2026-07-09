@@ -12,7 +12,11 @@ import java.util.Optional;
 
 public interface ContractDepositRepository extends JpaRepository<ContractDepositEntity, Long> {
     // Note: Ham `findByContractId` truy cap hoac truy van du lieu phuc vu tang service.
-    Optional<ContractDepositEntity> findByContractId(Integer contractId);
+    Optional<ContractDepositEntity> findByContractIdAndOwnerRole(Integer contractId, String ownerRole);
+    java.util.List<ContractDepositEntity> findByContractIdOrderByOwnerRoleAsc(Integer contractId);
+    default Optional<ContractDepositEntity> findByContractId(Integer contractId) {
+        return findByContractIdAndOwnerRole(contractId, "BUSINESS");
+    }
 
     Optional<ContractDepositEntity> findByHoldTransactionId(Long holdTransactionId);
 

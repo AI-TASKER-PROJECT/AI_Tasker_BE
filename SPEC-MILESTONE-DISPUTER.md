@@ -1,9 +1,9 @@
-# SPEC-MILESTONE-DISPUTER.md — v2.1
+# SPEC-MILESTONE-DISPUTER.md — v2.2
 
 **Project:** AITASKER-BE  
 **Platform:** AITASKER — AI expert and business matching platform  
 **Spec purpose:** Implementation guide for harness engineering agents  
-**Version:** v2.1
+**Version:** v2.2
 **Prepared date:** 2026-07-01  
 **Last updated:** 2026-07-09
 **Primary target:** Backend agents, database agents, integration agents, tester agents, reviewer agents  
@@ -28,7 +28,9 @@ The v2 design replaces the earlier incomplete milestone payment model with a **p
 
 The spec also fixes the review findings from v1:
 
-- Business can reject a re-submitted deliverable without creating a second dispute.
+- Business rejection does not automatically create a dispute. It records
+  rejection feedback and returns the milestone to `IN_PROGRESS`.
+- Expert revises and re-submits through the normal deliverable flow.
 - Dispute and termination settlement cannot double-release the same milestone escrow.
 - Milestones that are not completed due to contract termination must enter `CANCELLED` instead of remaining zombie `PENDING` rows.
 - `STAFF_DECIDED` and settlement execution are separated.
@@ -50,9 +52,12 @@ The spec also fixes the review findings from v1:
 - Assigned Staff remains the final professional decision-maker. Admin may assign
   or replace Staff for operational reasons but may not approve, reject, revise,
   or change Staff's payout percentage.
-- Immediate termination never charges a fixed 10% penalty to either party.
+- Business holds a 20% contract security deposit and Expert holds a separate 10%
+  contract performance deposit before activation.
+- Immediate termination does not require Staff and charges the initiating party
+  10% of total contract value for the other party.
 
-### 0.1 v2.1 Binding Decisions
+### 0.1 v2.2 Binding Decisions
 
 The following decisions override conflicting experimental code or supplementary
 notes:
@@ -62,13 +67,24 @@ notes:
 3. Staff's valid decision is final and triggers system settlement.
 4. Admin cannot adjust Staff's payout percentage, including by a plus/minus
    tolerance.
-5. There is no fixed 10% abrupt-termination penalty, compensation, confiscation,
-   or partial security-deposit deduction.
-6. An overdue on-demand progress-report request may unlock immediate termination
-   for Business, but does not create a penalty or transfer money from one party
-   to the other.
-7. Contract security-deposit handling remains binary under sections 4.1, 9.7,
-   and 11.8.
+5. Rejecting a final deliverable never creates a dispute automatically.
+6. Rejection stores feedback, marks the rejected deliverable, and returns the
+   milestone from `UNDER_REVIEW` to `IN_PROGRESS`.
+7. Re-submission is the normal Expert submit flow; it does not require a dispute
+   or a special re-submit request.
+8. Dispute begins only through an explicit dispute action by Business or Expert.
+9. Business must hold 20% of total contract value and Expert must hold 10%
+   before the contract becomes `ACTIVE`.
+10. Immediate termination requires no Staff review and charges 10% of total
+    contract value to the initiating party for the counterparty.
+11. A Business immediate-termination penalty is funded from Business's held 20%
+    deposit; the remaining held Business deposit is refundable.
+12. An Expert immediate-termination penalty consumes Expert's held 10% deposit.
+13. Standard termination/disputed termination remains evidence-based and
+    Staff-reviewed; the fixed immediate-termination penalty does not apply.
+14. An overdue on-demand progress-report request may be used as Business's
+    recorded reason, but immediate termination remains an explicit paid option;
+    the timeout itself does not move money.
 
 ---
 
@@ -121,10 +137,10 @@ This spec covers:
 - Structured Business feedback on progress reports.
 - Deliverable submission.
 - Business milestone approval.
-- Business milestone rejection.
-- Expert re-submit during self-resolve.
-- Business reject again during self-resolve.
-- Business approval after self-resolve.
+- Business final-deliverable rejection with structured feedback.
+- Normal Expert correction and re-submission after rejection.
+- Explicit dispute initiation when either party contests scope, rejection,
+  evidence, review conduct, or contract termination.
 - Business or Expert dispute initiation.
 - Dispute escalation request with file/evidence.
 - Admin Staff assignment based on job domain and required skills.
@@ -134,12 +150,13 @@ This spec covers:
 - Staff mandatory decision.
 - System settlement execution after Staff decision.
 - Contract termination request by Business or Expert.
-- Immediate termination without a fixed penalty when section 11A guards are
-  satisfied.
+- Immediate termination with a fixed 10% contract-value penalty when section 11A
+  guards are satisfied.
+- Separate Business and Expert contract deposits.
 - Termination Staff review.
 - Partial work evidence for termination.
 - Termination settlement.
-- Admin manual refund of 20% contract deposit.
+- Admin resolution/refund of Business and Expert contract deposits.
 - Contract closure.
 - Cross-review opening after contract closure.
 - Database impact and migration plan.
@@ -157,7 +174,8 @@ This spec does not cover:
 - Complex appeal flow after Staff decision.
 - Platform penalties, platform fees, or confiscation of the unpaid dispute percentage.
 - Automatic AI judgment based on missed deadlines.
-- Financial penalties caused only by a missed progress-report deadline.
+- Automatic financial movement caused only by a missed progress-report deadline;
+  the deadline only unlocks an explicit immediate-termination action.
 - Multi-Staff voting or Staff committee review.
 - Admin review or override of a valid Staff dispute decision.
 - Appeal after a valid Staff dispute decision.
@@ -172,10 +190,13 @@ Business is the client that owns the job and contract budget.
 
 Business can:
 
+- Fund the required 20% Business contract deposit.
 - Deposit milestone escrow.
 - Review submitted deliverables.
 - Approve a milestone.
-- Reject a deliverable and initiate a dispute.
+- Reject a deliverable without automatically initiating a dispute.
+- Explicitly initiate dispute as a separate action when there is a genuine
+  disagreement.
 - Submit reasons/evidence for dispute.
 - Request an on-demand progress report while the current milestone is
   `IN_PROGRESS` or `OVERDUE`.
@@ -185,7 +206,8 @@ Business can:
 - Request immediate termination when section 11A guards are satisfied.
 - Submit termination reason and evidence.
 - Receive refund of unused milestone escrow after dispute or termination settlement.
-- Receive manual refund of the 20% contract security deposit after contract completion or valid termination.
+- Receive refund of the remaining Business contract deposit after completion or
+  valid termination.
 - Review Expert after contract is closed.
 
 Business cannot:
@@ -204,6 +226,7 @@ Expert performs the milestone work.
 
 Expert can:
 
+- Pay and hold the required 10% Expert contract performance deposit.
 - Start a deposited milestone.
 - Submit deliverable.
 - Re-submit deliverable during self-resolve.
@@ -214,6 +237,10 @@ Expert can:
 - Request contract termination.
 - Submit partial work evidence during termination review.
 - Receive milestone payout.
+- Receive refund of the Expert 10% deposit after completion or standard
+  termination.
+- Receive Business's 10% immediate-termination penalty when Business cancels
+  unilaterally.
 - Review Business after contract is closed.
 
 Expert cannot:
@@ -224,6 +251,7 @@ Expert cannot:
 - Cancel a dispute initiated by Business.
 - Cancel a dispute after Staff review has started.
 - Override Staff decision.
+- Start contract execution before the Expert 10% deposit is held.
 
 ### 3.3 Admin
 
@@ -237,7 +265,7 @@ Admin can:
   conflict-of-interest, or SLA reasons.
 - Cancel invalid or duplicate dispute records before settlement.
 - Cancel invalid or duplicate termination requests before settlement.
-- Execute or approve manual contract deposit refund, depending on existing wallet service design.
+- Execute or approve participant deposit resolution, depending on existing wallet service design.
 - Manage system categories, role access, and operational oversight.
 
 Admin must not:
@@ -266,7 +294,8 @@ Staff cannot:
 
 - Manually move wallet balances outside approved service methods.
 - Override wallet guards.
-- Refund the 20% contract deposit directly unless existing system explicitly grants that operation.
+- Refund participant deposits directly unless existing system explicitly grants
+  that operation.
 - Cancel a dispute instead of using `INTERVENTION_REJECTED`.
 
 ### 3.5 System
@@ -287,26 +316,77 @@ System is responsible for:
 
 ## 4. Core Financial Concepts
 
-### 4.1 Contract Security Deposit
+### 4.1 Participant Contract Deposits
 
-The contract security deposit is 20% of the total contract budget.
+Two deposits are required before contract activation:
 
-It is:
+| Owner | Required held amount | Purpose |
+|---|---:|---|
+| Business | 20% of total contract value | Contract security and funding commitment |
+| Expert | 10% of total contract value | Expert performance commitment |
 
-- Paid by Business after contract signing.
-- Held by platform/admin/system wallet according to existing implementation.
-- Separate from milestone escrow.
-- Refunded manually by Admin after:
-  - contract normal completion; or
-  - valid contract termination after required settlement is complete.
+Both deposits:
 
-It is not:
+- are paid after required contract/NDA signatures and before `ACTIVE`;
+- are held in ledger-backed escrow/holding balance;
+- are separate from per-milestone escrow;
+- must have a persisted owner role and account;
+- must be idempotently funded once;
+- are normally refunded in full after valid completion or standard termination,
+  subject to the existing Admin closure operation;
+- may be resolved differently only by an explicit rule in this specification.
 
-- A milestone payment.
-- A milestone escrow.
-- A platform penalty by default.
-- Automatically confiscated.
-- Partially refundable. Admin refund action is binary: refund the full held amount (100%), or withhold the full held amount (0%). There is no percentage-based split, deduction, or partial confiscation of the contract security deposit. This is different from milestone escrow, which Staff may split by percentage during dispute resolution (10.9); the contract deposit has no equivalent Staff-decision mechanism, so no partial-amount authority exists for it.
+The fixed immediate-termination penalty is the explicit exception:
+
+- Business immediate termination transfers 10% of total contract value from the
+  held Business deposit to Expert. The remaining Business deposit is refundable.
+- Expert immediate termination transfers the full held Expert deposit, equal to
+  10% of total contract value, to Business.
+- The counterparty's own deposit remains unaffected and refundable.
+- The platform does not keep the 10% penalty.
+
+No service may charge the penalty from a participant's available wallet when the
+required held deposit exists. Contract activation must prevent the insufficient-
+deposit case.
+
+### 4.1A Deposit Funding And Activation
+
+Contract status remains `PENDING` until all of these are true:
+
+1. Business and Expert signed the contract.
+2. Business and Expert signed the NDA when required.
+3. Business's 20% deposit is `HELD`.
+4. Expert's 10% deposit is `HELD`.
+
+Only then may the system atomically activate the contract and move the job to
+`IN_PROGRESS`.
+
+### 4.1B Deposit Resolution
+
+Normal completion or standard termination:
+
+```text
+Business held deposit -> Business available: 100% of remaining held amount
+Expert held deposit -> Expert available: 100% of remaining held amount
+```
+
+Business immediate termination:
+
+```text
+Business held deposit -> Expert available: 10% of total contract value
+Business held deposit -> Business available: remaining held amount
+Expert held deposit -> Expert available: full held amount
+```
+
+Expert immediate termination:
+
+```text
+Expert held deposit -> Business available: 10% of total contract value
+Business held deposit -> Business available: full held amount
+```
+
+All deposit resolution must use wallet ledger entries and one-time resolution
+guards. The sum of penalty plus refunds must equal the deposits' held amounts.
 
 ### 4.2 Milestone Escrow
 
@@ -346,22 +426,17 @@ businessRefundAmount = milestoneEscrowAmount - expertPayoutAmount
 
 The refund must be calculated by subtraction from escrow amount, not by independently multiplying the remaining percentage, to avoid rounding mismatch.
 
-### 4.4 Platform Fee Or Penalty
+### 4.4 Platform Fee And Immediate-Termination Penalty
 
 There is no platform penalty or platform fee in v2 dispute settlement.
 
 If Staff decides Expert receives 70%, the remaining 30% is refunded to Business.
 
-There is also no fixed immediate-termination penalty:
+There is no platform fee in dispute or standard termination settlement.
 
-- Business immediate termination does not transfer a fixed percentage to Expert.
-- Expert immediate termination does not debit Expert's available wallet by a
-  fixed percentage.
-- The 20% contract security deposit must not be partially consumed as a fixed
-  termination penalty.
-- Money movement during termination is limited to refunding unreleased escrow,
-  executing a Staff-approved partial-work split when applicable, and processing
-  the binary contract security-deposit result.
+Immediate termination is different: it charges exactly 10% of total contract
+value to the initiating party for the counterparty. This is compensation, not a
+platform fee and not a Staff-decided milestone payout.
 
 ---
 
@@ -389,11 +464,11 @@ CANCELLED
 | Status | Meaning |
 |---|---|
 | `DRAFT` | Contract created but not fully accepted/signed. Existing behavior. |
-| `PENDING` | Contract pending required pre-activation steps. Existing behavior. |
+| `PENDING` | Contract pending signatures and/or required Business 20% and Expert 10% deposits. |
 | `ACTIVE` | Contract is active and milestones can be executed. |
 | `TERMINATION_PENDING` | A termination request is being reviewed. Contract execution actions are blocked except allowed termination/dispute actions. |
-| `COMPLETED` | All milestones are completed. Contract waits for Admin refund of 20% security deposit. |
-| `TERMINATED` | Termination has been approved and required milestone settlement is complete. Contract waits for Admin refund of 20% security deposit. |
+| `COMPLETED` | All milestones are completed. Contract waits for resolution/refund of both participant deposits. |
+| `TERMINATED` | Termination and required milestone settlement are complete. Contract waits for unresolved participant deposits, unless immediate termination resolved them atomically. |
 | `CLOSED` | Final state. Deposit refund is done. Cross-review is opened. |
 | `CANCELLED` | Legacy or invalid cancellation state. Do not use for new valid v2 termination flow unless existing code requires compatibility. |
 
@@ -405,8 +480,11 @@ ACTIVE -> COMPLETED -> CLOSED
 
 Rules:
 
+- `PENDING -> ACTIVE` occurs only after all signatures and both participant
+  deposits are held.
 - `ACTIVE -> COMPLETED` occurs after all contract milestones are `COMPLETED`.
-- `COMPLETED -> CLOSED` occurs only after Admin refunds the 20% contract security deposit.
+- `COMPLETED -> CLOSED` occurs only after Admin resolves/refunds both participant
+  deposits.
 - Cross-review opens only at `CLOSED`.
 
 ### 5.4 Termination Transitions
@@ -422,8 +500,10 @@ Rules:
 - `TERMINATION_PENDING -> ACTIVE` occurs if Staff rejects the termination request.
 - `TERMINATION_PENDING -> TERMINATED` occurs after Staff approves termination and required current milestone settlement is executed.
 - `ACTIVE -> TERMINATED` is allowed only through the guarded immediate
-  termination flow in section 11A. It never applies a fixed percentage penalty.
-- `TERMINATED -> CLOSED` occurs only after Admin refunds the 20% contract security deposit.
+  termination flow in section 11A and applies the fixed 10% contract-value
+  penalty.
+- `TERMINATED -> CLOSED` occurs only after Admin resolves both participant
+  deposits, including any immediate-termination penalty.
 
 ### 5.5 Contract Blocking Rules
 
@@ -480,10 +560,13 @@ IN_PROGRESS -> OVERDUE when the milestone due time passes
 IN_PROGRESS -> UNDER_REVIEW
 OVERDUE -> UNDER_REVIEW
 UNDER_REVIEW -> COMPLETED
+UNDER_REVIEW -> IN_PROGRESS after Business rejection
 UNDER_REVIEW -> DISPUTED
 IN_PROGRESS -> DISPUTED
 OVERDUE -> DISPUTED
-DISPUTED -> UNDER_REVIEW
+DISPUTED -> IN_PROGRESS when Staff returns work for correction
+DISPUTED -> UNDER_REVIEW only when a deliverable submitted before dispute
+remains under formal review
 DISPUTED -> COMPLETED
 DISPUTED -> CANCELLED only if dispute is cancelled and contract termination closes milestone without settlement, but prefer previous state rollback before Staff review
 PENDING -> CANCELLED due to contract termination
@@ -504,7 +587,7 @@ DEPOSITED -> UNDER_REVIEW
 IN_PROGRESS -> COMPLETED without Business approval or Staff settlement
 OVERDUE -> COMPLETED without Business approval, configured review-SLA
 auto-approval, or Staff settlement
-UNDER_REVIEW -> IN_PROGRESS without reject/self-resolve process
+UNDER_REVIEW -> IN_PROGRESS without a persisted Business rejection and feedback
 COMPLETED -> any non-terminal status
 CANCELLED -> any non-terminal status
 ```
@@ -598,7 +681,7 @@ Meanings:
 
 | Type | Meaning |
 |---|---|
-| `BUSINESS_REJECTED_DELIVERABLE` | Business rejected a submitted deliverable. |
+| `BUSINESS_REJECTED_DELIVERABLE` | A participant explicitly opened dispute about a persisted Business rejection; rejection alone does not create it. |
 | `EXPERT_SCOPE_CONCERN` | Expert claims Business is requesting out-of-scope work. |
 | `EXPERT_NO_REVIEW_RESPONSE` | Expert claims Business is not reviewing or responding appropriately. |
 | `EXPERT_BAD_FAITH_REJECTION` | Expert claims Business rejected deliverable unfairly or outside acceptance criteria. |
@@ -645,7 +728,7 @@ CANCELLED
 | `STAFF_APPROVED` | Staff approved termination and defined required settlement if any. |
 | `STAFF_REJECTED` | Staff rejected termination request. Contract returns to `ACTIVE`. |
 | `AWAITING_SETTLEMENT_EXECUTION` | Required milestone settlement is pending or retrying. |
-| `AWAITING_DEPOSIT_REFUND` | Milestone settlement is done; waiting for Admin refund of 20% security deposit. |
+| `AWAITING_DEPOSIT_REFUND` | Milestone settlement is done; waiting for Admin resolution/refund of Business and Expert deposits. |
 | `COMPLETED` | Termination request is fully completed. Contract should be `CLOSED`. |
 | `CANCELLED` | Requester withdrew request before Staff decision or Admin cancelled invalid/duplicate request. |
 
@@ -844,7 +927,8 @@ An expired request:
 - does not automatically create a dispute;
 - does not move money;
 - does not apply a penalty;
-- unlocks Business immediate termination under section 11A.
+- may be recorded as the reason for Business immediate termination under
+  section 11A, but is not required for that paid option.
 
 ### 9.2C Business Feedback On A Progress Report
 
@@ -900,30 +984,42 @@ Actor: Expert
 Preconditions:
 
 - Contract status is `ACTIVE`.
-- Milestone status is `IN_PROGRESS` or `OVERDUE`, or `DISPUTED` if re-submit
-  during self-resolve.
+- Milestone status is `IN_PROGRESS` or `OVERDUE`.
 - Expert is assigned to contract.
 - Milestone escrow is deposited.
 - Milestone escrow is not released.
-- Re-submit count does not exceed configured maximum if current dispute was caused by deliverable rejection.
 
-System behavior for normal submit:
+System behavior:
 
 1. Create new `deliverables` row.
-2. Set submission round.
-3. Set milestone status to `UNDER_REVIEW`.
-4. Write audit log.
-5. Notify Business.
+2. Set `submission_round = previous maximum + 1`.
+3. Mark the prior rejected deliverable `SUPERSEDED` when applicable.
+4. Preserve prior rejection feedback and history.
+5. Set the new deliverable status `SUBMITTED`.
+6. Set milestone status to `UNDER_REVIEW`.
+7. Write audit log.
+8. Notify Business.
 
-System behavior for re-submit during self-resolve:
+This same flow handles first submission and every correction/resubmission.
+Expert does not need:
 
-1. Use the active dispute.
-2. Create new `deliverables` row with `submitted_during_dispute_id` if field exists.
-3. Increment or derive resubmit count.
-4. Set milestone status to `UNDER_REVIEW`.
-5. Keep dispute status `PENDING_SELF_RESOLVE`.
-6. Write audit log.
-7. Notify Business.
+- an active dispute;
+- a special re-submit request;
+- Business permission to resubmit;
+- a dispute-specific endpoint.
+
+The normal submission endpoint is the only final-product submission command.
+
+### 9.3A Explicit Dispute Instead Of Resubmission
+
+If Expert believes Business's rejection is invalid, out of scope, or in bad
+faith, Expert may explicitly initiate a dispute from `IN_PROGRESS` after the
+rejection. The rejected deliverable and rejection feedback become evidence.
+
+Business may also explicitly initiate a dispute if correction cycles reveal a
+scope/evidence disagreement that normal rejection feedback cannot resolve.
+
+Neither action happens automatically from reject or resubmit.
 
 ### 9.4 Business Approves Milestone
 
@@ -932,7 +1028,10 @@ Actor: Business
 Preconditions:
 
 - Contract status is `ACTIVE`.
-- Milestone status is `UNDER_REVIEW`.
+- Milestone status is:
+  - `UNDER_REVIEW`; or
+  - `DISPUTED` with an active `PENDING_SELF_RESOLVE` dispute and a submitted
+    deliverable that Business now accepts.
 - Business owns contract.
 - Milestone escrow exists.
 - `milestones.escrow_released_at IS NULL`.
@@ -952,7 +1051,8 @@ System behavior:
 10. Write wallet ledger.
 11. Write audit log.
 12. Notify Expert.
-13. If all milestones are completed, set contract `COMPLETED` and notify Admin to refund contract deposit.
+13. If all milestones are completed, set contract `COMPLETED` and notify Admin
+    to refund both participant deposits.
 
 Important:
 
@@ -970,45 +1070,24 @@ Preconditions:
 - Business owns contract.
 - Milestone escrow exists and is not released.
 - No active termination request.
-
-There are two valid branches.
-
-#### 9.5.1 First Rejection
-
-Additional precondition:
-
-- No active dispute exists for milestone.
+- No active dispute exists for the milestone. If a dispute is already active,
+  parties must use the dispute flow rather than normal rejection.
 
 System behavior:
 
-1. Create dispute.
-2. Set dispute status `PENDING_SELF_RESOLVE`.
-3. Set initiation type `BUSINESS_REJECTED_DELIVERABLE`.
-4. Set initiated by Business account.
-5. Store rejection reason/evidence.
-6. Store `previous_milestone_status = UNDER_REVIEW`.
-7. Set milestone status `DISPUTED`.
-8. Write audit log.
-9. Notify Expert.
+1. Require non-empty rejection feedback.
+2. Mark the current deliverable `REJECTED`.
+3. Store `rejection_feedback` and `rejected_at` on that deliverable.
+4. Increment milestone `reject_count`.
+5. Store milestone `last_rejection_feedback`.
+6. Set milestone status from `UNDER_REVIEW` to `IN_PROGRESS`.
+7. Do not create a dispute.
+8. Do not set milestone status to `DISPUTED`.
+9. Write audit log.
+10. Notify Expert to correct and submit through section 9.3.
 
-#### 9.5.2 Reject Re-submitted Deliverable
-
-Additional precondition:
-
-- Active dispute exists for milestone.
-- Active dispute status is `PENDING_SELF_RESOLVE`.
-- Milestone was moved back to `UNDER_REVIEW` by Expert re-submit.
-
-System behavior:
-
-1. Do not create a new dispute.
-2. Append rejection reason/evidence to the existing dispute or attachment/log table.
-3. Set milestone status back to `DISPUTED`.
-4. Keep dispute status `PENDING_SELF_RESOLVE`.
-5. Write audit log.
-6. Notify Expert.
-
-This fixes the v1 bug where reject re-submission was blocked by the `no active dispute` precondition.
+The same behavior applies to the first rejection and every later rejection.
+Historical deliverables and feedback must remain readable.
 
 ### 9.6 All Milestones Completed
 
@@ -1024,30 +1103,31 @@ Preconditions:
 System behavior:
 
 1. Set contract status `COMPLETED`.
-2. Notify Admin that 20% contract security deposit can be refunded.
+2. Notify Admin that both participant deposits can be refunded.
 3. Do not open cross-review yet.
 4. Cross-review opens only after contract becomes `CLOSED`.
 
-### 9.7 Admin Refunds Contract Security Deposit After Completion
+### 9.7 Admin Refunds Participant Deposits After Completion
 
 Actor: Admin
 
 Preconditions:
 
 - Contract status is `COMPLETED`.
-- Contract deposit status is `HELD` or compatible refundable status.
+- Business 20% and Expert 10% deposits are `HELD` or compatible refundable
+  status.
 - All milestones completed.
 - No active dispute.
 - No active termination request.
 
 System behavior:
 
-1. Lock contract deposit row.
-2. Lock relevant wallets.
-3. Refund 20% contract deposit to Business available balance. Refund amount must equal exactly `contract_deposits.held_amount` (100%). Partial refund percentages are not supported (see 4.1); Admin may only choose refund or withhold, never a fraction.
-4. Write `wallet_transactions` with `transaction_type = CONTRACT_DEPOSIT_REFUND`.
-5. Update `contract_deposits.status = REFUNDED`.
-6. Set `contract_deposits.refunded_at = now()`.
+1. Lock both participant deposit rows.
+2. Lock Business and Expert wallets.
+3. Refund the full remaining Business deposit to Business.
+4. Refund the full remaining Expert deposit to Expert.
+5. Write one ledger refund entry per deposit.
+6. Update both deposit statuses and refund timestamps.
 7. Set contract status `CLOSED`.
 8. Open review capability for both parties.
 9. Write audit log.
@@ -1063,7 +1143,8 @@ A dispute is a formal disagreement about the current milestone, deliverable, sco
 
 Both Business and Expert may initiate dispute in valid contexts.
 
-Business usually initiates dispute by rejecting a deliverable.
+Rejecting a deliverable never initiates dispute automatically. Business or
+Expert must call the explicit dispute API and provide a dispute reason/evidence.
 
 Expert may initiate dispute when there is a valid issue such as:
 
@@ -1088,7 +1169,7 @@ Preconditions:
 
 System behavior:
 
-1. Create dispute.
+1. Create dispute only because Expert explicitly requested it.
 2. Set `initiated_by_account_id = expertAccountId`.
 3. Set `initiated_by = EXPERT`.
 4. Set `initiation_type` to one of `EXPERT_SCOPE_CONCERN`, `EXPERT_NO_REVIEW_RESPONSE`, `EXPERT_BAD_FAITH_REJECTION`, or `OTHER` (see 7.5).
@@ -1098,6 +1179,33 @@ System behavior:
 8. Set milestone status `DISPUTED`.
 9. Write audit log.
 10. Notify Business.
+
+### 10.2A Business-Initiated Dispute
+
+Actor: Business
+
+Business rejection under section 9.5 is not this action.
+
+Preconditions:
+
+- Contract status is `ACTIVE`.
+- Milestone status is `IN_PROGRESS`, `OVERDUE`, or `UNDER_REVIEW`.
+- Business owns the contract.
+- No active dispute exists for the milestone.
+- No active termination request exists.
+- Business explicitly provides dispute reason and evidence.
+
+System behavior:
+
+1. Create one dispute because Business explicitly requested it.
+2. Store `initiated_by_account_id`, role, initiation type, reason, and evidence.
+3. Store the current milestone status as `previous_milestone_status`.
+4. Set dispute status `PENDING_SELF_RESOLVE`.
+5. Set milestone status `DISPUTED`.
+6. Write audit and notify Expert.
+
+When the dispute is about a prior rejection, the system links or references the
+rejected deliverable and feedback; it does not rewrite rejection history.
 
 ### 10.3 One Active Dispute Per Milestone
 
@@ -1124,7 +1232,11 @@ Expert agrees that deliverable needs change.
 Flow:
 
 ```text
-DISPUTED -> Expert updates deliverable -> UNDER_REVIEW -> Business approves or rejects again
+DISPUTED -> parties agree to return to correction
+-> dispute RESOLVED/CANCELLED with recorded agreement
+-> milestone IN_PROGRESS
+-> Expert submits through normal flow
+-> milestone UNDER_REVIEW
 ```
 
 #### 10.4.2 Explanation-Based
@@ -1145,17 +1257,20 @@ Business may then:
 - Maintain rejection; or
 - Request Staff intervention.
 
-### 10.5 Re-submit Limit
+### 10.5 Correction And Escalation Rules
 
-Maximum re-submit count is 3 for Business-rejection deliverable disputes.
+Normal rejection/resubmission has no dispute-specific three-resubmit gate.
+Every rejection remains auditable through deliverable history and
+`reject_count`.
 
-Important rule:
+Either Business or Expert may explicitly initiate or escalate a dispute when the
+issue is a genuine disagreement rather than an ordinary correction cycle. The
+backend must not:
 
-```text
-The 3 re-submit limit is a maximum self-resolve limit, not a prerequisite for Staff escalation.
-```
-
-Either Business or Expert may request Staff intervention at any time during active dispute if the issue is serious.
+- auto-create dispute at rejection count 1, 3, or any other count;
+- require three re-submissions before escalation;
+- block a valid normal resubmission merely because a reject counter reached a
+  configured threshold.
 
 ### 10.6 Request Staff Intervention
 
@@ -1414,6 +1529,11 @@ For a Business request:
 - No Expert response within three days is treated as acceptance by an
   idempotent scheduled system operation.
 
+This is the evidence/reason-based termination path. If the counterparty
+disagrees, the disagreement becomes a Staff-reviewed termination case. It is
+separate from section 11A immediate termination and does not charge the fixed
+10% penalty.
+
 ### 11.2 Admin Assigns Staff For Termination
 
 Actor: Admin
@@ -1566,13 +1686,13 @@ System behavior:
 17. Set termination request status `AWAITING_DEPOSIT_REFUND`.
 18. Set contract status `TERMINATED`.
 19. Commit transaction.
-20. Notify Admin to refund contract deposit.
+20. Notify Admin to refund both participant deposits.
 
 If expert payout = 0 and full escrow is refunded to Business, current milestone may be `CANCELLED` instead of `COMPLETED` if Staff reports no accepted work.
 
 The Staff report must state whether current milestone is closed as `COMPLETED` or `CANCELLED`.
 
-### 11.8 Admin Refunds Contract Security Deposit After Termination
+### 11.8 Admin Resolves Participant Deposits After Standard Termination
 
 Actor: Admin
 
@@ -1581,21 +1701,24 @@ Preconditions:
 - Contract status is `TERMINATED`.
 - Termination request status is `AWAITING_DEPOSIT_REFUND`.
 - Required milestone settlement is done or not required.
-- Contract deposit is refundable.
+- Business and Expert deposits are still held and unresolved.
 
 System behavior:
 
-1. Lock contract deposit row.
-2. Lock Business wallet.
-3. Refund 20% contract security deposit to Business available balance. Refund amount must equal exactly `contract_deposits.held_amount` (100%). Partial refund percentages are not supported (see 4.1); Admin may only choose refund or withhold, never a fraction.
-4. Write wallet ledger entry.
-5. Update contract deposit status `REFUNDED`.
-6. Set `contract_deposits.refunded_at = now()`.
+1. Lock both participant deposit rows.
+2. Lock Business and Expert wallets.
+3. Refund the full remaining Business held deposit to Business.
+4. Refund the full remaining Expert held deposit to Expert.
+5. Write wallet ledger entries for both refunds.
+6. Set both deposit statuses `REFUNDED` and resolution timestamps.
 7. Set termination request status `COMPLETED`.
 8. Set contract status `CLOSED`.
 9. Open review capability.
 10. Write audit log.
 11. Notify Business and Expert.
+
+The fixed 10% penalty applies only to immediate termination under section 11A,
+not standard Staff-reviewed termination.
 
 ### 11.9 Withdraw Termination Request
 
@@ -1619,10 +1742,10 @@ System behavior:
 
 ---
 
-## 11A. Immediate Termination Without Fixed Penalty
+## 11A. Immediate Termination With Fixed 10% Penalty
 
 Immediate termination is a guarded alternative to Staff-reviewed standard
-termination. It is not a punishment mechanism and does not decide disputed work.
+termination. It does not decide disputed work and does not require Staff.
 
 ### 11A.1 Common Preconditions
 
@@ -1632,40 +1755,50 @@ termination. It is not a punishment mechanism and does not decide disputed work.
 - No milestone is `UNDER_REVIEW` or `DISPUTED`.
 - All unreleased milestone escrow can be identified and refunded atomically.
 - Caller explicitly confirms immediate termination and provides a reason.
+- Both participant contract deposits are held and unresolved.
 
 ### 11A.2 Business Eligibility
 
-Business may terminate immediately when either condition is true:
-
-1. The contract has no final-deliverable rejection history; or
-2. The latest on-demand progress-report request is overdue and still has no
-   linked Expert submission.
-
-The overdue-request exception allows Business to terminate even if earlier final
-deliverables were rejected. Scheduled checkpoint lateness alone does not qualify.
+Business may terminate immediately whenever the common preconditions are
+satisfied and Business confirms the 10% penalty. Final-deliverable rejection
+history does not block this paid exit. An overdue on-demand progress-report
+request may be stored as the reason, but is not a prerequisite.
 
 ### 11A.3 Expert Eligibility
 
 Expert may terminate immediately when the common preconditions are satisfied.
-This operation does not debit Expert's available wallet and does not pay a fixed
-compensation percentage to Business.
+The Expert's held 10% contract deposit funds the penalty to Business. The
+service must not charge Expert's available wallet as a substitute for missing
+deposit; missing deposit means the contract should never have become `ACTIVE`.
 
 ### 11A.4 Financial And State Behavior
 
 1. Start one transaction and lock contract, affected milestones, escrow balances,
-   and contract deposit.
+   and both participant deposits.
 2. Refund every unreleased unfinished milestone escrow amount to Business.
 3. Preserve completed milestones.
 4. Mark all other unfinished milestones `CANCELLED`.
-5. Set contract status `TERMINATED`.
-6. Do not transfer a fixed percentage between Business and Expert.
-7. Do not partially deduct the 20% contract security deposit.
-8. Leave contract security-deposit disposition to the existing binary
-   Admin-controlled refund/withhold process.
-9. Write ledger, audit, and participant notifications.
+5. Calculate `penaltyAmount = contract.totalBudget * 10%`.
+6. If Business initiated:
+   - debit `penaltyAmount` from Business's held 20% deposit;
+   - credit Expert available balance by `penaltyAmount`;
+   - refund the remaining held Business deposit to Business;
+   - refund Expert's full held deposit to Expert.
+7. If Expert initiated:
+   - debit the full Expert held deposit, which must equal `penaltyAmount`;
+   - credit Business available balance by `penaltyAmount`;
+   - refund Business's full held deposit to Business.
+8. Mark both deposits resolved with penalty/refund transaction references.
+9. Set contract status `TERMINATED`, then `CLOSED` when every required deposit
+   and escrow movement is committed. If project policy requires Admin closure,
+   remain `TERMINATED` but do not allow the same deposits to be resolved again.
+10. Write ledger, audit, and participant notifications.
 
 If work quality, rejection, payout, or evidence is contested, immediate
 termination must reject and the parties must use standard termination or dispute.
+
+The 10% is based on total contract value, not current milestone value, remaining
+contract value, or the 20% Business-deposit percentage.
 
 ---
 
@@ -1682,7 +1815,7 @@ contract.status = CLOSED
 This means:
 
 - All milestone or termination settlement is complete.
-- 20% contract security deposit is refunded.
+- Remaining Business and Expert contract deposits are resolved/refunded.
 - Contract has reached final state.
 
 ### 12.2 Review Rules
@@ -1709,7 +1842,7 @@ Agents must follow these rules:
 
 1. Do not edit old Flyway migrations.
 2. Query the repository's latest applied migration and create the next available
-   version. At the time of v2.1 planning this is expected to be after the
+   version. At the time of v2.2 planning this is expected to be after the
    existing Flow 4–5 migrations; do not assume or reuse `V45`.
 3. Do not delete or truncate existing data by default.
 4. Prefer additive schema changes and compatibility backfills.
@@ -1744,6 +1877,52 @@ CLOSED
 ```
 
 Do not remove `CANCELLED` unless codebase confirms it is unused.
+
+Contract activation must additionally validate both required participant
+deposits.
+
+#### 13.3.1A `contract_deposits`
+
+The deposit model must support one deposit per participant role:
+
+```sql
+ALTER TABLE contract_deposits
+ADD COLUMN owner_account_id BIGINT NULL REFERENCES account(account_id),
+ADD COLUMN owner_role VARCHAR(20) NULL,
+ADD COLUMN required_percentage DECIMAL(5,2) NULL,
+ADD COLUMN required_amount DECIMAL(19,2) NULL,
+ADD COLUMN penalty_amount DECIMAL(19,2) NULL DEFAULT 0,
+ADD COLUMN penalty_beneficiary_account_id BIGINT NULL REFERENCES account(account_id),
+ADD COLUMN penalty_transaction_id BIGINT NULL REFERENCES wallet_transactions(id),
+ADD COLUMN resolution_type VARCHAR(50) NULL,
+ADD COLUMN resolved_at TIMESTAMP NULL;
+```
+
+Required role values:
+
+```text
+BUSINESS
+EXPERT
+```
+
+Required percentages:
+
+```text
+BUSINESS = 20.00
+EXPERT = 10.00
+```
+
+Required uniqueness:
+
+```sql
+CREATE UNIQUE INDEX uq_contract_deposits_contract_role
+ON contract_deposits(contract_id, owner_role);
+```
+
+Backfill existing deposit rows as `BUSINESS`. A new Expert deposit row must be
+created and funded before an existing non-active contract can activate. Active
+legacy-contract handling requires an explicit compatibility migration; do not
+fabricate an Expert payment.
 
 #### 13.3.2 `milestones`
 
@@ -1831,7 +2010,10 @@ resolved_at             (existing)
 cancelled_at            (existing)
 ```
 
-Correction: an earlier pass of this section mistakenly claimed `initiation_type` had no defined enum and dropped it. That was wrong — 7.5 "Dispute Initiation Types" defines a required 5-value enum (`BUSINESS_REJECTED_DELIVERABLE`, `EXPERT_SCOPE_CONCERN`, `EXPERT_NO_REVIEW_RESPONSE`, `EXPERT_BAD_FAITH_REJECTION`, `OTHER`), distinct from `initiated_by` (which only says Business vs Expert, not the reason category). 9.5.1 step 3 and 10.2 step 4 both set it. It must be added.
+`initiation_type` is distinct from `initiated_by`: role identifies who opened
+the dispute, while type identifies the explicit disagreement. A persisted
+Business rejection may support `BUSINESS_REJECTED_DELIVERABLE`, but section 9.5
+never sets this field because rejection does not create a dispute.
 
 Add the remaining fields — each is set by a concrete system-behavior step (9.5, 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 11.x) that current code cannot fully execute without them:
 
@@ -1960,8 +2142,9 @@ Optional but recommended for v2 re-submit tracking:
 
 ```sql
 submission_round INT NOT NULL DEFAULT 1,
-submitted_during_dispute_id BIGINT NULL REFERENCES disputes(dispute_id),
-status VARCHAR(50) NULL
+status VARCHAR(50) NULL,
+rejection_feedback TEXT NULL,
+rejected_at TIMESTAMP NULL
 ```
 
 Recommended status values:
@@ -1973,7 +2156,8 @@ REJECTED
 SUPERSEDED
 ```
 
-If not implemented, service must derive latest deliverable by `created_at` and count re-submits through dispute logs/attachments.
+If not implemented, service must derive latest deliverable and submission round
+by `created_at`. Rejection history must not depend on dispute rows.
 
 #### 13.3.8 Required New Table: `milestone_progress_reports`
 
@@ -2119,6 +2303,11 @@ CREATE TABLE termination_requests (
 );
 ```
 
+`deposit_refund_required` means participant-deposit resolution is still
+required. Implementations may rename it to
+`participant_deposit_resolution_required` in a new additive migration if this
+does not break compatibility.
+
 Unique active request guard:
 
 ```sql
@@ -2231,6 +2420,10 @@ DISPUTE_SETTLEMENT_REFUND
 TERMINATION_SETTLEMENT_PAYOUT
 TERMINATION_SETTLEMENT_REFUND
 CONTRACT_DEPOSIT_REFUND
+EXPERT_CONTRACT_DEPOSIT_HOLD
+EXPERT_CONTRACT_DEPOSIT_REFUND
+IMMEDIATE_TERMINATION_PENALTY
+IMMEDIATE_TERMINATION_COMPENSATION
 ```
 
 Recommended reference types:
@@ -2274,6 +2467,19 @@ Metadata JSONB:
 
 New v2 wallet movements must populate metadata consistently.
 
+Immediate-termination metadata must include:
+
+```json
+{
+  "settlementSourceType": "IMMEDIATE_TERMINATION",
+  "initiatingRole": "BUSINESS",
+  "penaltyPercentage": 10,
+  "contractTotalBudget": 100000000,
+  "penaltyAmount": 10000000,
+  "penaltyBeneficiaryAccountId": 9
+}
+```
+
 ### 14.4 Atomic Settlement Rule
 
 Any operation that releases milestone escrow must be atomic.
@@ -2308,6 +2514,9 @@ Required methods or equivalent:
 
 ```text
 depositMilestoneEscrow(contractId, milestoneId, businessAccountId)
+fundBusinessContractDeposit(contractId, businessAccountId)
+fundExpertContractDeposit(contractId, expertAccountId)
+activateContractWhenBothDepositsHeld(contractId)
 startMilestone(milestoneId, expertAccountId)
 markMilestoneOverdue(contractId, milestoneId)
 requestProgressReport(contractId, milestoneId, businessAccountId)
@@ -2320,13 +2529,15 @@ rejectMilestone(milestoneId, businessAccountId, request)
 ```
 
 `rejectMilestone` must handle both first rejection and rejection after re-submit.
+It must update deliverable/milestone rejection history and return the milestone
+to `IN_PROGRESS`; it must not create a dispute.
 
 ### 15.2 DisputeService
 
 Required methods or equivalent:
 
 ```text
-createDisputeFromBusinessRejection(milestoneId, businessAccountId, request)
+createBusinessInitiatedDispute(milestoneId, businessAccountId, request)
 createExpertInitiatedDispute(milestoneId, expertAccountId, request)
 requestStaffIntervention(disputeId, accountId, request)
 assignStaff(disputeId, adminAccountId, staffId)
@@ -2340,6 +2551,9 @@ resolveByBusinessApproval(disputeId, milestoneId)
 
 `issueStaffDecision` stores the binding percentage and triggers
 `executeDisputeSettlement`. No Admin final-decision method is permitted.
+
+Business-rejection history may be attached as evidence, but no dispute service
+method is called automatically from `rejectMilestone`.
 
 ### 15.3 TerminationRequestService
 
@@ -2360,6 +2574,10 @@ refundDepositAfterTermination(terminationRequestId, adminAccountId, request)
 immediateTerminate(contractId, participantAccountId, request)
 ```
 
+`immediateTerminate` must consume the initiator's held deposit, credit the
+counterparty, refund remaining held deposits as defined in 11A, and never ask
+Staff to approve the fixed 10% result.
+
 ### 15.4 WalletLedgerService
 
 Required operations:
@@ -2368,7 +2586,9 @@ Required operations:
 moveAvailableToEscrow(walletId, amount, reference)
 releaseEscrowToExpert(businessWalletId, expertWalletId, amount, reference)
 splitEscrow(businessWalletId, expertWalletId, escrowAmount, expertPayoutAmount, businessRefundAmount, reference)
-refundContractDeposit(contractDepositId, adminAccountId, reference)
+refundParticipantDeposits(contractId, adminAccountId, reference)
+holdExpertContractDeposit(contractId, expertAccountId, amount)
+settleImmediateTerminationPenalty(contractId, initiatingRole, penaltyAmount)
 ```
 
 `splitEscrow` must be shared by dispute settlement and termination settlement.
@@ -2379,6 +2599,9 @@ Must log:
 
 ```text
 MILESTONE_ESCROW_DEPOSITED
+BUSINESS_CONTRACT_DEPOSIT_HELD
+EXPERT_CONTRACT_DEPOSIT_HELD
+CONTRACT_ACTIVATED_AFTER_DUAL_DEPOSIT
 MILESTONE_STARTED
 PROGRESS_REPORT_SUBMITTED
 PROGRESS_REPORT_REQUESTED
@@ -2402,11 +2625,13 @@ TERMINATION_ACCEPTED_BY_EXPERT
 TERMINATION_DISPUTED_BY_EXPERT
 TERMINATION_RESPONSE_EXPIRED
 CONTRACT_IMMEDIATE_TERMINATED
+IMMEDIATE_TERMINATION_PENALTY_SETTLED
 TERMINATION_STAFF_ASSIGNED
 TERMINATION_STAFF_REJECTED
 TERMINATION_STAFF_APPROVED
 TERMINATION_SETTLEMENT_EXECUTED
 CONTRACT_DEPOSIT_REFUNDED
+PARTICIPANT_DEPOSITS_REFUNDED
 CONTRACT_CLOSED
 REVIEW_CREATED
 ```
@@ -2477,7 +2702,7 @@ New request DTO minimums:
   },
   "ImmediateTerminationRequest": {
     "reason": "Required progress report was not submitted by the deadline.",
-    "confirmed": true
+    "confirmedPenalty": true
   }
 }
 ```
@@ -2515,9 +2740,28 @@ DISPUTE_NOT_STAFF_DECIDED
 ESCROW_ALREADY_RELEASED
 IMMEDIATE_TERMINATION_NOT_ALLOWED
 TERMINATION_REQUEST_ALREADY_ACTIVE
+BUSINESS_CONTRACT_DEPOSIT_NOT_HELD
+EXPERT_CONTRACT_DEPOSIT_NOT_HELD
+CONTRACT_DEPOSIT_ALREADY_RESOLVED
 ```
 
-### 16.1 Milestone APIs
+### 16.1 Contract Deposit APIs
+
+```http
+POST /api/v1/contracts/{contractId}/deposit/pay
+POST /api/v1/contracts/{contractId}/expert-deposit/pay
+POST /api/v1/admin/contracts/{contractId}/deposits/refund
+```
+
+- Business endpoint funds 20% of total contract value.
+- Expert endpoint funds 10% of total contract value.
+- Each endpoint is idempotent for an already-held correct amount.
+- Contract activation occurs only after signatures and both deposits are held.
+- Admin refund endpoint resolves both participant deposits after normal
+  completion or standard termination. Immediate termination normally resolves
+  deposits inside its own atomic transaction.
+
+### 16.2 Milestone APIs
 
 ```http
 POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit
@@ -2538,7 +2782,7 @@ The two scheduler-oriented routes are operational triggers. Production may run
 the same service methods from scheduled jobs; if exposed, they require Admin or
 internal-system authorization and remain idempotent.
 
-### 16.2 Dispute APIs
+### 16.3 Dispute APIs
 
 ```http
 POST /api/v1/disputes/{disputeId}/escalation-request
@@ -2557,7 +2801,7 @@ GET  /api/v1/disputes/{disputeId}
 reuse the stored Staff percentage exactly. There is no
 `/api/v1/disputes/{disputeId}/admin-final-decision` endpoint.
 
-### 16.3 Termination APIs
+### 16.4 Termination APIs
 
 ```http
 POST /api/v1/contracts/{contractId}/termination-requests
@@ -2579,7 +2823,7 @@ GET  /api/v1/termination-requests/{terminationRequestId}
 `expire-awaiting-expert` is an Admin/internal idempotent trigger; a scheduled job
 may invoke the same service without HTTP.
 
-### 16.4 Case Attachment APIs
+### 16.5 Case Attachment APIs
 
 ```http
 POST /api/v1/case-attachments
@@ -2589,7 +2833,7 @@ GET  /api/v1/case-attachments?ownerType=...&ownerId=...
 Upload authorization follows owner type and case participation. Assigned Staff
 has access only while temporary case access is valid.
 
-### 16.5 Review APIs
+### 16.6 Review APIs
 
 ```http
 POST /api/v1/contracts/{contractId}/reviews
@@ -2602,6 +2846,9 @@ GET  /api/v1/contracts/{contractId}/reviews
 
 | Action | Business | Expert | Admin | Staff | System |
 |---|---:|---:|---:|---:|---:|
+| Fund Business 20% contract deposit | Contract Business | No | No | No | No |
+| Fund Expert 10% contract deposit | No | Contract Expert | No | No | No |
+| Activate contract after both deposits | No | No | No | No | Yes |
 | Deposit milestone escrow | Yes | No | No | No | No |
 | Start milestone | No | Yes | No | No | No |
 | Request on-demand progress report | Contract Business | No | No | No | No |
@@ -2622,11 +2869,12 @@ GET  /api/v1/contracts/{contractId}/reviews
 | Request termination | Yes | Yes | No | No | No |
 | Accept/dispute Business termination request | No | Contract Expert | No | No | Timeout only |
 | Immediate termination | Eligible Contract Business | Eligible Contract Expert | No | No | No |
+| Apply immediate-termination 10% deposit penalty | Initiator through immediate-termination command | Initiator through immediate-termination command | No override | No | Atomic helper |
 | Assign Staff to termination | No | No | Yes | No | No |
 | Approve/reject termination | No | No | No | Assigned Staff | No |
 | Execute termination settlement | No | No | Retry only | No | Yes |
 | Withdraw own termination request before Staff decision | Requester only | Requester only | Yes for invalid/duplicate | No | No |
-| Refund contract deposit | No | No | Yes | No | System helper allowed |
+| Refund participant deposits | No | No | Yes | No | System helper allowed |
 | Create review after CLOSED | Yes | Yes | No | No | No |
 
 ---
@@ -2641,25 +2889,34 @@ GET  /api/v1/contracts/{contractId}/reviews
 6. Each contract can have at most one active termination request.
 7. Staff decision is mandatory after Staff accepts intervention and issues decision.
 8. Admin assigns Staff but does not override Staff professional decision.
-9. Business and Expert can request Staff intervention at any time during active dispute; three re-submits are not required first.
-10. Three re-submits are a maximum self-resolve limit, not an escalation prerequisite.
-11. Contract deposit refund must happen before contract becomes `CLOSED`.
+9. Rejecting a deliverable never creates a dispute automatically.
+10. Rejection returns the milestone to `IN_PROGRESS`; normal resubmission does
+    not require dispute state or a special request.
+11. Both participant deposits must be resolved before contract becomes `CLOSED`.
 12. Reviews open only when contract is `CLOSED`.
 13. No destructive data deletion is allowed by default in migrations.
 14. New v2 wallet movements must use `wallet_transactions`, not legacy `transactions`.
-15. Contract deposit refund is binary — 100% of `held_amount` or 0% — never a partial percentage (see 4.1, 9.7, 11.8).
+15. Business must hold 20% and Expert must hold 10% of total contract value
+    before contract activation.
 16. Every public route defined by this specification starts with `/api/v1`.
 17. Admin never approves, revises, or changes an assigned Staff dispute
     decision or payout percentage.
-18. Immediate termination never charges either party a fixed 10% penalty.
+18. Immediate termination charges exactly 10% of total contract value to the
+    initiator for the counterparty.
 19. At most one on-demand progress-report request may be pending per contract
     milestone.
-20. Missing a scheduled progress checkpoint alone never unlocks immediate
-    termination; only an expired on-demand request does.
+20. Missing a scheduled or on-demand report never moves money automatically;
+    immediate termination always requires an explicit confirmed command.
 21. An expired report request never moves money or adjudicates work quality.
 22. Staff cannot issue the official dispute decision before the 48-hour evidence
     window ends.
 23. Settlement retry must use the stored Staff percentage unchanged.
+24. Standard termination does not apply the fixed immediate-termination penalty.
+25. Immediate termination penalty is funded from the initiator's held contract
+    deposit, not milestone escrow.
+26. The platform never keeps the immediate-termination penalty.
+27. A deliverable rejection and every later resubmission remain historically
+    auditable.
 
 ---
 
@@ -2684,29 +2941,30 @@ And `escrow_released_at` is set
 
 ### 19.2 Business Rejects, Expert Re-submits, Business Approves
 
-Given milestone is `UNDER_REVIEW`  
-When Business rejects deliverable  
-Then dispute is created with `PENDING_SELF_RESOLVE`  
-And milestone becomes `DISPUTED`
+Given milestone is `UNDER_REVIEW`
+When Business rejects deliverable
+Then no dispute is created
+And current deliverable becomes `REJECTED`
+And rejection feedback is stored
+And milestone becomes `IN_PROGRESS`
 
-When Expert re-submits  
-Then milestone becomes `UNDER_REVIEW`  
-And dispute remains active
+When Expert re-submits
+Then milestone becomes `UNDER_REVIEW`
+And submission round increases
 
-When Business approves  
-Then dispute becomes `RESOLVED`  
-And `resolution_type = BUSINESS_APPROVED_AFTER_SELF_RESOLVE`  
-And escrow releases 100% to Expert
+When Business approves
+Then escrow releases 100% to Expert
+And milestone becomes `COMPLETED`
 
 ### 19.3 Business Rejects Re-submission
 
-Given active dispute exists with `PENDING_SELF_RESOLVE`  
-And Expert re-submitted deliverable  
-And milestone is `UNDER_REVIEW`  
-When Business rejects again  
-Then no new dispute is created  
-And rejection reason is appended to existing dispute  
-And milestone returns to `DISPUTED`
+Given Expert re-submitted after an earlier rejection
+And milestone is `UNDER_REVIEW`
+When Business rejects again
+Then no new dispute is created
+And the new deliverable rejection is stored independently
+And milestone returns to `IN_PROGRESS`
+And earlier rejection history remains readable
 
 ### 19.4 Staff Dispute Decision 70/30
 
@@ -2764,10 +3022,10 @@ And waits for deposit refund
 
 ### 19.9 Contract Closure After Refund
 
-Given contract is `COMPLETED` or `TERMINATED`  
-And contract deposit is held  
-When Admin refunds deposit  
-Then contract becomes `CLOSED`  
+Given contract is `COMPLETED` or standard `TERMINATED`
+And Business and Expert deposits are held
+When Admin refunds both deposits
+Then contract becomes `CLOSED`
 And reviews are opened
 
 ### 19.10 Double Settlement Guard
@@ -2793,15 +3051,16 @@ And the report has `is_late = true`
 When Business creates the next request
 Then request number is 2 and deadline is 12 hours
 
-### 19.12 Overdue Request Unlocks Penalty-Free Immediate Termination
+### 19.12 Overdue Request As Business Immediate-Termination Reason
 
 Given an on-demand report request is expired without submission
 And no milestone is `UNDER_REVIEW` or `DISPUTED`
 When Business terminates immediately
 Then unreleased unfinished milestone escrow is refunded to Business
 And unfinished milestones become `CANCELLED`
-And no fixed percentage is transferred to Expert
-And the contract security deposit is not partially deducted
+And 10% of total contract value moves from Business's held deposit to Expert
+And the remaining Business deposit is refunded
+And Expert's held deposit is refunded
 
 ### 19.13 Staff Decision Cannot Be Overridden
 
@@ -2835,6 +3094,35 @@ When Expert accepts or does not respond for three days
 Then unfinished escrow is refunded and the contract terminates without a fixed
 penalty
 
+### 19.16 Contract Activation Requires Dual Deposits
+
+Given all signatures are complete
+And Business has funded 20% of total contract value
+But Expert has not funded 10%
+Then contract remains `PENDING`
+
+When Expert funds the required 10%
+Then the system may activate the contract exactly once
+
+### 19.17 Expert Immediate Termination Penalty
+
+Given contract total value is 100,000,000
+And Expert's held deposit is 10,000,000
+When Expert terminates immediately
+Then 10,000,000 is credited to Business
+And Business's held deposit is refunded to Business
+And no Staff review is required
+
+### 19.18 Business Immediate Termination Penalty
+
+Given contract total value is 100,000,000
+And Business's held deposit is 20,000,000
+When Business terminates immediately
+Then 10,000,000 is credited to Expert
+And the remaining 10,000,000 Business deposit is refunded to Business
+And Expert's held deposit is refunded to Expert
+And no Staff review is required
+
 ---
 
 ## 20. Acceptance Criteria
@@ -2850,7 +3138,11 @@ penalty
   state.
 - `OVERDUE` milestones continue to accept reports and deliverables.
 - Business approval releases 100% escrow to Expert.
-- Business rejection creates or updates active dispute correctly.
+- Business rejection stores feedback, marks the deliverable rejected, and
+  returns milestone to `IN_PROGRESS` without creating dispute.
+- Expert resubmits through the normal deliverable API without a dispute or
+  special request.
+- Dispute is created only by an explicit participant action.
 - Expert can initiate dispute in allowed states.
 - Only one active dispute exists per milestone.
 - Either party can request Staff intervention at any time during active dispute.
@@ -2861,10 +3153,13 @@ penalty
 - System executes dispute settlement and splits escrow correctly.
 - Business and Expert can request termination.
 - Business termination requests support Expert accept/dispute/three-day timeout.
-- Eligible participants can terminate immediately without a fixed 10% penalty.
+- Eligible participants can terminate immediately without Staff and pay exactly
+  10% of total contract value to the counterparty.
+- Contract cannot activate until Business 20% and Expert 10% deposits are held.
 - Termination settlement cannot double-settle active dispute milestone.
-- Admin can refund contract deposit after completion/termination.
-- Contract becomes `CLOSED` only after deposit refund.
+- Admin can refund both participant deposits after completion/standard
+  termination.
+- Contract becomes `CLOSED` only after both deposits are resolved.
 - Reviews are available only after `CLOSED`.
 
 ### 20.2 Database Acceptance
@@ -2882,6 +3177,9 @@ penalty
 - Progress-report request history exists and prevents two pending requests for
   the same contract milestone.
 - Rejected Admin-final-decision fields and statuses are absent.
+- `contract_deposits` supports unique `BUSINESS` and `EXPERT` owner roles.
+- Deliverables persist rejection feedback, rejection time, status, and
+  submission round without requiring dispute rows.
 
 ### 20.3 Financial Acceptance
 
@@ -2889,8 +3187,13 @@ penalty
 - No milestone escrow can be released twice.
 - Ledger entries are posted for every wallet balance movement.
 - New v2 ledger rows include contract and milestone references.
-- Contract deposit refund is recorded in wallet ledger and contract deposit row.
-- Immediate termination creates no fixed-percentage compensation transaction.
+- Both participant deposit funding and refunds are recorded in wallet ledger and
+  deposit rows.
+- Immediate termination penalty equals exactly 10% of total contract value.
+- Business immediate termination penalty comes from Business's held 20% deposit.
+- Expert immediate termination penalty comes from Expert's held 10% deposit.
+- The penalty beneficiary is the counterparty, never the platform.
+- Penalty plus refunds equal the resolved held deposit amounts.
 - Settlement retry uses the stored Staff percentage unchanged.
 
 ### 20.4 Harness Agent Acceptance
@@ -2922,8 +3225,11 @@ Recommended order:
    - Add repositories.
 
 3. Wallet Agent:
+   - Implement Business 20% and Expert 10% contract deposit holds.
+   - Gate activation on both deposits.
    - Implement milestone escrow deposit.
    - Implement split escrow.
+   - Implement immediate-termination penalty and counterparty compensation.
    - Implement idempotency guard.
    - Implement ledger metadata.
 
@@ -2942,7 +3248,7 @@ Recommended order:
 
 6. Termination Agent:
    - Implement termination request response lifecycle, settlement, and guarded
-     immediate termination without fixed penalty.
+     immediate termination with fixed 10% counterparty compensation.
 
 7. Contract Closure Agent:
    - Implement deposit refund closure and review opening.
@@ -2964,17 +3270,23 @@ Recommended order:
 - Do not simplify Staff decision into Business/Expert acceptance. Staff decision is mandatory.
 - Do not add Admin final review, payout adjustment, report revision, or approval
   after Staff decision.
-- Do not add a fixed 10% immediate-termination penalty for Business or Expert.
-- Do not use partial contract security-deposit deduction as a termination
-  penalty.
+- Do not omit or change the fixed 10% immediate-termination penalty.
+- Do not calculate the penalty from milestone value or remaining project value;
+  use total contract value.
+- Do not charge available balance when the initiator's required held deposit
+  exists.
+- Do not pay the penalty to the platform; credit the counterparty.
 - Do not expose a new public Flow 4–5 route without the `/api/v1` prefix.
 - Do not allow Staff to decide before the 48-hour evidence window closes.
 - Do not allow multiple pending on-demand report requests for one contract
   milestone.
-- Do not treat scheduled checkpoint lateness as the on-demand SLA violation that
-  unlocks immediate termination.
-- Do not require 3 re-submits before Staff escalation. Three re-submits are only the self-resolve maximum.
+- Do not move money or terminate automatically from any missed report deadline;
+  require an explicit immediate-termination command and penalty confirmation.
+- Do not auto-create dispute or block normal resubmission based on rejection
+  count. Dispute requires an explicit participant action.
 - Do not allow Expert to start work before milestone escrow deposit.
+- Do not activate a contract before Business 20% and Expert 10% deposits are
+  both held.
 - Do not allow milestone escrow release without checking `escrow_released_at`.
 - Do not allow termination settlement to run while active dispute settlement is unresolved.
 - Do not leave future milestones as `PENDING` after contract termination.

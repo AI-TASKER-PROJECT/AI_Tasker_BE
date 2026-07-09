@@ -290,7 +290,7 @@ class PaymentWalletServiceTest {
     }
 
     @Test
-    void payContractDeposit_shouldHoldDepositAndActivateContract() {
+    void payContractDeposit_shouldHoldBusinessDepositAndWaitForExpertDeposit() {
         AccountEntity businessAccount = AccountEntity.builder()
                 .accountId(10)
                 .role(RoleEntity.builder().roleName("BUSINESS").build())
@@ -322,7 +322,7 @@ class PaymentWalletServiceTest {
         when(accessService.currentAccount()).thenReturn(businessAccount);
         when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
         when(contractRepository.findById(30)).thenReturn(Optional.of(contract));
-        when(contractDepositRepository.findByContractId(30)).thenReturn(Optional.empty());
+        when(contractDepositRepository.findByContractIdAndOwnerRole(30, "BUSINESS")).thenReturn(Optional.empty());
         when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("300000"));
         when(walletLedgerService.holdEscrowFromAvailable(any(), any(), any(), any(), any(), any()))
                 .thenReturn(WalletTransactionEntity.builder().id(70L).build());
@@ -332,21 +332,53 @@ class PaymentWalletServiceTest {
             return deposit;
         });
         when(contractRepository.save(any(ContractEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(30)).thenReturn(List.of(contractMilestone));
-        when(milestoneRepository.findById(60)).thenReturn(Optional.of(milestone));
-        when(jobRepository.findById(50)).thenReturn(Optional.of(job));
 
         PaymentActionResponse<ContractDepositEntity> response = paymentWalletService.payContractDeposit(30);
 
         assertTrue(response.isCompleted());
         assertEquals("HELD", response.getData().getStatus());
         assertEquals(new BigDecimal("200000.00"), response.getData().getDepositAmount());
+        assertEquals("PENDING", contract.getStatus());
+        assertNull(contract.getActivatedAt());
+    }
+
+    @Test
+    void payExpertContractDeposit_shouldActivateWhenBothDepositsAreHeld() {
+        AccountEntity expertAccount = AccountEntity.builder()
+                .accountId(11).role(RoleEntity.builder().roleName("EXPERT").build()).status("Approved").build();
+        ExpertProfileEntity expert = ExpertProfileEntity.builder().expertId(40).accountId(11).build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(30).businessId(20).expertId(40).jobId(50)
+                .status("PENDING").totalBudget(new BigDecimal("1000000")).build();
+        ContractDepositEntity businessDeposit = ContractDepositEntity.builder()
+                .contractId(30).ownerRole("BUSINESS").ownerAccountId(10)
+                .heldAmount(new BigDecimal("200000.00")).status("HELD").build();
+        ContractDepositEntity expertDeposit = ContractDepositEntity.builder()
+                .contractId(30).ownerRole("EXPERT").ownerAccountId(11)
+                .requiredAmount(new BigDecimal("100000.00")).heldAmount(new BigDecimal("100000.00"))
+                .status("HELD").build();
+        com.aitasker.be.entity.JobEntity job =
+                com.aitasker.be.entity.JobEntity.builder().jobId(50).status("OPEN").build();
+
+        when(accessService.currentAccount()).thenReturn(expertAccount);
+        when(expertProfileRepository.findByAccountId(11)).thenReturn(Optional.of(expert));
+        when(contractRepository.findById(30)).thenReturn(Optional.of(contract));
+        when(contractDepositRepository.findByContractIdAndOwnerRole(30, "EXPERT"))
+                .thenReturn(Optional.of(expertDeposit));
+        when(contractDepositRepository.findByContractIdAndOwnerRole(30, "BUSINESS"))
+                .thenReturn(Optional.of(businessDeposit));
+        when(contractRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(30)).thenReturn(List.of());
+        when(jobRepository.findById(50)).thenReturn(Optional.of(job));
+
+        PaymentActionResponse<ContractDepositEntity> result =
+                paymentWalletService.payExpertContractDeposit(30);
+
+        assertTrue(result.isCompleted());
         assertEquals("ACTIVE", contract.getStatus());
         assertNotNull(contract.getActivatedAt());
         assertEquals("IN_PROGRESS", job.getStatus());
-        assertEquals(new BigDecimal("1000000"), job.getBudget());
-        assertEquals(Integer.valueOf(30), milestone.getContractId());
-        assertEquals(new BigDecimal("1000000"), milestone.getFundsAllocated());
+        verify(walletLedgerService, never()).holdEscrowFromAvailable(any(), any(), any(), any(), any(), any());
     }
 
     @Test

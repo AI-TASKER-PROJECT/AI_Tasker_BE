@@ -35,6 +35,16 @@ public class ContractMilestoneViewResponse {
     private String durationUnit;
     private String criteriaSnapshot;
     private String deliverableExpectation;
+    private LocalDateTime dueAt;
+    private Boolean overdue;
+    private Integer progressReportRequestCount;
+    private LocalDateTime progressReportRequestedAt;
+    private LocalDateTime progressReportDueAt;
+    private LocalDateTime progressReportSubmittedAt;
+    private Boolean progressReportRequestPending;
+    private Boolean progressReportRequestOverdue;
+    private Integer rejectCount;
+    private String lastRejectionFeedback;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

@@ -313,50 +313,106 @@ public class PaymentWalletService {
         if (!"PENDING".equals(contract.getStatus())) {
             throw new AppException("CONTRACT_INVALID_STATUS");
         }
-        if (contractDepositRepository.findByContractId(contractId)
-                .filter(deposit -> "HELD".equals(deposit.getStatus()))
-                .isPresent()) {
-            throw new AppException("DEPOSIT_ALREADY_HELD");
-        }
+        return fundContractDeposit(contract, actor, ROLE_BUSINESS, business.getBusinessId(), new BigDecimal("20.00"));
+    }
 
-        BigDecimal depositAmount = depositAmount(contract);
+    @Transactional
+    public PaymentActionResponse<ContractDepositEntity> payExpertContractDeposit(Integer contractId) {
+        AccountEntity actor = requireApprovedRole(ROLE_EXPERT);
+        ExpertProfileEntity expert = expertProfileRepository.findByAccountId(actor.getAccountId())
+                .orElseThrow(() -> new NotFoundException("CHUA CO EXPERT PROFILE"));
+        ContractEntity contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new NotFoundException("CONTRACT_NOT_FOUND"));
+        if (!expert.getExpertId().equals(contract.getExpertId())) {
+            throw new AppException("BAN KHONG THUOC CONTRACT NAY");
+        }
+        return fundContractDeposit(contract, actor, ROLE_EXPERT, contract.getBusinessId(), new BigDecimal("10.00"));
+    }
+
+    private PaymentActionResponse<ContractDepositEntity> fundContractDeposit(
+            ContractEntity contract,
+            AccountEntity actor,
+            String ownerRole,
+            Integer businessId,
+            BigDecimal requiredPercentage
+    ) {
+        Integer contractId = contract.getContractId();
+        if (!ContractEntity.STATUS_PENDING.equals(contract.getStatus())) {
+            throw new AppException("CONTRACT_INVALID_STATUS");
+        }
+        BigDecimal depositAmount = percentageAmount(contract, requiredPercentage);
+        Optional<ContractDepositEntity> existing = contractDepositRepository
+                .findByContractIdAndOwnerRole(contractId, ownerRole);
+        if (existing.filter(deposit -> "HELD".equals(deposit.getStatus())
+                && money(deposit.getHeldAmount()).compareTo(depositAmount) == 0).isPresent()) {
+        boolean activated = activateContractAfterBothDeposits(contract, LocalDateTime.now(), actor.getAccountId());
+        if (activated) {
+            notifyBothParticipants(contract, actor.getAccountId(), "CONTRACT_ACTIVATED_AFTER_DUAL_DEPOSIT",
+                    "Hợp đồng đã được kích hoạt", "Hai bên đã hoàn tất ký quỹ, hợp đồng bắt đầu thực thi.");
+        }
+            return completed(existing.get(), "CONTRACT_DEPOSIT_ALREADY_HELD");
+        }
+        if (existing.filter(deposit -> !"UNPAID".equals(deposit.getStatus())).isPresent()) {
+            throw new AppException("CONTRACT_DEPOSIT_ALREADY_RESOLVED");
+        }
         BigDecimal available = walletLedgerService.availableBalance(actor.getAccountId());
         if (available.compareTo(depositAmount) < 0) {
             return insufficient(available, depositAmount, "INSUFFICIENT_BALANCE");
         }
 
-        ContractDepositEntity deposit = contractDepositRepository.findByContractId(contractId)
+        ContractDepositEntity deposit = existing
                 .orElseGet(() -> ContractDepositEntity.builder()
                         .contractId(contractId)
-                        .businessId(contract.getBusinessId())
+                        .businessId(businessId)
+                        .ownerAccountId(actor.getAccountId())
+                        .ownerRole(ownerRole)
+                        .requiredPercentage(requiredPercentage)
+                        .requiredAmount(depositAmount)
                         .depositAmount(depositAmount)
                         .heldAmount(BigDecimal.ZERO)
                         .refundedAmount(BigDecimal.ZERO)
                         .resolvedAmount(BigDecimal.ZERO)
+                        .penaltyAmount(BigDecimal.ZERO)
                         .status("UNPAID")
                         .build());
 
+        String txType = ROLE_BUSINESS.equals(ownerRole)
+                ? "CONTRACT_SECURITY_DEPOSIT_HOLD" : "EXPERT_CONTRACT_DEPOSIT_HOLD";
         WalletTransactionEntity tx = walletLedgerService.holdEscrowFromAvailable(
                 actor.getAccountId(),
                 depositAmount,
-                "CONTRACT_SECURITY_DEPOSIT_HOLD",
+                txType,
                 "CONTRACT_DEPOSIT",
                 Long.valueOf(contractId),
-                "Contract security deposit"
+                ownerRole + " contract deposit"
         );
+        tx.setContractId(contractId);
+        tx.setMetadata("{\"ownerRole\":\"" + ownerRole + "\",\"requiredPercentage\":" + requiredPercentage + "}");
+        walletTransactionRepository.save(tx);
         LocalDateTime now = LocalDateTime.now();
+        deposit.setOwnerAccountId(actor.getAccountId());
+        deposit.setOwnerRole(ownerRole);
+        deposit.setRequiredPercentage(requiredPercentage);
+        deposit.setRequiredAmount(depositAmount);
         deposit.setDepositAmount(depositAmount);
         deposit.setHeldAmount(depositAmount);
         deposit.setRefundedAmount(BigDecimal.ZERO);
         deposit.setResolvedAmount(BigDecimal.ZERO);
+        deposit.setPenaltyAmount(BigDecimal.ZERO);
         deposit.setStatus("HELD");
         deposit.setHoldTransactionId(tx.getId());
         deposit.setPaidAt(now);
         ContractDepositEntity savedDeposit = contractDepositRepository.save(deposit);
 
-        activateContractAfterDeposit(contract, now);
-        auditLogService.record(ACTION_PAY_CONTRACT_DEPOSIT, "contract_deposits",
+        boolean activated = activateContractAfterBothDeposits(contract, now, actor.getAccountId());
+        auditLogService.record(ROLE_EXPERT.equals(ownerRole) ? "EXPERT_CONTRACT_DEPOSIT_HELD" : "BUSINESS_CONTRACT_DEPOSIT_HELD",
+                "contract_deposits",
                 String.valueOf(savedDeposit.getDepositId()), actor.getAccountId());
+        notifyDepositHeld(contract, actor.getAccountId(), ownerRole);
+        if (activated) {
+            notifyBothParticipants(contract, actor.getAccountId(), "CONTRACT_ACTIVATED_AFTER_DUAL_DEPOSIT",
+                    "Hợp đồng đã được kích hoạt", "Hai bên đã hoàn tất ký quỹ, hợp đồng bắt đầu thực thi.");
+        }
         return completed(savedDeposit, "CONTRACT_DEPOSIT_HELD");
     }
 
@@ -370,7 +426,7 @@ public class PaymentWalletService {
         if (!List.of(ContractEntity.STATUS_COMPLETED, ContractEntity.STATUS_TERMINATED).contains(contract.getStatus())) {
             throw new AppException("CONTRACT_INVALID_STATUS");
         }
-        ContractDepositEntity deposit = contractDepositRepository.findByContractId(contractId)
+        ContractDepositEntity deposit = contractDepositRepository.findByContractIdAndOwnerRole(contractId, ROLE_BUSINESS)
                 .orElseThrow(() -> new NotFoundException("CONTRACT_DEPOSIT_NOT_FOUND"));
         if (!List.of("HELD", "PARTIALLY_REFUNDED").contains(deposit.getStatus())) {
             throw new AppException("DEPOSIT_INVALID_STATUS");
@@ -427,11 +483,177 @@ public class PaymentWalletService {
         deposit.setStatus(refundStatus(refundAmount, resolvedAmount));
         ContractDepositEntity saved = contractDepositRepository.save(deposit);
 
-        contract.setStatus(ContractEntity.STATUS_CLOSED);
-        contractRepository.save(contract);
-        auditLogService.record(ACTION_REFUND_CONTRACT_DEPOSIT, "contract_deposits",
+        boolean closed = closeWhenBothDepositsResolved(contract, admin.getAccountId());
+        auditLogService.record("CONTRACT_DEPOSIT_REFUNDED", "contract_deposits",
                 String.valueOf(saved.getDepositId()), admin.getAccountId());
+        notifyBusiness(contract, admin.getAccountId(), "CONTRACT_DEPOSIT_REFUNDED",
+                "Ký quỹ hợp đồng đã được hoàn", "Ký quỹ bảo đảm của doanh nghiệp đã được xử lý hoàn/trừ theo quyết định.");
+        if (closed) {
+            notifyBothParticipants(contract, admin.getAccountId(), "CONTRACT_CLOSED",
+                    "Hợp đồng đã đóng", "Hợp đồng đã đóng sau khi hoàn tất xử lý ký quỹ.");
+        }
         return saved;
+    }
+
+    @Transactional
+    public List<ContractDepositEntity> refundParticipantDeposits(Integer contractId, DepositRefundRequest request) {
+        AccountEntity admin = accessService.currentAccount();
+        accessService.requireRole("ADMIN");
+        ContractEntity contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new NotFoundException("CONTRACT_NOT_FOUND"));
+        if (!List.of(ContractEntity.STATUS_COMPLETED, ContractEntity.STATUS_TERMINATED).contains(contract.getStatus())) {
+            throw new AppException("CONTRACT_INVALID_STATUS");
+        }
+        List<ContractDepositEntity> deposits = contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(contractId);
+        if (deposits.size() < 2) throw new AppException("EXPERT_CONTRACT_DEPOSIT_NOT_HELD");
+        LocalDateTime now = LocalDateTime.now();
+        for (ContractDepositEntity deposit : deposits) {
+            if (!"HELD".equals(deposit.getStatus())) continue;
+            BigDecimal held = money(deposit.getHeldAmount());
+            WalletTransactionEntity tx = walletLedgerService.releaseEscrowToAvailable(
+                    deposit.getOwnerAccountId(), held,
+                    ROLE_EXPERT.equals(deposit.getOwnerRole())
+                            ? "EXPERT_CONTRACT_DEPOSIT_REFUND" : "CONTRACT_SECURITY_DEPOSIT_REFUND",
+                    "CONTRACT_DEPOSIT", deposit.getDepositId(), "Refund participant contract deposit");
+            tx.setContractId(contractId);
+            walletTransactionRepository.save(tx);
+            deposit.setHeldAmount(BigDecimal.ZERO);
+            deposit.setRefundedAmount(money(deposit.getRefundedAmount()).add(held));
+            deposit.setRefundTransactionId(tx.getId());
+            deposit.setAdminId(admin.getAccountId());
+            deposit.setAdminNote(request == null ? null : request.getAdminNote());
+            deposit.setRefundedAt(now);
+            deposit.setResolvedAt(now);
+            deposit.setResolutionType("STANDARD_REFUND");
+            deposit.setStatus("REFUNDED");
+            contractDepositRepository.save(deposit);
+        }
+        boolean closed = closeWhenBothDepositsResolved(contract, admin.getAccountId());
+        auditLogService.record("PARTICIPANT_DEPOSITS_REFUNDED", "contracts",
+                String.valueOf(contractId), admin.getAccountId());
+        notifyBothParticipants(contract, admin.getAccountId(), "PARTICIPANT_DEPOSITS_REFUNDED",
+                "Ký quỹ hai bên đã được hoàn", "Ký quỹ tham gia hợp đồng của hai bên đã được xử lý hoàn.");
+        if (closed) {
+            notifyBothParticipants(contract, admin.getAccountId(), "CONTRACT_CLOSED",
+                    "Hợp đồng đã đóng", "Hợp đồng đã đóng sau khi hoàn tất xử lý ký quỹ.");
+        }
+        return contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(contractId);
+    }
+
+    @Transactional
+    public ContractEntity immediateTerminateContract(ContractEntity contract, AccountEntity initiator, String initiatingRole) {
+        ContractDepositEntity businessDeposit = contractDepositRepository
+                .findByContractIdAndOwnerRole(contract.getContractId(), ROLE_BUSINESS)
+                .filter(item -> "HELD".equals(item.getStatus()))
+                .orElseThrow(() -> new AppException("BUSINESS_CONTRACT_DEPOSIT_NOT_HELD"));
+        ContractDepositEntity expertDeposit = contractDepositRepository
+                .findByContractIdAndOwnerRole(contract.getContractId(), ROLE_EXPERT)
+                .filter(item -> "HELD".equals(item.getStatus()))
+                .orElseThrow(() -> new AppException("EXPERT_CONTRACT_DEPOSIT_NOT_HELD"));
+        Integer businessAccountId = businessDeposit.getOwnerAccountId();
+        Integer expertAccountId = expertDeposit.getOwnerAccountId();
+        BigDecimal penalty = percentageAmount(contract, new BigDecimal("10.00"));
+
+        for (ContractMilestoneEntity item : contractMilestoneRepository
+                .findByContractIdOrderByOrderIndexAsc(contract.getContractId())) {
+            if (ContractMilestoneEntity.STATUS_COMPLETED.equals(item.getStatus())) continue;
+            if (List.of(ContractMilestoneEntity.STATUS_DEPOSITED, ContractMilestoneEntity.STATUS_IN_PROGRESS,
+                    ContractMilestoneEntity.STATUS_OVERDUE).contains(item.getStatus())
+                    && item.getEscrowReleasedAt() == null) {
+                WalletTransactionEntity refund = walletLedgerService.releaseEscrowToAvailable(
+                        businessAccountId, item.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_REFUND,
+                        "MILESTONE", item.getJobMilestoneId().longValue(), "Immediate termination milestone refund");
+                refund.setContractId(contract.getContractId());
+                refund.setMilestoneId(item.getJobMilestoneId());
+                walletTransactionRepository.save(refund);
+                item.setEscrowReleasedAt(LocalDateTime.now());
+                item.setSettlementSourceType("IMMEDIATE_TERMINATION");
+                item.setSettlementSourceId(contract.getContractId().longValue());
+            }
+            item.setStatus(ContractMilestoneEntity.STATUS_CANCELLED);
+            contractMilestoneRepository.save(item);
+            milestoneRepository.findById(item.getJobMilestoneId()).ifPresent(live -> {
+                live.setStatus(ContractMilestoneEntity.STATUS_CANCELLED);
+                live.setEscrowReleasedAt(item.getEscrowReleasedAt());
+                live.setSettlementSourceType(item.getSettlementSourceType());
+                live.setSettlementSourceId(item.getSettlementSourceId());
+                milestoneRepository.save(live);
+            });
+        }
+
+        if (ROLE_BUSINESS.equals(initiatingRole)) {
+            settleDepositPenalty(businessDeposit, expertAccountId, penalty, contract.getContractId());
+            refundDepositRemainder(businessDeposit, contract.getContractId());
+            refundDepositRemainder(expertDeposit, contract.getContractId());
+        } else {
+            if (money(expertDeposit.getHeldAmount()).compareTo(penalty) != 0) {
+                throw new AppException("EXPERT_CONTRACT_DEPOSIT_NOT_HELD");
+            }
+            settleDepositPenalty(expertDeposit, businessAccountId, penalty, contract.getContractId());
+            refundDepositRemainder(businessDeposit, contract.getContractId());
+        }
+        LocalDateTime now = LocalDateTime.now();
+        contract.setStatus(ContractEntity.STATUS_CLOSED);
+        contract.setTerminatedAt(now);
+        contract.setUpdatedAt(now);
+        ContractEntity saved = contractRepository.save(contract);
+        JobEntity job = jobRepository.findById(contract.getJobId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA CONTRACT"));
+        job.setStatus("CLOSED");
+        jobRepository.save(job);
+        auditLogService.record("IMMEDIATE_TERMINATION_PENALTY_SETTLED", "contracts",
+                String.valueOf(contract.getContractId()), initiator.getAccountId());
+        auditLogService.record("CONTRACT_CLOSED", "contracts",
+                String.valueOf(contract.getContractId()), initiator.getAccountId());
+        return saved;
+    }
+
+    private void settleDepositPenalty(
+            ContractDepositEntity deposit, Integer beneficiaryAccountId, BigDecimal penalty, Integer contractId) {
+        if (money(deposit.getHeldAmount()).compareTo(penalty) < 0) {
+            throw new AppException("CONTRACT_DEPOSIT_ALREADY_RESOLVED");
+        }
+        WalletTransactionEntity debit = walletLedgerService.debitEscrow(
+                deposit.getOwnerAccountId(), penalty, "IMMEDIATE_TERMINATION_PENALTY",
+                "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination penalty");
+        debit.setContractId(contractId);
+        debit.setMetadata("{\"settlementSourceType\":\"IMMEDIATE_TERMINATION\",\"initiatingRole\":\""
+                + deposit.getOwnerRole() + "\",\"penaltyPercentage\":10,\"penaltyAmount\":" + penalty + "}");
+        walletTransactionRepository.save(debit);
+        WalletTransactionEntity credit = walletLedgerService.creditAvailable(
+                beneficiaryAccountId, penalty, "IMMEDIATE_TERMINATION_COMPENSATION",
+                "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination compensation");
+        credit.setContractId(contractId);
+        credit.setMetadata(debit.getMetadata());
+        walletTransactionRepository.save(credit);
+        deposit.setHeldAmount(money(deposit.getHeldAmount()).subtract(penalty));
+        deposit.setResolvedAmount(money(deposit.getResolvedAmount()).add(penalty));
+        deposit.setPenaltyAmount(penalty);
+        deposit.setPenaltyBeneficiaryAccountId(beneficiaryAccountId);
+        deposit.setPenaltyTransactionId(credit.getId());
+        deposit.setResolutionType("IMMEDIATE_TERMINATION_PENALTY");
+        contractDepositRepository.save(deposit);
+    }
+
+    private void refundDepositRemainder(ContractDepositEntity deposit, Integer contractId) {
+        BigDecimal remainder = money(deposit.getHeldAmount());
+        if (remainder.signum() > 0) {
+            WalletTransactionEntity refund = walletLedgerService.releaseEscrowToAvailable(
+                    deposit.getOwnerAccountId(), remainder,
+                    ROLE_EXPERT.equals(deposit.getOwnerRole())
+                            ? "EXPERT_CONTRACT_DEPOSIT_REFUND" : "CONTRACT_SECURITY_DEPOSIT_REFUND",
+                    "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination deposit refund");
+            refund.setContractId(contractId);
+            walletTransactionRepository.save(refund);
+            deposit.setRefundTransactionId(refund.getId());
+            deposit.setRefundedAmount(money(deposit.getRefundedAmount()).add(remainder));
+        }
+        deposit.setHeldAmount(BigDecimal.ZERO);
+        deposit.setStatus(deposit.getPenaltyAmount() != null && deposit.getPenaltyAmount().signum() > 0
+                ? "PENALTY_SETTLED" : "REFUNDED");
+        deposit.setResolvedAt(LocalDateTime.now());
+        if (deposit.getResolutionType() == null) deposit.setResolutionType("IMMEDIATE_TERMINATION_REFUND");
+        contractDepositRepository.save(deposit);
     }
 
     @Transactional
@@ -1185,7 +1407,19 @@ public class PaymentWalletService {
     }
 
     // Note: Ham `activateContractAfterDeposit` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private void activateContractAfterDeposit(ContractEntity contract, LocalDateTime now) {
+    private boolean activateContractAfterBothDeposits(ContractEntity contract, LocalDateTime now, Integer actorAccountId) {
+        if (ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) {
+            return false;
+        }
+        boolean businessHeld = contractDepositRepository.findByContractIdAndOwnerRole(contract.getContractId(), ROLE_BUSINESS)
+                .filter(deposit -> "HELD".equals(deposit.getStatus())).isPresent();
+        boolean expertHeld = contractDepositRepository.findByContractIdAndOwnerRole(contract.getContractId(), ROLE_EXPERT)
+                .filter(deposit -> "HELD".equals(deposit.getStatus())).isPresent();
+        if (!businessHeld || !expertHeld) {
+            contract.setStatus(ContractEntity.STATUS_PENDING);
+            contractRepository.save(contract);
+            return false;
+        }
         contract.setStatus("ACTIVE");
         if (contract.getActivatedAt() == null) {
             contract.setActivatedAt(now);
@@ -1197,6 +1431,31 @@ public class PaymentWalletService {
         job.setBudget(contract.getTotalBudget());
         job.setStatus("IN_PROGRESS");
         jobRepository.save(job);
+        auditLogService.record("CONTRACT_ACTIVATED_AFTER_DUAL_DEPOSIT", "contracts",
+                String.valueOf(contract.getContractId()), actorAccountId);
+        return true;
+    }
+
+    private void notifyDepositHeld(ContractEntity contract, Integer actorAccountId, String ownerRole) {
+        String type = ROLE_EXPERT.equals(ownerRole) ? "EXPERT_CONTRACT_DEPOSIT_HELD" : "BUSINESS_CONTRACT_DEPOSIT_HELD";
+        String title = ROLE_EXPERT.equals(ownerRole) ? "Chuyên gia đã ký quỹ" : "Doanh nghiệp đã ký quỹ";
+        String message = ROLE_EXPERT.equals(ownerRole)
+                ? "Chuyên gia đã hoàn tất ký quỹ 10% cho hợp đồng."
+                : "Doanh nghiệp đã hoàn tất ký quỹ 20% cho hợp đồng.";
+        notifyBothParticipants(contract, actorAccountId, type, title, message);
+    }
+
+    private void notifyBothParticipants(ContractEntity contract, Integer actorAccountId, String type, String title, String message) {
+        notifyBusiness(contract, actorAccountId, type, title, message);
+        expertProfileRepository.findById(contract.getExpertId())
+                .ifPresent(expert -> notificationService.notifyContractEvent(
+                        expert.getAccountId(), actorAccountId, type, title, message, contract.getContractId()));
+    }
+
+    private void notifyBusiness(ContractEntity contract, Integer actorAccountId, String type, String title, String message) {
+        businessProfileRepository.findById(contract.getBusinessId())
+                .ifPresent(business -> notificationService.notifyContractEvent(
+                        business.getAccountId(), actorAccountId, type, title, message, contract.getContractId()));
     }
 
     // Note: Ham `applyContractMilestoneBudgets` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -1255,9 +1514,30 @@ public class PaymentWalletService {
 
     // Note: Ham `depositAmount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal depositAmount(ContractEntity contract) {
+        return percentageAmount(contract, new BigDecimal("20.00"));
+    }
+
+    private BigDecimal percentageAmount(ContractEntity contract, BigDecimal percentage) {
         return money(contract.getTotalBudget())
-                .multiply(new BigDecimal("0.20"))
+                .multiply(percentage)
+                .divide(new BigDecimal("100"))
                 .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private boolean closeWhenBothDepositsResolved(ContractEntity contract, Integer actorAccountId) {
+        List<ContractDepositEntity> deposits = contractDepositRepository
+                .findByContractIdOrderByOwnerRoleAsc(contract.getContractId());
+        boolean bothResolved = Set.of(ROLE_BUSINESS, ROLE_EXPERT).stream().allMatch(role ->
+                deposits.stream().anyMatch(deposit -> role.equals(deposit.getOwnerRole())
+                        && money(deposit.getHeldAmount()).signum() == 0));
+        if (bothResolved && !ContractEntity.STATUS_CLOSED.equals(contract.getStatus())) {
+            contract.setStatus(ContractEntity.STATUS_CLOSED);
+            contractRepository.save(contract);
+            auditLogService.record("CONTRACT_CLOSED", "contracts",
+                    String.valueOf(contract.getContractId()), actorAccountId);
+            return true;
+        }
+        return false;
     }
 
     // Note: Ham `refundStatus` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.

@@ -70,6 +70,11 @@ public class DisputeEntity {
     @Column(name = "escalation_requested_by_account_id") private Integer escalationRequestedByAccountId;
     @Column(name = "escalation_requested_at") private LocalDateTime escalationRequestedAt;
     @Column(name = "staff_review_started_at") private LocalDateTime staffReviewStartedAt;
+    @Column(name = "evidence_collection_due_at") private LocalDateTime evidenceCollectionDueAt;
+    @Column(name = "staff_access_scope", length = 50) private String staffAccessScope;
+    @Column(name = "staff_access_expires_at") private LocalDateTime staffAccessExpiresAt;
+    @Column(name = "staff_sla_due_at") private LocalDateTime staffSlaDueAt;
+    @Column(name = "staff_sla_escalated_at") private LocalDateTime staffSlaEscalatedAt;
     @Column(name = "staff_decided_at") private LocalDateTime staffDecidedAt;
     @Column(name = "intervention_rejected_at") private LocalDateTime interventionRejectedAt;
     @Column(name = "intervention_rejection_reason") private String interventionRejectionReason;

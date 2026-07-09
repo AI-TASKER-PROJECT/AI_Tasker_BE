@@ -105,7 +105,8 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/contracts/{contractId}/nda-sign`
   - `POST /api/v1/contracts/{contractId}/reject`
   - `POST /api/v1/contracts/{contractId}/deposit/pay`
-  - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
+  - `POST /api/v1/contracts/{contractId}/expert-deposit/pay`
+  - `POST /api/v1/admin/contracts/{contractId}/deposits/refund`
   - `GET /api/v1/contracts/{contractId}/milestones`
   - `POST /api/v1/milestones`
   - `PATCH /api/v1/milestones/{milestoneId}`
@@ -132,7 +133,12 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/disputes/{disputeId}/staff-decision?expertPercent=...&note=...&staffReport=...`
   - `POST /api/v1/disputes/{disputeId}/execute-settlement`
   - `POST /api/v1/disputes/{disputeId}/cancel?reason=...`
+  - `POST /api/v1/disputes/staff-sla-escalate`
   - `POST /api/v1/contracts/{contractId}/termination-requests`
+  - `POST /api/v1/contracts/{contractId}/immediate-termination`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/accept`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/dispute`
+  - `POST /api/v1/termination-requests/expire-awaiting-expert`
   - `GET /api/v1/contracts/{contractId}/termination-requests`
   - `GET /api/v1/termination-requests/{terminationRequestId}`
   - `POST /api/v1/termination-requests/{terminationRequestId}/assign-staff?staffId=...`
@@ -156,7 +162,8 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/jobs/{jobId}/publish`
   - `POST /api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select`
   - `POST /api/v1/contracts/{contractId}/deposit/pay`
-  - `POST /api/v1/admin/contracts/{contractId}/deposit/refund`
+  - `POST /api/v1/contracts/{contractId}/expert-deposit/pay`
+  - `POST /api/v1/admin/contracts/{contractId}/deposits/refund`
   - `POST /api/v1/withdrawal-requests`
   - `GET /api/v1/withdrawal-requests`
   - `GET /api/v1/admin/withdrawal-requests`

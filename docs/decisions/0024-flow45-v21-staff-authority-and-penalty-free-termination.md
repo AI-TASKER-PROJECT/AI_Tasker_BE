@@ -4,7 +4,7 @@ Date: 2026-07-09
 
 ## Status
 
-Accepted
+Superseded by decision 0025 on 2026-07-09.
 
 ## Context
 

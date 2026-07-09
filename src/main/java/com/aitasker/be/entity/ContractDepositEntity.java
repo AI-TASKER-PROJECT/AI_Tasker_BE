@@ -46,12 +46,24 @@ public class ContractDepositEntity {
     private Long depositId;
 
     // Note: Annotation nay cau hinh cot database tuong ung voi field entity.
-    @Column(name = "contract_id", nullable = false, unique = true)
+    @Column(name = "contract_id", nullable = false)
     private Integer contractId;
 
     // Note: Annotation nay cau hinh cot database tuong ung voi field entity.
     @Column(name = "business_id", nullable = false)
     private Integer businessId;
+
+    @Column(name = "owner_account_id")
+    private Integer ownerAccountId;
+
+    @Column(name = "owner_role", nullable = false, length = 20)
+    private String ownerRole;
+
+    @Column(name = "required_percentage", nullable = false, precision = 5, scale = 2)
+    private BigDecimal requiredPercentage;
+
+    @Column(name = "required_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal requiredAmount;
 
     // Note: Annotation nay cau hinh cot database tuong ung voi field entity.
     @Column(name = "deposit_amount", nullable = false, precision = 19, scale = 2)
@@ -96,6 +108,17 @@ public class ContractDepositEntity {
     // Note: Annotation nay cau hinh cot database tuong ung voi field entity.
     @Column(name = "refunded_at")
     private LocalDateTime refundedAt;
+
+    @Column(name = "penalty_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal penaltyAmount;
+    @Column(name = "penalty_beneficiary_account_id")
+    private Integer penaltyBeneficiaryAccountId;
+    @Column(name = "penalty_transaction_id")
+    private Long penaltyTransactionId;
+    @Column(name = "resolution_type", length = 50)
+    private String resolutionType;
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
 
     // Note: Annotation nay tu ghi thoi diem tao du lieu khi insert database.
     @CreationTimestamp
