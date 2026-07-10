@@ -35,7 +35,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 
 ## Profile Verification Flow
 
-- Giai thich flow: Tao, xem va duyet ho so Business/Expert va portfolio.
+- Giai thich flow: Tao, xem va duyet ho so Business/Expert va portfolio. Business profile responses now include `verifiedRepresentative` (nguoi dai dien phap ly tu VietQR API). `companyName`/`address` duoc auto-fill tu VietQR khi submit.
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |

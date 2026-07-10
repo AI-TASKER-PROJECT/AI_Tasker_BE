@@ -118,7 +118,11 @@ The following service boundaries are established and should be preserved:
 - `service/core/AccessService`: current account lookup from JWT and role checks.
 - `service/core/ProfileService`: KYB/KYC, portfolio, approval, and approval
   audit behavior, including Firebase-backed business license, expert
-  certificate, and expert portfolio file uploads.
+  certificate, and expert portfolio file uploads. Business profile submission
+  (`upsertBusiness`) now calls `TaxCheckService` for automatic MST verification
+  via VietQR and stores `verifiedRepresentative` from the government registry.
+  `companyName` and `address` are auto-filled from VietQR as the single source
+  of truth.
 - `service/core/MarketplaceService`: job lifecycle, proposal submission, and
   proposal review.
 - `service/core/CatalogService`: domain, skill, technology, and job metadata

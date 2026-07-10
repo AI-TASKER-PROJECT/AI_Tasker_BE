@@ -7,6 +7,7 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
+import com.aitasker.be.dto.auth.TaxCheckResponse;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
@@ -19,6 +20,7 @@ import com.aitasker.be.repository.ExpertProfileRepository;
 import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.PortfolioRepository;
 import com.aitasker.be.repository.StaffRepository;
+import com.aitasker.be.service.auth.TaxCheckService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +35,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -56,6 +59,7 @@ class ProfileServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private FirebaseStorageService firebaseStorageService;
     @Mock private NotificationService notificationService;
+    @Mock private TaxCheckService taxCheckService;
     @Mock private JobRepository jobRepository;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -78,21 +82,30 @@ class ProfileServiceTest {
                 .fullName("Nova Retail Owner")
                 .status("Rejected")
                 .build();
-        BusinessProfileEntity input = BusinessProfileEntity.builder()
+        TaxCheckResponse vietQrResponse = TaxCheckResponse.builder()
                 .taxCode("0312345678")
                 .companyName("Nova Retail")
                 .address("TP HCM")
+                .representative("Nguyen Van A")
+                .status("FOUND")
+                .build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder()
+                .taxCode("0312345678")
                 .businessLicenseUrl("licenses/nova.pdf")
                 .build();
         BusinessProfileEntity savedProfile = BusinessProfileEntity.builder()
                 .businessId(5)
                 .accountId(accountId)
                 .taxCode(input.getTaxCode())
-                .companyName(input.getCompanyName())
+                .companyName("Nova Retail")
+                .address("TP HCM")
+                .verifiedRepresentative("Nguyen Van A")
                 .kybStatus("Pending")
                 .build();
 
         when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.existsByTaxCodeExcludingAccount("0312345678", accountId)).thenReturn(false);
+        when(taxCheckService.checkTaxCode("0312345678")).thenReturn(vietQrResponse);
         when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.empty());
         when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenReturn(savedProfile);
         when(staffRepository.findAll()).thenReturn(List.of(
@@ -104,6 +117,7 @@ class ProfileServiceTest {
 
         assertEquals("Pending", account.getStatus());
         assertEquals(savedProfile, result);
+        assertEquals("Nguyen Van A", result.getVerifiedRepresentative());
         verify(accountRepository).save(account);
         verify(notificationService).notifyProfileSubmitted(40, accountId, "BUSINESS", 5, "Nova Retail");
         verify(notificationService).notifyProfileSubmitted(41, accountId, "BUSINESS", 5, "Nova Retail");
@@ -489,6 +503,135 @@ class ProfileServiceTest {
         assertNull(saved.getRejectionReason());
         verify(accountRepository).save(argThat(account -> "Approved".equals(account.getStatus())));
         verify(notificationService).notifyProfileReviewed(profileAccountId, staffAccountId, "BUSINESS", "Approved");
+    }
+
+    @Test
+    void upsertBusiness_shouldThrowWhenTaxCodeFormatInvalid() {
+        BusinessProfileEntity input = BusinessProfileEntity.builder().taxCode("12345").build();
+        AppException ex = assertThrows(AppException.class, () -> profileService.upsertBusiness(input));
+        assertEquals("MA SO THUE KHONG HOP LE", ex.getMessage());
+        verify(businessProfileRepository, never()).existsByTaxCodeExcludingAccount(anyString(), anyInt());
+        verifyNoInteractions(taxCheckService);
+    }
+
+    @Test
+    void upsertBusiness_shouldThrowWhenTaxCodeDuplicate() {
+        Integer accountId = 10;
+        AccountEntity account = AccountEntity.builder().accountId(accountId).fullName("A").build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder().taxCode("0312345678").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.existsByTaxCodeExcludingAccount("0312345678", accountId)).thenReturn(true);
+
+        AppException ex = assertThrows(AppException.class, () -> profileService.upsertBusiness(input));
+        assertEquals("MA SO THUE DA DUOC SU DUNG BOI TAI KHOAN KHAC", ex.getMessage());
+        verifyNoInteractions(taxCheckService);
+    }
+
+    @Test
+    void upsertBusiness_shouldThrowWhenTaxCodeNotFoundInVietQR() {
+        Integer accountId = 10;
+        AccountEntity account = AccountEntity.builder().accountId(accountId).fullName("A").build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder().taxCode("0312345678").build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.existsByTaxCodeExcludingAccount("0312345678", accountId)).thenReturn(false);
+        when(taxCheckService.checkTaxCode("0312345678")).thenThrow(new NotFoundException("KHONG TIM THAY DOANH NGHIEP VOI MA SO THUE: 0312345678"));
+
+        NotFoundException ex = assertThrows(NotFoundException.class, () -> profileService.upsertBusiness(input));
+        assertEquals("KHONG TIM THAY DOANH NGHIEP VOI MA SO THUE: 0312345678", ex.getMessage());
+        verify(businessProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void upsertBusiness_shouldAutoFillCompanyInfoFromVietQR() {
+        Integer accountId = 10;
+        AccountEntity account = AccountEntity.builder().accountId(accountId).fullName("Business Owner").status("Pending").build();
+        TaxCheckResponse vietQr = TaxCheckResponse.builder()
+                .taxCode("0312345678")
+                .companyName("CONG TY TNHH ABC")
+                .address("123 Nguyen Hue, Q1, TPHCM")
+                .representative("Nguyen Van B")
+                .status("FOUND")
+                .build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder()
+                .taxCode("0312345678")
+                .businessLicenseUrl("licenses/abc.pdf")
+                .build();
+        BusinessProfileEntity savedProfile = BusinessProfileEntity.builder()
+                .businessId(5)
+                .accountId(accountId)
+                .taxCode("0312345678")
+                .companyName("CONG TY TNHH ABC")
+                .address("123 Nguyen Hue, Q1, TPHCM")
+                .verifiedRepresentative("Nguyen Van B")
+                .businessLicenseUrl("licenses/abc.pdf")
+                .kybStatus("Pending")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.existsByTaxCodeExcludingAccount("0312345678", accountId)).thenReturn(false);
+        when(taxCheckService.checkTaxCode("0312345678")).thenReturn(vietQr);
+        when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.empty());
+        when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenReturn(savedProfile);
+        when(staffRepository.findAll()).thenReturn(List.of());
+
+        BusinessProfileEntity result = profileService.upsertBusiness(input);
+
+        assertEquals("CONG TY TNHH ABC", result.getCompanyName());
+        assertEquals("123 Nguyen Hue, Q1, TPHCM", result.getAddress());
+        assertEquals("Nguyen Van B", result.getVerifiedRepresentative());
+        assertEquals("Pending", result.getKybStatus());
+        verify(accountRepository).save(account);
+    }
+
+    @Test
+    void upsertBusiness_shouldAllowResubmitSameAccount() {
+        Integer accountId = 10;
+        AccountEntity account = AccountEntity.builder().accountId(accountId).fullName("Owner").status("Rejected").build();
+        TaxCheckResponse vietQr = TaxCheckResponse.builder()
+                .taxCode("0312345678")
+                .companyName("My Company")
+                .address("My Address")
+                .representative("Rep")
+                .status("FOUND")
+                .build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder()
+                .taxCode("0312345678")
+                .businessLicenseUrl("licenses/new.pdf")
+                .build();
+        BusinessProfileEntity existingProfile = BusinessProfileEntity.builder()
+                .businessId(5)
+                .accountId(accountId)
+                .taxCode("0312345678")
+                .companyName("Old Name")
+                .kybStatus("Rejected")
+                .build();
+        BusinessProfileEntity savedProfile = BusinessProfileEntity.builder()
+                .businessId(5)
+                .accountId(accountId)
+                .taxCode("0312345678")
+                .companyName("My Company")
+                .address("My Address")
+                .verifiedRepresentative("Rep")
+                .businessLicenseUrl("licenses/new.pdf")
+                .kybStatus("Pending")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.existsByTaxCodeExcludingAccount("0312345678", accountId)).thenReturn(false);
+        when(taxCheckService.checkTaxCode("0312345678")).thenReturn(vietQr);
+        when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.of(existingProfile));
+        when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenReturn(savedProfile);
+        when(staffRepository.findAll()).thenReturn(List.of());
+
+        BusinessProfileEntity result = profileService.upsertBusiness(input);
+
+        assertEquals("My Company", result.getCompanyName());
+        assertEquals("Pending", result.getKybStatus());
+        assertEquals("Rep", result.getVerifiedRepresentative());
+        verify(businessProfileRepository).existsByTaxCodeExcludingAccount("0312345678", accountId);
+        verify(taxCheckService).checkTaxCode("0312345678");
     }
 
     private void assertBusinessContact(BusinessProfileEntity result, String fullName, String email, String phone) {

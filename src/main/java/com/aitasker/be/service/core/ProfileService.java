@@ -7,8 +7,10 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.dto.auth.TaxCheckResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
+import com.aitasker.be.service.auth.TaxCheckService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,23 +33,36 @@ public class ProfileService {
     private final FirebaseStorageService firebaseStorageService;
     private final JobRepository jobRepository;
     private final NotificationService notificationService;
+    private final TaxCheckService taxCheckService;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
-    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
+    // Note: Annotation nay dam bao cac thao tac database trong ham chay cung mot transaction.
     @Transactional
-    // Note: Hàm `upsertBusiness` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Note: Ham `upsertBusiness` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public BusinessProfileEntity upsertBusiness(BusinessProfileEntity input) {
         accessService.requireRole("BUSINESS");
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         // KIEM TRA CAC TRUONG BAT BUOC DE TRANH LUU HO SO THIEU DU LIEU KYB.
         if (input.getTaxCode() == null || input.getTaxCode().isBlank()) throw new AppException("TAX CODE KHONG DUOC DE TRONG");
-        if (input.getCompanyName() == null || input.getCompanyName().isBlank()) throw new AppException("COMPANY NAME KHONG DUOC DE TRONG");
+        // KIEM TRA DINH DANG MA SO THUE (10 HOAC 13 CHU SO).
+        if (!input.getTaxCode().matches("\\d{10}|\\d{13}")) throw new AppException("MA SO THUE KHONG HOP LE");
+
         AccountEntity account = accessService.currentAccount();
+
+        // KIEM TRA TRUNG MST — MOT MST CHI THUOC VE MOT ACCOUNT.
+        if (businessProfileRepository.existsByTaxCodeExcludingAccount(input.getTaxCode(), account.getAccountId())) {
+            throw new AppException("MA SO THUE DA DUOC SU DUNG BOI TAI KHOAN KHAC");
+        }
+
+        // XAC THUC MST VOI VIETQR — HE THONG TU DONG DIEN THONG TIN DOANH NGHIEP TU NGUON CHINH THUC.
+        TaxCheckResponse vietQrData = taxCheckService.checkTaxCode(input.getTaxCode());
+
         BusinessProfileEntity entity = businessProfileRepository.findByAccountId(account.getAccountId()).orElseGet(BusinessProfileEntity::new);
         entity.setAccountId(account.getAccountId());
         entity.setTaxCode(input.getTaxCode());
-        entity.setCompanyName(input.getCompanyName());
-        entity.setAddress(input.getAddress());
+        entity.setCompanyName(vietQrData.getCompanyName());
+        entity.setAddress(vietQrData.getAddress());
+        entity.setVerifiedRepresentative(vietQrData.getRepresentative());
         entity.setBusinessLicenseUrl(input.getBusinessLicenseUrl());
         // Moi lan nop/cap nhat KYB deu dua account ve Pending de staff duyet lai.
         entity.setKybStatus("Pending");
