@@ -77,7 +77,6 @@ public class AuditLogService {
     public static final String ACTION_APPROVE_MILESTONE = "Duyệt milestone";
     public static final String ACTION_REJECT_MILESTONE = "Từ chối sản phẩm milestone";
     public static final String ACTION_ESCALATE_DISPUTE = "Yêu cầu can thiệp tranh chấp";
-    public static final String ACTION_REJECT_INTERVENTION = "Từ chối can thiệp tranh chấp";
     public static final String ACTION_STAFF_DECIDE_DISPUTE = "Ra quyết định tranh chấp";
     public static final String ACTION_EXECUTE_DISPUTE_SETTLEMENT = "Thực thi quyết toán tranh chấp";
     public static final String ACTION_CANCEL_DISPUTE = "Hủy tranh chấp";
@@ -314,7 +313,7 @@ public class AuditLogService {
             case "MILESTONE_STARTED" -> ACTION_START_MILESTONE;
             case "PROGRESS_REPORT_SUBMITTED" -> ACTION_SUBMIT_PROGRESS_REPORT;
             case "PROGRESS_REPORT_REQUESTED" -> "Yêu cầu báo cáo tiến độ";
-            case "PROGRESS_REPORT_FEEDBACK_RECORDED" -> "Ghi phản hồi báo cáo tiến độ";
+            case "PROGRESS_REPORT_ACKNOWLEDGED" -> "Xác nhận báo cáo tiến độ";
             case "PROGRESS_REPORT_REQUEST_EXPIRED" -> "Yêu cầu báo cáo tiến độ hết hạn";
             case "MILESTONE_MARKED_OVERDUE" -> "Đánh dấu milestone quá hạn";
             case "MILESTONE_REVIEW_SLA_AUTO_APPROVED" -> "Tự động duyệt milestone quá SLA";
@@ -324,8 +323,8 @@ public class AuditLogService {
             case "DISPUTE_CREATED" -> ACTION_CREATE_DISPUTE;
             case "DISPUTE_ESCALATION_REQUESTED" -> ACTION_ESCALATE_DISPUTE;
             case "DISPUTE_STAFF_ASSIGNED" -> ACTION_ASSIGN_DISPUTE;
+            case "DISPUTE_STAFF_ROUTED" -> ACTION_ASSIGN_DISPUTE;
             case "DISPUTE_STAFF_SLA_ESCALATED" -> "Escalate SLA xử lý tranh chấp";
-            case "DISPUTE_INTERVENTION_REJECTED" -> ACTION_REJECT_INTERVENTION;
             case "DISPUTE_STAFF_DECIDED" -> ACTION_STAFF_DECIDE_DISPUTE;
             case "DISPUTE_SETTLEMENT_EXECUTED" -> ACTION_EXECUTE_DISPUTE_SETTLEMENT;
             case "DISPUTE_CANCELLED" -> ACTION_CANCEL_DISPUTE;

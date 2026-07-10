@@ -111,8 +111,9 @@ Alternate exits:
   timeout before optional Staff review. Immediate termination is a separate
   guarded command: the initiator pays exactly 10% of total contract value from
   its held deposit to the counterparty, without Staff review.
-- Admin participant-deposit refund is the gate from normal `COMPLETED` or
-  `TERMINATED` to `CLOSED`. Both deposits must be resolved. Reviews are
+- Admin participant-deposit refund is an operational retry/audit tool. The system
+  automatically refunds both held participant deposits at normal completion or
+  valid termination, then transitions the contract to `CLOSED`. Reviews are
   available only after `CLOSED`.
 - `COMPLETED`, `TERMINATED`, `CLOSED`, and `CANCELLED` contracts cannot start
   new milestone work.
@@ -139,6 +140,7 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/expert-deposit/pay`
 - `POST /api/v1/admin/contracts/{contractId}/deposits/refund`
 - `POST /api/v1/contracts/{contractId}/reject`
+- `POST /api/v1/contracts/{contractId}/cancel-draft`
 - `GET /api/v1/contracts/{contractId}/milestones`
 - `POST /api/v1/contracts/{contractId}/termination-requests`
 - `POST /api/v1/contracts/{contractId}/immediate-termination`
@@ -159,7 +161,7 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`
-- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge`
 - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/check-overdue`
 - `POST /api/v1/contracts/{contractId}/milestones/sla-auto-approve`
@@ -170,9 +172,8 @@ Alternate exits:
   approval/release)
 - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...`
 - `POST /api/v1/disputes/{disputeId}/escalation-request`
-- `POST /api/v1/disputes/{disputeId}/assign-staff`
+- `POST /api/v1/disputes/{disputeId}/route-staff`
 - `GET /api/v1/disputes/{disputeId}/staff-candidates`
-- `POST /api/v1/disputes/{disputeId}/reject-intervention`
 - `POST /api/v1/disputes/{disputeId}/staff-decision`
 - `POST /api/v1/disputes/{disputeId}/execute-settlement`
 - `POST /api/v1/disputes/{disputeId}/cancel`

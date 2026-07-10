@@ -49,7 +49,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -838,5 +840,92 @@ class PaymentWalletServiceTest {
                 .badgeStartAt(start)
                 .badgeEndAt(end)
                 .build();
+    }
+
+    // --- v2.3 auto-participant-deposit-refund tests ---
+
+    @Test
+    void autoRefundParticipantDeposits_shouldRefundBothAndCloseContract() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5)
+                .status(ContractEntity.STATUS_COMPLETED).build();
+        ContractDepositEntity bizDeposit = ContractDepositEntity.builder()
+                .depositId(1L).contractId(1).ownerRole("BUSINESS").status("HELD").ownerAccountId(50)
+                .heldAmount(BigDecimal.valueOf(20_000_000)).refundedAmount(BigDecimal.ZERO).build();
+        ContractDepositEntity expDeposit = ContractDepositEntity.builder()
+                .depositId(2L).contractId(1).ownerRole("EXPERT").status("HELD").ownerAccountId(60)
+                .heldAmount(BigDecimal.valueOf(10_000_000)).refundedAmount(BigDecimal.ZERO).build();
+        WalletTransactionEntity bizTx = WalletTransactionEntity.builder().id(701L).build();
+        WalletTransactionEntity expTx = WalletTransactionEntity.builder().id(702L).build();
+
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(1))
+                .thenReturn(List.of(bizDeposit, expDeposit));
+        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any()))
+                .thenReturn(bizTx, expTx);
+        when(contractDepositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        List<ContractDepositEntity> result = paymentWalletService.autoRefundParticipantDeposits(1, 1);
+
+        assertEquals(2, result.size());
+        assertEquals("REFUNDED", bizDeposit.getStatus());
+        assertEquals("REFUNDED", expDeposit.getStatus());
+        assertEquals("STANDARD_REFUND", bizDeposit.getResolutionType());
+        assertNotNull(bizDeposit.getResolvedAt());
+        verify(walletLedgerService, times(2)).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any());
+        verify(auditLogService).record(eq("PARTICIPANT_DEPOSITS_REFUNDED"), any(), any(), eq(1));
+    }
+
+    @Test
+    void autoRefundParticipantDeposits_shouldSkipAlreadyRefunded() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5)
+                .status(ContractEntity.STATUS_COMPLETED).build();
+        ContractDepositEntity bizDeposit = ContractDepositEntity.builder()
+                .depositId(1L).contractId(1).ownerRole("BUSINESS").status("REFUNDED").ownerAccountId(50)
+                .heldAmount(BigDecimal.ZERO).refundedAmount(BigDecimal.valueOf(20_000_000)).build();
+        ContractDepositEntity expDeposit = ContractDepositEntity.builder()
+                .depositId(2L).contractId(1).ownerRole("EXPERT").status("HELD").ownerAccountId(60)
+                .heldAmount(BigDecimal.valueOf(10_000_000)).refundedAmount(BigDecimal.ZERO).build();
+        WalletTransactionEntity tx = WalletTransactionEntity.builder().id(703L).build();
+
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(1))
+                .thenReturn(List.of(bizDeposit, expDeposit));
+        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any())).thenReturn(tx);
+        when(contractDepositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        paymentWalletService.autoRefundParticipantDeposits(1, 1);
+
+        verify(walletLedgerService, times(1)).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any());
+        assertEquals("REFUNDED", expDeposit.getStatus());
+        assertEquals("REFUNDED", bizDeposit.getStatus());
+    }
+
+    @Test
+    void refundParticipantDeposits_shouldDelegateToInternalAndRequireAdmin() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5)
+                .status(ContractEntity.STATUS_COMPLETED).build();
+        ContractDepositEntity bizDeposit = ContractDepositEntity.builder()
+                .depositId(1L).contractId(1).ownerRole("BUSINESS").status("HELD").ownerAccountId(50)
+                .heldAmount(BigDecimal.valueOf(20_000_000)).refundedAmount(BigDecimal.ZERO).build();
+        ContractDepositEntity expDeposit = ContractDepositEntity.builder()
+                .depositId(2L).contractId(1).ownerRole("EXPERT").status("HELD").ownerAccountId(60)
+                .heldAmount(BigDecimal.valueOf(10_000_000)).refundedAmount(BigDecimal.ZERO).build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(1))
+                .thenReturn(List.of(bizDeposit, expDeposit));
+        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any()))
+                .thenReturn(WalletTransactionEntity.builder().id(704L).build());
+        when(contractDepositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(50).build()));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
+
+        List<ContractDepositEntity> result = paymentWalletService.refundParticipantDeposits(1, null);
+
+        assertEquals(2, result.size());
+        assertEquals("REFUNDED", bizDeposit.getStatus());
+        assertEquals("REFUNDED", expDeposit.getStatus());
     }
 }

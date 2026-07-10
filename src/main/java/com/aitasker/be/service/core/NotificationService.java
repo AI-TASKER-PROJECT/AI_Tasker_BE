@@ -310,14 +310,14 @@ public class NotificationService {
         );
     }
 
-    // Note: Hàm `notifyDisputeAssigned` tạo thông báo tiếng Việt khi admin gán tranh chấp cho staff.
+    // Note: Thông báo cho Staff khi hệ thống hoặc Staff-ops route tranh chấp.
     public void notifyDisputeAssigned(Integer receiverAccountId, Integer actorAccountId, Integer disputeId) {
         createAndPush(
                 receiverAccountId,
                 actorAccountId,
                 "DISPUTE_ASSIGNED",
                 "Bạn được gán xử lý tranh chấp",
-                "Admin vừa gán một tranh chấp cho bạn xử lý.",
+                "Hệ thống vừa chuyển một tranh chấp cho bạn xử lý.",
                 "/staff/disputes/" + disputeId
         );
     }
@@ -366,29 +366,20 @@ public class NotificationService {
                 Map.of("contractId", contractId, "milestoneId", milestoneId, "disputeId", disputeId));
     }
 
-    // Note: Báo cho admin khi một bên yêu cầu staff can thiệp vào tranh chấp.
+    // Note: Báo cho Staff-ops khi một bên yêu cầu can thiệp tranh chấp.
     public void notifyDisputeEscalationRequested(Integer receiverAccountId, Integer actorAccountId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_ESCALATION_REQUESTED",
                 "Có yêu cầu can thiệp tranh chấp",
-                "Một bên vừa yêu cầu staff can thiệp vào tranh chấp. Admin cần phân công staff xử lý.",
-                "/admin/disputes/" + disputeId,
+                "Một bên vừa yêu cầu Staff can thiệp vào tranh chấp.",
+                "/staff/disputes/" + disputeId,
                 Map.of("disputeId", disputeId));
     }
 
-    // Note: Báo cho hai bên khi admin đã phân công staff xem xét tranh chấp.
+    // Note: Báo cho hai bên khi tranh chấp đã được route tới Staff.
     public void notifyDisputeUnderStaffReview(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_UNDER_REVIEW",
                 "Tranh chấp đang được staff xem xét",
-                "Admin đã phân công staff xem xét tranh chấp của hợp đồng. Vui lòng theo dõi kết quả.",
-                "/contracts/" + contractId + "/disputes/" + disputeId,
-                Map.of("contractId", contractId, "disputeId", disputeId));
-    }
-
-    // Note: Báo cho hai bên khi staff từ chối can thiệp và trả tranh chấp về giai đoạn tự giải quyết.
-    public void notifyDisputeInterventionRejected(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
-        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_INTERVENTION_REJECTED",
-                "Staff đã từ chối can thiệp",
-                "Staff đã từ chối can thiệp và trả tranh chấp về giai đoạn tự giải quyết. Hai bên vui lòng tiếp tục trao đổi.",
+                "Tranh chấp đã được chuyển tới Staff xem xét. Vui lòng theo dõi kết quả.",
                 "/contracts/" + contractId + "/disputes/" + disputeId,
                 Map.of("contractId", contractId, "disputeId", disputeId));
     }
@@ -467,15 +458,6 @@ public class NotificationService {
                 "Admin đã hoàn tiền ký quỹ hợp đồng sau khi chấm dứt. Hợp đồng đã đóng và bạn có thể đánh giá đối tác.",
                 "/contracts/" + contractId,
                 Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
-    }
-
-    public void notifyProgressReportFeedbackRecorded(Integer receiverAccountId, Integer actorAccountId,
-            Integer contractId, Integer milestoneId, Long progressReportId) {
-        createAndPush(receiverAccountId, actorAccountId, "PROGRESS_REPORT_FEEDBACK_RECORDED",
-                "Doanh nghiệp đã phản hồi báo cáo tiến độ",
-                "Doanh nghiệp đã ghi nhận phản hồi cho báo cáo tiến độ của milestone.",
-                "/contracts/" + contractId + "/milestones/" + milestoneId + "/progress-reports/" + progressReportId,
-                Map.of("contractId", contractId, "milestoneId", milestoneId, "progressReportId", progressReportId));
     }
 
     public void notifyMilestoneMarkedOverdue(Integer receiverAccountId, Integer actorAccountId,

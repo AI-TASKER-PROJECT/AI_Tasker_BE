@@ -9,7 +9,6 @@ import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ProgressReportRequest;
-import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
@@ -59,6 +58,11 @@ public class ContractExecutionController {
     @PostMapping("/contracts/{contractId}/reject")
     public ResponseEntity<ApiResponse<ContractEntity>> rejectContract(@PathVariable Integer contractId) {
         return ResponseEntity.ok(ApiResponse.success("REJECT CONTRACT SUCCESS", service.rejectContract(contractId)));
+    }
+
+    @PostMapping("/contracts/{contractId}/cancel-draft")
+    public ResponseEntity<ApiResponse<ContractEntity>> cancelDraftContract(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success("CANCEL CONTRACT DRAFT SUCCESS", service.cancelDraftContract(contractId)));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
@@ -157,12 +161,12 @@ public class ContractExecutionController {
                 service.requestProgressReport(contractId, milestoneId)));
     }
 
-    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback")
-    public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> feedbackProgressReport(
+    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge")
+    public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> acknowledgeProgressReport(
             @PathVariable Integer contractId, @PathVariable Integer milestoneId,
-            @PathVariable Long progressReportId, @RequestBody ProgressReportFeedbackRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("PROGRESS REPORT FEEDBACK SUCCESS",
-                service.feedbackProgressReport(contractId, milestoneId, progressReportId, request)));
+            @PathVariable Long progressReportId) {
+        return ResponseEntity.ok(ApiResponse.success("PROGRESS REPORT ACKNOWLEDGED",
+                service.acknowledgeProgressReport(contractId, milestoneId, progressReportId)));
     }
 
     @PostMapping("/contracts/{contractId}/milestones/check-overdue")
@@ -200,9 +204,9 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success("ESCALATION REQUEST SUCCESS", service.escalateDispute(disputeId, reason, evidenceFile)));
     }
 
-    @PostMapping("/disputes/{disputeId}/assign-staff")
-    public ResponseEntity<ApiResponse<DisputeEntity>> assignDisputeStaff(@PathVariable Integer disputeId, @RequestParam Integer staffId) {
-        return ResponseEntity.ok(ApiResponse.success("ASSIGN DISPUTE STAFF SUCCESS", service.assignDispute(disputeId, staffId)));
+    @PostMapping("/disputes/{disputeId}/route-staff")
+    public ResponseEntity<ApiResponse<DisputeEntity>> routeDisputeStaff(@PathVariable Integer disputeId, @RequestParam(required = false) Integer staffId) {
+        return ResponseEntity.ok(ApiResponse.success("ROUTE DISPUTE STAFF SUCCESS", service.routeDispute(disputeId, staffId)));
     }
 
     @GetMapping("/disputes/{disputeId}/staff-candidates")
@@ -210,11 +214,6 @@ public class ContractExecutionController {
             @PathVariable Integer disputeId) {
         return ResponseEntity.ok(ApiResponse.success("LIST STAFF CANDIDATES SUCCESS",
                 service.listStaffCandidates(disputeId)));
-    }
-
-    @PostMapping("/disputes/{disputeId}/reject-intervention")
-    public ResponseEntity<ApiResponse<DisputeEntity>> rejectInterventionAlias(@PathVariable Integer disputeId, @RequestParam(required = false) String reason) {
-        return ResponseEntity.ok(ApiResponse.success("REJECT INTERVENTION SUCCESS", service.rejectIntervention(disputeId, reason)));
     }
 
     @PostMapping("/disputes/{disputeId}/staff-decision")

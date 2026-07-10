@@ -145,11 +145,10 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 18 | POST | `/api/v1/milestones/{milestoneId}/complete` | Bearer JWT | Operation completeMilestone. |
 | 19 | POST | `/api/v1/milestones/{milestoneId}/approve` | Bearer JWT | Operation approveMilestone. |
 | 20 | POST | `/api/v1/disputes/{disputeId}/staff-decision` | Bearer JWT | Operation staffDecideAlias. |
-| 21 | POST | `/api/v1/disputes/{disputeId}/reject-intervention` | Bearer JWT | Operation rejectInterventionAlias. |
-| 22 | POST | `/api/v1/disputes/{disputeId}/execute-settlement` | Bearer JWT | Operation executeDisputeSettlementAlias. |
+| 21 | POST | `/api/v1/disputes/{disputeId}/execute-settlement` | Bearer JWT | Operation executeDisputeSettlementAlias. |
 | 23 | POST | `/api/v1/disputes/{disputeId}/escalation-request` | Bearer JWT | Operation requestEscalation. |
 | 24 | POST | `/api/v1/disputes/{disputeId}/cancel` | Bearer JWT | Operation cancelDispute. |
-| 25 | POST | `/api/v1/disputes/{disputeId}/assign-staff` | Bearer JWT | Operation assignDisputeStaff. |
+| 24 | POST | `/api/v1/disputes/{disputeId}/route-staff` | Bearer JWT | Operation routeDisputeStaff. |
 | 25A | POST | `/api/v1/disputes/staff-sla-escalate` | Bearer JWT | Admin/system escalates overdue Staff dispute SLA. |
 | 26 | GET | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation listTerminationRequests. |
 | 27 | POST | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation requestTermination. |
@@ -157,11 +156,12 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 29 | GET | `/api/v1/contracts/{contractId}/reviews` | Bearer JWT | Operation listContractReviews. |
 | 30 | POST | `/api/v1/contracts/{contractId}/reviews` | Bearer JWT | Operation createContractReview. |
 | 31 | POST | `/api/v1/contracts/{contractId}/reject` | Bearer JWT | Operation rejectContract. |
-| 32 | POST | `/api/v1/contracts/{contractId}/nda-sign` | Bearer JWT | Operation signNda. |
+| 32 | POST | `/api/v1/contracts/{contractId}/cancel-draft` | Bearer JWT | Operation cancelDraftContract. |
+| 33 | POST | `/api/v1/contracts/{contractId}/nda-sign` | Bearer JWT | Operation signNda. |
 | 33 | GET | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports` | Bearer JWT | List progress reports and SLA result. |
 | 34 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports` | Bearer JWT | Submit scheduled, requested, or voluntary report. |
 | 35 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request` | Bearer JWT | Business requests report with 24h/12h SLA. |
-| 36 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback` | Bearer JWT | Business records structured feedback. |
+| 35 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge` | Bearer JWT | Business acknowledges latest progress report. |
 | 37 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit` | Bearer JWT | Deposit milestone escrow. |
 | 38 | POST | `/api/v1/contracts/{contractId}/milestones/check-overdue` | Bearer JWT | Admin/system idempotent overdue trigger. |
 | 39 | POST | `/api/v1/contracts/{contractId}/milestones/sla-auto-approve` | Bearer JWT | Admin/system review-SLA trigger. |

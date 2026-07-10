@@ -9,7 +9,6 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
-import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
 import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
@@ -336,6 +335,34 @@ public class ContractExecutionService {
         return saved;
     }
 
+    @Transactional
+    public ContractEntity cancelDraftContract(Integer contractId) {
+        accessService.requireRole("BUSINESS");
+        accessService.requireApprovedAccount();
+        ContractEntity contract = requireBusinessOwnedContract(contractId);
+        boolean untouchedDraft = ContractEntity.STATUS_DRAFT.equals(contract.getStatus())
+                && contract.getBusinessAcceptedAt() == null
+                && contract.getExpertAcceptedAt() == null
+                && contract.getBusinessNdaSignedAt() == null
+                && contract.getExpertNdaSignedAt() == null;
+        if (!untouchedDraft) throw new AppException("CONTRACT_DRAFT_CANCELLATION_NOT_ALLOWED");
+
+        contract.setStatus(ContractEntity.STATUS_CANCELLED);
+        contract.setUpdatedAt(LocalDateTime.now());
+        JobEntity job = jobRepository.findById(contract.getJobId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA CONTRACT"));
+        job.setStatus("OPEN");
+        jobRepository.save(job);
+        ContractEntity saved = contractRepository.save(contract);
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        auditLogService.record("CONTRACT_DRAFT_CANCELLED_BY_BUSINESS", "contracts", String.valueOf(contractId), actorAccountId);
+        expertProfileRepository.findById(saved.getExpertId()).ifPresent(expert ->
+                notificationService.notifyContractEvent(expert.getAccountId(), actorAccountId,
+                        "CONTRACT_DRAFT_CANCELLED", "Hợp đồng nháp đã bị hủy",
+                        "Doanh nghiệp đã hủy hợp đồng nháp trước khi hai bên ký.", contractId));
+        return saved;
+    }
+
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     public ContractEntity requestTermination(Integer contractId, String reason) {
@@ -442,6 +469,7 @@ public class ContractExecutionService {
         contract.setUpdatedAt(now);
         ContractEntity saved = contractRepository.save(contract);
         auditLogService.record(AuditLogService.ACTION_TERMINATE_CONTRACT, "contracts", String.valueOf(contractId), actor.getAccountId());
+        paymentWalletService.autoRefundParticipantDeposits(contractId, actor.getAccountId());
         return saved;
     }
 
@@ -629,9 +657,13 @@ public class ContractExecutionService {
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         enrichLedger(walletLedgerService.holdEscrowFromAvailable(businessAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_DEPOSIT, "MILESTONE", milestoneId.longValue(), "Deposit milestone escrow"),
                 contractId, milestoneId, walletMetadata("MILESTONE_ESCROW_DEPOSIT", null, null, accessService.currentAccount().getAccountId(), businessAccountId, null, null, contractMilestone.getFinalBudget(), BigDecimal.ZERO));
+        LocalDateTime now = LocalDateTime.now();
         milestone.setStatus(ContractMilestoneEntity.STATUS_DEPOSITED);
-        milestone.setUpdatedAt(LocalDateTime.now());
+        milestone.setUpdatedAt(now);
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_DEPOSITED);
+        if (contractMilestone.getInProgressStartedAt() == null) {
+            contractMilestone.setInProgressStartedAt(now);
+        }
         contractMilestoneRepository.save(contractMilestone);
         MilestoneEntity saved = milestoneRepository.save(milestone);
         Integer actorAccountId = accessService.currentAccount().getAccountId();
@@ -656,7 +688,6 @@ public class ContractExecutionService {
         milestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
         milestone.setUpdatedAt(LocalDateTime.now());
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
-        contractMilestone.setInProgressStartedAt(LocalDateTime.now());
         contractMilestoneRepository.save(contractMilestone);
         MilestoneEntity saved = milestoneRepository.save(milestone);
         auditLogService.record("MILESTONE_STARTED", "milestones", String.valueOf(milestoneId), accessService.currentAccount().getAccountId());
@@ -689,6 +720,7 @@ public class ContractExecutionService {
             throw new AppException("CHI DUOC NOP BAO CAO TIEN DO KHI MILESTONE DANG THUC HIEN");
         }
         List<MilestoneProgressReportEntity> existingReports = milestoneProgressReportRepository.findByMilestoneIdOrderByCreatedAtAsc(milestoneId);
+        requireLatestProgressReportAcknowledged(contractId, milestoneId);
         String checkpointType = nextCheckpointType(contractMilestone, existingReports);
         LocalDateTime checkpointDue = checkpointType == null ? null : checkpointDueDate(contractMilestone, checkpointType);
         LocalDateTime now = LocalDateTime.now();
@@ -710,7 +742,7 @@ public class ContractExecutionService {
                 .demoLink(request.getDemoLink())
                 .submissionNotes(request.getSubmissionNotes())
                 .isLate(isLate)
-                .requiresAdjustment(false)
+                .acknowledgementState(MilestoneProgressReportEntity.ACK_PENDING)
                 .build());
         openRequest.ifPresent(item -> {
             item.setStatus(MilestoneProgressReportRequestEntity.STATUS_SUBMITTED);
@@ -745,6 +777,7 @@ public class ContractExecutionService {
         ContractMilestoneEntity milestone = findContractMilestoneForUpdate(contractId, milestoneId);
         if (!List.of(ContractMilestoneEntity.STATUS_IN_PROGRESS, ContractMilestoneEntity.STATUS_OVERDUE)
                 .contains(milestone.getStatus())) throw new AppException("MILESTONE_NOT_EXECUTABLE");
+        requireLatestProgressReportAcknowledged(contractId, milestoneId);
         LocalDateTime now = LocalDateTime.now();
         Optional<MilestoneProgressReportRequestEntity> pending =
                 milestoneProgressReportRequestRepository
@@ -776,38 +809,41 @@ public class ContractExecutionService {
     }
 
     @Transactional
-    public MilestoneProgressReportEntity feedbackProgressReport(
-            Integer contractId, Integer milestoneId, Long progressReportId, ProgressReportFeedbackRequest input) {
+    public MilestoneProgressReportEntity acknowledgeProgressReport(
+            Integer contractId, Integer milestoneId, Long progressReportId) {
         accessService.requireRole("BUSINESS");
-        requireBusinessOwnedContract(contractId);
-        findContractMilestone(contractId, milestoneId);
+        ContractEntity contract = requireBusinessOwnedContract(contractId);
+        ContractMilestoneEntity milestone = findContractMilestone(contractId, milestoneId);
+        if (List.of(ContractMilestoneEntity.STATUS_COMPLETED, ContractMilestoneEntity.STATUS_CANCELLED)
+                .contains(milestone.getStatus())) {
+            throw new AppException("PROGRESS_REPORT_ACK_NOT_ALLOWED");
+        }
         MilestoneProgressReportEntity report = milestoneProgressReportRepository.findById(progressReportId)
                 .filter(item -> contractId.equals(item.getContractId()) && milestoneId.equals(item.getMilestoneId()))
                 .orElseThrow(() -> new NotFoundException("PROGRESS_REPORT_REQUEST_NOT_FOUND"));
-        if (input == null || input.getFeedback() == null || input.getFeedback().isBlank()) {
-            throw new AppException("PROGRESS_REPORT_FEEDBACK_NOT_ALLOWED");
+        if (!MilestoneProgressReportEntity.ACK_PENDING.equals(report.getAcknowledgementState())) {
+            throw new AppException("PROGRESS_REPORT_ACK_NOT_ALLOWED");
         }
-        report.setBusinessFeedback(input.getFeedback().trim());
-        report.setFeedbackCategory(input.getCategory());
-        report.setFeedbackSeverity(input.getSeverity());
-        try {
-            report.setFeedbackDodItems(input.getDodItems() == null ? null : objectMapper.writeValueAsString(input.getDodItems()));
-        } catch (Exception ex) {
-            throw new AppException("PROGRESS_REPORT_FEEDBACK_NOT_ALLOWED");
-        }
-        report.setRequiresAdjustment(Boolean.TRUE.equals(input.getRequiresAdjustment()));
-        report.setFeedbackByAccountId(accessService.currentAccount().getAccountId());
-        report.setFeedbackAt(LocalDateTime.now());
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        report.setAcknowledgementState(MilestoneProgressReportEntity.ACKNOWLEDGED);
+        report.setAcknowledgedByAccountId(actorAccountId);
+        report.setAcknowledgedAt(LocalDateTime.now());
         MilestoneProgressReportEntity saved = milestoneProgressReportRepository.save(report);
-        auditLogService.record("PROGRESS_REPORT_FEEDBACK_RECORDED", "milestone_progress_reports",
-                String.valueOf(progressReportId), accessService.currentAccount().getAccountId());
-        ContractEntity contract = contractRepository.findById(contractId)
-                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
+        auditLogService.record("PROGRESS_REPORT_ACKNOWLEDGED", "milestone_progress_reports",
+                String.valueOf(progressReportId), actorAccountId);
         expertProfileRepository.findById(contract.getExpertId()).ifPresent(expert ->
-                notificationService.notifyProgressReportFeedbackRecorded(
-                        expert.getAccountId(), accessService.currentAccount().getAccountId(),
-                        contractId, milestoneId, progressReportId));
+                notificationService.notifyContractEvent(expert.getAccountId(), actorAccountId,
+                        "PROGRESS_REPORT_ACKNOWLEDGED", "Báo cáo tiến độ đã được xác nhận",
+                        "Doanh nghiệp đã xác nhận báo cáo tiến độ. Bạn có thể gửi báo cáo tiếp theo khi phù hợp.", contractId));
         return saved;
+    }
+
+    private void requireLatestProgressReportAcknowledged(Integer contractId, Integer milestoneId) {
+        milestoneProgressReportRepository.findFirstByContractIdAndMilestoneIdOrderByCreatedAtDesc(contractId, milestoneId)
+                .filter(report -> MilestoneProgressReportEntity.ACK_PENDING.equals(report.getAcknowledgementState()))
+                .ifPresent(report -> {
+                    throw new AppException("PROGRESS_REPORT_ACK_PENDING");
+                });
     }
 
     @Transactional
@@ -1006,8 +1042,9 @@ public class ContractExecutionService {
         contract.setUpdatedAt(LocalDateTime.now());
         ContractEntity saved = contractRepository.save(contract);
         closeCompletedContractJob(saved);
-        auditLogService.record("CONTRACT_CLOSED", "contracts", String.valueOf(saved.getContractId()), actorAccountId);
+        auditLogService.record("CONTRACT_COMPLETED", "contracts", String.valueOf(saved.getContractId()), actorAccountId);
         notifyBothParticipants(saved, actorAccountId, "CONTRACT_COMPLETED", "Hợp đồng đã hoàn tất", "Tất cả milestone của hợp đồng đã hoàn thành.");
+        paymentWalletService.autoRefundParticipantDeposits(saved.getContractId(), actorAccountId);
     }
 
     private void notifyCounterpartyContractEvent(ContractEntity contract, Integer actorAccountId, Integer expertId, Integer businessId, String type, String title, String message) {
@@ -1265,39 +1302,39 @@ public class ContractExecutionService {
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
-    // Note: Hàm `assignDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public DisputeEntity assignDispute(Integer disputeId, Integer staffId) {
-        accessService.requireRole("ADMIN");
+    public DisputeEntity routeDispute(Integer disputeId, Integer staffId) {
+        accessService.requireRole("STAFF");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        if (!DisputeEntity.STATUS_ESCALATION_REQUESTED.equals(dispute.getStatus())) {
+            throw new AppException("DISPUTE_NOT_READY_FOR_STAFF_ROUTING");
+        }
+        Integer routedStaffId = staffId == null ? selectStaffForDispute() : staffId;
+        return routeDisputeToStaff(dispute, routedStaffId, accessService.currentAccount().getAccountId());
+    }
+
+    private DisputeEntity routeDisputeToStaff(DisputeEntity dispute, Integer staffId, Integer actorAccountId) {
         staffRepository.findById(staffId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY STAFF"));
         dispute.setAssignedStaffId(staffId);
-        if (DisputeEntity.STATUS_ESCALATION_REQUESTED.equals(dispute.getStatus())
-                || DisputeEntity.STATUS_PENDING_SELF_RESOLVE.equals(dispute.getStatus())) {
-            dispute.setStatus(DisputeEntity.STATUS_STAFF_REVIEWING);
-            LocalDateTime now = LocalDateTime.now();
-            dispute.setStaffReviewStartedAt(now);
-            dispute.setEvidenceCollectionDueAt(now.plusHours(48));
-            dispute.setStaffAccessScope("READ_EXECUTE");
-            dispute.setStaffAccessExpiresAt(now.plusHours(48).plusDays(3));
-            dispute.setStaffSlaDueAt(now.plusHours(48).plusDays(3));
-        } else if ("Open".equalsIgnoreCase(dispute.getStatus())) {
-            dispute.setStatus("UnderReview");
-        }
+        dispute.setStatus(DisputeEntity.STATUS_STAFF_REVIEWING);
+        LocalDateTime now = LocalDateTime.now();
+        dispute.setStaffReviewStartedAt(now);
+        dispute.setEvidenceCollectionDueAt(now.plusHours(48));
+        dispute.setStaffAccessScope("READ_EXECUTE");
+        dispute.setStaffAccessExpiresAt(now.plusHours(48).plusDays(3));
+        dispute.setStaffSlaDueAt(now.plusHours(48).plusDays(3));
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
-        auditLogService.record(AuditLogService.ACTION_ASSIGN_DISPUTE, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
-        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        auditLogService.record("DISPUTE_STAFF_ROUTED", "disputes", String.valueOf(dispute.getDisputeId()), actorAccountId);
         staffRepository.findById(staffId)
                 .ifPresent(staff -> notificationService.notifyDisputeAssigned(
                         staff.getAccountId(),
                         actorAccountId,
-                        disputeId
+                        dispute.getDisputeId()
                 ));
-        if (DisputeEntity.STATUS_STAFF_REVIEWING.equals(saved.getStatus())) {
-            contractRepository.findById(saved.getContractId()).ifPresent(contract ->
-                    notifyContractParticipantsExcept(contract, actorAccountId,
-                            (receiver, actor) -> notificationService.notifyDisputeUnderStaffReview(receiver, actor, contract.getContractId(), disputeId)));
-        }
+        contractRepository.findById(saved.getContractId()).ifPresent(contract ->
+                notifyContractParticipantsExcept(contract, actorAccountId,
+                        (receiver, actor) -> notificationService.notifyDisputeUnderStaffReview(
+                                receiver, actor, contract.getContractId(), dispute.getDisputeId())));
         return saved;
     }
 
@@ -1311,7 +1348,6 @@ public class ContractExecutionService {
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
         dispute.setProposedAction(proposedAction);
         dispute.setStatus("Resolved");
-        dispute.setAdminApprovedBy(accessService.currentAccount().getAccountId());
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
         auditLogService.record(AuditLogService.ACTION_RESOLVE_DISPUTE, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
@@ -1504,9 +1540,13 @@ public class ContractExecutionService {
     }
 
     public List<StaffAssignmentCandidateResponse> listStaffCandidates(Integer disputeId) {
-        accessService.requireRole("ADMIN");
+        accessService.requireRole("STAFF");
         disputeRepository.findById(disputeId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        return rankedStaffCandidates();
+    }
+
+    private List<StaffAssignmentCandidateResponse> rankedStaffCandidates() {
         return staffRepository.findAll().stream().map(staff -> {
             int workload = (int) disputeRepository.findByAssignedStaffId(staff.getStaffId()).stream()
                     .filter(item -> activeDisputeStatuses().contains(item.getStatus())).count();
@@ -1523,6 +1563,12 @@ public class ContractExecutionService {
                 .toList();
     }
 
+    private Integer selectStaffForDispute() {
+        return rankedStaffCandidates().stream().findFirst()
+                .map(StaffAssignmentCandidateResponse::getStaffId)
+                .orElseThrow(() -> new AppException("NO_ELIGIBLE_DISPUTE_STAFF"));
+    }
+
     private ContractMilestoneEntity findContractMilestoneForUpdate(Integer contractId, Integer milestoneId) {
         return contractMilestoneRepository.findByContractIdAndJobMilestoneIdForUpdate(contractId, milestoneId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT MILESTONE"));
@@ -1536,37 +1582,21 @@ public class ContractExecutionService {
             throw new AppException("CHI DUOC ESCALATE KHI DISPUTE O TRANG THAI PENDING_SELF_RESOLVE");
         }
         requireContractParticipantOrOperator(dispute.getContractId());
-        dispute.setEscalationReason(reason);
-        dispute.setEscalationEvidenceFile(evidenceFile);
+        if (reason == null || reason.isBlank() || evidenceFile == null || evidenceFile.isBlank()) {
+            throw new AppException("DISPUTE_ESCALATION_EVIDENCE_REQUIRED");
+        }
+        dispute.setEscalationReason(reason.trim());
+        dispute.setEscalationEvidenceFile(evidenceFile.trim());
         dispute.setEscalationRequestedByAccountId(accessService.currentAccount().getAccountId());
         dispute.setEscalationRequestedAt(LocalDateTime.now());
         dispute.setStatus(DisputeEntity.STATUS_ESCALATION_REQUESTED);
-        DisputeEntity saved = disputeRepository.save(dispute);
+        disputeRepository.save(dispute);
         Integer actorAccountId = accessService.currentAccount().getAccountId();
         auditLogService.record("DISPUTE_ESCALATION_REQUESTED", "disputes", String.valueOf(disputeId), actorAccountId);
-        notifyAllAdmins(actorAccountId, (receiver, actor) -> notificationService.notifyDisputeEscalationRequested(receiver, actor, disputeId));
-        return saved;
-    }
-
-    @Transactional
-    public DisputeEntity rejectIntervention(Integer disputeId, String reason) {
-        accessService.requireRole("STAFF");
-        DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
-        requireAssignedStaff(dispute);
-        if (!DisputeEntity.STATUS_STAFF_REVIEWING.equals(dispute.getStatus())) {
-            throw new AppException("DISPUTE KHONG O TRANG THAI STAFF_REVIEWING");
-        }
-        // Spec 10.8: luu ly do tu choi can thiep va thoi diem, tra dispute ve PENDING_SELF_RESOLVE.
-        dispute.setInterventionRejectionReason(reason == null || reason.isBlank() ? null : reason.trim());
-        dispute.setInterventionRejectedAt(LocalDateTime.now());
-        dispute.setStatus(DisputeEntity.STATUS_PENDING_SELF_RESOLVE);
-        DisputeEntity saved = disputeRepository.save(dispute);
-        Integer actorAccountId = accessService.currentAccount().getAccountId();
-        auditLogService.record("DISPUTE_INTERVENTION_REJECTED", "disputes", String.valueOf(disputeId), actorAccountId);
-        contractRepository.findById(saved.getContractId()).ifPresent(contract ->
-                notifyContractParticipantsExcept(contract, actorAccountId,
-                        (receiver, actor) -> notificationService.notifyDisputeInterventionRejected(receiver, actor, contract.getContractId(), disputeId)));
-        return saved;
+        Integer staffId = selectStaffForDispute();
+        staffRepository.findById(staffId).ifPresent(staff ->
+                notificationService.notifyDisputeEscalationRequested(staff.getAccountId(), actorAccountId, disputeId));
+        return routeDisputeToStaff(dispute, staffId, actorAccountId);
     }
 
     @Transactional
@@ -1579,10 +1609,6 @@ public class ContractExecutionService {
         requireAssignedStaff(dispute);
         if (!DisputeEntity.STATUS_STAFF_REVIEWING.equals(dispute.getStatus())) {
             throw new AppException("CHI DUOC RA QUYET DINH KHI DISPUTE O TRANG THAI STAFF_REVIEWING");
-        }
-        if (dispute.getEvidenceCollectionDueAt() != null
-                && LocalDateTime.now().isBefore(dispute.getEvidenceCollectionDueAt())) {
-            throw new AppException("EVIDENCE_WINDOW_STILL_OPEN");
         }
         if (dispute.getMilestoneId() == null) throw new AppException("DISPUTE CHUA GAN MILESTONE");
         // Spec 10.9: tinh truoc so tien de xuat cho Expert va so hoan lai cho Business tu escrow milestone.
@@ -1604,7 +1630,7 @@ public class ContractExecutionService {
         auditLogService.record("DISPUTE_STAFF_DECIDED", "disputes", String.valueOf(disputeId), actorAccountId);
         notifyContractParticipantsExcept(contract, actorAccountId,
                 (receiver, actor) -> notificationService.notifyDisputeStaffDecided(receiver, actor, contract.getContractId(), disputeId));
-        return saved;
+        return executeDisputeSettlementInternal(saved, actorAccountId);
     }
 
     @Transactional
@@ -1686,10 +1712,14 @@ public class ContractExecutionService {
         contract.setStatus(ContractEntity.STATUS_TERMINATED);
         contract.setTerminatedAt(LocalDateTime.now());
         contractRepository.save(contract);
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
         auditLogService.record(auditAction, "termination_requests",
-                String.valueOf(request.getTerminationRequestId()), accessService.currentAccount().getAccountId());
+                String.valueOf(request.getTerminationRequestId()), actorAccountId);
+        paymentWalletService.autoRefundParticipantDeposits(contract.getContractId(), actorAccountId);
+        request.setDepositRefundedAt(LocalDateTime.now());
+        request.setStatus(TerminationRequestEntity.STATUS_COMPLETED);
         TerminationRequestEntity saved = terminationRequestRepository.save(request);
-        notifyBothParticipants(contract, accessService.currentAccount().getAccountId(),
+        notifyBothParticipants(contract, actorAccountId,
                 (receiver, actor) -> notificationService.notifyTerminationAcceptedOrExpired(
                         receiver, actor, contract.getContractId(), saved.getTerminationRequestId(), auditAction));
         return saved;
@@ -1728,8 +1758,13 @@ public class ContractExecutionService {
     public DisputeEntity executeDisputeSettlement(Integer disputeId) {
         accessService.requireRole("ADMIN");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        return executeDisputeSettlementInternal(dispute, accessService.currentAccount().getAccountId());
+    }
+
+    private DisputeEntity executeDisputeSettlementInternal(DisputeEntity dispute, Integer actorAccountId) {
+        Integer disputeId = dispute.getDisputeId();
         if (!DisputeEntity.STATUS_STAFF_DECIDED.equals(dispute.getStatus())) {
-            throw new AppException("CHI DUOC THUC THI SETTLEMENT KHI DISPUTE DA STAFF_DECIDED");
+            throw new AppException("DISPUTE_NOT_STAFF_DECIDED");
         }
         if (dispute.getStaffDecisionPercentage() == null) throw new AppException("DISPUTE CHUA CO TY LE SETTLEMENT");
         ContractEntity contract = contractRepository.findById(dispute.getContractId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT"));
@@ -1744,7 +1779,7 @@ public class ContractExecutionService {
         BigDecimal businessRefund = escrowAmount.subtract(expertPayout);
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId()).map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
-        String metadata = walletMetadata("DISPUTE", disputeId, null, accessService.currentAccount().getAccountId(), businessAccountId, expertAccountId, BigDecimal.valueOf(dispute.getStaffDecisionPercentage()), expertPayout, businessRefund);
+        String metadata = walletMetadata("DISPUTE", disputeId, null, actorAccountId, businessAccountId, expertAccountId, BigDecimal.valueOf(dispute.getStaffDecisionPercentage()), expertPayout, businessRefund);
         WalletTransactionEntity settlementDebit = enrichLedger(walletLedgerService.debitEscrow(businessAccountId, escrowAmount, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "DISPUTE", disputeId.longValue(), "Dispute settlement debit"), contract.getContractId(), dispute.getMilestoneId(), metadata);
         if (expertPayout.signum() > 0) {
             enrichLedger(walletLedgerService.creditAvailable(expertAccountId, expertPayout, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "DISPUTE", disputeId.longValue(), "Dispute expert payout"), contract.getContractId(), dispute.getMilestoneId(), metadata);
@@ -1770,7 +1805,6 @@ public class ContractExecutionService {
         dispute.setSettlementExecutedAt(LocalDateTime.now());
         dispute.setSettlementWalletTransactionId(settlementDebit == null ? null : settlementDebit.getId());
         DisputeEntity saved = disputeRepository.save(dispute);
-        Integer actorAccountId = accessService.currentAccount().getAccountId();
         auditLogService.record("DISPUTE_SETTLEMENT_EXECUTED", "disputes", String.valueOf(disputeId), actorAccountId);
         notifyContractParticipantsExcept(contract, actorAccountId,
                 (receiver, actor) -> notificationService.notifyDisputeResolved(receiver, actor, contract.getContractId(), disputeId));
@@ -1783,17 +1817,15 @@ public class ContractExecutionService {
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
         AccountEntity actor = accessService.currentAccount();
         String role = actor.getRole().getRoleName();
-        boolean admin = "ADMIN".equals(role);
-        if (!admin) {
-            requireApprovedForBusinessOrExpert();
-            ContractEntity contract = requireContractParticipantOrOperator(dispute.getContractId());
-            boolean requester = role.equals(dispute.getInitiatedBy());
-            if (!requester || !isParticipant(contract, actor)) {
-                throw new AppException("CHI NGUOI TAO DISPUTE HOAC ADMIN MOI DUOC HUY");
-            }
-            if (!List.of(DisputeEntity.STATUS_PENDING_SELF_RESOLVE, DisputeEntity.STATUS_ESCALATION_REQUESTED).contains(dispute.getStatus())) {
-                throw new AppException("CHI DUOC HUY DISPUTE TRUOC KHI STAFF REVIEW");
-            }
+        requireApprovedForBusinessOrExpert();
+        ContractEntity contract = requireContractParticipantOrOperator(dispute.getContractId());
+        boolean requester = role.equals(dispute.getInitiatedBy());
+        if (!requester || !isParticipant(contract, actor)) {
+            throw new AppException("ONLY_DISPUTE_INITIATOR_CAN_WITHDRAW");
+        }
+        if (!List.of(DisputeEntity.STATUS_PENDING_SELF_RESOLVE, DisputeEntity.STATUS_ESCALATION_REQUESTED).contains(dispute.getStatus())
+                || dispute.getAssignedStaffId() != null) {
+            throw new AppException("DISPUTE_WITHDRAWAL_NOT_ALLOWED_AFTER_STAFF_ROUTING");
         }
         if (!activeDisputeStatuses().contains(dispute.getStatus())) {
             throw new AppException("DISPUTE KHONG O TRANG THAI CO THE HUY");
@@ -1814,16 +1846,16 @@ public class ContractExecutionService {
                     });
         }
         dispute.setStatus(DisputeEntity.STATUS_CANCELLED);
-        dispute.setResolutionType(admin ? DisputeEntity.RESOLUTION_CANCELLED_BY_ADMIN : DisputeEntity.RESOLUTION_CANCELLED_BY_INITIATOR);
+        dispute.setResolutionType(DisputeEntity.RESOLUTION_CANCELLED_BY_INITIATOR);
         dispute.setCancellationReason(reason == null || reason.isBlank() ? null : reason.trim());
         dispute.setCancelledByAccountId(actor.getAccountId());
         dispute.setCancelledAt(LocalDateTime.now());
         DisputeEntity saved = disputeRepository.save(dispute);
         auditLogService.record("DISPUTE_CANCELLED", "disputes", String.valueOf(disputeId), actor.getAccountId());
-        contractRepository.findById(dispute.getContractId()).ifPresent(contract ->
-                notifyContractParticipantsExcept(contract, actor.getAccountId(),
+        contractRepository.findById(dispute.getContractId()).ifPresent(disputeContract ->
+                notifyContractParticipantsExcept(disputeContract, actor.getAccountId(),
                         (receiver, actorId) -> notificationService.notifyDisputeCancelled(
-                                receiver, actorId, contract.getContractId(), disputeId)));
+                                receiver, actorId, disputeContract.getContractId(), disputeId)));
         return saved;
     }
 
@@ -1980,6 +2012,9 @@ public class ContractExecutionService {
         request.setStatus(TerminationRequestEntity.STATUS_AWAITING_DEPOSIT_REFUND);
         Integer actorAccountId = accessService.currentAccount().getAccountId();
         auditLogService.record("TERMINATION_SETTLEMENT_EXECUTED", "termination_requests", String.valueOf(terminationRequestId), actorAccountId);
+        paymentWalletService.autoRefundParticipantDeposits(contract.getContractId(), actorAccountId);
+        request.setDepositRefundedAt(LocalDateTime.now());
+        request.setStatus(TerminationRequestEntity.STATUS_COMPLETED);
         notifyContractParticipantsExcept(contract, actorAccountId,
                 (receiver, actor) -> notificationService.notifyTerminationSettlementExecuted(receiver, actor, contract.getContractId(), terminationRequestId));
         return terminationRequestRepository.save(request);

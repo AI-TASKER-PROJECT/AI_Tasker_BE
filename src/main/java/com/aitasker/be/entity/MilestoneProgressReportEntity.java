@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 public class MilestoneProgressReportEntity {
     public static final String CHECKPOINT_MIDPOINT = "MIDPOINT";
     public static final String CHECKPOINT_PRE_DEADLINE = "PRE_DEADLINE";
+    public static final String ACK_PENDING = "PENDING_BUSINESS_ACK";
+    public static final String ACKNOWLEDGED = "ACKNOWLEDGED";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,21 +41,12 @@ public class MilestoneProgressReportEntity {
     private String submissionNotes;
     @Column(name = "is_late", nullable = false)
     private Boolean isLate;
-    @Column(name = "business_feedback")
-    private String businessFeedback;
-    @Column(name = "feedback_category", length = 30)
-    private String feedbackCategory;
-    @Column(name = "feedback_severity", length = 20)
-    private String feedbackSeverity;
-    @Column(name = "feedback_dod_items", columnDefinition = "jsonb")
-    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-    private String feedbackDodItems;
-    @Column(name = "requires_adjustment", nullable = false)
-    private Boolean requiresAdjustment;
-    @Column(name = "feedback_by_account_id")
-    private Integer feedbackByAccountId;
-    @Column(name = "feedback_at")
-    private LocalDateTime feedbackAt;
+    @Column(name = "acknowledgement_state", nullable = false, length = 30)
+    private String acknowledgementState;
+    @Column(name = "acknowledged_by_account_id")
+    private Integer acknowledgedByAccountId;
+    @Column(name = "acknowledged_at")
+    private LocalDateTime acknowledgedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

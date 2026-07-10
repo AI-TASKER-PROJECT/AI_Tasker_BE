@@ -499,6 +499,17 @@ public class PaymentWalletService {
     public List<ContractDepositEntity> refundParticipantDeposits(Integer contractId, DepositRefundRequest request) {
         AccountEntity admin = accessService.currentAccount();
         accessService.requireRole("ADMIN");
+        return refundParticipantDepositsInternal(
+                contractId, admin.getAccountId(), admin.getAccountId(), request == null ? null : request.getAdminNote());
+    }
+
+    @Transactional
+    public List<ContractDepositEntity> autoRefundParticipantDeposits(Integer contractId, Integer operationalActorAccountId) {
+        return refundParticipantDepositsInternal(contractId, operationalActorAccountId, null, null);
+    }
+
+    private List<ContractDepositEntity> refundParticipantDepositsInternal(
+            Integer contractId, Integer operationalActorAccountId, Integer adminId, String adminNote) {
         ContractEntity contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new NotFoundException("CONTRACT_NOT_FOUND"));
         if (!List.of(ContractEntity.STATUS_COMPLETED, ContractEntity.STATUS_TERMINATED).contains(contract.getStatus())) {
@@ -520,21 +531,21 @@ public class PaymentWalletService {
             deposit.setHeldAmount(BigDecimal.ZERO);
             deposit.setRefundedAmount(money(deposit.getRefundedAmount()).add(held));
             deposit.setRefundTransactionId(tx.getId());
-            deposit.setAdminId(admin.getAccountId());
-            deposit.setAdminNote(request == null ? null : request.getAdminNote());
+            deposit.setAdminId(adminId);
+            deposit.setAdminNote(adminNote);
             deposit.setRefundedAt(now);
             deposit.setResolvedAt(now);
             deposit.setResolutionType("STANDARD_REFUND");
             deposit.setStatus("REFUNDED");
             contractDepositRepository.save(deposit);
         }
-        boolean closed = closeWhenBothDepositsResolved(contract, admin.getAccountId());
+        boolean closed = closeWhenBothDepositsResolved(contract, operationalActorAccountId);
         auditLogService.record("PARTICIPANT_DEPOSITS_REFUNDED", "contracts",
-                String.valueOf(contractId), admin.getAccountId());
-        notifyBothParticipants(contract, admin.getAccountId(), "PARTICIPANT_DEPOSITS_REFUNDED",
+                String.valueOf(contractId), operationalActorAccountId);
+        notifyBothParticipants(contract, operationalActorAccountId, "PARTICIPANT_DEPOSITS_REFUNDED",
                 "Ký quỹ hai bên đã được hoàn", "Ký quỹ tham gia hợp đồng của hai bên đã được xử lý hoàn.");
         if (closed) {
-            notifyBothParticipants(contract, admin.getAccountId(), "CONTRACT_CLOSED",
+            notifyBothParticipants(contract, operationalActorAccountId, "CONTRACT_CLOSED",
                     "Hợp đồng đã đóng", "Hợp đồng đã đóng sau khi hoàn tất xử lý ký quỹ.");
         }
         return contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(contractId);

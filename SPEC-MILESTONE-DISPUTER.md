@@ -1,11 +1,11 @@
-# SPEC-MILESTONE-DISPUTER.md — v2.2
+# SPEC-MILESTONE-DISPUTER.md — v2.3
 
 **Project:** AITASKER-BE  
 **Platform:** AITASKER — AI expert and business matching platform  
 **Spec purpose:** Implementation guide for harness engineering agents  
-**Version:** v2.2
+**Version:** v2.3
 **Prepared date:** 2026-07-01  
-**Last updated:** 2026-07-09
+**Last updated:** 2026-07-11
 **Primary target:** Backend agents, database agents, integration agents, tester agents, reviewer agents  
 **Language:** English technical specification
 
@@ -20,11 +20,14 @@ This specification defines the final v2 design for the remaining contract execut
 
 The v2 design replaces the earlier incomplete milestone payment model with a **per-milestone escrow model**:
 
-- Business must deposit the current milestone budget before Expert starts the milestone.
+- Business milestone escrow deposit starts the milestone timeline immediately;
+  there is no separate wait for Expert to start the clock.
 - The milestone escrow is released only once.
 - Normal approval releases 100% of milestone escrow to Expert.
 - Dispute or termination settlement releases a Staff-decided percentage to Expert and refunds the remaining amount to Business.
-- Contract security deposit of 20% is separate from milestone escrow and is refunded manually by Admin after contract completion or valid termination.
+- Contract security deposits are separate from milestone escrow and are refunded
+  automatically by the system after contract completion or valid termination,
+  with Admin retry/audit only.
 
 The spec also fixes the review findings from v1:
 
@@ -45,19 +48,20 @@ The spec also fixes the review findings from v1:
   evidence.
 - Business may request an on-demand progress report with a 24-hour first-request
   SLA and a 12-hour subsequent-request SLA.
-- Progress reports support product links and structured Business feedback.
-- Dispute Staff assignment supports specialization/workload candidates, a
-  48-hour evidence window, temporary read/execute scope, and a three-day Staff
-  decision SLA.
-- Assigned Staff remains the final professional decision-maker. Admin may assign
-  or replace Staff for operational reasons but may not approve, reject, revise,
-  or change Staff's payout percentage.
+- Progress reports support product links but no longer have a structured
+  mid-report feedback feature; Business uses on-demand report requests and a
+  lightweight acknowledgement to gate the next report.
+- Dispute Staff assignment is automatic/manual-by-Staff-pool and does not require
+  Admin assignment. Admin is not part of milestone-dispute routing and cannot
+  cancel milestone disputes.
+- Assigned Staff remains the final professional decision-maker and cannot reject
+  intervention after a case has been escalated.
 - Business holds a 20% contract security deposit and Expert holds a separate 10%
   contract performance deposit before activation.
 - Immediate termination does not require Staff and charges the initiating party
   10% of total contract value for the other party.
 
-### 0.1 v2.2 Binding Decisions
+### 0.1 v2.3 Binding Decisions
 
 The following decisions override conflicting experimental code or supplementary
 notes:
@@ -85,6 +89,19 @@ notes:
 14. An overdue on-demand progress-report request may be used as Business's
     recorded reason, but immediate termination remains an explicit paid option;
     the timeout itself does not move money.
+15. Business may cancel its own draft contract before it is signed or activated.
+16. Business milestone escrow deposit starts the milestone execution timeline.
+17. A new progress report cannot be submitted while the previous progress report
+    is waiting for Business acknowledgement.
+18. Structured progress-report feedback APIs are removed from the milestone
+    dispute flow.
+19. Dispute intervention requests auto-assign or directly route to Staff; Admin
+    assignment and Admin dispute cancellation are removed.
+20. Staff cannot reject intervention; an escalated dispute must proceed to Staff
+    decision.
+21. Staff decision must not be blocked by a hard 48-hour evidence-window error.
+22. WebSocket notifications must expose notification `type`, not a workflow
+    `status`, for dispute intervention request events.
 
 ---
 
@@ -134,7 +151,7 @@ This spec covers:
 - Milestone overdue tracking.
 - Scheduled checkpoint progress reports.
 - Business on-demand progress-report requests and SLA tracking.
-- Structured Business feedback on progress reports.
+- Business progress-report acknowledgement gate.
 - Deliverable submission.
 - Business milestone approval.
 - Business final-deliverable rejection with structured feedback.
@@ -143,10 +160,9 @@ This spec covers:
   evidence, review conduct, or contract termination.
 - Business or Expert dispute initiation.
 - Dispute escalation request with file/evidence.
-- Admin Staff assignment based on job domain and required skills.
+- Automatic/manual Staff-pool routing based on job domain and required skills.
 - Staff candidate ranking, evidence window, temporary case access, and Staff SLA.
 - Staff review.
-- Staff intervention rejection.
 - Staff mandatory decision.
 - System settlement execution after Staff decision.
 - Contract termination request by Business or Expert.
@@ -156,7 +172,7 @@ This spec covers:
 - Termination Staff review.
 - Partial work evidence for termination.
 - Termination settlement.
-- Admin resolution/refund of Business and Expert contract deposits.
+- System resolution/refund of Business and Expert contract deposits.
 - Contract closure.
 - Cross-review opening after contract closure.
 - Database impact and migration plan.
@@ -195,12 +211,15 @@ Business can:
 - Review submitted deliverables.
 - Approve a milestone.
 - Reject a deliverable without automatically initiating a dispute.
+- Cancel its own draft contract before either party signs or the contract enters
+  `PENDING` or `ACTIVE`.
 - Explicitly initiate dispute as a separate action when there is a genuine
   disagreement.
 - Submit reasons/evidence for dispute.
 - Request an on-demand progress report while the current milestone is
   `IN_PROGRESS` or `OVERDUE`.
-- Submit structured feedback on a progress report.
+- Acknowledge a submitted progress report so the Expert may submit the next
+  progress report when another request is opened.
 - Request Staff intervention for an active dispute.
 - Request contract termination.
 - Request immediate termination when section 11A guards are satisfied.
@@ -217,8 +236,8 @@ Business cannot:
 - Release escrow manually.
 - Override Staff decision.
 - Cancel a dispute initiated by Expert.
-- Cancel a dispute after Staff review has started.
-- Withdraw contract deposit directly without Admin refund.
+- Cancel a dispute after it has been routed to Staff.
+- Withdraw contract deposit directly outside the system refund flow.
 
 ### 3.2 Expert
 
@@ -230,6 +249,8 @@ Expert can:
 - Start a deposited milestone.
 - Submit deliverable.
 - Re-submit deliverable during self-resolve.
+- Submit progress reports only when there is no previous progress report waiting
+  for Business acknowledgement.
 - Explain why the deliverable meets acceptance criteria.
 - Initiate dispute in valid contexts.
 - Submit reasons/evidence for dispute.
@@ -249,7 +270,7 @@ Expert cannot:
 - Create dispute in `PENDING`, `DEPOSITED`, `COMPLETED`, or `CANCELLED` milestone states.
 - Create a second active dispute on the same milestone.
 - Cancel a dispute initiated by Business.
-- Cancel a dispute after Staff review has started.
+- Cancel a dispute after it has been routed to Staff.
 - Override Staff decision.
 - Start contract execution before the Expert 10% deposit is held.
 
@@ -259,11 +280,11 @@ Admin is an operational platform manager.
 
 Admin can:
 
-- Assign a suitable Staff to dispute escalation or termination request.
-- Choose Staff based on job domain, required skills, Staff specialization, workload, and conflict of interest if available.
-- Replace an assignment before Staff decides when required for availability,
-  conflict-of-interest, or SLA reasons.
-- Cancel invalid or duplicate dispute records before settlement.
+- Assign a suitable Staff to termination request.
+- Choose termination Staff based on job domain, required skills, Staff
+  specialization, workload, and conflict of interest if available.
+- Replace a termination assignment before Staff decides when required for
+  availability, conflict-of-interest, or SLA reasons.
 - Cancel invalid or duplicate termination requests before settlement.
 - Execute or approve participant deposit resolution, depending on existing wallet service design.
 - Manage system categories, role access, and operational oversight.
@@ -272,6 +293,8 @@ Admin must not:
 
 - Override Staff professional decision about deliverable quality or payout percentage.
 - Approve, reject, request revision of, or alter a valid Staff dispute decision.
+- Assign, reassign, or cancel milestone disputes. Milestone dispute routing is
+  automatic/manual inside the Staff workflow, not Admin-operated.
 - Execute duplicate milestone escrow settlement.
 - Use legacy `transactions` for new wallet settlement.
 
@@ -282,8 +305,9 @@ Staff is the professional reviewer assigned to a dispute or termination case.
 Staff can:
 
 - Review dispute files, deliverables, SoW, milestone criteria, timeline, and evidence.
-- Reject intervention and return dispute to self-resolve with reason.
-- Accept intervention and issue a mandatory decision.
+- Receive dispute intervention requests directly from the system assignment
+  workflow.
+- Issue a mandatory decision for an escalated dispute.
 - Decide Expert payout percentage from 0% to 100%.
 - Issue the final professional dispute decision without Admin approval.
 - Write Staff report and decision rationale.
@@ -296,7 +320,8 @@ Staff cannot:
 - Override wallet guards.
 - Refund participant deposits directly unless existing system explicitly grants
   that operation.
-- Cancel a dispute instead of using `INTERVENTION_REJECTED`.
+- Reject intervention or return an escalated milestone dispute to self-resolve.
+- Cancel a dispute.
 
 ### 3.5 System
 
@@ -311,6 +336,8 @@ System is responsible for:
 - Sending notifications.
 - Preventing duplicate active disputes and termination requests.
 - Preventing double settlement.
+- Returning initial participant deposits to both sides after normal completion or
+  valid standard termination.
 
 ---
 
@@ -332,8 +359,8 @@ Both deposits:
 - are separate from per-milestone escrow;
 - must have a persisted owner role and account;
 - must be idempotently funded once;
-- are normally refunded in full after valid completion or standard termination,
-  subject to the existing Admin closure operation;
+- are normally refunded in full after valid completion or standard termination
+  by an idempotent system operation;
 - may be resolved differently only by an explicit rule in this specification.
 
 The fixed immediate-termination penalty is the explicit exception:
@@ -472,6 +499,20 @@ CANCELLED
 | `CLOSED` | Final state. Deposit refund is done. Cross-review is opened. |
 | `CANCELLED` | Legacy or invalid cancellation state. Do not use for new valid v2 termination flow unless existing code requires compatibility. |
 
+### 5.2A Draft Contract Cancellation
+
+Business may cancel its own contract while it is still `DRAFT` and before either
+side has signed or funded any contract deposit. This cancellation:
+
+- sets the contract status to `CANCELLED`;
+- returns the related job to the proposal-review/open state required by the
+  existing marketplace flow;
+- writes an audit event and notifies the Expert when a draft was already visible;
+- does not require Expert approval.
+
+Expert rejection of an eligible `DRAFT` or `PENDING` contract remains valid, but
+Business draft cancellation is a separate Business-owned action.
+
 ### 5.3 Normal Completion Transitions
 
 ```text
@@ -483,8 +524,8 @@ Rules:
 - `PENDING -> ACTIVE` occurs only after all signatures and both participant
   deposits are held.
 - `ACTIVE -> COMPLETED` occurs after all contract milestones are `COMPLETED`.
-- `COMPLETED -> CLOSED` occurs only after Admin resolves/refunds both participant
-  deposits.
+- `COMPLETED -> CLOSED` occurs only after the system resolves/refunds both
+  participant deposits.
 - Cross-review opens only at `CLOSED`.
 
 ### 5.4 Termination Transitions
@@ -502,7 +543,7 @@ Rules:
 - `ACTIVE -> TERMINATED` is allowed only through the guarded immediate
   termination flow in section 11A and applies the fixed 10% contract-value
   penalty.
-- `TERMINATED -> CLOSED` occurs only after Admin resolves both participant
+- `TERMINATED -> CLOSED` occurs only after the system resolves both participant
   deposits, including any immediate-termination penalty.
 
 ### 5.5 Contract Blocking Rules
@@ -543,7 +584,7 @@ CANCELLED
 | Status | Meaning |
 |---|---|
 | `PENDING` | Milestone exists but Business has not deposited milestone budget yet. |
-| `DEPOSITED` | Business has deposited full milestone budget into escrow. Expert can start. |
+| `DEPOSITED` | Business has deposited full milestone budget into escrow. The milestone execution timeline starts at this moment even if Expert has not clicked start. |
 | `IN_PROGRESS` | Expert is working on the milestone. Expert submits progress reports during this state per `9.2A`; reports do not change milestone status. |
 | `OVERDUE` | The milestone execution deadline has passed while work remains active. Expert may still submit progress reports and a final deliverable; Business may request an on-demand progress report. |
 | `UNDER_REVIEW` | Expert submitted deliverable; Business is reviewing. |
@@ -617,7 +658,6 @@ Required v2 values:
 PENDING_SELF_RESOLVE
 ESCALATION_REQUESTED
 STAFF_REVIEWING
-INTERVENTION_REJECTED
 STAFF_DECIDED
 RESOLVED
 CANCELLED
@@ -628,12 +668,11 @@ CANCELLED
 | Status | Meaning |
 |---|---|
 | `PENDING_SELF_RESOLVE` | Business and Expert are self-resolving the dispute. |
-| `ESCALATION_REQUESTED` | A party submitted file/evidence requesting Staff intervention. |
-| `STAFF_REVIEWING` | Admin assigned Staff and Staff is reviewing the case. |
-| `INTERVENTION_REJECTED` | Staff rejected intervention. This should be logged/history state, then current status returns to `PENDING_SELF_RESOLVE`. |
+| `ESCALATION_REQUESTED` | A party submitted file/evidence requesting Staff intervention; the system must route the case to Staff without Admin assignment. |
+| `STAFF_REVIEWING` | Staff is assigned by the system/manual Staff workflow and is reviewing the case. |
 | `STAFF_DECIDED` | Staff issued mandatory decision; settlement execution is pending or retrying. |
 | `RESOLVED` | Dispute is resolved and settlement or approval has been executed. |
-| `CANCELLED` | Dispute was withdrawn/cancelled before Staff review or cancelled by Admin as invalid/duplicate. |
+| `CANCELLED` | Dispute was withdrawn by the initiator before Staff routing. Admin cancellation is out of scope for milestone disputes. |
 
 ### 7.3 Active Dispute Statuses
 
@@ -646,11 +685,8 @@ STAFF_REVIEWING
 STAFF_DECIDED
 ```
 
-`INTERVENTION_REJECTED` should not remain active as a stable current state unless the codebase needs it. Preferred behavior:
-
-```text
-STAFF_REVIEWING -> INTERVENTION_REJECTED logged -> PENDING_SELF_RESOLVE
-```
+`INTERVENTION_REJECTED` is not a valid v2.3 current status. Existing data may be
+read for compatibility, but new code must not create it.
 
 ### 7.4 Allowed Transitions
 
@@ -658,9 +694,8 @@ STAFF_REVIEWING -> INTERVENTION_REJECTED logged -> PENDING_SELF_RESOLVE
 PENDING_SELF_RESOLVE -> ESCALATION_REQUESTED
 PENDING_SELF_RESOLVE -> RESOLVED
 PENDING_SELF_RESOLVE -> CANCELLED
-ESCALATION_REQUESTED -> STAFF_REVIEWING
+ESCALATION_REQUESTED -> STAFF_REVIEWING by automatic/manual Staff routing
 ESCALATION_REQUESTED -> CANCELLED
-STAFF_REVIEWING -> INTERVENTION_REJECTED -> PENDING_SELF_RESOLVE
 STAFF_REVIEWING -> STAFF_DECIDED
 STAFF_DECIDED -> RESOLVED
 ```
@@ -695,7 +730,6 @@ Required enum values:
 BUSINESS_APPROVED_AFTER_SELF_RESOLVE
 STAFF_DECISION_SETTLEMENT
 CANCELLED_BY_INITIATOR
-CANCELLED_BY_ADMIN
 ```
 
 ---
@@ -728,7 +762,7 @@ CANCELLED
 | `STAFF_APPROVED` | Staff approved termination and defined required settlement if any. |
 | `STAFF_REJECTED` | Staff rejected termination request. Contract returns to `ACTIVE`. |
 | `AWAITING_SETTLEMENT_EXECUTION` | Required milestone settlement is pending or retrying. |
-| `AWAITING_DEPOSIT_REFUND` | Milestone settlement is done; waiting for Admin resolution/refund of Business and Expert deposits. |
+| `AWAITING_DEPOSIT_REFUND` | Milestone settlement is done; waiting for system resolution/refund of Business and Expert deposits. |
 | `COMPLETED` | Termination request is fully completed. Contract should be `CLOSED`. |
 | `CANCELLED` | Requester withdrew request before Staff decision or Admin cancelled invalid/duplicate request. |
 
@@ -800,8 +834,11 @@ System behavior:
 5. Write `wallet_transactions` entries.
 6. Set milestone status to `DEPOSITED`.
 7. Mirror `contract_milestones.status` if required by existing design.
-8. Write audit log.
-9. Notify Expert.
+8. Set `contract_milestones.in_progress_started_at = now()` if it is not already
+   set. This timestamp is the source of truth for milestone timeline, overdue
+   detection, and progress-report checkpoint calculation.
+9. Write audit log.
+10. Notify Expert.
 
 Ledger reference:
 
@@ -828,8 +865,10 @@ Preconditions:
 System behavior:
 
 1. Set milestone status to `IN_PROGRESS`.
-2. Write audit log.
-3. Notify Business.
+2. Do not reset `contract_milestones.in_progress_started_at`; the timeline
+   already started when Business deposited milestone escrow.
+3. Write audit log.
+4. Notify Business.
 
 ### 9.2A Submit Milestone Progress Report
 
@@ -855,6 +894,11 @@ Preconditions:
 - Contract status is `ACTIVE`.
 - Milestone status is `IN_PROGRESS` or `OVERDUE`.
 - Expert is assigned to contract.
+- No previous progress report for the same contract milestone is waiting for
+  Business acknowledgement.
+- If Business has an active on-demand request, the report satisfies that request.
+  If no active request exists, voluntary checkpoint reports are allowed only when
+  the previous report has already been acknowledged.
 
 System behavior:
 
@@ -871,8 +915,20 @@ System behavior:
 5. If an open on-demand request exists, set its status to `SUBMITTED`, record
    `submitted_at`, and set its `progress_report_id`. A late submission closes the
    request but preserves `is_late = true`.
-6. Write audit log.
-7. Notify Business.
+6. Set the report acknowledgement state to `PENDING_BUSINESS_ACK`.
+7. Write audit log.
+8. Notify Business.
+
+Submit gate:
+
+- The Expert cannot submit another progress report for the same contract
+  milestone while the latest report has acknowledgement state
+  `PENDING_BUSINESS_ACK`.
+- Business acknowledgement is required before another report can be accepted,
+  regardless of whether the previous report came from a scheduled checkpoint,
+  on-demand request, or voluntary update.
+- The acknowledgement is not structured feedback and must not carry category,
+  severity, DoD item review, or revision-request semantics.
 
 Business view: `GET` list of all progress reports for a milestone, ordered
 oldest first. Business, Expert, assigned Staff, and authorized Admin may read
@@ -905,8 +961,10 @@ System behavior:
 3. Allocate the next request number.
 4. Create a progress-report request with status `PENDING`, `requested_at = now`,
    and the applicable `due_at`.
-5. Notify Expert with type `PROGRESS_REPORT_REQUESTED`.
-6. Write `PROGRESS_REPORT_REQUESTED` audit event.
+5. Reject the request if the latest progress report is still waiting for Business
+   acknowledgement; Business must acknowledge that report first.
+6. Notify Expert with type `PROGRESS_REPORT_REQUESTED`.
+7. Write `PROGRESS_REPORT_REQUESTED` audit event.
 
 Derived response flags:
 
@@ -930,7 +988,7 @@ An expired request:
 - may be recorded as the reason for Business immediate termination under
   section 11A, but is not required for that paid option.
 
-### 9.2C Business Feedback On A Progress Report
+### 9.2C Business Acknowledges A Progress Report
 
 Actor: Business
 
@@ -939,21 +997,23 @@ Preconditions:
 - Business owns the contract.
 - Report belongs to the specified contract and milestone.
 - Milestone is not terminal.
+- Report acknowledgement state is `PENDING_BUSINESS_ACK`.
 
-Feedback fields:
+System behavior:
 
-- `category`: `CORE_LOGIC`, `UI_UX`, `SECURITY`, `PERFORMANCE`, or `OTHER`;
-- `severity`: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`;
-- `dod_items`: zero or more acceptance-criteria identifiers with pass/fail and
-  optional comment;
-- required free-text `feedback`;
-- `requires_adjustment`;
-- `feedback_by_account_id` and `feedback_at`.
+1. Set report acknowledgement state to `ACKNOWLEDGED`.
+2. Set `acknowledged_by_account_id` and `acknowledged_at`.
+3. Write audit log.
+4. Notify Expert that the next progress report can be submitted when a new
+   request or checkpoint is applicable.
 
-Feedback is a work-cycle record. It does not itself create a dispute or change
-milestone status. Business may update feedback only through an audited revision
-operation; previous feedback content must remain recoverable through audit or
-version history.
+This acknowledgement is only a flow-control action. It does not:
+
+- create structured feedback;
+- request report revision;
+- change milestone status;
+- create a dispute;
+- move money.
 
 ### 9.2D Milestone Overdue Detection
 
@@ -1001,6 +1061,8 @@ System behavior:
 8. Notify Business.
 
 This same flow handles first submission and every correction/resubmission.
+The backend response must expose the current `submission_round` so the FE can
+display how many times the Expert has submitted or resubmitted the product.
 Expert does not need:
 
 - an active dispute;
@@ -1051,8 +1113,8 @@ System behavior:
 10. Write wallet ledger.
 11. Write audit log.
 12. Notify Expert.
-13. If all milestones are completed, set contract `COMPLETED` and notify Admin
-    to refund both participant deposits.
+13. If all milestones are completed, set contract `COMPLETED` and trigger the
+    system participant-deposit refund flow.
 
 Important:
 
@@ -1103,13 +1165,13 @@ Preconditions:
 System behavior:
 
 1. Set contract status `COMPLETED`.
-2. Notify Admin that both participant deposits can be refunded.
+2. Trigger the system participant-deposit refund flow.
 3. Do not open cross-review yet.
 4. Cross-review opens only after contract becomes `CLOSED`.
 
-### 9.7 Admin Refunds Participant Deposits After Completion
+### 9.7 System Refunds Participant Deposits After Completion
 
-Actor: Admin
+Actor: System with Admin-visible audit
 
 Preconditions:
 
@@ -1132,6 +1194,11 @@ System behavior:
 8. Open review capability for both parties.
 9. Write audit log.
 10. Notify Business and Expert.
+
+The refund must be executed automatically by the backend when the completion
+preconditions are satisfied, or by an idempotent system job immediately after
+completion. It must not remain a manual business step that leaves the initial
+20%/10% participant deposits held indefinitely.
 
 ---
 
@@ -1289,18 +1356,18 @@ System behavior:
 2. Store `escalation_requested_by_account_id`.
 3. Store `escalation_requested_at`.
 4. Store reason and file/attachment.
-5. Notify Admin.
+5. Notify Staff operations/system routing channel.
 6. Write audit log.
 
-### 10.7 Admin Assigns Staff
+### 10.7 Route Staff
 
-Actor: Admin
+Actor: System or Staff operations
 
 Preconditions:
 
 - Dispute status is `ESCALATION_REQUESTED`.
 - Dispute has required escalation reason/evidence.
-- Admin selects suitable Staff.
+- Staff routing selects a suitable Staff member without Admin participation.
 
 Staff selection criteria:
 
@@ -1320,18 +1387,22 @@ Candidate response must expose, without leaking unrelated private information:
 - Active dispute workload count.
 - Conflict-of-interest eligibility when known.
 
-The system should rank suitable candidates and may propose or automatically
-assign the best eligible Staff when `auto_assign_staff_enabled` is active.
-Admin remains able to select or replace an eligible Staff before a final
-decision. Automatic routing is operational assignment only; it does not grant
-Admin any professional decision authority.
+The system must rank suitable candidates and route the dispute directly to an
+eligible Staff member without Admin assignment. Routing may be fully automatic or
+manual inside a Staff operations queue, but the public milestone-dispute flow must
+not require Admin to assign Staff.
+
+Admin cannot select, replace, or cancel Staff assignment for milestone disputes.
+Staff replacement, if needed for availability, is an internal Staff-operations
+action and must not change the dispute decision authority.
 
 System behavior:
 
-1. Set `assigned_staff_id`.
+1. Set `assigned_staff_id` from the automatic/manual Staff routing workflow.
 2. Set dispute status `STAFF_REVIEWING`.
 3. Set `staff_review_started_at = now()`.
-4. Set `evidence_collection_due_at = now() + 48 hours`.
+4. Set `evidence_collection_due_at = now() + 48 hours` for display and evidence
+   guidance only.
 5. Grant temporary `READ_EXECUTE` case access to assigned Staff.
 6. Set `staff_access_expires_at = evidence_collection_due_at + 3 days`.
 7. Set `staff_sla_due_at = evidence_collection_due_at + 3 days`.
@@ -1343,7 +1414,9 @@ During the 48-hour evidence window:
 
 - Business and Expert may add case attachments.
 - Assigned Staff may inspect case materials.
-- Staff must not issue the official decision before the window closes.
+- Staff may issue the official decision earlier when the available evidence is
+  sufficient. The system must not throw a hard `EVIDENCE_WINDOW_STILL_OPEN`
+  error.
 
 After the evidence window:
 
@@ -1356,32 +1429,20 @@ After the evidence window:
 
 Admin does not decide the professional outcome.
 
-### 10.8 Staff Rejects Intervention
+### 10.8 Staff Intervention Cannot Be Rejected
 
-Actor: Staff
+Once a dispute has been escalated and routed to Staff, Staff must resolve it with
+a mandatory decision. There is no Staff rejection/intervention-refusal step in
+v2.3.
 
-Preconditions:
+Rules:
 
-- Dispute status is `STAFF_REVIEWING`.
-- Staff is assigned to dispute.
-
-Valid reasons:
-
-- Evidence is insufficient.
-- Rejection is not specific to acceptance criteria.
-- Parties should continue self-resolve.
-- Request appears to be premature.
-- Request appears to be abusive or delaying.
-
-System behavior:
-
-1. Store `intervention_rejection_reason`.
-2. Set `intervention_rejected_at`.
-3. Write status history/log entry `INTERVENTION_REJECTED`.
-4. Return current dispute status to `PENDING_SELF_RESOLVE`.
-5. Keep milestone status `DISPUTED`.
-6. Notify Business and Expert.
-7. Write audit log.
+- Do not expose `reject-intervention` as a public milestone-dispute API.
+- Do not create `INTERVENTION_REJECTED` for new disputes.
+- Do not return an escalated dispute to `PENDING_SELF_RESOLVE` through a Staff
+  action.
+- If evidence is weak, Staff still records that assessment in the Staff report
+  and chooses the appropriate payout percentage.
 
 ### 10.9 Staff Issues Mandatory Decision
 
@@ -1393,6 +1454,8 @@ Preconditions:
 - Staff is assigned to dispute.
 - Milestone status is `DISPUTED`.
 - Milestone escrow is not released.
+- Staff may decide before `evidence_collection_due_at` when the case evidence is
+  sufficient; the timestamp is informational/SLA guidance, not a hard blocker.
 
 Staff decision must include:
 
@@ -1463,29 +1526,29 @@ Retry may be initiated by an internal system job or an authorized operational
 endpoint, but retry must use the exact Staff percentage already stored. Retry
 does not create a new decision step.
 
-### 10.11 Cancel Or Withdraw Dispute
+### 10.11 Withdraw Dispute Before Staff Routing
 
-Actor: Dispute initiator or Admin
+Actor: Dispute initiator
 
 Rules:
 
-- The dispute initiator may withdraw the dispute before Staff starts reviewing.
-- Admin may cancel invalid or duplicate disputes.
+- The dispute initiator may withdraw the dispute before it is routed to Staff.
 - The non-initiating party cannot unilaterally cancel the dispute.
+- Admin cannot cancel milestone disputes.
 - No party can cancel after `STAFF_REVIEWING`, `STAFF_DECIDED`, or `RESOLVED`.
 
 Preconditions for initiator withdrawal:
 
 - Current user is `disputes.initiated_by_account_id`.
 - Dispute status is `PENDING_SELF_RESOLVE` or `ESCALATION_REQUESTED`.
-- Staff review has not started.
+- Staff has not been assigned and review has not started.
 
 System behavior:
 
 1. Set dispute status `CANCELLED`.
 2. Set `cancelled_by_account_id`.
 3. Set `cancelled_at`.
-4. Set `resolution_type = CANCELLED_BY_INITIATOR` or `CANCELLED_BY_ADMIN`.
+4. Set `resolution_type = CANCELLED_BY_INITIATOR`.
 5. Restore milestone status to `previous_milestone_status`.
 6. Write audit log.
 7. Notify both parties.
@@ -1686,15 +1749,15 @@ System behavior:
 17. Set termination request status `AWAITING_DEPOSIT_REFUND`.
 18. Set contract status `TERMINATED`.
 19. Commit transaction.
-20. Notify Admin to refund both participant deposits.
+20. Trigger the system participant-deposit refund flow.
 
 If expert payout = 0 and full escrow is refunded to Business, current milestone may be `CANCELLED` instead of `COMPLETED` if Staff reports no accepted work.
 
 The Staff report must state whether current milestone is closed as `COMPLETED` or `CANCELLED`.
 
-### 11.8 Admin Resolves Participant Deposits After Standard Termination
+### 11.8 System Resolves Participant Deposits After Standard Termination
 
-Actor: Admin
+Actor: System with Admin-visible audit/retry
 
 Preconditions:
 
@@ -1790,8 +1853,9 @@ deposit; missing deposit means the contract should never have become `ACTIVE`.
    - refund Business's full held deposit to Business.
 8. Mark both deposits resolved with penalty/refund transaction references.
 9. Set contract status `TERMINATED`, then `CLOSED` when every required deposit
-   and escrow movement is committed. If project policy requires Admin closure,
-   remain `TERMINATED` but do not allow the same deposits to be resolved again.
+   and escrow movement is committed. If project policy requires an operational
+   closure checkpoint, remain `TERMINATED`/`AWAITING_DEPOSIT_REFUND` but keep the
+   deposit resolution system-executable and idempotent.
 10. Write ledger, audit, and participant notifications.
 
 If work quality, rejection, payout, or evidence is contested, immediate
@@ -1975,7 +2039,9 @@ Add field (checkpoint anchor for `9.2A` progress reports):
 in_progress_started_at TIMESTAMP NULL
 ```
 
-Set when milestone transitions `DEPOSITED -> IN_PROGRESS` (`9.2`). Backfill existing `IN_PROGRESS` rows from `updated_at` since no earlier signal exists.
+Set when Business deposits milestone escrow (`9.1`). `startMilestone` must not
+reset it. Backfill existing `IN_PROGRESS` rows from `updated_at` since no
+earlier signal exists.
 
 The contract execution snapshot must support `OVERDUE`. The source-of-truth
 deadline is derived from `in_progress_started_at`, `duration`, and
@@ -1990,7 +2056,6 @@ Replace or expand status values to:
 PENDING_SELF_RESOLVE
 ESCALATION_REQUESTED
 STAFF_REVIEWING
-INTERVENTION_REJECTED
 STAFF_DECIDED
 RESOLVED
 CANCELLED
@@ -2015,7 +2080,9 @@ the dispute, while type identifies the explicit disagreement. A persisted
 Business rejection may support `BUSINESS_REJECTED_DELIVERABLE`, but section 9.5
 never sets this field because rejection does not create a dispute.
 
-Add the remaining fields — each is set by a concrete system-behavior step (9.5, 10.2, 10.6, 10.7, 10.8, 10.9, 10.10, 11.x) that current code cannot fully execute without them:
+Add the remaining fields — each is set by a concrete system-behavior step (9.5,
+10.2, 10.6, 10.7, 10.9, 10.10, 11.x) that current code cannot fully execute
+without them:
 
 ```sql
 initiated_by_account_id BIGINT NULL,
@@ -2031,8 +2098,6 @@ staff_access_scope VARCHAR(50) NULL,
 staff_access_expires_at TIMESTAMP NULL,
 staff_sla_due_at TIMESTAMP NULL,
 staff_sla_escalated_at TIMESTAMP NULL,
-intervention_rejected_at TIMESTAMP NULL,
-intervention_rejection_reason TEXT NULL,
 
 staff_report TEXT NULL,
 staff_proposed_expert_amount DECIMAL(19,2) NULL,
@@ -2081,11 +2146,12 @@ WHERE status IN (
 Status backfill recommendation:
 
 ```text
-Open        -> PENDING_SELF_RESOLVE
-UnderReview -> STAFF_REVIEWING
-Escalated   -> ESCALATION_REQUESTED
-Resolved    -> RESOLVED
-Rejected    -> CANCELLED or INTERVENTION_REJECTED depending on context; if unknown, prefer CANCELLED with migration comment
+Open                  -> PENDING_SELF_RESOLVE
+UnderReview           -> STAFF_REVIEWING
+Escalated             -> ESCALATION_REQUESTED
+Resolved              -> RESOLVED
+Rejected              -> CANCELLED with migration comment
+INTERVENTION_REJECTED -> CANCELLED with migration comment for legacy rows
 ```
 
 #### 13.3.5 `wallet_transactions`
@@ -2177,14 +2243,13 @@ CREATE TABLE milestone_progress_reports (
     demo_link TEXT NULL,
     submission_notes TEXT NULL,
     is_late BOOLEAN NOT NULL DEFAULT FALSE,
-    business_feedback TEXT NULL,
-    feedback_category VARCHAR(30) NULL,
-    feedback_severity VARCHAR(20) NULL,
-    feedback_dod_items JSONB NULL,
-    requires_adjustment BOOLEAN NOT NULL DEFAULT FALSE,
-    feedback_by_account_id INT NULL REFERENCES account(account_id),
-    feedback_at TIMESTAMP NULL,
+    acknowledgement_status VARCHAR(30) NOT NULL DEFAULT 'PENDING_BUSINESS_ACK',
+    acknowledged_by_account_id INT NULL REFERENCES account(account_id),
+    acknowledged_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_progress_report_ack_status
+      CHECK (acknowledgement_status IN ('PENDING_BUSINESS_ACK', 'ACKNOWLEDGED')),
     CONSTRAINT chk_progress_report_checkpoint_type CHECK (checkpoint_type IN ('MIDPOINT', 'PRE_DEADLINE') OR checkpoint_type IS NULL),
     CONSTRAINT chk_progress_report_percent CHECK (percent_complete IS NULL OR (percent_complete BETWEEN 0 AND 100))
 );
@@ -2196,8 +2261,9 @@ Not linked to `disputes` or `case_attachments` — kept as an independent
 progress-work-cycle record per `9.2A`–`9.2C`.
 
 The report remains independent of disputes and case attachments, but may link to
-the on-demand request it satisfies. Structured feedback belongs to the report
-work cycle and must not be interpreted as a dispute decision.
+the on-demand request it satisfies. Business acknowledgement is a flow-control
+gate only; it is not structured feedback, rejection, revision, or dispute
+evidence by itself.
 
 #### 13.3.9 Required New Table: `milestone_progress_report_requests`
 
@@ -2521,11 +2587,12 @@ startMilestone(milestoneId, expertAccountId)
 markMilestoneOverdue(contractId, milestoneId)
 requestProgressReport(contractId, milestoneId, businessAccountId)
 submitProgressReport(contractId, milestoneId, expertAccountId, request)
-feedbackProgressReport(contractId, milestoneId, progressReportId, businessAccountId, request)
+acknowledgeProgressReport(contractId, milestoneId, progressReportId, businessAccountId)
 autoApproveExpiredReviewSla(contractId, milestoneId)
 submitDeliverable(milestoneId, expertAccountId, request)
 approveMilestone(milestoneId, businessAccountId)
 rejectMilestone(milestoneId, businessAccountId, request)
+cancelDraftContract(contractId, businessAccountId, request)
 ```
 
 `rejectMilestone` must handle both first rejection and rejection after re-submit.
@@ -2540,17 +2607,17 @@ Required methods or equivalent:
 createBusinessInitiatedDispute(milestoneId, businessAccountId, request)
 createExpertInitiatedDispute(milestoneId, expertAccountId, request)
 requestStaffIntervention(disputeId, accountId, request)
-assignStaff(disputeId, adminAccountId, staffId)
-listStaffAssignmentCandidates(disputeId, adminAccountId)
-rejectIntervention(disputeId, staffAccountId, request)
+routeStaff(disputeId)
+listStaffAssignmentCandidates(disputeId)
 issueStaffDecision(disputeId, staffAccountId, request)
 executeDisputeSettlement(disputeId)
 cancelDispute(disputeId, accountId, request)
 resolveByBusinessApproval(disputeId, milestoneId)
 ```
 
-`issueStaffDecision` stores the binding percentage and triggers
-`executeDisputeSettlement`. No Admin final-decision method is permitted.
+`routeStaff` assigns Staff without Admin participation. `issueStaffDecision`
+stores the binding percentage and triggers `executeDisputeSettlement`. No Admin
+final-decision or Staff intervention-rejection method is permitted.
 
 Business-rejection history may be attached as evidence, but no dispute service
 method is called automatically from `rejectMilestone`.
@@ -2587,6 +2654,7 @@ moveAvailableToEscrow(walletId, amount, reference)
 releaseEscrowToExpert(businessWalletId, expertWalletId, amount, reference)
 splitEscrow(businessWalletId, expertWalletId, escrowAmount, expertPayoutAmount, businessRefundAmount, reference)
 refundParticipantDeposits(contractId, adminAccountId, reference)
+autoRefundParticipantDeposits(contractId, reference)
 holdExpertContractDeposit(contractId, expertAccountId, amount)
 settleImmediateTerminationPenalty(contractId, initiatingRole, penaltyAmount)
 ```
@@ -2605,7 +2673,7 @@ CONTRACT_ACTIVATED_AFTER_DUAL_DEPOSIT
 MILESTONE_STARTED
 PROGRESS_REPORT_SUBMITTED
 PROGRESS_REPORT_REQUESTED
-PROGRESS_REPORT_FEEDBACK_RECORDED
+PROGRESS_REPORT_ACKNOWLEDGED
 PROGRESS_REPORT_REQUEST_EXPIRED
 MILESTONE_MARKED_OVERDUE
 MILESTONE_REVIEW_SLA_AUTO_APPROVED
@@ -2616,7 +2684,6 @@ DISPUTE_CREATED
 DISPUTE_ESCALATION_REQUESTED
 DISPUTE_STAFF_ASSIGNED
 DISPUTE_STAFF_SLA_ESCALATED
-DISPUTE_INTERVENTION_REJECTED
 DISPUTE_STAFF_DECIDED
 DISPUTE_SETTLEMENT_EXECUTED
 DISPUTE_CANCELLED
@@ -2632,6 +2699,7 @@ TERMINATION_STAFF_APPROVED
 TERMINATION_SETTLEMENT_EXECUTED
 CONTRACT_DEPOSIT_REFUNDED
 PARTICIPANT_DEPOSITS_REFUNDED
+CONTRACT_DRAFT_CANCELLED_BY_BUSINESS
 CONTRACT_CLOSED
 REVIEW_CREATED
 ```
@@ -2691,15 +2759,7 @@ New request DTO minimums:
     "demoLink": "https://...",
     "submissionNotes": "Known issue documented"
   },
-  "ProgressReportFeedback": {
-    "category": "CORE_LOGIC",
-    "severity": "HIGH",
-    "dodItems": [
-      {"criteriaId": 12, "passed": false, "comment": "Missing refresh flow"}
-    ],
-    "feedback": "Please fix the refresh-token path.",
-    "requiresAdjustment": true
-  },
+  "ProgressReportAcknowledgement": {},
   "ImmediateTerminationRequest": {
     "reason": "Required progress report was not submitted by the deadline.",
     "confirmedPenalty": true
@@ -2732,9 +2792,9 @@ Required stable conflict errors include:
 ```text
 MILESTONE_NOT_EXECUTABLE
 PROGRESS_REPORT_REQUEST_ALREADY_PENDING
+PROGRESS_REPORT_ACK_PENDING
 PROGRESS_REPORT_REQUEST_NOT_FOUND
-PROGRESS_REPORT_FEEDBACK_NOT_ALLOWED
-EVIDENCE_WINDOW_STILL_OPEN
+PROGRESS_REPORT_ACK_NOT_ALLOWED
 DISPUTE_ALREADY_ACTIVE
 DISPUTE_NOT_STAFF_DECIDED
 ESCROW_ALREADY_RELEASED
@@ -2750,16 +2810,20 @@ CONTRACT_DEPOSIT_ALREADY_RESOLVED
 ```http
 POST /api/v1/contracts/{contractId}/deposit/pay
 POST /api/v1/contracts/{contractId}/expert-deposit/pay
+POST /api/v1/contracts/{contractId}/cancel-draft
 POST /api/v1/admin/contracts/{contractId}/deposits/refund
 ```
 
 - Business endpoint funds 20% of total contract value.
 - Expert endpoint funds 10% of total contract value.
+- Business may cancel its own draft contract before signatures/funding activate
+  the contract.
 - Each endpoint is idempotent for an already-held correct amount.
 - Contract activation occurs only after signatures and both deposits are held.
-- Admin refund endpoint resolves both participant deposits after normal
-  completion or standard termination. Immediate termination normally resolves
-  deposits inside its own atomic transaction.
+- Participant deposit refund is a system operation after normal completion or
+  standard termination; the Admin endpoint is only an idempotent operational
+  retry/audit tool and must not be the required happy path. Immediate
+  termination normally resolves deposits inside its own atomic transaction.
 
 ### 16.2 Milestone APIs
 
@@ -2769,7 +2833,7 @@ POST /api/v1/milestones/{milestoneId}/start
 POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request
 POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports
 GET  /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports
-POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback
+POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge
 POST /api/v1/milestones/{milestoneId}/deliverables
 POST /api/v1/milestones/{milestoneId}/approve
 POST /api/v1/milestones/{milestoneId}/reject
@@ -2787,8 +2851,7 @@ internal-system authorization and remain idempotent.
 ```http
 POST /api/v1/disputes/{disputeId}/escalation-request
 GET  /api/v1/disputes/{disputeId}/staff-candidates
-POST /api/v1/disputes/{disputeId}/assign-staff
-POST /api/v1/disputes/{disputeId}/reject-intervention
+POST /api/v1/disputes/{disputeId}/route-staff
 POST /api/v1/disputes/{disputeId}/staff-decision
 POST /api/v1/disputes/{disputeId}/execute-settlement
 POST /api/v1/disputes/{disputeId}/cancel
@@ -2796,10 +2859,13 @@ GET  /api/v1/contracts/{contractId}/disputes
 GET  /api/v1/disputes/{disputeId}
 ```
 
+`route-staff` is a system/Staff-ops trigger and must not require Admin.
 `staff-decision` stores the binding decision and triggers settlement.
 `execute-settlement` is an internal/Admin-authorized retry endpoint only. It must
 reuse the stored Staff percentage exactly. There is no
-`/api/v1/disputes/{disputeId}/admin-final-decision` endpoint.
+`/api/v1/disputes/{disputeId}/admin-final-decision`,
+`/api/v1/disputes/{disputeId}/assign-staff`, or
+`/api/v1/disputes/{disputeId}/reject-intervention` endpoint.
 
 ### 16.4 Termination APIs
 
@@ -2848,24 +2914,24 @@ GET  /api/v1/contracts/{contractId}/reviews
 |---|---:|---:|---:|---:|---:|
 | Fund Business 20% contract deposit | Contract Business | No | No | No | No |
 | Fund Expert 10% contract deposit | No | Contract Expert | No | No | No |
+| Cancel own draft contract | Contract Business while DRAFT | No | No | No | No |
 | Activate contract after both deposits | No | No | No | No | Yes |
 | Deposit milestone escrow | Yes | No | No | No | No |
 | Start milestone | No | Yes | No | No | No |
 | Request on-demand progress report | Contract Business | No | No | No | No |
 | Submit progress report | No | Contract Expert | No | No | No |
-| Feedback on progress report | Contract Business | No | No | No | No |
+| Acknowledge progress report | Contract Business | No | No | No | No |
 | Mark overdue / review-SLA auto-approve | No | No | Operational trigger | No | Yes |
 | Submit deliverable | No | Yes | No | No | No |
 | Approve milestone | Yes | No | No | No | No |
 | Reject milestone | Yes | No | No | No | No |
 | Expert initiate dispute | No | Yes | No | No | No |
 | Request Staff intervention | Yes | Yes | No | No | No |
-| List Staff candidates | No | No | Yes | No | No |
-| Assign Staff to dispute | No | No | Yes | No | No |
-| Reject intervention | No | No | No | Assigned Staff | No |
+| List Staff candidates | No | No | No | Staff ops | System helper |
+| Route Staff to dispute | No | No | No | Staff ops | Yes |
 | Issue Staff dispute decision | No | No | No | Assigned Staff | No |
 | Execute dispute settlement | No | No | Retry stored decision only | No | Yes |
-| Cancel own dispute before Staff review | Initiator only | Initiator only | Yes for invalid/duplicate | No | No |
+| Withdraw own dispute before Staff routing | Initiator only | Initiator only | No | No | No |
 | Request termination | Yes | Yes | No | No | No |
 | Accept/dispute Business termination request | No | Contract Expert | No | No | Timeout only |
 | Immediate termination | Eligible Contract Business | Eligible Contract Expert | No | No | No |
@@ -2874,7 +2940,7 @@ GET  /api/v1/contracts/{contractId}/reviews
 | Approve/reject termination | No | No | No | Assigned Staff | No |
 | Execute termination settlement | No | No | Retry only | No | Yes |
 | Withdraw own termination request before Staff decision | Requester only | Requester only | Yes for invalid/duplicate | No | No |
-| Refund participant deposits | No | No | Yes | No | System helper allowed |
+| Refund participant deposits | No | No | Retry/audit only | No | Yes |
 | Create review after CLOSED | Yes | Yes | No | No | No |
 
 ---
@@ -2887,8 +2953,8 @@ GET  /api/v1/contracts/{contractId}/reviews
 4. Dispute settlement and termination settlement cannot execute for the same milestone escrow.
 5. Each milestone can have at most one active dispute.
 6. Each contract can have at most one active termination request.
-7. Staff decision is mandatory after Staff accepts intervention and issues decision.
-8. Admin assigns Staff but does not override Staff professional decision.
+7. Staff decision is mandatory after dispute intervention is routed to Staff.
+8. Staff routing for disputes never requires Admin assignment or Admin cancellation.
 9. Rejecting a deliverable never creates a dispute automatically.
 10. Rejection returns the milestone to `IN_PROGRESS`; normal resubmission does
     not require dispute state or a special request.
@@ -2908,8 +2974,8 @@ GET  /api/v1/contracts/{contractId}/reviews
 20. Missing a scheduled or on-demand report never moves money automatically;
     immediate termination always requires an explicit confirmed command.
 21. An expired report request never moves money or adjudicates work quality.
-22. Staff cannot issue the official dispute decision before the 48-hour evidence
-    window ends.
+22. Staff decision cannot be blocked solely because the 48-hour evidence window
+    has not ended; the evidence timestamp is guidance/SLA metadata.
 23. Settlement retry must use the stored Staff percentage unchanged.
 24. Standard termination does not apply the fixed immediate-termination penalty.
 25. Immediate termination penalty is funded from the initiator's held contract
@@ -2917,6 +2983,15 @@ GET  /api/v1/contracts/{contractId}/reviews
 26. The platform never keeps the immediate-termination penalty.
 27. A deliverable rejection and every later resubmission remain historically
     auditable.
+28. A progress report blocks the next progress report until Business
+    acknowledgement is recorded.
+29. Progress-report acknowledgement is not structured feedback and must not
+    create report revision semantics.
+30. WebSocket notifications for dispute intervention expose notification
+    `type`; clients must not depend on workflow `status` as notification type.
+31. Participant deposits are automatically refunded by the system when closure
+    preconditions are met, with Admin retry/audit only.
+32. Business can cancel its own draft contract before activation.
 
 ---
 
@@ -2927,6 +3002,7 @@ GET  /api/v1/contracts/{contractId}/reviews
 Given contract is `ACTIVE` and milestone is `PENDING`  
 When Business deposits milestone escrow  
 Then milestone becomes `DEPOSITED`
+And milestone execution timeline starts immediately
 
 When Expert starts milestone  
 Then milestone becomes `IN_PROGRESS`
@@ -2980,13 +3056,14 @@ And milestone becomes `COMPLETED`
 And dispute becomes `RESOLVED`  
 And `escrow_released_at` is set
 
-### 19.5 Staff Rejects Intervention
+### 19.5 Staff Intervention Cannot Be Rejected
 
 Given dispute status is `STAFF_REVIEWING`  
-When Staff rejects intervention with reason  
-Then intervention rejection is logged  
-And current dispute status returns to `PENDING_SELF_RESOLVE`  
-And milestone remains `DISPUTED`
+When assigned Staff reviews weak or incomplete evidence
+Then Staff must still issue a decision or request evidence through the active
+case flow
+And no `INTERVENTION_REJECTED` status is created
+And the dispute does not return to self-resolve
 
 ### 19.6 Expert-Initiated Dispute
 
@@ -3024,7 +3101,9 @@ And waits for deposit refund
 
 Given contract is `COMPLETED` or standard `TERMINATED`
 And Business and Expert deposits are held
-When Admin refunds both deposits
+When closure preconditions are satisfied
+Then the system refunds both deposits idempotently
+And Admin retry/audit may observe the same resolved result
 Then contract becomes `CLOSED`
 And reviews are opened
 
@@ -3071,12 +3150,13 @@ And Admin cannot change the percentage or request decision revision
 
 ### 19.14 Evidence Window And Staff SLA
 
-Given Admin assigns Staff
+Given dispute intervention is routed to Staff
 Then evidence collection closes after 48 hours
 And temporary Staff access and Staff decision SLA end three days later
 
 When Staff attempts a final decision before evidence collection closes
-Then the operation is rejected
+Then the operation succeeds if Staff has sufficient evidence
+And the system does not return `EVIDENCE_WINDOW_STILL_OPEN`
 
 When Staff misses the decision SLA
 Then escalation metadata is set once and Admin is notified
@@ -3123,6 +3203,33 @@ And the remaining 10,000,000 Business deposit is refunded to Business
 And Expert's held deposit is refunded to Expert
 And no Staff review is required
 
+### 19.19 Progress Report Acknowledgement Gate
+
+Given Expert submitted a progress report
+And Business has not acknowledged it
+When Expert submits another progress report
+Then the request is rejected with `PROGRESS_REPORT_ACK_PENDING`
+
+When Business acknowledges the latest report
+Then Expert can submit the next progress report when otherwise allowed
+And no structured report feedback or revision state is created
+
+### 19.20 Business Cancels Draft Contract
+
+Given a contract is `DRAFT`
+And Business owns the contract
+When Business cancels the draft
+Then the contract becomes `CANCELLED`
+And Expert approval is not required
+And no funded escrow or participant deposit is moved
+
+### 19.21 Dispute Notification Type
+
+Given a participant requests Staff intervention
+When the WebSocket notification is delivered
+Then the notification payload contains notification `type`
+And clients must not interpret dispute workflow `status` as notification type
+
 ---
 
 ## 20. Acceptance Criteria
@@ -3130,12 +3237,16 @@ And no Staff review is required
 ### 20.1 Functional Acceptance
 
 - Business can deposit current milestone escrow.
+- Business milestone escrow deposit starts the milestone execution timeline
+  immediately.
 - Expert cannot start milestone before escrow deposit.
 - Business can request progress reports with 24-hour first and 12-hour later
   request SLAs without creating duplicate pending requests.
 - Expert submissions close pending report requests and preserve late status.
-- Business can record structured report feedback without changing milestone
-  state.
+- Expert cannot submit another progress report until Business acknowledges the
+  latest progress report.
+- Business can acknowledge progress reports without creating structured
+  feedback, revision, or dispute semantics.
 - `OVERDUE` milestones continue to accept reports and deliverables.
 - Business approval releases 100% escrow to Expert.
 - Business rejection stores feedback, marks the deliverable rejected, and
@@ -3146,20 +3257,28 @@ And no Staff review is required
 - Expert can initiate dispute in allowed states.
 - Only one active dispute exists per milestone.
 - Either party can request Staff intervention at any time during active dispute.
-- Staff can reject intervention and return dispute to self-resolve.
+- Dispute intervention is routed to Staff without Admin assignment.
+- Staff cannot reject intervention or return an escalated dispute to
+  self-resolve.
 - Staff can issue mandatory decision.
-- Staff cannot decide before the evidence window closes.
+- Staff decision is not blocked solely by the 48-hour evidence window.
 - Admin cannot override or revise Staff's decision.
+- Admin cannot cancel milestone disputes after Staff routing.
 - System executes dispute settlement and splits escrow correctly.
+- WebSocket dispute intervention notifications expose notification `type`, not
+  workflow `status`, as the notification classification.
+- Staff decision/settlement responses expose deliverable `submission_round` so
+  FE can display resubmission count.
 - Business and Expert can request termination.
 - Business termination requests support Expert accept/dispute/three-day timeout.
 - Eligible participants can terminate immediately without Staff and pay exactly
   10% of total contract value to the counterparty.
 - Contract cannot activate until Business 20% and Expert 10% deposits are held.
 - Termination settlement cannot double-settle active dispute milestone.
-- Admin can refund both participant deposits after completion/standard
-  termination.
+- System automatically refunds both participant deposits after
+  completion/standard termination; Admin retry is audit/ops only.
 - Contract becomes `CLOSED` only after both deposits are resolved.
+- Business can cancel its own draft contract before activation.
 - Reviews are available only after `CLOSED`.
 
 ### 20.2 Database Acceptance
@@ -3237,21 +3356,21 @@ Recommended order:
    - Implement milestone state transitions.
    - Implement `OVERDUE` detection and review-SLA auto-approval guards.
    - Implement progress-report request history, 24h/12h SLA, submissions, and
-     structured feedback.
+     Business acknowledgement gate.
    - Implement submit/re-submit.
    - Implement approve/reject logic.
 
 5. Dispute Agent:
-   - Implement dispute initiation, escalation, candidate ranking, evidence
-     window, Staff access/SLA, final Staff decision, settlement execution, and
-     cancel rules.
+   - Implement dispute initiation, escalation, automatic/manual Staff routing
+     without Admin, candidate ranking, evidence window metadata, Staff
+     access/SLA, final Staff decision, settlement execution, and withdraw rules.
 
 6. Termination Agent:
    - Implement termination request response lifecycle, settlement, and guarded
      immediate termination with fixed 10% counterparty compensation.
 
 7. Contract Closure Agent:
-   - Implement deposit refund closure and review opening.
+   - Implement automatic deposit refund closure and review opening.
 
 8. Integration Agent:
    - Ensure contract/milestone/dispute/termination/wallet status changes are consistent.
@@ -3277,7 +3396,19 @@ Recommended order:
   exists.
 - Do not pay the penalty to the platform; credit the counterparty.
 - Do not expose a new public Flow 4–5 route without the `/api/v1` prefix.
-- Do not allow Staff to decide before the 48-hour evidence window closes.
+- Do not block Staff decision solely because the 48-hour evidence window is
+  still open.
+- Do not expose progress-report structured feedback; use Business
+  acknowledgement only.
+- Do not allow Expert to submit a new progress report while the latest report is
+  waiting for Business acknowledgement.
+- Do not require Admin assignment for milestone dispute Staff routing.
+- Do not allow Staff to reject dispute intervention.
+- Do not allow Admin to cancel milestone disputes.
+- Do not leave participant deposit refunds as a manual-only Admin operation.
+- Do not return dispute workflow `status` as notification type over WebSocket.
+- Do expose deliverable submission round for FE resubmission counts.
+- Do allow Business to cancel its own draft contract before activation.
 - Do not allow multiple pending on-demand report requests for one contract
   milestone.
 - Do not move money or terminate automatically from any missed report deadline;
@@ -3292,4 +3423,3 @@ Recommended order:
 - Do not leave future milestones as `PENDING` after contract termination.
 - Do not open reviews before contract `CLOSED`.
 - Do not delete existing data unless project owner explicitly approves a dev/test reset.
-
