@@ -96,7 +96,9 @@ public class AiSowGenerationService {
     // Note: Hàm chuẩn hóa cuối cùng: questions tối đa 3, needMoreInfo theo questions, assumptions không null,
     // và ngân sách/thời lượng milestone khớp yêu cầu. Không xóa sow hay milestones khi có questions.
     private void finalizeResponse(GenerateSowResponse response, GenerateSowRequest request) {
-        List<String> questions = limitQuestions(defaultList(response.getQuestions()));
+        List<String> questions = Boolean.TRUE.equals(request.getClarificationAlreadyAsked())
+                ? new ArrayList<>()
+                : limitQuestions(defaultList(response.getQuestions()));
         response.setQuestions(questions);
         response.setNeedMoreInfo(!questions.isEmpty());
 
@@ -198,9 +200,7 @@ public class AiSowGenerationService {
                    sow.assumptions. Khong bao gio de viec thieu thong tin lam bo
                    sot sow hay milestones.
                 4. Neu con thieu thong tin material co the lam ban draft tot hon,
-                   tra TOI DA 3 cau hoi ngan gon, khong trung thong tin da co trong
-                   input. Cau hoi chi la de xuat (advisory), khong bat buoc nguoi dung
-                   tra loi. Khong bien domain checklist thanh form phai dien day du.
+                   %s
                 5. needMoreInfo=true Chi khi questions khong rong; neu khong can cau
                    hoi thi needMoreInfo=false va questions=[].
                 6. Khong bao gio bo sot sow hay milestones vi co questions.
@@ -263,6 +263,7 @@ public class AiSowGenerationService {
                 """;
         return template.formatted(
                 ragContext == null ? "" : ragContext,
+                clarificationInstruction(request),
                 request.getProjectTitle(),
                 request.getRawRequirement(),
                 request.getBudget(),
@@ -271,6 +272,21 @@ public class AiSowGenerationService {
                 defaultList(request.getSupportFields()),
                 defaultList(request.getRequiredSkills())
         );
+    }
+
+    private String clarificationInstruction(GenerateSowRequest request) {
+        if (Boolean.TRUE.equals(request.getClarificationAlreadyAsked())) {
+            return """
+                    KHONG duoc tra them cau hoi nao nua vi he thong da hoi user mot lan.
+                    Bat buoc suy luan gia dinh hop ly, ghi vao sow.assumptions,
+                    dat needMoreInfo=false va questions=[].
+                    """;
+        }
+        return """
+                tra TOI DA 3 cau hoi ngan gon, khong trung thong tin da co trong
+                input. Cau hoi chi la de xuat (advisory), khong bat buoc nguoi dung
+                tra loi. Khong bien domain checklist thanh form phai dien day du.
+                """;
     }
 
     // Note: Hàm parse nội dung AI trả về, làm sạch các field dễ sai kiểu rồi map sang response DTO.

@@ -178,6 +178,18 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
+    void buildPrompt_whenClarificationAlreadyAsked_shouldForbidMoreQuestions() {
+        GenerateSowRequest request = buildRequest();
+        request.setClarificationAlreadyAsked(true);
+
+        String prompt = service.buildPrompt(request, "RAG context");
+
+        assertTrue(prompt.contains("KHONG duoc tra them cau hoi nao nua"));
+        assertTrue(prompt.contains("needMoreInfo=false va questions=[]"));
+        assertTrue(prompt.contains("sow.assumptions"));
+    }
+
+    @Test
     void buildRecoveryPrompt_shouldForceCompleteDraftAndNotRepeatQuestionOnlyResponse() {
         String prompt = service.buildRecoveryPrompt(buildRequest(), "RAG context");
 
@@ -692,6 +704,50 @@ class AiSowGenerationServiceTest {
         assertEquals("Can bo sung API don hang?", response.getQuestions().get(0));
         assertEquals("He thong ho tro bao nhieu ngon ngu?", response.getQuestions().get(1));
         assertEquals("Q4?", response.getQuestions().get(2));
+    }
+
+    @Test
+    void generateSow_whenClarificationAlreadyAsked_shouldSuppressFurtherQuestions() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+        GenerateSowRequest request = buildRequest();
+        request.setClarificationAlreadyAsked(true);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
+                        {
+                          "needMoreInfo": true,
+                          "questions": ["Can bo sung API don hang?", "Can bo sung ngon ngu ho tro?"],
+                          "sow": {
+                            "title": "AI support bot",
+                            "overview": "Build bot",
+                            "objectives": ["Answer"],
+                            "scopeOfWork": ["Design"],
+                            "deliverables": ["Bot API"],
+                            "assumptions": ["API don hang duoc suy luan theo REST"],
+                            "outOfScope": []
+                          },
+                          "milestones": [
+                            {
+                              "name": "Build",
+                              "description": "Develop bot",
+                              "duration": 1,
+                              "durationUnit": "tuan",
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot API hoat dong dung contract"]
+                            }
+                          ]
+                        }
+                        """)));
+
+        GenerateSowResponse response = localService.generateSow(request);
+
+        assertFalse(response.getNeedMoreInfo());
+        assertTrue(response.getQuestions().isEmpty());
+        assertEquals(List.of("API don hang duoc suy luan theo REST"), response.getSow().getAssumptions());
+        assertEquals(1, response.getMilestones().size());
     }
 
     @Test

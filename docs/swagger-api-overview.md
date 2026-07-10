@@ -59,7 +59,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 
 ## Job Draft & Publish Flow
 
-- Giai thich flow: Tao draft, cap nhat, gan taxonomy, sinh SoW va publish job.
+- Giai thich flow: Tao draft, cap nhat, gan taxonomy, sinh SoW va publish job. `POST /api/jobs/generate-sow` co flag optional `clarificationAlreadyAsked`; lan dau de false/bo trong de AI co the hoi toi da 3 cau, lan sau set true de backend khong hoi them nua va tu suy luan vao `sow.assumptions`.
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |

@@ -50,4 +50,6 @@ public class GenerateSowRequest {
 
     private List<String> supportFields;
     private List<String> requiredSkills;
+    // Note: Frontend set true after the first clarification cycle so AI must stop asking optional questions.
+    private Boolean clarificationAlreadyAsked;
 }

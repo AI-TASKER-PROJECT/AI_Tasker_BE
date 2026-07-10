@@ -25,11 +25,15 @@
 ```text
 $ ./mvnw test -Dtest=ProfileServiceTest
 Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
-BUILD SUCCESS (2026-07-10)
+Time elapsed: 1.145 s
+BUILD SUCCESS (2026-07-10 14:33:36 +07:00)
+Total time: 3.023 s
 ```
 
 ## Trace
 
-- `./mvnw -DskipTests compile` — BUILD SUCCESS on 2026-07-10.
-- `./mvnw test -Dtest=ProfileServiceTest` — 26/26 passed on 2026-07-10.
-- Static compile proof: 214 main sources + 23 test sources compiled without errors.
+- `./mvnw -DskipTests compile` — BUILD SUCCESS on 2026-07-10 12:38:09 +07:00.
+- `./mvnw test -Dtest=ProfileServiceTest` — 26/26 passed on 2026-07-10 12:43:28 +07:00 (run 1).
+- `./mvnw test -Dtest=ProfileServiceTest` — 26/26 passed on 2026-07-10 14:33:36 +07:00 (run 2, re-confirm).
+- Static compile proof: 214 main sources compiled without errors.
+- Test compile proof: 23 test sources compiled without errors (1 unchecked warning in ExpertRecommendationServiceTest, pre-existing).
