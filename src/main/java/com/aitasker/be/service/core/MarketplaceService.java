@@ -1,17 +1,40 @@
+/*
+ * NOTE FILE: src/main/java/com/aitasker/be/service/core/MarketplaceService.java
+ * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.common.exception.ForbiddenException;
+import com.aitasker.be.dto.catalog.JobSkillAssignmentRequest;
+import com.aitasker.be.dto.core.ProposalRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
+import com.aitasker.be.security.SecurityUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 
+// Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
+// Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class MarketplaceService {
     private final AccessService accessService;
@@ -19,68 +42,201 @@ public class MarketplaceService {
     private final ExpertProfileRepository expertProfileRepository;
     private final JobRepository jobRepository;
     private final ProposalRepository proposalRepository;
+    private final SowRepository sowRepository;
+    private final MilestoneRepository milestoneRepository;
+    private final ContractRepository contractRepository;
+    private final DomainRepository domainRepository;
+    private final SkillRepository skillRepository;
+    private final JobDomainRepository jobDomainRepository;
+    private final JobSkillRepository jobSkillRepository;
+    private final TechnologyRepository technologyRepository;
+    private final JobTechnologyRepository jobTechnologyRepository;
+    private final AcceptanceCriteriaRepository criteriaRepository;
+    private final PaymentWalletService paymentWalletService;
+    private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
+    private final FirebaseStorageService firebaseStorageService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `createJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public JobEntity createJob(JobEntity input) {
         accessService.requireRole("BUSINESS");
         // VALIDATE CAC TRUONG BAT BUOC CUA JOB DE DUNG VOI BR DANG TUYEN BAI TOAN.
         if (input.getTitle() == null || input.getTitle().isBlank()) throw new AppException("TITLE KHONG DUOC DE TRONG");
         if (input.getRawRequirements() == null || input.getRawRequirements().isBlank()) throw new AppException("RAW REQUIREMENTS KHONG DUOC DE TRONG");
         if (input.getBudget() == null || input.getBudget().signum() <= 0) throw new AppException("BUDGET PHAI LON HON 0");
-        input.setStatus(input.getStatus() == null ? "DRAFT" : input.getStatus());
-        if (!List.of("DRAFT", "OPEN", "CLOSED", "CANCELLED").contains(input.getStatus())) {
-            throw new AppException("STATUS JOB KHONG HOP LE");
-        }
+        SowEntity sow = input.getSow();
+        List<MilestoneEntity> milestones = input.getMilestones();
+        validateAndNormalizeJobDuration(input);
+        validateMilestoneDurationsWithinJob(input, milestones);
         BusinessProfileEntity business = currentApprovedBusiness();
         input.setJobId(null);
         input.setBusinessId(business.getBusinessId());
-        if ("OPEN".equals(input.getStatus()) && input.getPublishedAt() == null) input.setPublishedAt(LocalDateTime.now());
-        return jobRepository.save(input);
+        input.setStatus("DRAFT");
+        input.setPublishedAt(null);
+        JobEntity saved = jobRepository.save(input);
+        saveSow(saved.getJobId(), sow);
+        saveMilestones(saved, milestones);
+        saveJobDomains(saved.getJobId(), input.getDomainIds());
+        saveJobSkills(saved.getJobId(), input.getSkills());
+        saveJobTechnologies(saved.getJobId(), input.getTechnologyIds());
+        auditLogService.record(AuditLogService.ACTION_CREATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
+        return attachJobDetails(saved);
     }
 
-    public List<JobEntity> listJobs() { return jobRepository.findByStatus("OPEN"); }
-
-    public JobEntity getJob(Integer id) { return jobRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB")); }
-
     @Transactional
-    public ProposalEntity submitProposal(ProposalEntity input) {
+    public JobEntity updateDraftJob(Integer jobId, JobEntity input) {
+        accessService.requireRole("BUSINESS");
+        if (input == null) throw new AppException("JOB UPDATE BODY KHONG DUOC DE TRONG");
+        JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        BusinessProfileEntity business = currentApprovedBusiness();
+        if (!business.getBusinessId().equals(job.getBusinessId())) {
+            throw new AppException("BAN KHONG CO QUYEN THAO TAC JOB NAY");
+        }
+        if (!"DRAFT".equalsIgnoreCase(job.getStatus())) {
+            throw new AppException("JOB KHONG O TRANG THAI DRAFT");
+        }
+        if (contractRepository.findByJobId(jobId).isPresent()) {
+            throw new AppException("JOB DA CO CONTRACT, KHONG DUOC CHINH MILESTONE");
+        }
+        if (input.getTitle() != null && !input.getTitle().isBlank()) job.setTitle(input.getTitle());
+        if (input.getRawRequirements() != null && !input.getRawRequirements().isBlank()) job.setRawRequirements(input.getRawRequirements());
+        if (input.getBudget() != null && input.getBudget().signum() > 0) job.setBudget(input.getBudget());
+        JobEntity saved = jobRepository.save(job);
+        upsertSow(saved.getJobId(), input.getSow());
+        replaceDraftMilestones(saved, input.getMilestones());
+        auditLogService.record(AuditLogService.ACTION_UPDATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
+        return attachJobDetails(saved);
+    }
+
+    // Note: Hàm `listJobs` chỉ lấy job OPEN để marketplace không làm lộ job nháp của doanh nghiệp.
+    public List<JobEntity> listJobs() {
+        return attachJobDetails(jobRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc("OPEN"));
+    }
+
+    // Note: Hàm `listMyJobs` lấy toàn bộ job của business hiện tại, bao gồm DRAFT để doanh nghiệp kiểm tra trước khi public.
+    public List<JobEntity> listMyJobs() {
+        accessService.requireRole("BUSINESS");
+        BusinessProfileEntity business = currentApprovedBusiness();
+        return attachJobDetails(jobRepository.findByBusinessIdOrderByCreatedAtDesc(business.getBusinessId()));
+    }
+
+    // Note: Hàm `getJob` kiểm soát quyền xem chi tiết job theo trạng thái public hoặc quyền sở hữu job nháp.
+    public JobEntity getJob(Integer id) {
+        JobEntity job = jobRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        if ("OPEN".equalsIgnoreCase(job.getStatus())) return attachJobDetails(job);
+        if (!SecurityUtils.hasRole("BUSINESS")) {
+            throw new NotFoundException("JOB CHUA DUOC PUBLIC");
+        }
+        BusinessProfileEntity business = currentApprovedBusiness();
+        if (!business.getBusinessId().equals(job.getBusinessId())) {
+            throw new ForbiddenException("BAN KHONG CO QUYEN XEM JOB NAY");
+        }
+        return attachJobDetails(job);
+    }
+
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
+    @Transactional
+    // Note: Hàm `submitProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    public ProposalEntity submitProposal(ProposalRequest request) {
         accessService.requireRole("EXPERT");
         // CHI CHO EXPERT DA KYC APPROVED NOP PROPOSAL CHO JOB DA MO CONG KHAI.
-        JobEntity job = jobRepository.findById(input.getJobId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        if (request.getJobId() == null) throw new AppException("JOB ID KHONG DUOC DE TRONG");
+        JobEntity job = jobRepository.findById(request.getJobId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
             throw new AppException("JOB KHONG O TRANG THAI CHO PHEP NOP PROPOSAL");
         }
-        if (input.getTechnicalSolution() == null || input.getTechnicalSolution().isBlank()) throw new AppException("TECHNICAL SOLUTION KHONG DUOC DE TRONG");
-        if (input.getBidAmount() == null || input.getBidAmount().signum() <= 0) throw new AppException("BID AMOUNT PHAI LON HON 0");
-        Integer expertId = currentApprovedExpert().getExpertId();
-        if (proposalRepository.existsByJobIdAndExpertId(input.getJobId(), expertId)) {
+        if (request.getTechnicalSolution() == null || request.getTechnicalSolution().isBlank()) throw new AppException("TECHNICAL SOLUTION KHONG DUOC DE TRONG");
+        if (request.getBidAmount() == null || request.getBidAmount().signum() <= 0) throw new AppException("BID AMOUNT PHAI LON HON 0");
+        if (request.getProposalDescription() == null || request.getProposalDescription().isBlank()) {
+            throw new AppException("PROPOSAL DESCRIPTION KHONG DUOC DE TRONG");
+        }
+        ExpertProfileEntity expert = currentApprovedExpert();
+        AccountEntity actor = accessService.currentAccount();
+        Integer expertId = expert.getExpertId();
+        if (proposalRepository.existsByJobIdAndExpertIdAndStatusNotIgnoreCase(request.getJobId(), expertId, "Rejected")) {
             throw new com.aitasker.be.common.exception.ResourceConflictException("DA TON TAI PROPOSAL CHO JOB NAY");
         }
+        ProposalEntity input = ProposalEntity.builder()
+                .jobId(request.getJobId())
+                .technicalSolution(request.getTechnicalSolution())
+                .proposalDescription(request.getProposalDescription())
+                .proposalFileUrl(request.getProposalFileUrl())
+                .bidAmount(request.getBidAmount())
+                .businessSelected(Boolean.FALSE)
+                .build();
+        input.assignProposalMilestone(normalizeProposalMilestone(request.proposalMilestoneText(), job, request.getBidAmount()));
         input.setExpertId(expertId);
-        input.setStatus(input.getStatus() == null ? "Pending" : input.getStatus());
-        return proposalRepository.save(input);
+        input.setStatus("Pending");
+        ProposalEntity saved = proposalRepository.save(input);
+        paymentWalletService.consumeProposalCredit(actor, saved.getProposalId().longValue());
+        auditLogService.record(AuditLogService.ACTION_SUBMIT_PROPOSAL, "proposals", String.valueOf(saved.getProposalId()), actor.getAccountId());
+        businessProfileRepository.findById(job.getBusinessId())
+                .ifPresent(business -> notificationService.notifyProposalCreated(
+                        business.getAccountId(),
+                        actor.getAccountId(),
+                        job.getJobId(),
+                        job.getTitle()
+                ));
+        return saved;
     }
 
-    public List<ProposalEntity> listProposalsByJob(Integer jobId) { return proposalRepository.findByJobId(jobId); }
+    // Note: Hàm `uploadProposalFile` upload file proposal của chuyên gia lên Firebase và trả path để gán vào proposal.
+    public String uploadProposalFile(MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        ExpertProfileEntity expert = currentApprovedExpert();
+        return firebaseStorageService.upload(file, "proposal-files/experts/" + expert.getExpertId());
+    }
 
+    // Note: Hàm `listProposalsByJob` lấy proposal theo job và chỉ cho doanh nghiệp sở hữu job xem danh sách này.
+    public List<ProposalEntity> listProposalsByJob(Integer jobId) {
+        accessService.requireRole("BUSINESS");
+        requireBusinessOwnedJob(jobId);
+        return proposalRepository.findByJobId(jobId);
+    }
+
+    // Note: Hàm `listMyProposals` lấy các proposal của expert hiện tại để chuyên gia theo dõi trạng thái sau khi nộp.
+    public List<ProposalEntity> listMyProposals() {
+        accessService.requireRole("EXPERT");
+        Integer expertId = currentApprovedExpert().getExpertId();
+        return proposalRepository.findByExpertIdOrderByCreatedAtDesc(expertId);
+    }
+
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `updateJobStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public JobEntity updateJobStatus(Integer jobId, String status) {
         accessService.requireRole("BUSINESS");
+        AccountEntity actor = accessService.currentAccount();
         // KIEM TRA STATUS JOB DE DAM BAO DUNG VOI VONG DOI TUYEN DUNG.
-        if (!List.of("DRAFT", "OPEN", "CLOSED", "CANCELLED").contains(status)) {
+        if (!List.of("DRAFT", "OPEN", "IN_PROGRESS", "CLOSED").contains(status)) {
             throw new AppException("STATUS JOB KHONG HOP LE");
         }
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        String previousStatus = job.getStatus();
         BusinessProfileEntity business = currentApprovedBusiness();
         if (!business.getBusinessId().equals(job.getBusinessId())) {
             throw new AppException("BAN KHONG CO QUYEN CAP NHAT JOB NAY");
         }
+        boolean publishing = "OPEN".equals(status) && !"OPEN".equalsIgnoreCase(previousStatus);
+        if (publishing && sowRepository.findByJobId(jobId).isEmpty()) {
+            throw new AppException("JOB_MUST_HAVE_AI_SOW");
+        }
         job.setStatus(status);
         if ("OPEN".equals(status) && job.getPublishedAt() == null) job.setPublishedAt(LocalDateTime.now());
-        return jobRepository.save(job);
+        JobEntity saved = jobRepository.save(job);
+        if (publishing) {
+            paymentWalletService.consumeJobPostCredit(actor, Long.valueOf(jobId));
+        }
+        auditLogService.record(AuditLogService.ACTION_CHANGE_JOB_STATUS, "jobs", String.valueOf(jobId), actor.getAccountId());
+        return attachJobDetails(saved);
     }
 
+    // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Note: Hàm `reviewProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public ProposalEntity reviewProposal(Integer proposalId, String status) {
         accessService.requireRole("BUSINESS");
         // CHI CHO PHEP DOANH NGHIEP PHE DUYET HOAC TU CHOI PROPOSAL.
@@ -97,7 +253,370 @@ public class MarketplaceService {
             throw new AppException("BAN KHONG CO QUYEN REVIEW PROPOSAL NAY");
         }
         proposal.setStatus(status);
-        return proposalRepository.save(proposal);
+        ProposalEntity saved = proposalRepository.save(proposal);
+        auditLogService.record(AuditLogService.ACTION_REVIEW_PROPOSAL, "proposals", String.valueOf(proposalId), accountId);
+        expertProfileRepository.findById(proposal.getExpertId())
+                .ifPresent(expert -> notificationService.notifyProposalReviewed(
+                        expert.getAccountId(),
+                        accountId,
+                        job.getJobId(),
+                        job.getTitle(),
+                        status
+                ));
+        return saved;
+    }
+
+    // Note: Hàm `requireBusinessOwnedJob` kiểm tra job thuộc về business hiện tại trước khi cho xem proposal hoặc cập nhật job.
+    private JobEntity requireBusinessOwnedJob(Integer jobId) {
+        JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        BusinessProfileEntity business = currentApprovedBusiness();
+        if (!business.getBusinessId().equals(job.getBusinessId())) {
+            throw new AppException("BAN KHONG CO QUYEN THAO TAC JOB NAY");
+        }
+        return job;
+    }
+
+    // Note: Hàm `currentApprovedBusiness` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Note: Hàm `attachProposalCounts` gắn tổng số proposal cho từng job trước khi trả response cho giao diện.
+    private List<JobEntity> attachProposalCounts(List<JobEntity> jobs) {
+        jobs.forEach(this::attachProposalCount);
+        return jobs;
+    }
+
+    // Note: Hàm `attachProposalCount` đếm proposal theo job và đưa vào field tạm, không làm thay đổi schema bảng jobs.
+    private JobEntity attachProposalCount(JobEntity job) {
+        if (job != null && job.getJobId() != null) {
+            job.setProposalsCount(proposalRepository.countByJobId(job.getJobId()));
+        }
+        return job;
+    }
+
+    private void saveSow(Integer jobId, SowEntity sow) {
+        if (sow == null) return;
+        if (sow.getTitle() == null || sow.getTitle().isBlank()) throw new AppException("SOW TITLE KHONG DUOC DE TRONG");
+        sow.setSowId(null);
+        sow.setJobId(jobId);
+        sowRepository.save(sow);
+    }
+
+    private void upsertSow(Integer jobId, SowEntity sow) {
+        if (sow == null) return;
+        if (sow.getTitle() == null || sow.getTitle().isBlank()) throw new AppException("SOW TITLE KHONG DUOC DE TRONG");
+        SowEntity existing = sowRepository.findByJobId(jobId).orElse(null);
+        if (existing != null) {
+            existing.setTitle(sow.getTitle());
+            existing.setOverview(sow.getOverview());
+            existing.setObjectives(sow.getObjectives());
+            existing.setScopeOfWork(sow.getScopeOfWork());
+            existing.setDeliverable(sow.getDeliverable());
+            existing.setAssumptions(sow.getAssumptions());
+            existing.setOutOfScope(sow.getOutOfScope());
+            sowRepository.save(existing);
+        } else {
+            sow.setSowId(null);
+            sow.setJobId(jobId);
+            sowRepository.save(sow);
+        }
+    }
+
+    private void saveMilestones(JobEntity job, List<MilestoneEntity> milestones) {
+        if (milestones == null || milestones.isEmpty()) return;
+        Set<Integer> orderIndexes = new LinkedHashSet<>();
+        int defaultOrderIndex = 1;
+        for (MilestoneEntity milestone : milestones) {
+            if (milestone.getOrderIndex() == null) milestone.setOrderIndex(defaultOrderIndex);
+            if (milestone.getMilestoneName() == null || milestone.getMilestoneName().isBlank()) throw new AppException("MILESTONE NAME KHONG DUOC DE TRONG");
+            if (milestone.getFundsAllocated() == null || milestone.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
+            if (milestone.getOrderIndex() == null || milestone.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
+            if (!orderIndexes.add(milestone.getOrderIndex())) throw new AppException("ORDER INDEX BI TRUNG TRONG MILESTONE");
+            validateAndNormalizeMilestoneDuration(milestone);
+            milestone.setMilestoneId(null);
+            milestone.setJobId(job.getJobId());
+            milestone.setContractId(null);
+            if (milestone.getStatus() == null) milestone.setStatus("PENDING");
+            MilestoneEntity saved = milestoneRepository.save(milestone);
+            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getAcceptanceCriteria());
+            defaultOrderIndex++;
+        }
+    }
+
+    private void replaceDraftMilestones(JobEntity job, List<MilestoneEntity> milestones) {
+        List<MilestoneEntity> existing = milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId());
+        for (MilestoneEntity old : existing) {
+            milestoneRepository.delete(old);
+        }
+        milestoneRepository.flush();
+        if (milestones == null || milestones.isEmpty()) return;
+        Set<Integer> orderIndexes = new LinkedHashSet<>();
+        int defaultOrderIndex = 1;
+        for (MilestoneEntity milestone : milestones) {
+            if (milestone.getOrderIndex() == null) milestone.setOrderIndex(defaultOrderIndex);
+            if (milestone.getMilestoneName() == null || milestone.getMilestoneName().isBlank()) throw new AppException("MILESTONE NAME KHONG DUOC DE TRONG");
+            if (milestone.getFundsAllocated() == null || milestone.getFundsAllocated().signum() < 0) throw new AppException("FUNDS ALLOCATED KHONG HOP LE");
+            if (milestone.getOrderIndex() == null || milestone.getOrderIndex() <= 0) throw new AppException("ORDER INDEX PHAI LON HON 0");
+            if (!orderIndexes.add(milestone.getOrderIndex())) throw new AppException("ORDER INDEX BI TRUNG TRONG MILESTONE");
+            milestone.setMilestoneId(null);
+            milestone.setJobId(job.getJobId());
+            milestone.setContractId(null);
+            if (milestone.getStatus() == null) milestone.setStatus("PENDING");
+            MilestoneEntity saved = milestoneRepository.save(milestone);
+            replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getAcceptanceCriteria());
+            defaultOrderIndex++;
+        }
+    }
+
+    // Note: Hàm `saveJobDomains` lưu các lĩnh vực business chọn ngay lúc tạo job.
+    private void saveJobDomains(Integer jobId, List<Integer> domainIds) {
+        if (domainIds == null) return;
+        Set<Integer> ids = new LinkedHashSet<>(domainIds);
+        for (Integer domainId : ids) {
+            domainRepository.findById(domainId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DOMAIN " + domainId));
+            jobDomainRepository.save(JobDomainEntity.builder()
+                    .id(new JobDomainId(jobId, domainId))
+                    .build());
+        }
+    }
+
+    // Note: Hàm `saveJobSkills` lưu các kỹ năng và trạng thái bắt buộc/tùy chọn business chọn ngay lúc tạo job.
+    private void validateAndNormalizeJobDuration(JobEntity job) {
+        boolean hasDuration = job.getPlannedDurationValue() != null;
+        boolean hasUnit = job.getPlannedDurationUnit() != null && !job.getPlannedDurationUnit().isBlank();
+        if (hasDuration != hasUnit) {
+            throw new AppException("JOB DURATION VA DURATION UNIT PHAI CUNG CO HOAC CUNG KHONG CO");
+        }
+        if (hasDuration && job.getPlannedDurationValue() <= 0) {
+            throw new AppException("JOB DURATION PHAI LON HON 0");
+        }
+        if (hasUnit) {
+            job.setPlannedDurationUnit(normalizeDurationUnit(job.getPlannedDurationUnit()));
+        }
+    }
+
+    private void validateMilestoneDurationsWithinJob(JobEntity job, List<MilestoneEntity> milestones) {
+        if (milestones == null || milestones.isEmpty()) return;
+        int totalMilestoneDays = 0;
+        boolean hasMilestoneDuration = false;
+        for (MilestoneEntity milestone : milestones) {
+            validateAndNormalizeMilestoneDuration(milestone);
+            if (milestone.getDuration() != null) {
+                hasMilestoneDuration = true;
+                totalMilestoneDays += toDurationDays(milestone.getDuration(), milestone.getDurationUnit());
+            }
+        }
+        if (!hasMilestoneDuration) return;
+        if (job.getPlannedDurationValue() == null || job.getPlannedDurationUnit() == null || job.getPlannedDurationUnit().isBlank()) {
+            throw new AppException("JOB DURATION BAT BUOC KHI MILESTONE CO DURATION");
+        }
+        int jobDurationDays = toDurationDays(job.getPlannedDurationValue(), job.getPlannedDurationUnit());
+        if (totalMilestoneDays > jobDurationDays) {
+            throw new AppException("TONG DURATION CUA MILESTONE KHONG DUOC VUOT QUA DURATION CUA JOB");
+        }
+    }
+
+    private void validateAndNormalizeMilestoneDuration(MilestoneEntity milestone) {
+        boolean hasDuration = milestone.getDuration() != null;
+        boolean hasUnit = milestone.getDurationUnit() != null && !milestone.getDurationUnit().isBlank();
+        if (hasDuration != hasUnit) {
+            throw new AppException("MILESTONE DURATION VA DURATION UNIT PHAI CUNG CO HOAC CUNG KHONG CO");
+        }
+        if (hasDuration && milestone.getDuration() <= 0) {
+            throw new AppException("MILESTONE DURATION PHAI LON HON 0");
+        }
+        if (hasUnit) {
+            milestone.setDurationUnit(normalizeDurationUnit(milestone.getDurationUnit()));
+        }
+    }
+
+    private String normalizeDurationUnit(String durationUnit) {
+        String unit = durationUnit.trim().toUpperCase();
+        if (!List.of("DAY", "WEEK", "MONTH").contains(unit)) {
+            throw new AppException("DURATION UNIT KHONG HOP LE. CHAP NHAN: DAY, WEEK, MONTH");
+        }
+        return unit;
+    }
+
+    private int toDurationDays(Integer duration, String durationUnit) {
+        return duration * switch (normalizeDurationUnit(durationUnit)) {
+            case "DAY" -> 1;
+            case "WEEK" -> 7;
+            case "MONTH" -> 30;
+            default -> throw new AppException("DURATION UNIT KHONG HOP LE. CHAP NHAN: DAY, WEEK, MONTH");
+        };
+    }
+
+    private void saveJobSkills(Integer jobId, List<JobSkillAssignmentRequest> assignments) {
+        if (assignments == null) return;
+        Set<Integer> seen = new LinkedHashSet<>();
+        for (JobSkillAssignmentRequest assignment : assignments) {
+            if (assignment == null || assignment.getSkillId() == null || !seen.add(assignment.getSkillId())) continue;
+            skillRepository.findById(assignment.getSkillId())
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SKILL " + assignment.getSkillId()));
+            jobSkillRepository.save(JobSkillEntity.builder()
+                    .id(new JobSkillId(jobId, assignment.getSkillId()))
+                    .isMandatory(assignment.getIsMandatory() == null || assignment.getIsMandatory())
+                    .build());
+        }
+    }
+
+    // Note: Hàm `saveJobTechnologies` lưu các công nghệ business chọn cho job vào bảng trung gian.
+    private void saveJobTechnologies(Integer jobId, List<Integer> technologyIds) {
+        if (technologyIds == null) return;
+        Set<Integer> ids = new LinkedHashSet<>(technologyIds);
+        for (Integer technologyId : ids) {
+            technologyRepository.findById(technologyId)
+                    .orElseThrow(() -> new NotFoundException("KHONG TIM THAY TECHNOLOGY " + technologyId));
+            jobTechnologyRepository.save(JobTechnologyEntity.builder()
+                    .id(new JobTechnologyId(jobId, technologyId))
+                    .build());
+        }
+    }
+
+    private List<JobEntity> attachJobDetails(List<JobEntity> jobs) {
+        jobs.forEach(this::attachJobDetails);
+        return jobs;
+    }
+
+    private JobEntity attachJobDetails(JobEntity job) {
+        if (job != null && job.getJobId() != null) {
+            job.setProposalsCount(proposalRepository.countByJobId(job.getJobId()));
+            job.setSow(sowRepository.findByJobId(job.getJobId()).orElse(null));
+            job.setMilestones(attachMilestoneCriteria(milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId())));
+            List<Integer> domainIds = jobDomainRepository.findByIdJobId(job.getJobId()).stream()
+                    .map(item -> item.getId().getDomainId())
+                    .toList();
+            job.setDomainIds(domainIds);
+            job.setDomains(domainIds.isEmpty() ? List.of() : domainRepository.findAllById(domainIds));
+            List<JobSkillEntity> jobSkills = jobSkillRepository.findByIdJobId(job.getJobId());
+            List<Integer> skillIds = jobSkills.stream()
+                    .map(item -> item.getId().getSkillId())
+                    .toList();
+            job.setJobSkills(jobSkills);
+            job.setSkillIds(skillIds);
+            job.setSkills(jobSkills.stream()
+                    .map(item -> {
+                        JobSkillAssignmentRequest assignment = new JobSkillAssignmentRequest();
+                        assignment.setSkillId(item.getId().getSkillId());
+                        assignment.setIsMandatory(item.getIsMandatory());
+                        return assignment;
+                    })
+                    .toList());
+            job.setSkillDetails(skillIds.isEmpty() ? List.of() : skillRepository.findAllById(skillIds));
+            List<Integer> technologyIds = jobTechnologyRepository.findByIdJobId(job.getJobId()).stream()
+                    .map(item -> item.getId().getTechnologyId())
+                    .toList();
+            job.setTechnologyIds(technologyIds);
+            job.setTechnologies(technologyIds.isEmpty() ? List.of() : technologyRepository.findAllById(technologyIds));
+        }
+        return job;
+    }
+
+    private List<MilestoneEntity> attachMilestoneCriteria(List<MilestoneEntity> milestones) {
+        milestones.forEach(this::attachMilestoneCriteria);
+        return milestones;
+    }
+
+    private MilestoneEntity attachMilestoneCriteria(MilestoneEntity milestone) {
+        List<AcceptanceCriteriaEntity> criteria = criteriaRepository
+                .findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(milestone.getMilestoneId());
+        milestone.setCriteria(criteria);
+        milestone.setAcceptanceCriteria(criteria.stream()
+                .map(AcceptanceCriteriaEntity::getDescription)
+                .toList());
+        return milestone;
+    }
+
+    private void replaceMilestoneCriteria(Integer milestoneId, List<String> descriptions) {
+        criteriaRepository.deleteByMilestoneId(milestoneId);
+        if (descriptions == null || descriptions.isEmpty()) return;
+        LinkedHashSet<String> unique = new LinkedHashSet<>();
+        int sortOrder = 1;
+        for (String description : descriptions) {
+            if (description == null || description.isBlank()) continue;
+            String normalized = description.trim();
+            if (!unique.add(normalized.toLowerCase(java.util.Locale.ROOT))) continue;
+            criteriaRepository.save(AcceptanceCriteriaEntity.builder()
+                    .milestoneId(milestoneId)
+                    .description(normalized)
+                    .sortOrder(sortOrder++)
+                    .build());
+        }
+    }
+
+    private String normalizeProposalMilestone(String proposalMilestone, JobEntity job, BigDecimal bidAmount) {
+        if (proposalMilestone == null || proposalMilestone.isBlank()) {
+            return null;
+        }
+
+        List<MilestoneEntity> jobMilestones = milestoneRepository.findByJobIdOrderByOrderIndexAsc(job.getJobId());
+        if (jobMilestones.isEmpty()) {
+            throw new AppException("JOB CHUA CO MILESTONE DE DE XUAT NGAN SACH");
+        }
+
+        Map<Integer, MilestoneEntity> milestonesById = jobMilestones.stream()
+                .collect(Collectors.toMap(MilestoneEntity::getMilestoneId, item -> item));
+        ArrayNode normalized = objectMapper.createArrayNode();
+        Set<Integer> seenMilestones = new LinkedHashSet<>();
+        BigDecimal total = BigDecimal.ZERO;
+
+        try {
+            JsonNode root = objectMapper.readTree(proposalMilestone);
+            if (!root.isArray()) {
+                throw new AppException("PROPOSAL MILESTONE PHAI LA JSON ARRAY");
+            }
+
+            for (JsonNode item : root) {
+                Integer milestoneId = readRequiredInteger(item, "milestoneId");
+                BigDecimal proposedBudget = readRequiredBudget(item, "proposedBudget");
+                if (!milestonesById.containsKey(milestoneId)) {
+                    throw new AppException("MILESTONE DE XUAT KHONG THUOC JOB NAY " + milestoneId);
+                }
+                if (!seenMilestones.add(milestoneId)) {
+                    throw new AppException("MILESTONE DE XUAT BI TRUNG " + milestoneId);
+                }
+
+                ObjectNode normalizedItem = objectMapper.createObjectNode();
+                normalizedItem.put("milestoneId", milestoneId);
+                normalizedItem.put("proposedBudget", proposedBudget);
+                normalized.add(normalizedItem);
+                total = total.add(proposedBudget);
+            }
+        } catch (JsonProcessingException ex) {
+            throw new AppException("PROPOSAL MILESTONE KHONG PHAI JSON HOP LE");
+        }
+
+        if (seenMilestones.size() != jobMilestones.size()) {
+            throw new AppException("PROPOSAL MILESTONE PHAI GIU NGUYEN SO LUONG MILESTONE CUA JOB");
+        }
+        if (bidAmount != null && total.compareTo(bidAmount) != 0) {
+            throw new AppException("TONG NGAN SACH MILESTONE DE XUAT PHAI BANG BID AMOUNT");
+        }
+
+        try {
+            return objectMapper.writeValueAsString(normalized);
+        } catch (JsonProcessingException ex) {
+            throw new AppException("KHONG CHUAN HOA DUOC PROPOSAL MILESTONE");
+        }
+    }
+
+    private Integer readRequiredInteger(JsonNode node, String fieldName) {
+        JsonNode value = node == null ? null : node.get(fieldName);
+        if (value == null || !value.canConvertToInt()) {
+            throw new AppException(fieldName.toUpperCase() + " KHONG HOP LE");
+        }
+        return value.asInt();
+    }
+
+    private BigDecimal readRequiredBudget(JsonNode node, String fieldName) {
+        JsonNode value = node == null ? null : node.get(fieldName);
+        if (value == null || !value.isNumber()) {
+            throw new AppException(fieldName.toUpperCase() + " KHONG HOP LE");
+        }
+        BigDecimal budget = value.decimalValue();
+        if (budget.signum() <= 0) {
+            throw new AppException(fieldName.toUpperCase() + " PHAI LON HON 0");
+        }
+        return budget;
     }
 
     private BusinessProfileEntity currentApprovedBusiness() {
@@ -111,6 +630,7 @@ public class MarketplaceService {
         return business;
     }
 
+    // Note: Hàm `currentApprovedExpert` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private ExpertProfileEntity currentApprovedExpert() {
         accessService.requireApprovedAccount();
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -121,4 +641,5 @@ public class MarketplaceService {
         }
         return expert;
     }
+
 }

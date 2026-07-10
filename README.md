@@ -32,6 +32,9 @@ Swagger/OpenAPI:
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 - De goi API duoc bao ve, bam `Authorize` va nhap access token JWT, khong them tien to `Bearer`.
 - Dat `SWAGGER_ENABLED=false` neu can tat Swagger UI va OpenAPI docs.
+- `GET /api/users/me/quota` la source of truth cho quota, active package va
+  Premium permission. Frontend khong duoc dung localStorage
+  `aitasker_active_package` lam business truth.
 
 ## 5) Flyway migration
 - Da bo sung migration `V8__align_excel_schema.sql` de dong bo theo DB/BR moi.
@@ -40,6 +43,20 @@ Swagger/OpenAPI:
   - `skills`
   - `job_domains`
   - `job_skills`
+- Da bo sung migration `V31__status_enum_constraint_alignment.sql` de chuan hoa
+  status uppercase cho contract/job/milestone va gioi han `wallet_transactions`
+  ve `POSTED`.
+- Da bo sung migration `V32__premium_expiration_entitlement.sql` de them
+  `user_quotas.premium_expired_at`, backfill Premium hien huu, va xoa flag cu.
+- Da bo sung migration `V34__profile_rejection_reason.sql` de luu ly do
+  staff tu choi xac minh KYB/KYC vao `business_profiles.rejection_reason`
+  va `expert_profiles.rejection_reason`.
+- Da bo sung migration `V37__business_initial_quota_and_recommendation_selection.sql`
+  de cap 3 job-post quota mien phi cho Business va luu trang thai Business
+  chon expert duoc AI recommend.
+- Da bo sung migration `V48__milestone_owned_acceptance_criteria.sql` de bo
+  catalog 26 tieu chi co dinh, chuyen du lieu cu thanh tieu chi thuoc tung
+  milestone va cho AI/Business quan ly noi dung rieng theo moc.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.
@@ -52,37 +69,106 @@ docker compose up -d
 Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
 
 ## 7) Cac API backend da bo sung (week 4-8)
+- Auth/Security:
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `POST /api/auth/refresh`
+  - `POST /api/auth/forgot-password`
+  - `POST /api/auth/reset-password`
+  - `POST /api/auth/google/login`
+  - `POST /api/auth/google/register`
+  - `GET /api/auth/check-email`
+  - `GET /api/auth/me`
+  - `POST /api/auth/email/send-otp`
+  - `POST /api/auth/email/verify-otp`
 - Profile/KYC-KYB:
   - `POST /api/v1/profiles/business`
+  - `GET /api/v1/profiles/business/{businessId}`
   - `POST /api/v1/profiles/expert`
+  - `GET /api/v1/profiles/expert/{expertId}`
+  - `POST /api/v1/profiles/expert/portfolio-file`
   - `POST /api/v1/profiles/approve/{type}/{id}?status=...`
 - Marketplace:
   - `POST /api/v1/jobs`
+  - `PUT /api/v1/jobs/{jobId}` (draft update: persist jobs + sow + milestones, US-022)
   - `GET /api/v1/jobs`
   - `GET /api/v1/jobs/{jobId}`
   - `POST /api/v1/proposals`
   - `GET /api/v1/jobs/{jobId}/proposals`
-  - `PATCH /api/v1/jobs/{jobId}/status?status=...`
+  - `PATCH /api/v1/jobs/{jobId}/status?status=DRAFT|OPEN|IN_PROGRESS|CLOSED`
   - `PATCH /api/v1/proposals/{proposalId}/status?status=Accepted|Rejected`
 - Contract/Execution/Finance/Dispute:
+  - `GET /api/v1/contracts`
+  - `GET /api/v1/contracts/{contractId}`
   - `POST /api/v1/contracts/from-proposals/{proposalId}`
-  - `POST /api/v1/contracts/change-requests`
-  - `POST /api/v1/contracts/{contractId}/activate`
+  - `POST /api/v1/contracts/{contractId}/sign`
   - `POST /api/v1/contracts/{contractId}/nda-sign`
-  - `POST /api/v1/contracts/{contractId}/terminate?reason=...`
+  - `POST /api/v1/contracts/{contractId}/reject`
+  - `POST /api/v1/contracts/{contractId}/deposit/pay`
+  - `POST /api/v1/contracts/{contractId}/expert-deposit/pay`
+  - `POST /api/v1/admin/contracts/{contractId}/deposits/refund`
+  - `GET /api/v1/contracts/{contractId}/milestones`
   - `POST /api/v1/milestones`
-  - `POST /api/v1/criteria`
-  - `POST /api/v1/deliverables`
-  - `POST /api/v1/transactions`
-  - `POST /api/v1/transactions/{transactionId}/webhook?paymentStatus=Success|Failed&bankTxCode=...&receiptImgUrl=...`
-  - `POST /api/v1/invoices`
-  - `POST /api/v1/disputes`
-  - `PATCH /api/v1/transactions/{transactionId}/status?status=Pending|Success|Failed`
-  - `PATCH /api/v1/disputes/{disputeId}/assign?staffId=...`
-  - `PATCH /api/v1/disputes/{disputeId}/resolve?proposedAction=...`
-  - `POST /api/v1/milestones/sla-auto-approve`
-  - `POST /api/v1/disputes/{disputeId}/demo-testing?testResult=...`
-  - `POST /api/v1/disputes/{disputeId}/technical-report?reportContent=...&proposedAction=...`
+  - `PATCH /api/v1/milestones/{milestoneId}`
+  - `GET /api/v1/jobs/{jobId}/milestones`
+  - `GET /api/v1/milestones/{milestoneId}/criteria`
+  - `POST /api/v1/milestones/{milestoneId}/criteria`
+  - `PUT /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+  - `DELETE /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+  - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
+  - `POST /api/v1/milestones/{milestoneId}/start`
+  - `POST /api/v1/milestones/{milestoneId}/deliverables`
+  - `GET /api/v1/milestones/{milestoneId}/deliverables`
+  - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+  - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+  - `POST /api/v1/milestones/{milestoneId}/approve`
+  - `POST /api/v1/milestones/{milestoneId}/reject?reason=...`
+  - `POST /api/v1/milestones/{milestoneId}/complete`
+  - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...&initiatedBy=...&initiationType=...`
+  - `GET /api/v1/contracts/{contractId}/disputes`
+  - `GET /api/v1/disputes/{disputeId}`
+  - `POST /api/v1/disputes/{disputeId}/escalation-request?reason=...&evidenceFile=...`
+  - `POST /api/v1/disputes/{disputeId}/assign-staff?staffId=...`
+  - `POST /api/v1/disputes/{disputeId}/reject-intervention?reason=...`
+  - `POST /api/v1/disputes/{disputeId}/staff-decision?expertPercent=...&note=...&staffReport=...`
+  - `POST /api/v1/disputes/{disputeId}/execute-settlement`
+  - `POST /api/v1/disputes/{disputeId}/cancel?reason=...`
+  - `POST /api/v1/disputes/staff-sla-escalate`
+  - `POST /api/v1/contracts/{contractId}/termination-requests`
+  - `POST /api/v1/contracts/{contractId}/immediate-termination`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/accept`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/dispute`
+  - `POST /api/v1/termination-requests/expire-awaiting-expert`
+  - `GET /api/v1/contracts/{contractId}/termination-requests`
+  - `GET /api/v1/termination-requests/{terminationRequestId}`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/assign-staff?staffId=...`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/reject?reason=...`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/approve`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/partial-evidence`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/execute-settlement`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/withdraw?reason=...`
+  - `POST /api/v1/termination-requests/{terminationRequestId}/refund-deposit`
+  - `POST /api/v1/case-attachments`
+  - `GET /api/v1/case-attachments?ownerType=...&ownerId=...`
+  - `POST /api/v1/contracts/{contractId}/reviews`
+  - `GET /api/v1/contracts/{contractId}/reviews`
+  - `GET /api/wallet/current`
+  - `GET /api/wallet/transactions`
+  - `GET /api/membership/packages`
+  - `POST /api/membership/packages/{packageId}/purchase`
+  - `POST /api/credits/job-post/purchase`
+  - `POST /api/credits/proposal/purchase`
+  - `GET /api/users/me/quota`
+  - `POST /api/v1/jobs/{jobId}/publish`
+  - `POST /api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select`
+  - `POST /api/v1/contracts/{contractId}/deposit/pay`
+  - `POST /api/v1/contracts/{contractId}/expert-deposit/pay`
+  - `POST /api/v1/admin/contracts/{contractId}/deposits/refund`
+  - `POST /api/v1/withdrawal-requests`
+  - `GET /api/v1/withdrawal-requests`
+  - `GET /api/v1/admin/withdrawal-requests`
+  - `POST /api/v1/admin/withdrawal-requests/{withdrawalId}/approve`
+  - `POST /api/v1/admin/withdrawal-requests/{withdrawalId}/reject`
 - Admin/Review/Settings:
   - `POST /api/v1/admin/reviews`
   - `GET /api/v1/admin/reviews/contracts/{contractId}`
@@ -91,6 +177,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `GET /api/v1/admin/staffs`
   - `POST /api/v1/admin/staffs`
   - `GET /api/v1/admin/analytics/overview`
+  - `GET /api/v1/admin/wallet/transactions`
 
 ## 8) Luu y nghiep vu
 - JWT da nang cap claim role thuc (`BUSINESS/EXPERT/ADMIN/STAFF`) de phuc vu RBAC.

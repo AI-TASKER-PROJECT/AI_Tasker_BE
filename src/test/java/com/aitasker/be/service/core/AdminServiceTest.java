@@ -1,4 +1,10 @@
+/*
+ * NOTE FILE: src/test/java/com/aitasker/be/service/core/AdminServiceTest.java
+ * Đây là file gì: File service chứa nghiệp vụ chính, điều phối repository và kiểm tra luật xử lý của hệ thống.
+ * Mục đích note: giải thích các annotation và hàm chính để đọc hiểu chức năng code.
+ */
 package com.aitasker.be.service.core;
+
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.admin.AccountRequest;
@@ -16,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,25 +31,44 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+// Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private AccessService accessService;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ContractRepository contractRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private DisputeRepository disputeRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private TransactionRepository transactionRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private AccountRepository accountRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private BusinessProfileRepository businessProfileRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ExpertProfileRepository expertProfileRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private StaffRepository staffRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ReviewRepository reviewRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private SystemSettingRepository systemSettingRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private RoleRepository roleRepository;
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AuditLogService auditLogService;
+    @Mock private PaymentWalletService paymentWalletService;
+    @Mock private NotificationService notificationService;
 
+    // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private AdminService adminService;
 
+    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
+    // Note: Hàm `createReview_shouldThrowWhenRatingOutOfRange` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void createReview_shouldThrowWhenRatingOutOfRange() {
         ReviewEntity input = ReviewEntity.builder()
                 .contractId(1)
@@ -52,7 +78,9 @@ class AdminServiceTest {
         assertEquals("RATING PHAI NAM TRONG KHOANG 1 DEN 5", ex.getMessage());
     }
 
+    // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
+    // Note: Hàm `createAccount_shouldCreateStaffProfileWhenRoleIsStaff` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.
     void createAccount_shouldCreateStaffProfileWhenRoleIsStaff() {
         AccountRequest request = new AccountRequest();
         request.setEmail("new.staff@mail.com");
@@ -74,6 +102,7 @@ class AdminServiceTest {
         });
         when(staffRepository.findByAccountId(99)).thenReturn(Optional.empty());
         when(staffRepository.save(any(StaffEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
 
         adminService.createAccount(request);
 
@@ -81,5 +110,62 @@ class AdminServiceTest {
         verify(staffRepository).save(staffCaptor.capture());
         assertEquals(99, staffCaptor.getValue().getAccountId());
         assertEquals("KYB/KYC profile verification, Data Engineering", staffCaptor.getValue().getSpecialization());
+    }
+
+    @Test
+    void createAccount_shouldEnsureQuotaWhenRoleIsBusiness() {
+        AccountRequest request = new AccountRequest();
+        request.setEmail("new.business@mail.com");
+        request.setPassword("12345678");
+        request.setFullName("New Business");
+        request.setPhone("0900999001");
+        request.setRole("BUSINESS");
+        request.setStatus("Approved");
+
+        RoleEntity businessRole = RoleEntity.builder().roleId(2).roleName("BUSINESS").build();
+        when(accountRepository.existsByEmailIgnoreCase("new.business@mail.com")).thenReturn(false);
+        when(roleRepository.findByRoleNameIgnoreCase("BUSINESS")).thenReturn(Optional.of(businessRole));
+        when(passwordEncoder.encode("12345678")).thenReturn("hashed");
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> {
+            AccountEntity account = invocation.getArgument(0);
+            account.setAccountId(100);
+            return account;
+        });
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build());
+
+        adminService.createAccount(request);
+
+        verify(paymentWalletService).ensureQuotaForAccount(org.mockito.ArgumentMatchers.argThat(account ->
+                Integer.valueOf(100).equals(account.getAccountId())
+                        && "BUSINESS".equals(account.getRole().getRoleName())
+        ));
+    }
+
+    @Test
+    void createAccount_shouldNotifyAdminsWhenNewAccountIsCreated() {
+        AccountRequest request = new AccountRequest();
+        request.setEmail("new.expert@mail.com");
+        request.setPassword("12345678");
+        request.setFullName("New Expert");
+        request.setPhone("0900999002");
+        request.setRole("EXPERT");
+        request.setStatus("Pending");
+
+        RoleEntity expertRole = RoleEntity.builder().roleId(3).roleName("EXPERT").build();
+        AccountEntity admin = AccountEntity.builder().accountId(1).role(RoleEntity.builder().roleName("ADMIN").build()).build();
+        when(accountRepository.existsByEmailIgnoreCase("new.expert@mail.com")).thenReturn(false);
+        when(roleRepository.findByRoleNameIgnoreCase("EXPERT")).thenReturn(Optional.of(expertRole));
+        when(passwordEncoder.encode("12345678")).thenReturn("hashed");
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> {
+            AccountEntity account = invocation.getArgument(0);
+            account.setAccountId(101);
+            return account;
+        });
+        when(accessService.currentAccount()).thenReturn(admin);
+        when(accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")).thenReturn(List.of(admin));
+
+        adminService.createAccount(request);
+
+        verify(notificationService).notifyNewAccountCreated(1, 101, "New Expert", "new.expert@mail.com", "EXPERT");
     }
 }

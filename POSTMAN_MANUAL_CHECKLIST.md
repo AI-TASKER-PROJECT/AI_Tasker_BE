@@ -108,7 +108,17 @@ docker compose up -d
 }
 ```
 
-4. ADMIN/STAFF DUYET HO SO  
+4. EXPERT XEM TRANG CA NHAN DOANH NGHIEP
+- `GET {{base_url}}/api/v1/profiles/business/{businessId}`
+- AUTH: `{{expert_token}}`
+- EXPECT: `200`, tra ve `BusinessProfileEntity` kem `fullName`, `email`, `phone`
+
+5. BUSINESS XEM TRANG CA NHAN CHUYEN GIA
+- `GET {{base_url}}/api/v1/profiles/expert/{expertId}`
+- AUTH: `{{business_token}}`
+- EXPECT: `200`, tra ve `ExpertProfileEntity` kem `fullName`, `email`, `phone`, `title`
+
+6. ADMIN/STAFF DUYET HO SO  
 - `POST {{base_url}}/api/v1/profiles/approve/BUSINESS/{id}?status=Approved`  
 - `POST {{base_url}}/api/v1/profiles/approve/EXPERT/{id}?status=Approved`
 
@@ -159,18 +169,6 @@ docker compose up -d
 ```
 - EXPECT: `200`, LAY `contractId` -> ENV `contract_id`
 
-2. REQUEST CHANGE  
-- `POST {{base_url}}/api/v1/contracts/change-requests`  
-- AUTH: `{{expert_token}}`  
-- BODY:
-```json
-{
-  "contractId": {{contract_id}},
-  "changeType": "Timeline",
-  "changeSummary": "DE XUAT 35 NGAY"
-}
-```
-
 3. ACTIVATE CONTRACT  
 - `POST {{base_url}}/api/v1/contracts/{{contract_id}}/activate`  
 - AUTH: `{{business_token}}`
@@ -195,15 +193,17 @@ docker compose up -d
 - LAY `milestoneId` -> ENV `milestone_id`
 
 6. TAO ACCEPTANCE CRITERIA  
-- `POST {{base_url}}/api/v1/criteria`  
+- `POST {{base_url}}/api/v1/milestones/{{milestone_id}}/criteria`
 - AUTH: `{{business_token}}
 ```json
 {
-  "milestoneId": {{milestone_id}},
   "description": "MODEL DAT DO CHINH XAC TOI THIEU 92% TREN TAP KIEM THU",
-  "isPassed": false
+  "sortOrder": 1
 }
 ```
+
+- Sua: `PUT {{base_url}}/api/v1/milestones/{{milestone_id}}/criteria/{criteriaId}`
+- Xoa: `DELETE {{base_url}}/api/v1/milestones/{{milestone_id}}/criteria/{criteriaId}`
 
 7. SUBMIT DELIVERABLE  
 - `POST {{base_url}}/api/v1/deliverables`  

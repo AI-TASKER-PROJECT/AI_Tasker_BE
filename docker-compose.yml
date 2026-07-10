@@ -1,6 +1,9 @@
+# NOTE FILE: docker-compose.yml
+# Đây là file gì: File Docker Compose khai báo dịch vụ hạ tầng cần chạy cùng back-end.
+# Mục đích note: mô tả vai trò file cấu hình/script, không note rải vào từng khai báo.
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: aitasker-postgres
     restart: unless-stopped
     environment:
@@ -11,6 +14,13 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: redis-otp
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:

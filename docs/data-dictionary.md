@@ -34,7 +34,7 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Jobs
 - Mục đích: Bài toán/tin tuyển dụng của doanh nghiệp.
-- Cột nổi bật: `structured_sow`, `ai_tag`, `budget`, `status`.
+- Cột nổi bật: `structured_sow`, `ai_tag`, `budget`, `status`, `planned_duration_value`, `planned_duration_unit`.
 - Quan hệ chính: `business_id -> BusinessProfiles.business_id`.
 
 ### Proposals
@@ -45,7 +45,7 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Contracts
 - Mục đích: Hợp đồng giữa doanh nghiệp và chuyên gia.
-- Cột nổi bật: `total_budget`, `timeline_days`, `nda_signed`, `status`.
+- Cột nổi bật: `total_budget`, `timeline_days`, `business_accepted_at`, `expert_accepted_at`, `business_nda_signed_at`, `expert_nda_signed_at`, `status`.
 - Quan hệ chính: `job_id -> Jobs`; `business_id -> BusinessProfiles`; `expert_id -> ExpertProfiles`.
 
 ### ContractChangeRequests
@@ -54,10 +54,12 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Milestones
 - Mục đích: Các cột mốc thực thi trong hợp đồng.
-- Quan hệ chính: `contract_id -> Contracts.contract_id`.
+- Cột nổi bật: `duration`, `duration_unit`.
+- Quan hệ chính: `job_id -> Jobs.job_id`; `contract_id -> Contracts.contract_id` khi milestone đã gắn hợp đồng.
 
 ### AcceptanceCriteria
-- Mục đích: Tiêu chí nghiệm thu chi tiết theo milestone.
+- Mục đích: Tiêu chí nghiệm thu do AI sinh hoặc Business chỉnh sửa, thuộc riêng
+  một milestone và có thứ tự hiển thị.
 - Quan hệ chính: `milestone_id -> Milestones.milestone_id`.
 
 ### Deliverables
@@ -72,6 +74,19 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 ### Invoices
 - Mục đích: Hóa đơn/chứng từ giao dịch.
 - Quan hệ chính: `transaction_id -> Transactions.transaction_id`.
+
+### Payment Wallet Tables
+- `payment_order`: PayOS wallet top-up orders and provider metadata.
+- `system_wallet`: wallet balance snapshot per account/role.
+- `wallet_transactions`: real wallet ledger movements.
+- `membership_packages`: configurable Business/Expert packages.
+- `membership_purchases`: membership purchase history and badge range.
+- `user_quotas`: job-post/proposal credit balances, initial free quota grants,
+  badge expiration, and Premium entitlement expiration.
+- `quota_usage_logs`: grant, purchase, consume, and adjust quota history,
+  including `INITIAL_BUSINESS_GRANT` and `INITIAL_EXPERT_GRANT`.
+- `contract_deposits`: 20% contract security deposit hold/refund lifecycle.
+- `withdrawal_requests`: manual withdrawal requests and admin review.
 
 ### Reviews
 - Mục đích: Đánh giá chéo sau khi hợp đồng hoàn tất.
@@ -96,8 +111,10 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 ## 3) Quy ước trạng thái (gợi ý)
 - KYB/KYC: `Pending`, `Approved`, `Rejected`.
 - Proposal: `Submitted`, `Shortlisted`, `Accepted`, `Rejected`, `Withdrawn`.
-- Contract: `Draft`, `Negotiating`, `Active`, `Completed`, `Terminated`, `Cancelled`.
-- Milestone: `Pending`, `InProgress`, `Submitted`, `Approved`, `Rejected`, `AutoApproved`.
+- Job: `DRAFT`, `OPEN`, `IN_PROGRESS`, `CLOSED`.
+- Contract: `DRAFT`, `PENDING`, `ACTIVE`, `COMPLETED`, `CANCELLED`.
+- Milestone: `PENDING`, `DEPOSITED`, `IN_PROGRESS`, `UNDER_REVIEW`, `DISPUTED`, `COMPLETED`.
+- Wallet transaction: `POSTED`.
 - Transaction: `Pending`, `Processing`, `Success`, `Failed`, `Cancelled`.
 - Dispute: `Open`, `UnderReview`, `Resolved`, `Rejected`, `Escalated`.
 

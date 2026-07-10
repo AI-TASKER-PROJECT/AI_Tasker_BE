@@ -41,7 +41,10 @@ docker compose up -d
 - `POST /api/v1/profiles/approve/EXPERT/{id}?status=Approved`
 4. Kiem tra list:
 - `GET /api/v1/profiles/business`
+- `GET /api/v1/profiles/business/{businessId}` — xem trang ca nhan doanh nghiep, response co `fullName`, `email`, `phone`
+- `GET /api/v1/profiles/business/by-job/{jobId}` — job OPEN public, response co `fullName`, `email`, `phone`
 - `GET /api/v1/profiles/expert`
+- `GET /api/v1/profiles/expert/{expertId}` — xem trang ca nhan chuyen gia, response co `fullName`, `email`, `phone`, `title`
 
 ### C. Marketplace
 1. BUSINESS tao job: `POST /api/v1/jobs`.
@@ -57,40 +60,33 @@ docker compose up -d
 ### D. Contract + Execution
 1. BUSINESS tao contract draft tu proposal:
 - `POST /api/v1/contracts/from-proposals/{proposalId}`
-2. BUSINESS/EXPERT tao request change:
-- `POST /api/v1/contracts/change-requests`
-3. Kich hoat contract:
-- `POST /api/v1/contracts/{contractId}/activate`
-4. Tao milestone, criteria, deliverable:
-- `POST /api/v1/milestones`
-- `POST /api/v1/criteria`
-- `POST /api/v1/deliverables`
-5. EXPERT ky NDA khi contract active:
+3. Ky contract, ky NDA, va thanh toan contract deposit:
+- `POST /api/v1/contracts/{contractId}/sign`
 - `POST /api/v1/contracts/{contractId}/nda-sign`
-6. BUSINESS/ADMIN cham dut contract:
-- `POST /api/v1/contracts/{contractId}/terminate?reason=...`
+- `POST /api/v1/contracts/{contractId}/deposit/pay`
+4. Tao milestone va criteria:
+- `POST /api/v1/milestones`
+- `POST /api/v1/milestones/{milestoneId}/criteria`
+- `PUT /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+- `DELETE /api/v1/milestones/{milestoneId}/criteria/{criteriaId}`
+5. Milestone Dispute v2 smoke flow:
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
+- `POST /api/v1/milestones/{milestoneId}/start`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
+- `POST /api/v1/milestones/{milestoneId}/deliverables`
+- `POST /api/v1/milestones/{milestoneId}/approve` hoac `POST /api/v1/milestones/{milestoneId}/reject?reason=...`
+6. BUSINESS/EXPERT tao termination request:
+- `POST /api/v1/contracts/{contractId}/termination-requests`
 
 ### E. Finance + Dispute
-1. Tao transaction:
-- `POST /api/v1/transactions`
-2. STAFF/ADMIN cap nhat trang thai transaction:
-- `PATCH /api/v1/transactions/{transactionId}/status?status=Success`
-2b. Mo phong webhook payment:
-- `POST /api/v1/transactions/{transactionId}/webhook?paymentStatus=Success&bankTxCode=...&receiptImgUrl=...`
-2. Tao invoice:
-- `POST /api/v1/invoices`
-3. Tao dispute:
-- `POST /api/v1/disputes`
-4. ADMIN gan dispute cho staff:
-- `PATCH /api/v1/disputes/{disputeId}/assign?staffId={staffId}`
-5. ADMIN resolve dispute:
-- `PATCH /api/v1/disputes/{disputeId}/resolve?proposedAction=...`
-6. STAFF ghi ket qua demo testing:
-- `POST /api/v1/disputes/{disputeId}/demo-testing?testResult=...`
-7. STAFF ban hanh technical report:
-- `POST /api/v1/disputes/{disputeId}/technical-report?reportContent=...&proposedAction=...`
-8. Chay tac vu SLA auto approve milestone:
-- `POST /api/v1/milestones/sla-auto-approve`
+1. Tao dispute theo milestone v2:
+- `POST /api/v1/milestones/{milestoneId}/disputes?contractId={contractId}&initiatedBy=EXPERT&initiationType=EXPERT_SCOPE_CONCERN`
+2. Escalate/settle dispute v2:
+- `POST /api/v1/disputes/{disputeId}/escalation-request?reason=...&evidenceFile=...`
+- `POST /api/v1/disputes/{disputeId}/assign-staff?staffId={staffId}`
+- `POST /api/v1/disputes/{disputeId}/reject-intervention?reason=...`
+- `POST /api/v1/disputes/{disputeId}/staff-decision?expertPercent=70&note=...&staffReport=...`
+- `POST /api/v1/disputes/{disputeId}/execute-settlement`
  
 ### F. Review + System Settings
 1. TAO REVIEW SAU KHI CONTRACT O TRANG THAI KET THUC:
