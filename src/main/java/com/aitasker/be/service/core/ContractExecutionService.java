@@ -212,6 +212,8 @@ public class ContractExecutionService {
                     .criteriaSnapshot(criteriaSnapshot)
                     .deliverableExpectation(milestone.getDescription())
                     .status("PENDING")
+                    .resubmitCount(0)
+                    .rejectCount(0)
                     .build());
         }
     }
