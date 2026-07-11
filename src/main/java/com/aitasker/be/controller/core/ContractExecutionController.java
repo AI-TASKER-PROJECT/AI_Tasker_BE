@@ -8,6 +8,7 @@ package com.aitasker.be.controller.core;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
+import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
@@ -20,6 +21,7 @@ import com.aitasker.be.service.core.AdminService;
 import com.aitasker.be.service.core.ContractExecutionService;
 import com.aitasker.be.service.core.PaymentWalletService;
 import com.aitasker.be.service.core.StaffDisputeService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -138,11 +140,15 @@ public class ContractExecutionController {
     }
 
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/deposit")
+    @Operation(summary = "Deposit milestone escrow and auto-start milestone",
+            description = "Business deposits milestone escrow. On success, both milestone records move to IN_PROGRESS and the execution timeline starts.")
     public ResponseEntity<ApiResponse<MilestoneEntity>> depositMilestone(@PathVariable Integer contractId, @PathVariable Integer milestoneId) {
         return ResponseEntity.ok(ApiResponse.success("DEPOSIT MILESTONE SUCCESS", service.depositMilestoneEscrow(contractId, milestoneId)));
     }
 
     @PostMapping("/milestones/{milestoneId}/start")
+    @Operation(summary = "Start milestone compatibility endpoint",
+            description = "Compatibility endpoint for older clients and legacy DEPOSITED rows. Deposit now auto-starts milestones; calling this route when already IN_PROGRESS is idempotent.")
     public ResponseEntity<ApiResponse<MilestoneEntity>> startMilestone(@PathVariable Integer milestoneId) {
         return ResponseEntity.ok(ApiResponse.success("START MILESTONE SUCCESS", service.startMilestone(milestoneId)));
     }
@@ -171,6 +177,14 @@ public class ContractExecutionController {
             @PathVariable Long progressReportId) {
         return ResponseEntity.ok(ApiResponse.success("PROGRESS REPORT ACKNOWLEDGED",
                 service.acknowledgeProgressReport(contractId, milestoneId, progressReportId)));
+    }
+
+    @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback")
+    public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> feedbackProgressReport(
+            @PathVariable Integer contractId, @PathVariable Integer milestoneId,
+            @PathVariable Long progressReportId, @RequestBody ProgressReportFeedbackRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("PROGRESS REPORT FEEDBACK SUCCESS",
+                service.feedbackProgressReport(contractId, milestoneId, progressReportId, request)));
     }
 
     @PostMapping("/contracts/{contractId}/milestones/check-overdue")

@@ -10,6 +10,7 @@ import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
+import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
 import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
 import com.aitasker.be.dto.core.StaffDisputeFilter;
@@ -670,9 +671,9 @@ public class ContractExecutionService {
         enrichLedger(walletLedgerService.holdEscrowFromAvailable(businessAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_DEPOSIT, "MILESTONE", milestoneId.longValue(), "Deposit milestone escrow"),
                 contractId, milestoneId, walletMetadata("MILESTONE_ESCROW_DEPOSIT", null, null, accessService.currentAccount().getAccountId(), businessAccountId, null, null, contractMilestone.getFinalBudget(), BigDecimal.ZERO));
         LocalDateTime now = LocalDateTime.now();
-        milestone.setStatus(ContractMilestoneEntity.STATUS_DEPOSITED);
+        milestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
         milestone.setUpdatedAt(now);
-        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_DEPOSITED);
+        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
         if (contractMilestone.getInProgressStartedAt() == null) {
             contractMilestone.setInProgressStartedAt(now);
         }
@@ -693,6 +694,15 @@ public class ContractExecutionService {
         ContractEntity contract = requireExpertOwnedContract(Optional.ofNullable(milestone.getContractId()).orElseGet(() -> contractRepository.findByJobId(milestone.getJobId()).map(ContractEntity::getContractId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT CUA MILESTONE"))));
         if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) throw new AppException("CHI DUOC BAT DAU MILESTONE KHI CONTRACT ACTIVE");
         ContractMilestoneEntity contractMilestone = findContractMilestoneForUpdate(contract.getContractId(), milestoneId);
+        if (ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(contractMilestone.getStatus())) {
+            ensureEscrowNotReleased(contractMilestone);
+            if (!ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(milestone.getStatus())) {
+                milestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
+                milestone.setUpdatedAt(LocalDateTime.now());
+                return milestoneRepository.save(milestone);
+            }
+            return milestone;
+        }
         if (!ContractMilestoneEntity.STATUS_DEPOSITED.equals(contractMilestone.getStatus())) {
             throw new AppException("MILESTONE PHAI DUOC DEPOSIT TRUOC KHI BAT DAU");
         }
@@ -754,6 +764,7 @@ public class ContractExecutionService {
                 .demoLink(request.getDemoLink())
                 .submissionNotes(request.getSubmissionNotes())
                 .isLate(isLate)
+                .requiresAdjustment(false)
                 .acknowledgementState(MilestoneProgressReportEntity.ACK_PENDING)
                 .build());
         openRequest.ifPresent(item -> {
@@ -817,6 +828,48 @@ public class ContractExecutionService {
                 notificationService.notifyContractEvent(expert.getAccountId(), accessService.currentAccount().getAccountId(),
                         "PROGRESS_REPORT_REQUESTED", "Yêu cầu báo cáo tiến độ",
                         "Doanh nghiệp đã yêu cầu báo cáo tiến độ cho milestone.", contractId));
+        return saved;
+    }
+
+    @Transactional
+    public MilestoneProgressReportEntity feedbackProgressReport(
+            Integer contractId, Integer milestoneId, Long progressReportId, ProgressReportFeedbackRequest input) {
+        accessService.requireRole("BUSINESS");
+        ContractEntity contract = requireBusinessOwnedContract(contractId);
+        ContractMilestoneEntity milestone = findContractMilestone(contractId, milestoneId);
+        if (List.of(ContractMilestoneEntity.STATUS_COMPLETED, ContractMilestoneEntity.STATUS_CANCELLED)
+                .contains(milestone.getStatus())) {
+            throw new AppException("PROGRESS_REPORT_FEEDBACK_NOT_ALLOWED");
+        }
+        MilestoneProgressReportEntity report = milestoneProgressReportRepository.findById(progressReportId)
+                .filter(item -> contractId.equals(item.getContractId()) && milestoneId.equals(item.getMilestoneId()))
+                .orElseThrow(() -> new NotFoundException("PROGRESS_REPORT_REQUEST_NOT_FOUND"));
+        if (input == null || input.getFeedback() == null || input.getFeedback().isBlank()) {
+            throw new AppException("PROGRESS_REPORT_FEEDBACK_NOT_ALLOWED");
+        }
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        report.setBusinessFeedback(input.getFeedback().trim());
+        report.setFeedbackCategory(input.getCategory());
+        report.setFeedbackSeverity(input.getSeverity());
+        try {
+            report.setFeedbackDodItems(input.getDodItems() == null ? null : objectMapper.writeValueAsString(input.getDodItems()));
+        } catch (Exception ex) {
+            throw new AppException("PROGRESS_REPORT_FEEDBACK_NOT_ALLOWED");
+        }
+        report.setRequiresAdjustment(Boolean.TRUE.equals(input.getRequiresAdjustment()));
+        report.setFeedbackByAccountId(actorAccountId);
+        report.setFeedbackAt(LocalDateTime.now());
+        if (MilestoneProgressReportEntity.ACK_PENDING.equals(report.getAcknowledgementState())) {
+            report.setAcknowledgementState(MilestoneProgressReportEntity.ACKNOWLEDGED);
+            report.setAcknowledgedByAccountId(actorAccountId);
+            report.setAcknowledgedAt(LocalDateTime.now());
+        }
+        MilestoneProgressReportEntity saved = milestoneProgressReportRepository.save(report);
+        auditLogService.record("PROGRESS_REPORT_FEEDBACK_RECORDED", "milestone_progress_reports",
+                String.valueOf(progressReportId), actorAccountId);
+        expertProfileRepository.findById(contract.getExpertId()).ifPresent(expert ->
+                notificationService.notifyProgressReportFeedbackRecorded(
+                        expert.getAccountId(), actorAccountId, contractId, milestoneId, progressReportId));
         return saved;
     }
 

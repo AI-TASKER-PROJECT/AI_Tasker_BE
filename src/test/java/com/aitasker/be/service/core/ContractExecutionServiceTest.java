@@ -10,6 +10,7 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
+import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.AcceptanceCriteriaEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
@@ -993,7 +994,7 @@ class ContractExecutionServiceTest {
     // --- Phase 2 Dispute Flow Tests ---
 
     @Test
-    void depositMilestoneEscrow_shouldHoldEscrowAndSetDeposited() {
+    void depositMilestoneEscrow_shouldHoldEscrowAndAutoStartMilestone() {
         ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2).businessId(10).expertId(5).status("ACTIVE").build();
         MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).jobId(2).milestoneName("M1").build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
@@ -1015,8 +1016,9 @@ class ContractExecutionServiceTest {
         MilestoneEntity result = contractExecutionService.depositMilestoneEscrow(1, 200);
 
         verify(walletLedgerService).holdEscrowFromAvailable(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any());
-        assertEquals("DEPOSITED", result.getStatus());
-        assertEquals("DEPOSITED", cm.getStatus());
+        assertEquals("IN_PROGRESS", result.getStatus());
+        assertEquals("IN_PROGRESS", cm.getStatus());
+        assertNotNull(cm.getInProgressStartedAt());
     }
 
     @Test
@@ -1423,6 +1425,26 @@ class ContractExecutionServiceTest {
     }
 
     @Test
+    void startMilestone_shouldReturnAlreadyInProgressMilestone() {
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).contractId(1).status(ContractMilestoneEntity.STATUS_IN_PROGRESS).build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_ACTIVE).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(200).status(ContractMilestoneEntity.STATUS_IN_PROGRESS).build();
+        AccountEntity expert = AccountEntity.builder().accountId(90).role(RoleEntity.builder().roleName("EXPERT").build()).build();
+
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(accessService.currentAccount()).thenReturn(expert);
+        when(expertProfileRepository.findByAccountId(90)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        mockLockedContractMilestone(1, 200, contractMilestone);
+
+        MilestoneEntity result = contractExecutionService.startMilestone(200);
+
+        assertEquals(ContractMilestoneEntity.STATUS_IN_PROGRESS, result.getStatus());
+        verify(milestoneRepository, never()).save(any());
+        verify(auditLogService, never()).record(eq("MILESTONE_STARTED"), any(), any(), any());
+    }
+
+    @Test
     void cancelDispute_byInitiatorRestoresPreviousStatus() {
         DisputeEntity dispute = DisputeEntity.builder()
                 .disputeId(1)
@@ -1567,7 +1589,7 @@ class ContractExecutionServiceTest {
         contractExecutionService.depositMilestoneEscrow(1, 200);
 
         assertNotNull(cm.getInProgressStartedAt());
-        assertEquals("DEPOSITED", cm.getStatus());
+        assertEquals("IN_PROGRESS", cm.getStatus());
     }
 
     @Test
@@ -1670,6 +1692,100 @@ class ContractExecutionServiceTest {
         AppException ex = assertThrows(AppException.class,
                 () -> contractExecutionService.requestProgressReport(1, 200));
         assertEquals("PROGRESS_REPORT_ACK_PENDING", ex.getMessage());
+    }
+
+    @Test
+    void feedbackProgressReport_shouldStoreFeedbackAcknowledgeAndNotify() {
+        MilestoneProgressReportEntity report = MilestoneProgressReportEntity.builder()
+                .progressReportId(1L).contractId(1).milestoneId(200)
+                .acknowledgementState(MilestoneProgressReportEntity.ACK_PENDING).build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractId(1).jobMilestoneId(200).status("IN_PROGRESS").build();
+        ProgressReportFeedbackRequest request = new ProgressReportFeedbackRequest();
+        request.setCategory("SCOPE");
+        request.setSeverity("INFO");
+        request.setDodItems(List.of("API_CONTRACT_STABLE"));
+        request.setFeedback("  Tien do tot, bo sung demo link o lan sau.  ");
+        request.setRequiresAdjustment(true);
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(50).role(RoleEntity.builder().roleName("BUSINESS").build()).build());
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(milestoneProgressReportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(milestoneProgressReportRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
+
+        MilestoneProgressReportEntity result = contractExecutionService.feedbackProgressReport(1, 200, 1L, request);
+
+        assertEquals("Tien do tot, bo sung demo link o lan sau.", result.getBusinessFeedback());
+        assertEquals("SCOPE", result.getFeedbackCategory());
+        assertEquals("INFO", result.getFeedbackSeverity());
+        assertTrue(result.getFeedbackDodItems().contains("API_CONTRACT_STABLE"));
+        assertTrue(result.getRequiresAdjustment());
+        assertEquals(Integer.valueOf(50), result.getFeedbackByAccountId());
+        assertNotNull(result.getFeedbackAt());
+        assertEquals(MilestoneProgressReportEntity.ACKNOWLEDGED, result.getAcknowledgementState());
+        assertEquals(Integer.valueOf(50), result.getAcknowledgedByAccountId());
+        assertNotNull(result.getAcknowledgedAt());
+        verify(auditLogService).record(eq("PROGRESS_REPORT_FEEDBACK_RECORDED"), eq("milestone_progress_reports"), eq("1"), eq(50));
+        verify(notificationService).notifyProgressReportFeedbackRecorded(60, 50, 1, 200, 1L);
+    }
+
+    @Test
+    void feedbackProgressReport_shouldRejectBlankFeedback() {
+        MilestoneProgressReportEntity report = MilestoneProgressReportEntity.builder()
+                .progressReportId(1L).contractId(1).milestoneId(200)
+                .acknowledgementState(MilestoneProgressReportEntity.ACK_PENDING).build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractId(1).jobMilestoneId(200).status("IN_PROGRESS").build();
+        ProgressReportFeedbackRequest request = new ProgressReportFeedbackRequest();
+        request.setFeedback(" ");
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(50).role(RoleEntity.builder().roleName("BUSINESS").build()).build());
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(milestoneProgressReportRepository.findById(1L)).thenReturn(Optional.of(report));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.feedbackProgressReport(1, 200, 1L, request));
+
+        assertEquals("PROGRESS_REPORT_FEEDBACK_NOT_ALLOWED", ex.getMessage());
+        verify(milestoneProgressReportRepository, never()).save(any());
+    }
+
+    @Test
+    void submitProgressReport_shouldAcceptAfterBusinessFeedbackAcknowledgesPreviousReport() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).contractId(1).milestoneName("M1").status("IN_PROGRESS").build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractId(1).jobMilestoneId(200).status("IN_PROGRESS")
+                .inProgressStartedAt(LocalDateTime.now().minusDays(1)).duration(10).durationUnit("DAY").build();
+        MilestoneProgressReportEntity feedbackHandled = MilestoneProgressReportEntity.builder()
+                .progressReportId(1L).contractId(1).milestoneId(200)
+                .acknowledgementState(MilestoneProgressReportEntity.ACKNOWLEDGED)
+                .businessFeedback("Can bo sung demo link trong bao cao sau").build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("EXPERT").build()).build());
+        when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(milestoneProgressReportRepository.findByMilestoneIdOrderByCreatedAtAsc(200)).thenReturn(List.of(feedbackHandled));
+        when(milestoneProgressReportRepository.findFirstByContractIdAndMilestoneIdOrderByCreatedAtDesc(1, 200))
+                .thenReturn(Optional.of(feedbackHandled));
+        when(milestoneProgressReportRepository.save(any(MilestoneProgressReportEntity.class))).thenAnswer(i -> i.getArgument(0));
+
+        MilestoneProgressReportEntity result = contractExecutionService.submitProgressReport(1, 200, "Next report", 90, null);
+
+        assertEquals(MilestoneProgressReportEntity.ACK_PENDING, result.getAcknowledgementState());
+        assertEquals("Next report", result.getContent());
     }
 
     @Test

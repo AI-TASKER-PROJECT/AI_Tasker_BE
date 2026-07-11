@@ -2,9 +2,9 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **154**.
+- Tong so REST endpoint trong Swagger runtime: **166**.
 - Public endpoint: **21**.
-- Endpoint can Bearer JWT: **132**.
+- Endpoint can Bearer JWT: **145**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -35,7 +35,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 
 ## Profile Verification Flow
 
-- Giai thich flow: Tao, xem va duyet ho so Business/Expert va portfolio. Business/Expert profile responses include `averageRating` tinh dong tu `reviews.rating` theo `reviewee_id`; Business profile responses also include `verifiedRepresentative` (nguoi dai dien phap ly tu VietQR API). `companyName`/`address` duoc auto-fill tu VietQR khi submit.
+- Giai thich flow: Tao, xem va duyet ho so Business/Expert va portfolio.
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |
@@ -59,7 +59,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 
 ## Job Draft & Publish Flow
 
-- Giai thich flow: Tao draft, cap nhat, gan taxonomy, sinh SoW va publish job. `POST /api/jobs/generate-sow` co flag optional `clarificationAlreadyAsked`; lan dau de false/bo trong de AI co the hoi toi da 3 cau, lan sau set true de backend khong hoi them nua va tu suy luan vao `sow.assumptions`.
+- Giai thich flow: Tao draft, cap nhat, gan taxonomy, sinh SoW va publish job.
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |
@@ -74,7 +74,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 9 | GET | `/api/v1/jobs` | Public | Operation listJobs. |
 | 10 | POST | `/api/v1/jobs` | Bearer JWT | Operation createJob. |
 | 11 | POST | `/api/v1/jobs/{jobId}/publish` | Bearer JWT | Operation publishJob. |
-| 12 | POST | `/api/jobs/generate-sow` | Bearer JWT | Generate SoW |
+| 12 | POST | `/api/jobs/generate-sow` | Bearer JWT | Operation generateSow. |
 | 13 | PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Operation updateJobStatus. |
 | 14 | GET | `/api/v1/jobs/{jobId}/milestones` | Public | Operation listJobMilestones. |
 | 15 | GET | `/api/v1/jobs/my` | Bearer JWT | Operation listMyJobs. |
@@ -87,14 +87,14 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | --- | --- | --- | --- | --- |
 | 1 | POST | `/api/v1/proposals` | Bearer JWT | Operation submitProposal. |
 | 2 | POST | `/api/v1/proposals/file` | Bearer JWT | Operation uploadProposalFile. |
-| 3 | GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Get saved expert recommendations |
-| 4 | POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Generate expert recommendations |
-| 5 | POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | Bearer JWT | Select a recommended expert |
+| 3 | GET | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Operation getRecommendations. |
+| 4 | POST | `/api/jobs/{jobPostingId}/expert-recommendations` | Bearer JWT | Operation generateRecommendations. |
+| 5 | POST | `/api/jobs/{jobPostingId}/expert-recommendations/{expertId}/select` | Bearer JWT | Operation selectRecommendedExpert. |
 | 6 | PATCH | `/api/v1/proposals/{proposalId}/status` | Bearer JWT | Operation reviewProposal. |
 | 7 | GET | `/api/v1/proposals/my` | Bearer JWT | Operation listMyProposals. |
 | 8 | GET | `/api/v1/jobs/{jobId}/proposals` | Bearer JWT | Operation listProposals. |
 | 9 | GET | `/api/v1/jobs/{jobId}/matching` | Bearer JWT | Operation matching. |
-| 10 | GET | `/api/jobs/{jobPostingId}/expert-candidates` | Bearer JWT | Find top expert candidates |
+| 10 | GET | `/api/jobs/{jobPostingId}/expert-candidates` | Bearer JWT | Operation findTopCandidates. |
 
 ## Wallet & Payment Flow
 
@@ -122,6 +122,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 ## Contract Execution Flow
 
 - Giai thich flow: Contract, milestone, deliverable, dispute, termination va review.
+- Progress-report feedback endpoint restored: Business can store feedback and acknowledge a pending report without creating dispute/revision semantics.
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |
@@ -132,58 +133,58 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 5 | POST | `/api/v1/termination-requests/{terminationRequestId}/refund-deposit` | Bearer JWT | Operation refundTerminationDeposit. |
 | 6 | POST | `/api/v1/termination-requests/{terminationRequestId}/partial-evidence` | Bearer JWT | Operation submitPartialEvidence. |
 | 7 | POST | `/api/v1/termination-requests/{terminationRequestId}/execute-settlement` | Bearer JWT | Operation executeTerminationSettlement. |
-| 8 | POST | `/api/v1/termination-requests/{terminationRequestId}/assign-staff` | Bearer JWT | Operation assignTerminationStaff. |
-| 9 | POST | `/api/v1/termination-requests/{terminationRequestId}/approve` | Bearer JWT | Operation approveTermination. |
-| 10 | POST | `/api/v1/milestones` | Bearer JWT | Operation createMilestone. |
-| 11 | POST | `/api/v1/milestones/{milestoneId}/start` | Bearer JWT | Operation startMilestone. |
-| 12 | POST | `/api/v1/milestones/{milestoneId}/reject` | Bearer JWT | Operation rejectMilestone. |
-| 13 | POST | `/api/v1/milestones/{milestoneId}/disputes` | Bearer JWT | Operation initiateMilestoneDispute. |
-| 14 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Operation listDeliverables. |
-| 15 | POST | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Operation submitMilestoneDeliverable. |
-| 16 | GET | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Operation listCriteria. |
-| 17 | POST | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Operation createCriteria. |
-| 18 | POST | `/api/v1/milestones/{milestoneId}/complete` | Bearer JWT | Operation completeMilestone. |
-| 19 | POST | `/api/v1/milestones/{milestoneId}/approve` | Bearer JWT | Operation approveMilestone. |
-| 20 | POST | `/api/v1/disputes/{disputeId}/staff-decision` | Bearer JWT | Operation staffDecideAlias. |
-| 21 | POST | `/api/v1/disputes/{disputeId}/execute-settlement` | Bearer JWT | Operation executeDisputeSettlementAlias. |
-| 23 | POST | `/api/v1/disputes/{disputeId}/escalation-request` | Bearer JWT | Operation requestEscalation. |
-| 24 | POST | `/api/v1/disputes/{disputeId}/cancel` | Bearer JWT | Operation cancelDispute. |
+| 8 | POST | `/api/v1/termination-requests/{terminationRequestId}/dispute` | Bearer JWT | Operation disputeTermination. |
+| 9 | POST | `/api/v1/termination-requests/{terminationRequestId}/assign-staff` | Bearer JWT | Operation assignTerminationStaff. |
+| 10 | POST | `/api/v1/termination-requests/{terminationRequestId}/approve` | Bearer JWT | Operation approveTermination. |
+| 11 | POST | `/api/v1/termination-requests/{terminationRequestId}/accept` | Bearer JWT | Operation acceptTermination. |
+| 12 | POST | `/api/v1/termination-requests/expire-awaiting-expert` | Bearer JWT | Operation expireTerminationResponses. |
+| 13 | POST | `/api/v1/milestones` | Bearer JWT | Operation createMilestone. |
+| 14 | POST | `/api/v1/milestones/{milestoneId}/start` | Bearer JWT | Compatibility start endpoint; deposit now auto-starts milestones and this route is idempotent for `IN_PROGRESS`. |
+| 15 | POST | `/api/v1/milestones/{milestoneId}/reject` | Bearer JWT | Operation rejectMilestone. |
+| 16 | POST | `/api/v1/milestones/{milestoneId}/disputes` | Bearer JWT | Operation initiateMilestoneDispute. |
+| 17 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Operation listDeliverables. |
+| 18 | POST | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Operation submitMilestoneDeliverable. |
+| 19 | GET | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Operation listCriteria. |
+| 20 | POST | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Operation createCriteria. |
+| 21 | POST | `/api/v1/milestones/{milestoneId}/complete` | Bearer JWT | Operation completeMilestone. |
+| 22 | POST | `/api/v1/milestones/{milestoneId}/approve` | Bearer JWT | Operation approveMilestone. |
+| 23 | POST | `/api/v1/disputes/{disputeId}/staff-decision` | Bearer JWT | Operation staffDecideAlias. |
 | 24 | POST | `/api/v1/disputes/{disputeId}/route-staff` | Bearer JWT | Operation routeDisputeStaff. |
-| 25 | POST | `/api/v1/disputes/staff-sla-escalate` | Bearer JWT | Admin/system escalates overdue Staff dispute SLA. |
-| 26 | GET | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation listTerminationRequests. |
-| 27 | POST | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation requestTermination. |
-| 28 | POST | `/api/v1/contracts/{contractId}/sign` | Bearer JWT | Operation signContract. |
-| 29 | GET | `/api/v1/contracts/{contractId}/reviews` | Bearer JWT | Operation listContractReviews. |
-| 30 | POST | `/api/v1/contracts/{contractId}/reviews` | Bearer JWT | Operation createContractReview. |
-| 31 | POST | `/api/v1/contracts/{contractId}/reject` | Bearer JWT | Operation rejectContract. |
-| 32 | POST | `/api/v1/contracts/{contractId}/cancel-draft` | Bearer JWT | Operation cancelDraftContract. |
-| 33 | POST | `/api/v1/contracts/{contractId}/nda-sign` | Bearer JWT | Operation signNda. |
-| 33 | GET | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports` | Bearer JWT | List progress reports and SLA result. |
-| 34 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports` | Bearer JWT | Submit scheduled, requested, or voluntary report. |
-| 35 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request` | Bearer JWT | Business requests report with 24h/12h SLA. |
-| 35 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge` | Bearer JWT | Business acknowledges latest progress report. |
-| 37 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit` | Bearer JWT | Deposit milestone escrow. |
-| 38 | POST | `/api/v1/contracts/{contractId}/milestones/check-overdue` | Bearer JWT | Admin/system idempotent overdue trigger. |
-| 39 | POST | `/api/v1/contracts/{contractId}/milestones/sla-auto-approve` | Bearer JWT | Admin/system review-SLA trigger. |
-| 40 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | Bearer JWT | Business funds 20% contract deposit. |
-| 41 | POST | `/api/v1/contracts/{contractId}/expert-deposit/pay` | Bearer JWT | Expert funds 10% contract deposit. |
-| 42 | POST | `/api/v1/admin/contracts/{contractId}/deposits/refund` | Bearer JWT | Admin refunds both participant deposits. |
-| 43 | POST | `/api/v1/contracts/{contractId}/immediate-termination` | Bearer JWT | Participant confirms immediate termination and 10% compensation. |
-| 44 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | Bearer JWT | Operation createDraft. |
-| 45 | GET | `/api/v1/case-attachments` | Bearer JWT | Operation listCaseAttachments. |
-| 46 | POST | `/api/v1/case-attachments` | Bearer JWT | Operation createCaseAttachment. |
-| 47 | GET | `/api/v1/disputes/{disputeId}/staff-candidates` | Bearer JWT | Admin lists ranked Staff candidates. |
-| 48 | POST | `/api/v1/termination-requests/{terminationRequestId}/accept` | Bearer JWT | Expert accepts Business standard termination. |
-| 49 | POST | `/api/v1/termination-requests/{terminationRequestId}/dispute` | Bearer JWT | Expert disputes Business termination for Staff review. |
-| 50 | POST | `/api/v1/termination-requests/expire-awaiting-expert` | Bearer JWT | Admin/system expires three-day response SLA. |
-| 41 | PATCH | `/api/v1/milestones/{milestoneId}` | Bearer JWT | Operation updateMilestone. |
-| 42 | GET | `/api/v1/termination-requests/{terminationRequestId}` | Bearer JWT | Operation getTerminationRequest. |
-| 43 | GET | `/api/v1/disputes/{disputeId}` | Bearer JWT | Operation getDispute. |
-| 44 | GET | `/api/v1/contracts` | Bearer JWT | Operation listContracts. |
-| 45 | GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Operation getContract. |
-| 46 | GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Operation listMilestones. |
-| 47 | GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Operation listDisputes. |
-| 48 | GET | `/api/v1/staff/disputes` | Bearer JWT | Staff inbox disputes duoc gan, co phan trang/loc status. |
+| 25 | POST | `/api/v1/disputes/{disputeId}/execute-settlement` | Bearer JWT | Operation executeDisputeSettlementAlias. |
+| 26 | POST | `/api/v1/disputes/{disputeId}/escalation-request` | Bearer JWT | Operation requestEscalation. |
+| 27 | POST | `/api/v1/disputes/{disputeId}/cancel` | Bearer JWT | Operation cancelDispute. |
+| 28 | POST | `/api/v1/disputes/staff-sla-escalate` | Bearer JWT | Operation escalateOverdueStaffDisputes. |
+| 29 | GET | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation listTerminationRequests. |
+| 30 | POST | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation requestTermination. |
+| 31 | POST | `/api/v1/contracts/{contractId}/sign` | Bearer JWT | Operation signContract. |
+| 32 | GET | `/api/v1/contracts/{contractId}/reviews` | Bearer JWT | Operation listContractReviews. |
+| 33 | POST | `/api/v1/contracts/{contractId}/reviews` | Bearer JWT | Operation createContractReview. |
+| 34 | POST | `/api/v1/contracts/{contractId}/reject` | Bearer JWT | Operation rejectContract. |
+| 35 | POST | `/api/v1/contracts/{contractId}/nda-sign` | Bearer JWT | Operation signNda. |
+| 36 | GET | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports` | Bearer JWT | Operation listProgressReports. |
+| 37 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports` | Bearer JWT | Expert submits scheduled, requested, or voluntary progress report. |
+| 38 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback` | Bearer JWT | Business records feedback for a progress report; feedback also acknowledges it when pending. |
+| 39 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge` | Bearer JWT | Business acknowledges the latest progress report to unlock the next submission. |
+| 40 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request` | Bearer JWT | Business requests report with 24h/12h SLA. |
+| 41 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit` | Bearer JWT | Operation depositMilestone. |
+| 42 | POST | `/api/v1/contracts/{contractId}/milestones/sla-auto-approve` | Bearer JWT | Operation autoApproveReviewSla. |
+| 43 | POST | `/api/v1/contracts/{contractId}/milestones/check-overdue` | Bearer JWT | Operation checkOverdue. |
+| 44 | POST | `/api/v1/contracts/{contractId}/immediate-termination` | Bearer JWT | Operation immediateTermination. |
+| 45 | POST | `/api/v1/contracts/{contractId}/expert-deposit/pay` | Bearer JWT | Operation payExpertContractDeposit. |
+| 46 | POST | `/api/v1/contracts/{contractId}/deposit/pay` | Bearer JWT | Operation payContractDeposit. |
+| 47 | POST | `/api/v1/contracts/{contractId}/cancel-draft` | Bearer JWT | Operation cancelDraftContract. |
+| 48 | POST | `/api/v1/contracts/from-proposals/{proposalId}` | Bearer JWT | Operation createDraft. |
+| 49 | GET | `/api/v1/case-attachments` | Bearer JWT | Operation listCaseAttachments. |
+| 50 | POST | `/api/v1/case-attachments` | Bearer JWT | Operation createCaseAttachment. |
+| 51 | POST | `/api/v1/admin/contracts/{contractId}/deposits/refund` | Bearer JWT | Operation refundContractDeposits. |
+| 52 | PATCH | `/api/v1/milestones/{milestoneId}` | Bearer JWT | Operation updateMilestone. |
+| 53 | GET | `/api/v1/termination-requests/{terminationRequestId}` | Bearer JWT | Operation getTerminationRequest. |
+| 54 | GET | `/api/v1/disputes/{disputeId}` | Bearer JWT | Operation getDispute. |
+| 55 | GET | `/api/v1/disputes/{disputeId}/staff-candidates` | Bearer JWT | Operation listStaffCandidates. |
+| 56 | GET | `/api/v1/contracts` | Bearer JWT | Operation listContracts. |
+| 57 | GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Operation getContract. |
+| 58 | GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Operation listMilestones. |
+| 59 | GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Operation listDisputes. |
 
 ## Notification Flow
 
@@ -242,10 +243,10 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 14 | GET | `/api/v1/admin/wallet/transactions` | Bearer JWT | Operation platformWalletTransactions. |
 | 15 | GET | `/api/v1/admin/settings` | Bearer JWT | Operation listSettings. |
 | 16 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Operation listReviewsByContract. |
-| 17 | GET | `/api/v1/admin/audit-logs` | Bearer JWT | Operation listAuditLogs. |
-| 18 | GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Operation analyticsOverview. |
-| 19 | GET | `/api/v1/admin/disputes` | Bearer JWT | Operation listDisputes. |
-| 20 | GET | `/api/v1/admin/disputes/{disputeId}` | Bearer JWT | Operation getDisputeDetail. |
+| 17 | GET | `/api/v1/admin/disputes` | Bearer JWT | Operation listDisputes_1. |
+| 18 | GET | `/api/v1/admin/disputes/{disputeId}` | Bearer JWT | Operation getDisputeDetail. |
+| 19 | GET | `/api/v1/admin/audit-logs` | Bearer JWT | Operation listAuditLogs. |
+| 20 | GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Operation analyticsOverview. |
 
 ## System & Test Flow
 
@@ -253,5 +254,6 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |
-| 1 | GET | `/api/test/secure` | Bearer JWT | Operation secure. |
-| 2 | GET | `/api/health` | Public | Operation health. |
+| 1 | GET | `/api/v1/staff/disputes` | Bearer JWT | Operation listStaffDisputes. |
+| 2 | GET | `/api/test/secure` | Bearer JWT | Operation secure. |
+| 3 | GET | `/api/health` | Public | Operation health. |

@@ -190,6 +190,19 @@ public class NotificationService {
         );
     }
 
+    public void notifyProgressReportFeedbackRecorded(Integer receiverAccountId, Integer actorAccountId,
+            Integer contractId, Integer milestoneId, Long progressReportId) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "PROGRESS_REPORT_FEEDBACK_RECORDED",
+                "Doanh nghiệp đã phản hồi báo cáo tiến độ",
+                "Doanh nghiệp đã ghi nhận phản hồi cho báo cáo tiến độ của milestone.",
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId, "progressReportId", progressReportId)
+        );
+    }
+
     public void notifyContractEvent(Integer receiverAccountId, Integer actorAccountId, String type, String title, String message, Integer contractId) {
         createAndPush(
                 receiverAccountId,

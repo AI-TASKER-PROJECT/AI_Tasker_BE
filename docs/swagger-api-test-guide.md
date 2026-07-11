@@ -21,7 +21,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 
 1. Business/Expert sign contract and NDA, then Business pays contract deposit.
 2. Business deposits milestone escrow with `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`.
-3. Expert starts milestone, submits progress reports if needed, then submits deliverable.
+3. Business milestone deposit auto-starts the milestone; Expert submits progress reports if needed, then submits deliverable.
 4. Business approves to release escrow, or rejects to create/update one active dispute.
 5. Either party can request escalation; Admin assigns reviewer; Staff decision is recorded first, then Admin executes settlement separately.
 6. For termination, create a termination request, assign Staff, approve/reject, execute settlement, then refund deposit before contract is CLOSED and reviews are allowed.
@@ -1204,7 +1204,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### POST `/api/v1/milestones/{milestoneId}/start`
 - OperationId: `startMilestone`
 - Auth: Bearer JWT
-- Giai thich: Operation startMilestone.
+- Giai thich: Compatibility endpoint. Milestone escrow deposit now auto-starts the milestone; this route is idempotent when the milestone is already `IN_PROGRESS` and only transitions legacy `DEPOSITED` rows.
 - Params:
   - `milestoneId` (path, required, integer)
 - Body raw: Khong co.
@@ -1554,6 +1554,25 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback`
+- OperationId: `feedbackProgressReport`
+- Auth: Bearer JWT
+- Giai thich: Business records feedback for a progress report; feedback also acknowledges it when pending.
+- Params:
+  - `contractId` (path, required, integer)
+  - `milestoneId` (path, required, integer)
+  - `progressReportId` (path, required, integer)
+- Body raw:
+```json
+{ "schema": "ProgressReportFeedbackRequest" }
+```
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Feedback rong, milestone terminal, hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay report thuoc contract/milestone.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
 ### POST `/api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`

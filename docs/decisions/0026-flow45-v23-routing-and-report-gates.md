@@ -20,13 +20,19 @@ the notification `type` field.
 
 ## Decision
 
-1. **Escrow deposit starts milestone timeline.** Set `contract_milestones.in_progress_started_at`
-   during `depositMilestoneEscrow`. `startMilestone` must not reset it.
-2. **Business acknowledgement gate replaces structured feedback.** Remove the
-   `/feedback` endpoint, `ProgressReportFeedbackRequest` DTO, and all structured-
-   feedback fields from `MilestoneProgressReportEntity`. Add `acknowledgement_state`
-   (`PENDING_BUSINESS_ACK` / `ACKNOWLEDGED`), an `/acknowledge` endpoint, and a gate
-   that blocks new reports and on-demand requests while the latest report is pending ack.
+1. **Escrow deposit starts milestone execution.** Set
+   `contract_milestones.in_progress_started_at` during
+   `depositMilestoneEscrow` and move the milestone to `IN_PROGRESS`.
+   `startMilestone` is compatibility/idempotent behavior and must not reset the
+   timestamp.
+2. **Business acknowledgement gate controls report flow.** Add
+   `acknowledgement_state` (`PENDING_BUSINESS_ACK` / `ACKNOWLEDGED`), an
+   `/acknowledge` endpoint, and a gate that blocks new reports and on-demand
+   requests while the latest report is pending ack. US-052 restores the
+   `/feedback` endpoint and `ProgressReportFeedbackRequest` for Business
+   progress-tracking responses; feedback acknowledges a pending report but must
+   not create report revision, deliverable rejection, dispute, or settlement
+   semantics.
 3. **Business may cancel its own untouched `DRAFT` contract.** Add `POST /contracts/{contractId}/cancel-draft`.
    Requires `STATUS_DRAFT` with no signatures and no NDA signs; sets contract to `CANCELLED`
    and returns the job to `OPEN`.
@@ -50,8 +56,10 @@ the notification `type` field.
 
 ## Alternatives Considered
 
-1. Keep structured progress-report feedback. Rejected by spec — structured feedback
-   creates ambiguity and conflates flow control with deliverable-quality judgment.
+1. Keep structured progress-report feedback as a revision/dispute action.
+   Rejected by spec because feedback is allowed only as a tracking response and
+   acknowledgement carrier, not as deliverable-quality judgment, report
+   revision, dispute, or settlement behavior.
 2. Keep Admin as dispute-Staff assigner. Rejected — Admin is an operational manager,
    not a dispute workflow participant. Staff-ops routing decouples management from
    escalation.
@@ -67,15 +75,16 @@ the notification `type` field.
 Positive:
 - Milestone timeline starts at the moment Business commits escrow, eliminating
   ambiguity about when the clock begins.
-- Progress-report flow control is clean: ack is a gate, not quality feedback.
+- Progress-report flow control is clean: ack remains the gate, while optional
+  Business feedback is stored as tracking context only.
 - Business has a clean exit before any commitments are made.
 - Staff workload is managed inside Staff operations, not Admin gates.
 - Automatic refunds close the financial loop without manual Admin steps.
 - Staff can resolve disputes efficiently when evidence is sufficient.
 
 Tradeoffs:
-- Legacy structured-feedback columns remain readable but are no longer mapped or
-  writable by the Java entity.
+- Progress-report feedback columns remain mapped and writable through the
+  dedicated Business feedback endpoint restored by US-052.
 - `INTERVENTION_REJECTED` rows in legacy data are not backfilled to a different
   status; they remain readable for historical reference.
 - The escalation flow now auto-routes to Staff without Admin visibility; Admin

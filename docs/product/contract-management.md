@@ -72,8 +72,11 @@ Alternate exits:
   is `ACTIVE`, both NDA signatures exist, and the milestone is `IN_PROGRESS` or
   `OVERDUE`. First submission and correction/resubmission use the same endpoint,
   retain submission rounds, and move the milestone to `UNDER_REVIEW`.
-- The owning business can deposit milestone escrow only from `PENDING`, then
-  the expert starts execution from `DEPOSITED` to `IN_PROGRESS`. A Business approval from
+- The owning business can deposit milestone escrow only from `PENDING`; a
+  successful deposit automatically moves both milestone records to
+  `IN_PROGRESS` and starts the execution timeline. The Expert start endpoint is
+  retained only as a compatibility/idempotent path for legacy `DEPOSITED`
+  records or older clients. A Business approval from
   `UNDER_REVIEW` releases the escrow once, marks the milestone `COMPLETED`, and
   resolves any self-resolve dispute with
   `BUSINESS_APPROVED_AFTER_SELF_RESOLVE`.
@@ -82,6 +85,11 @@ Alternate exits:
   are progress tracking records only; they are not dispute evidence and are not
   stored as case attachments. If milestone duration or start timestamp is
   missing, the report is accepted with no checkpoint assignment.
+- The owning Business can acknowledge a progress report without feedback, or
+  submit progress-report feedback with category, severity, DoD context,
+  feedback text, and an adjustment flag. Feedback acknowledges a pending report
+  and unlocks the next Expert report, but it does not create a dispute,
+  deliverable rejection, report revision state, or money movement.
 - A Business rejection from `UNDER_REVIEW` marks the current deliverable
   `REJECTED`, stores feedback, increments rejection history, and returns the
   milestone to `IN_PROGRESS`. It never creates a dispute. Either participant
@@ -162,6 +170,7 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback`
 - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/check-overdue`
 - `POST /api/v1/contracts/{contractId}/milestones/sla-auto-approve`

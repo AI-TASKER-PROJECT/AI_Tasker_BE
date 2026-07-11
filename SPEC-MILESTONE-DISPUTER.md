@@ -1,9 +1,9 @@
-# SPEC-MILESTONE-DISPUTER.md — v2.3
+﻿# SPEC-MILESTONE-DISPUTER.md - v2.4
 
 **Project:** AITASKER-BE  
-**Platform:** AITASKER — AI expert and business matching platform  
+**Platform:** AITASKER - AI expert and business matching platform
 **Spec purpose:** Implementation guide for harness engineering agents  
-**Version:** v2.3
+**Version:** v2.4
 **Prepared date:** 2026-07-01  
 **Last updated:** 2026-07-11
 **Primary target:** Backend agents, database agents, integration agents, tester agents, reviewer agents  
@@ -15,8 +15,8 @@
 
 This specification defines the final v2 design for the remaining contract execution flows of AITASKER:
 
-1. **Flow 4 — Milestone Execution, Escrow Payment, Contract Completion, and Contract Termination**
-2. **Flow 5 — Milestone Dispute, Self-Resolve, Staff Intervention, Staff Settlement Decision, and Settlement Execution**
+1. **Flow 4 â€” Milestone Execution, Escrow Payment, Contract Completion, and Contract Termination**
+2. **Flow 5 â€” Milestone Dispute, Self-Resolve, Staff Intervention, Staff Settlement Decision, and Settlement Execution**
 
 The v2 design replaces the earlier incomplete milestone payment model with a **per-milestone escrow model**:
 
@@ -48,9 +48,9 @@ The spec also fixes the review findings from v1:
   evidence.
 - Business may request an on-demand progress report with a 24-hour first-request
   SLA and a 12-hour subsequent-request SLA.
-- Progress reports support product links but no longer have a structured
-  mid-report feedback feature; Business uses on-demand report requests and a
-  lightweight acknowledgement to gate the next report.
+- Progress reports support product links and Business feedback during milestone
+  execution; feedback also acknowledges the report when it is waiting for
+  acknowledgement, but it does not create dispute or revision semantics.
 - Dispute Staff assignment is automatic/manual-by-Staff-pool and does not require
   Admin assignment. Admin is not part of milestone-dispute routing and cannot
   cancel milestone disputes.
@@ -61,7 +61,7 @@ The spec also fixes the review findings from v1:
 - Immediate termination does not require Staff and charges the initiating party
   10% of total contract value for the other party.
 
-### 0.1 v2.3 Binding Decisions
+### 0.1 v2.4 Binding Decisions
 
 The following decisions override conflicting experimental code or supplementary
 notes:
@@ -93,8 +93,10 @@ notes:
 16. Business milestone escrow deposit starts the milestone execution timeline.
 17. A new progress report cannot be submitted while the previous progress report
     is waiting for Business acknowledgement.
-18. Structured progress-report feedback APIs are removed from the milestone
-    dispute flow.
+18. Structured progress-report feedback APIs are restored for milestone
+    progress tracking. Feedback may carry category, severity, DoD context,
+    feedback text, and an adjustment flag, and it must acknowledge a pending
+    report without creating report revision or dispute semantics.
 19. Dispute intervention requests auto-assign or directly route to Staff; Admin
     assignment and Admin dispute cancellation are removed.
 20. Staff cannot reject intervention; an escalated dispute must proceed to Staff
@@ -419,7 +421,9 @@ guards. The sum of penalty plus refunds must equal the deposits' held amounts.
 
 Milestone escrow is the budget of the current milestone.
 
-Business must deposit it before Expert starts work.
+Business must deposit it before Expert work is considered started. A successful
+milestone escrow deposit automatically starts the milestone; Expert no longer
+needs to click start for the normal path.
 
 Normal flow:
 
@@ -584,7 +588,7 @@ CANCELLED
 | Status | Meaning |
 |---|---|
 | `PENDING` | Milestone exists but Business has not deposited milestone budget yet. |
-| `DEPOSITED` | Business has deposited full milestone budget into escrow. The milestone execution timeline starts at this moment even if Expert has not clicked start. |
+| `DEPOSITED` | Legacy compatibility state for milestones deposited before auto-start or for historical data. New successful deposits should move directly to `IN_PROGRESS`. |
 | `IN_PROGRESS` | Expert is working on the milestone. Expert submits progress reports during this state per `9.2A`; reports do not change milestone status. |
 | `OVERDUE` | The milestone execution deadline has passed while work remains active. Expert may still submit progress reports and a final deliverable; Business may request an on-demand progress report. |
 | `UNDER_REVIEW` | Expert submitted deliverable; Business is reviewing. |
@@ -595,8 +599,8 @@ CANCELLED
 ### 6.3 Allowed Transitions
 
 ```text
-PENDING -> DEPOSITED
-DEPOSITED -> IN_PROGRESS
+PENDING -> IN_PROGRESS after Business deposits milestone escrow
+DEPOSITED -> IN_PROGRESS for legacy compatibility via startMilestone
 IN_PROGRESS -> OVERDUE when the milestone due time passes
 IN_PROGRESS -> UNDER_REVIEW
 OVERDUE -> UNDER_REVIEW
@@ -621,7 +625,7 @@ DISPUTED -> COMPLETED due to Staff dispute settlement
 ### 6.4 Forbidden Transitions
 
 ```text
-PENDING -> IN_PROGRESS
+PENDING -> IN_PROGRESS without a successful Business milestone escrow deposit
 PENDING -> UNDER_REVIEW
 PENDING -> COMPLETED without Staff termination rule
 DEPOSITED -> UNDER_REVIEW
@@ -808,7 +812,7 @@ STAFF_REJECTED -> terminal for request; contract returns ACTIVE
 
 ---
 
-## 9. Flow 4 — Milestone Execution And Escrow Payment
+## 9. Flow 4 â€” Milestone Execution And Escrow Payment
 
 ### 9.1 Deposit Current Milestone Escrow
 
@@ -832,8 +836,8 @@ System behavior:
 3. Debit Business available balance by milestone budget.
 4. Credit Business escrow balance by milestone budget.
 5. Write `wallet_transactions` entries.
-6. Set milestone status to `DEPOSITED`.
-7. Mirror `contract_milestones.status` if required by existing design.
+6. Set milestone status to `IN_PROGRESS`.
+7. Mirror `contract_milestones.status` to `IN_PROGRESS`.
 8. Set `contract_milestones.in_progress_started_at = now()` if it is not already
    set. This timestamp is the source of truth for milestone timeline, overdue
    detection, and progress-report checkpoint calculation.
@@ -850,25 +854,27 @@ contract_id = contractId
 milestone_id = milestoneId
 ```
 
-### 9.2 Start Milestone
+### 9.2 Start Milestone Compatibility
 
 Actor: Expert
 
 Preconditions:
 
 - Contract status is `ACTIVE`.
-- Milestone status is `DEPOSITED`.
+- Milestone status is `DEPOSITED` for legacy data, or already `IN_PROGRESS`
+  after the automatic deposit flow.
 - Expert is assigned to contract.
 - No active dispute.
 - No active termination request.
 
 System behavior:
 
-1. Set milestone status to `IN_PROGRESS`.
-2. Do not reset `contract_milestones.in_progress_started_at`; the timeline
-   already started when Business deposited milestone escrow.
-3. Write audit log.
-4. Notify Business.
+1. If milestone is already `IN_PROGRESS`, return success without changing the
+   timeline or writing a duplicate start audit event.
+2. If milestone is legacy `DEPOSITED`, set milestone status to `IN_PROGRESS`.
+3. Do not reset `contract_milestones.in_progress_started_at`; the timeline
+   starts when Business deposits milestone escrow.
+4. Write audit log only for the legacy `DEPOSITED -> IN_PROGRESS` transition.
 
 ### 9.2A Submit Milestone Progress Report
 
@@ -880,8 +886,8 @@ an on-demand Business request, or be voluntary.
 
 Checkpoints (mandatory, non-blocking):
 
-- `MIDPOINT` — due at 50% of the milestone's declared timeline, measured from `contract_milestones.in_progress_started_at`.
-- `PRE_DEADLINE` — due at 80% of the milestone's declared timeline (i.e. some time before the deadline).
+- `MIDPOINT` â€” due at 50% of the milestone's declared timeline, measured from `contract_milestones.in_progress_started_at`.
+- `PRE_DEADLINE` â€” due at 80% of the milestone's declared timeline (i.e. some time before the deadline).
 - Timeline length in days is derived from `contract_milestones.duration` + `duration_unit` (`DAY` = 1, `WEEK` = 7, `MONTH` = 30), matching the existing conversion used for job/milestone duration elsewhere in the spec.
 - Missing a scheduled checkpoint alone does not create a dispute, financial
   penalty, or termination right. The separate on-demand request in section
@@ -927,8 +933,12 @@ Submit gate:
 - Business acknowledgement is required before another report can be accepted,
   regardless of whether the previous report came from a scheduled checkpoint,
   on-demand request, or voluntary update.
-- The acknowledgement is not structured feedback and must not carry category,
-  severity, DoD item review, or revision-request semantics.
+- Business may acknowledge with no comment, or may submit progress-report
+  feedback. Feedback can carry category, severity, DoD item context, feedback
+  text, and an adjustment flag; if the report is pending acknowledgement, the
+  feedback action records acknowledgement at the same time.
+- Progress-report feedback is a tracking response only. It must not create a
+  dispute, deliverable rejection, report revision state, or money movement.
 
 Business view: `GET` list of all progress reports for a milestone, ordered
 oldest first. Business, Expert, assigned Staff, and authorized Admin may read
@@ -1009,11 +1019,55 @@ System behavior:
 
 This acknowledgement is only a flow-control action. It does not:
 
-- create structured feedback;
+- require structured feedback;
 - request report revision;
 - change milestone status;
 - create a dispute;
 - move money.
+
+### 9.2C.1 Business Gives Progress-Report Feedback
+
+Actor: Business
+
+Endpoint:
+
+```http
+POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback
+```
+
+Request body:
+
+```json
+{
+  "category": "SCOPE",
+  "severity": "INFO",
+  "dodItems": ["API_CONTRACT_STABLE"],
+  "feedback": "Progress is acceptable. Please include the demo link in the next report.",
+  "requiresAdjustment": false
+}
+```
+
+Preconditions:
+
+- Business owns the contract.
+- Report belongs to the specified contract and milestone.
+- Milestone is not terminal.
+- `feedback` is not blank.
+
+System behavior:
+
+1. Store `business_feedback`, `feedback_category`, `feedback_severity`,
+   `feedback_dod_items`, `requires_adjustment`, `feedback_by_account_id`, and
+   `feedback_at`.
+2. If the report acknowledgement state is `PENDING_BUSINESS_ACK`, also set it
+   to `ACKNOWLEDGED` and store `acknowledged_by_account_id` and
+   `acknowledged_at`.
+3. Write `PROGRESS_REPORT_FEEDBACK_RECORDED` audit log.
+4. Notify Expert with `PROGRESS_REPORT_FEEDBACK_RECORDED`.
+
+Feedback is a Business response to progress tracking only. It does not create a
+dispute, deliverable rejection, report revision state, or automatic
+termination/settlement action.
 
 ### 9.2D Milestone Overdue Detection
 
@@ -1202,7 +1256,7 @@ completion. It must not remain a manual business step that leaves the initial
 
 ---
 
-## 10. Flow 5 — Dispute Resolution
+## 10. Flow 5 â€” Dispute Resolution
 
 ### 10.1 Dispute Initiation Overview
 
@@ -1557,7 +1611,7 @@ If Business wants to accept the deliverable after self-resolve, Business should 
 
 ---
 
-## 11. Flow 4b — Contract Termination
+## 11. Flow 4b â€” Contract Termination
 
 ### 11.1 Request Termination
 
@@ -1655,7 +1709,7 @@ System behavior:
 
 ### 11.5 Current Milestone Termination Cases
 
-#### Case A — Current Milestone `PENDING`
+#### Case A â€” Current Milestone `PENDING`
 
 - Business has not deposited milestone escrow.
 - Expert should not have started official work.
@@ -1663,7 +1717,7 @@ System behavior:
 - Current milestone becomes `CANCELLED`.
 - Future milestones become `CANCELLED`.
 
-#### Case B — Current Milestone `DEPOSITED`
+#### Case B â€” Current Milestone `DEPOSITED`
 
 - Business deposited escrow.
 - Expert has not officially started.
@@ -1672,7 +1726,7 @@ System behavior:
 - Milestone may become `CANCELLED` after full escrow refund if no payout.
 - If Staff grants payout, settlement executes and milestone becomes `COMPLETED`.
 
-#### Case C — Current Milestone `IN_PROGRESS` Or `OVERDUE`
+#### Case C â€” Current Milestone `IN_PROGRESS` Or `OVERDUE`
 
 - Expert may submit partial evidence.
 - Staff evaluates partial work.
@@ -1680,7 +1734,7 @@ System behavior:
 - System splits escrow.
 - Milestone becomes `COMPLETED` after settlement.
 
-#### Case D — Current Milestone `UNDER_REVIEW`
+#### Case D â€” Current Milestone `UNDER_REVIEW`
 
 - Expert submitted deliverable.
 - Staff evaluates deliverable against acceptance criteria.
@@ -1688,7 +1742,7 @@ System behavior:
 - System splits escrow.
 - Milestone becomes `COMPLETED` after settlement.
 
-#### Case E — Current Milestone `DISPUTED`
+#### Case E â€” Current Milestone `DISPUTED`
 
 - Active dispute already exists.
 - Termination settlement must not run in parallel.
@@ -1907,7 +1961,7 @@ Agents must follow these rules:
 1. Do not edit old Flyway migrations.
 2. Query the repository's latest applied migration and create the next available
    version. At the time of v2.2 planning this is expected to be after the
-   existing Flow 4–5 migrations; do not assume or reuse `V45`.
+   existing Flow 4â€“5 migrations; do not assume or reuse `V45`.
 3. Do not delete or truncate existing data by default.
 4. Prefer additive schema changes and compatibility backfills.
 5. Normalize old data to the new schema where safe.
@@ -2039,9 +2093,9 @@ Add field (checkpoint anchor for `9.2A` progress reports):
 in_progress_started_at TIMESTAMP NULL
 ```
 
-Set when Business deposits milestone escrow (`9.1`). `startMilestone` must not
-reset it. Backfill existing `IN_PROGRESS` rows from `updated_at` since no
-earlier signal exists.
+Set when Business deposits milestone escrow (`9.1`). `startMilestone` is a
+compatibility endpoint and must not reset it. Backfill existing `IN_PROGRESS`
+rows from `updated_at` since no earlier signal exists.
 
 The contract execution snapshot must support `OVERDUE`. The source-of-truth
 deadline is derived from `in_progress_started_at`, `duration`, and
@@ -2080,7 +2134,7 @@ the dispute, while type identifies the explicit disagreement. A persisted
 Business rejection may support `BUSINESS_REJECTED_DELIVERABLE`, but section 9.5
 never sets this field because rejection does not create a dispute.
 
-Add the remaining fields — each is set by a concrete system-behavior step (9.5,
+Add the remaining fields â€” each is set by a concrete system-behavior step (9.5,
 10.2, 10.6, 10.7, 10.9, 10.10, 11.x) that current code cannot fully execute
 without them:
 
@@ -2190,7 +2244,7 @@ Metadata standard:
 
 #### 13.3.6 `reviews`
 
-Uniqueness (one review per reviewer per contract, see 12.2) is enforced at service level for MVP, not by a DB constraint. `AdminService.createReview` already guards this via `existsByContractIdAndReviewerId(contractId, reviewerId)`. Since a contract has exactly one Business and one Expert, checking `(contract_id, reviewer_id)` is equivalent to checking `(contract_id, reviewer_id, reviewee_id)` — no separate `reviewee_id` check is needed.
+Uniqueness (one review per reviewer per contract, see 12.2) is enforced at service level for MVP, not by a DB constraint. `AdminService.createReview` already guards this via `existsByContractIdAndReviewerId(contractId, reviewerId)`. Since a contract has exactly one Business and one Expert, checking `(contract_id, reviewer_id)` is equivalent to checking `(contract_id, reviewer_id, reviewee_id)` â€” no separate `reviewee_id` check is needed.
 
 A DB unique index is optional / nice-to-have, not required for MVP:
 
@@ -2243,6 +2297,13 @@ CREATE TABLE milestone_progress_reports (
     demo_link TEXT NULL,
     submission_notes TEXT NULL,
     is_late BOOLEAN NOT NULL DEFAULT FALSE,
+    business_feedback TEXT NULL,
+    feedback_category VARCHAR(30) NULL,
+    feedback_severity VARCHAR(20) NULL,
+    feedback_dod_items JSONB NULL,
+    requires_adjustment BOOLEAN NOT NULL DEFAULT FALSE,
+    feedback_by_account_id INT NULL REFERENCES account(account_id),
+    feedback_at TIMESTAMP NULL,
     acknowledgement_status VARCHAR(30) NOT NULL DEFAULT 'PENDING_BUSINESS_ACK',
     acknowledged_by_account_id INT NULL REFERENCES account(account_id),
     acknowledged_at TIMESTAMP NULL,
@@ -2257,13 +2318,14 @@ CREATE TABLE milestone_progress_reports (
 CREATE INDEX idx_milestone_progress_reports_milestone ON milestone_progress_reports(milestone_id, created_at);
 ```
 
-Not linked to `disputes` or `case_attachments` — kept as an independent
-progress-work-cycle record per `9.2A`–`9.2C`.
+Not linked to `disputes` or `case_attachments` â€” kept as an independent
+progress-work-cycle record per `9.2A`â€“`9.2C`.
 
 The report remains independent of disputes and case attachments, but may link to
 the on-demand request it satisfies. Business acknowledgement is a flow-control
-gate only; it is not structured feedback, rejection, revision, or dispute
-evidence by itself.
+gate. Business feedback can be stored on the report and can acknowledge a
+pending report, but it is not rejection, revision, dispute evidence, or money
+movement by itself.
 
 #### 13.3.9 Required New Table: `milestone_progress_report_requests`
 
@@ -2583,7 +2645,7 @@ depositMilestoneEscrow(contractId, milestoneId, businessAccountId)
 fundBusinessContractDeposit(contractId, businessAccountId)
 fundExpertContractDeposit(contractId, expertAccountId)
 activateContractWhenBothDepositsHeld(contractId)
-startMilestone(milestoneId, expertAccountId)
+startMilestone(milestoneId, expertAccountId) // compatibility for legacy DEPOSITED rows or idempotent IN_PROGRESS retry
 markMilestoneOverdue(contractId, milestoneId)
 requestProgressReport(contractId, milestoneId, businessAccountId)
 submitProgressReport(contractId, milestoneId, expertAccountId, request)
@@ -2834,6 +2896,7 @@ POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-req
 POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports
 GET  /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports
 POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge
+POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback
 POST /api/v1/milestones/{milestoneId}/deliverables
 POST /api/v1/milestones/{milestoneId}/approve
 POST /api/v1/milestones/{milestoneId}/reject
@@ -2985,8 +3048,8 @@ GET  /api/v1/contracts/{contractId}/reviews
     auditable.
 28. A progress report blocks the next progress report until Business
     acknowledgement is recorded.
-29. Progress-report acknowledgement is not structured feedback and must not
-    create report revision semantics.
+29. Progress-report feedback may acknowledge the report and store Business
+    comments, but must not create report revision or dispute semantics.
 30. WebSocket notifications for dispute intervention expose notification
     `type`; clients must not depend on workflow `status` as notification type.
 31. Participant deposits are automatically refunded by the system when closure
@@ -3001,11 +3064,11 @@ GET  /api/v1/contracts/{contractId}/reviews
 
 Given contract is `ACTIVE` and milestone is `PENDING`  
 When Business deposits milestone escrow  
-Then milestone becomes `DEPOSITED`
+Then milestone becomes `IN_PROGRESS`
 And milestone execution timeline starts immediately
 
-When Expert starts milestone  
-Then milestone becomes `IN_PROGRESS`
+When Expert retries start milestone for compatibility
+Then milestone remains `IN_PROGRESS`
 
 When Expert submits deliverable  
 Then milestone becomes `UNDER_REVIEW`
@@ -3212,7 +3275,12 @@ Then the request is rejected with `PROGRESS_REPORT_ACK_PENDING`
 
 When Business acknowledges the latest report
 Then Expert can submit the next progress report when otherwise allowed
-And no structured report feedback or revision state is created
+
+When Business submits feedback for the latest report
+Then the feedback is stored
+And the report is acknowledged if it was pending acknowledgement
+And Expert can submit the next progress report when otherwise allowed
+And no dispute, deliverable rejection, or report revision state is created
 
 ### 19.20 Business Cancels Draft Contract
 
@@ -3245,8 +3313,9 @@ And clients must not interpret dispute workflow `status` as notification type
 - Expert submissions close pending report requests and preserve late status.
 - Expert cannot submit another progress report until Business acknowledges the
   latest progress report.
-- Business can acknowledge progress reports without creating structured
-  feedback, revision, or dispute semantics.
+- Business can acknowledge progress reports without feedback, or submit
+  progress-report feedback that also acknowledges the report without creating
+  revision or dispute semantics.
 - `OVERDUE` milestones continue to accept reports and deliverables.
 - Business approval releases 100% escrow to Expert.
 - Business rejection stores feedback, marks the deliverable rejected, and
@@ -3395,11 +3464,12 @@ Recommended order:
 - Do not charge available balance when the initiator's required held deposit
   exists.
 - Do not pay the penalty to the platform; credit the counterparty.
-- Do not expose a new public Flow 4–5 route without the `/api/v1` prefix.
+- Do not expose a new public Flow 4â€“5 route without the `/api/v1` prefix.
 - Do not block Staff decision solely because the 48-hour evidence window is
   still open.
-- Do not expose progress-report structured feedback; use Business
-  acknowledgement only.
+- Do expose Business progress-report feedback for tracking responses; keep
+  acknowledgement as the gate and do not turn feedback into dispute/revision
+  semantics.
 - Do not allow Expert to submit a new progress report while the latest report is
   waiting for Business acknowledgement.
 - Do not require Admin assignment for milestone dispute Staff routing.

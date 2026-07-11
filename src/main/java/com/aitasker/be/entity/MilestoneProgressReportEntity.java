@@ -3,6 +3,8 @@ package com.aitasker.be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -41,6 +43,21 @@ public class MilestoneProgressReportEntity {
     private String submissionNotes;
     @Column(name = "is_late", nullable = false)
     private Boolean isLate;
+    @Column(name = "business_feedback")
+    private String businessFeedback;
+    @Column(name = "feedback_category", length = 30)
+    private String feedbackCategory;
+    @Column(name = "feedback_severity", length = 20)
+    private String feedbackSeverity;
+    @Column(name = "feedback_dod_items", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String feedbackDodItems;
+    @Column(name = "requires_adjustment", nullable = false)
+    private Boolean requiresAdjustment;
+    @Column(name = "feedback_by_account_id")
+    private Integer feedbackByAccountId;
+    @Column(name = "feedback_at")
+    private LocalDateTime feedbackAt;
     @Column(name = "acknowledgement_state", nullable = false, length = 30)
     private String acknowledgementState;
     @Column(name = "acknowledged_by_account_id")
