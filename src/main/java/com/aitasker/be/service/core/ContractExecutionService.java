@@ -1810,6 +1810,11 @@ public class ContractExecutionService {
         auditLogService.record("DISPUTE_SETTLEMENT_EXECUTED", "disputes", String.valueOf(disputeId), actorAccountId);
         notifyContractParticipantsExcept(contract, actorAccountId,
                 (receiver, actor) -> notificationService.notifyDisputeResolved(receiver, actor, contract.getContractId(), disputeId));
+        notifyAllAdmins(actorAccountId,
+                (receiver, actor) -> notificationService.notifyAdminDisputeSettlementReported(
+                        receiver, actor, disputeId, contract.getContractId(), dispute.getMilestoneId(),
+                        dispute.getStaffDecisionPercentage(), expertPayout, businessRefund,
+                        settlementDebit == null ? null : settlementDebit.getId()));
         tryCompleteContract(contract, actorAccountId);
         return saved;
     }

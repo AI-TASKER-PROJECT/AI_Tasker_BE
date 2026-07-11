@@ -164,7 +164,14 @@ public class AdminService {
         long completedContracts = contractRepository.findAll().stream().filter(c -> "COMPLETED".equals(c.getStatus())).count();
         long terminatedContracts = contractRepository.findAll().stream().filter(c -> "CANCELLED".equals(c.getStatus())).count();
         long totalDisputes = disputeRepository.count();
-        long openDisputes = disputeRepository.findAll().stream().filter(d -> "Open".equals(d.getStatus()) || "UnderReview".equals(d.getStatus())).count();
+        long openDisputes = disputeRepository.findAll().stream()
+                .filter(d -> List.of(
+                        DisputeEntity.STATUS_PENDING_SELF_RESOLVE,
+                        DisputeEntity.STATUS_ESCALATION_REQUESTED,
+                        DisputeEntity.STATUS_STAFF_REVIEWING,
+                        DisputeEntity.STATUS_STAFF_DECIDED
+                ).contains(d.getStatus()))
+                .count();
         long totalTransactions = transactionRepository.count();
         BigDecimal totalVolume = transactionRepository.findAll().stream()
                 .map(TransactionEntity::getAmount)
