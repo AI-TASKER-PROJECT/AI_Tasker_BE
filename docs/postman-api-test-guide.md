@@ -1305,13 +1305,13 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
-### POST `/api/v1/disputes/{disputeId}/reject-intervention`
-- OperationId: `rejectInterventionAlias`
+### POST `/api/v1/disputes/{disputeId}/route-staff`
+- OperationId: `routeDisputeStaff`
 - Auth: Bearer JWT
-- Giai thich: Operation rejectInterventionAlias.
+- Giai thich: Operation routeDisputeStaff. Staff or system routes dispute to a Staff member.
 - Params:
   - `disputeId` (path, required, integer)
-  - `reason` (query, optional, string)
+  - `staffId` (query, optional, integer) — pass null for auto-pick
 - Body raw: Khong co.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
@@ -1361,13 +1361,12 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
-### POST `/api/v1/disputes/{disputeId}/assign-staff`
-- OperationId: `assignDisputeStaff`
+### POST `/api/v1/contracts/{contractId}/cancel-draft`
+- OperationId: `cancelDraftContract`
 - Auth: Bearer JWT
-- Giai thich: Operation assignDisputeStaff.
+- Giai thich: Operation cancelDraftContract. Business cancels untouched DRAFT contract before any signature.
 - Params:
-  - `disputeId` (path, required, integer)
-  - `staffId` (query, required, integer)
+  - `contractId` (path, required, integer)
 - Body raw: Khong co.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
@@ -1497,6 +1496,21 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ```json
 { "schema": "ProgressReportRequest" }
 ```
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge`
+- OperationId: `acknowledgeProgressReport`
+- Auth: Bearer JWT
+- Giai thich: Operation acknowledgeProgressReport. Business acknowledges the latest progress report to unlock the next submission.
+- Params:
+  - `contractId` (path, required, integer)
+  - `milestoneId` (path, required, integer)
+  - `progressReportId` (path, required, integer)
+- Body raw: Khong co.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
