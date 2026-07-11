@@ -35,7 +35,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 
 ## Profile Verification Flow
 
-- Giai thich flow: Tao, xem va duyet ho so Business/Expert va portfolio. Business profile responses now include `verifiedRepresentative` (nguoi dai dien phap ly tu VietQR API). `companyName`/`address` duoc auto-fill tu VietQR khi submit.
+- Giai thich flow: Tao, xem va duyet ho so Business/Expert va portfolio. Business/Expert profile responses include `averageRating` tinh dong tu `reviews.rating` theo `reviewee_id`; Business profile responses also include `verifiedRepresentative` (nguoi dai dien phap ly tu VietQR API). `companyName`/`address` duoc auto-fill tu VietQR khi submit.
 
 | # | Method | Path | Auth | Giai thich |
 | --- | --- | --- | --- | --- |
@@ -149,7 +149,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 23 | POST | `/api/v1/disputes/{disputeId}/escalation-request` | Bearer JWT | Operation requestEscalation. |
 | 24 | POST | `/api/v1/disputes/{disputeId}/cancel` | Bearer JWT | Operation cancelDispute. |
 | 24 | POST | `/api/v1/disputes/{disputeId}/route-staff` | Bearer JWT | Operation routeDisputeStaff. |
-| 25A | POST | `/api/v1/disputes/staff-sla-escalate` | Bearer JWT | Admin/system escalates overdue Staff dispute SLA. |
+| 25 | POST | `/api/v1/disputes/staff-sla-escalate` | Bearer JWT | Admin/system escalates overdue Staff dispute SLA. |
 | 26 | GET | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation listTerminationRequests. |
 | 27 | POST | `/api/v1/contracts/{contractId}/termination-requests` | Bearer JWT | Operation requestTermination. |
 | 28 | POST | `/api/v1/contracts/{contractId}/sign` | Bearer JWT | Operation signContract. |

@@ -7,11 +7,17 @@ package com.aitasker.be.repository;
 
 import com.aitasker.be.entity.ReviewEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface ReviewRepository extends JpaRepository<ReviewEntity, Integer> {
     // Note: Hàm `findByContractId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<ReviewEntity> findByContractId(Integer contractId);
     boolean existsByContractIdAndReviewerId(Integer contractId, Integer reviewerId);
+
+    @Query(value = "SELECT AVG(rating) FROM reviews WHERE reviewee_id = :revieweeId", nativeQuery = true)
+    BigDecimal averageRatingByRevieweeId(@Param("revieweeId") Integer revieweeId);
 }

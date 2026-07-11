@@ -10,6 +10,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -46,4 +47,5 @@ public class BusinessProfileEntity {
     @Transient private String fullName;
     @Transient private String email;
     @Transient private String phone;
+    @Transient private BigDecimal averageRating;
 }

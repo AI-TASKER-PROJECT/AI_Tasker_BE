@@ -19,6 +19,8 @@ db-backup-*.sql
 
 node_modules
 
+drawio/
+
 # Firebase service account key
 /secrets/
 *.firebase-service-account.json

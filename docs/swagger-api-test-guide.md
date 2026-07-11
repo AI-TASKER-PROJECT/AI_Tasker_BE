@@ -1147,6 +1147,45 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### POST `/api/v1/termination-requests/{terminationRequestId}/dispute`
+- OperationId: `disputeTermination`
+- Auth: Bearer JWT
+- Giai thich: Operation disputeTermination.
+- Params:
+  - `terminationRequestId` (path, required, integer)
+  - `reason` (query, optional, string)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/termination-requests/{terminationRequestId}/accept`
+- OperationId: `acceptTermination`
+- Auth: Bearer JWT
+- Giai thich: Operation acceptTermination.
+- Params:
+  - `terminationRequestId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/termination-requests/expire-awaiting-expert`
+- OperationId: `expireTerminationResponses`
+- Auth: Bearer JWT
+- Giai thich: Operation expireTerminationResponses.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ### POST `/api/v1/milestones`
 - OperationId: `createMilestone`
 - Auth: Bearer JWT
@@ -1589,22 +1628,6 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
-### POST `/api/v1/admin/contracts/{contractId}/deposit/refund`
-- OperationId: `refundContractDeposit`
-- Auth: Bearer JWT
-- Giai thich: Operation refundContractDeposit.
-- Params:
-  - `contractId` (path, required, integer)
-- Body raw:
-```json
-{ "schema": "DepositRefundRequest" }
-```
-- Ma phan hoi thuong gap:
-  - `200`: Thanh cong theo message/schema tren Swagger.
-  - `400`: Validation loi hoac vi pham business rule/state transition.
-  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
-  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
-
 ### PATCH `/api/v1/milestones/{milestoneId}`
 - OperationId: `updateMilestone`
 - Auth: Bearer JWT
@@ -1711,6 +1734,116 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `200`: Thanh cong theo message/schema tren Swagger (StaffDisputeListResponse).
   - `400`: Validation loi (page < 0, size ngoai 1..100).
   - `401`/`403`: Sai token, het han token, sai role (chi STAFF).
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/disputes/staff-sla-escalate`
+- OperationId: `escalateOverdueStaffDisputes`
+- Auth: Bearer JWT
+- Giai thich: Operation escalateOverdueStaffDisputes.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`
+- OperationId: `requestProgressReport`
+- Auth: Bearer JWT
+- Giai thich: Operation requestProgressReport.
+- Params:
+  - `contractId` (path, required, integer)
+  - `milestoneId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/contracts/{contractId}/milestones/sla-auto-approve`
+- OperationId: `autoApproveReviewSla`
+- Auth: Bearer JWT
+- Giai thich: Operation autoApproveReviewSla.
+- Params:
+  - `contractId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/contracts/{contractId}/milestones/check-overdue`
+- OperationId: `checkOverdue`
+- Auth: Bearer JWT
+- Giai thich: Operation checkOverdue.
+- Params:
+  - `contractId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/contracts/{contractId}/immediate-termination`
+- OperationId: `immediateTermination`
+- Auth: Bearer JWT
+- Giai thich: Operation immediateTermination.
+- Params:
+  - `contractId` (path, required, integer)
+- Body raw:
+```json
+{ "schema": "ImmediateTerminationRequest" }
+```
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/contracts/{contractId}/expert-deposit/pay`
+- OperationId: `payExpertContractDeposit`
+- Auth: Bearer JWT
+- Giai thich: Operation payExpertContractDeposit.
+- Params:
+  - `contractId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/admin/contracts/{contractId}/deposits/refund`
+- OperationId: `refundContractDeposits`
+- Auth: Bearer JWT
+- Giai thich: Operation refundContractDeposits.
+- Params:
+  - `contractId` (path, required, integer)
+- Body raw:
+```json
+{ "schema": "DepositRefundRequest" }
+```
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/disputes/{disputeId}/staff-candidates`
+- OperationId: `listStaffCandidates`
+- Auth: Bearer JWT
+- Giai thich: Operation listStaffCandidates.
+- Params:
+  - `disputeId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
 ## Notification Flow
@@ -2161,6 +2294,38 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 - Auth: Bearer JWT
 - Giai thich: Operation analyticsOverview.
 - Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/disputes`
+- OperationId: `listDisputes_1`
+- Auth: Bearer JWT
+- Giai thich: Operation listDisputes_1.
+- Params:
+  - `page` (query, optional, integer)
+  - `size` (query, optional, integer)
+  - `status` (query, optional, string)
+  - `assignedStaffId` (query, optional, integer)
+  - `from` (query, optional, string)
+  - `to` (query, optional, string)
+  - `q` (query, optional, string)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/disputes/{disputeId}`
+- OperationId: `getDisputeDetail`
+- Auth: Bearer JWT
+- Giai thich: Operation getDisputeDetail.
+- Params:
+  - `disputeId` (path, required, integer)
 - Body raw: Khong co.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.

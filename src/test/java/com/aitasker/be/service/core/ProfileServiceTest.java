@@ -19,6 +19,7 @@ import com.aitasker.be.repository.BusinessProfileRepository;
 import com.aitasker.be.repository.ExpertProfileRepository;
 import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.PortfolioRepository;
+import com.aitasker.be.repository.ReviewRepository;
 import com.aitasker.be.repository.StaffRepository;
 import com.aitasker.be.service.auth.TaxCheckService;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -61,6 +63,7 @@ class ProfileServiceTest {
     @Mock private NotificationService notificationService;
     @Mock private TaxCheckService taxCheckService;
     @Mock private JobRepository jobRepository;
+    @Mock private ReviewRepository reviewRepository;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ProfileService profileService;
@@ -197,11 +200,13 @@ class ProfileServiceTest {
 
         when(businessProfileRepository.findById(businessId)).thenReturn(Optional.of(profile));
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(reviewRepository.averageRatingByRevieweeId(accountId)).thenReturn(new BigDecimal("4.5"));
 
         BusinessProfileEntity result = profileService.businessProfileById(businessId);
 
         assertBusinessContact(result, "Owner Name", "e@x.com", "090");
         assertEquals("Test Corp", result.getCompanyName());
+        assertEquals(new BigDecimal("4.5"), result.getAverageRating());
         verifyNoInteractions(accessService);
     }
 
@@ -342,11 +347,13 @@ class ProfileServiceTest {
         doNothing().when(accessService).requireRole(anyString(), anyString(), anyString(), anyString());
         when(expertProfileRepository.findById(expertId)).thenReturn(Optional.of(profile));
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(reviewRepository.averageRatingByRevieweeId(accountId)).thenReturn(new BigDecimal("4.8"));
 
         ExpertProfileEntity result = profileService.expertProfileById(expertId);
 
         assertExpertContact(result, "Expert Name", "expert@test.com", "091");
         assertEquals(5, result.getYearsOfExperience());
+        assertEquals(new BigDecimal("4.8"), result.getAverageRating());
     }
 
     @Test

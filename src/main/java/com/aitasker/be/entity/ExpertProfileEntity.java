@@ -10,6 +10,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -46,4 +47,5 @@ public class ExpertProfileEntity {
     @Transient private String phone;
     // Note: Annotation này đánh dấu dữ liệu chỉ dùng để trả response, không lưu xuống bảng expert_profiles.
     @Transient private String title;
+    @Transient private BigDecimal averageRating;
 }

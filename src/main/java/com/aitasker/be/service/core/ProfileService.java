@@ -33,6 +33,7 @@ public class ProfileService {
     private final FirebaseStorageService firebaseStorageService;
     private final JobRepository jobRepository;
     private final NotificationService notificationService;
+    private final ReviewRepository reviewRepository;
     private final TaxCheckService taxCheckService;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
@@ -295,6 +296,7 @@ public class ProfileService {
             business.setEmail(account.getEmail());
             business.setPhone(account.getPhone());
         });
+        business.setAverageRating(reviewRepository.averageRatingByRevieweeId(business.getAccountId()));
         return business;
     }
 
@@ -306,6 +308,7 @@ public class ProfileService {
             expert.setPhone(account.getPhone());
             expert.setTitle("Chuyên gia AI");
         });
+        expert.setAverageRating(reviewRepository.averageRatingByRevieweeId(expert.getAccountId()));
         return expert;
     }
 
@@ -317,6 +320,7 @@ public class ProfileService {
             expert.setPhone(account.getPhone());
             expert.setTitle("Chuyên gia AI");
         });
+        expert.setAverageRating(reviewRepository.averageRatingByRevieweeId(expert.getAccountId()));
         return expert;
     }
 
