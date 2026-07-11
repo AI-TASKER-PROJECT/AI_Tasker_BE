@@ -1,194 +1,240 @@
-# US-046: KYB Tax Code Verification Hardening
+# Admin Dispute & Settlement Dashboard
 
 ## Status
 
 planned
 
-## Lane/
+## Lane
 
-normal (risk flags: Data model, External systems, Public contracts, Existing behavior)
+high-risk (financial data, authorization, public API contract, existing dispute flow)
 
 ## Product Contract
 
-Khi Business nộp hồ sơ KYB, hệ thống tự động kiểm tra mã số thuế (MST) với cơ quan nhà nước qua VietQR API trước khi đưa vào hàng đợi duyệt của Staff. Hệ thống cũng tự động điền thông tin doanh nghiệp từ dữ liệu verified và kiểm tra trùng MST. Staff chỉ việc đối chiếu giấy phép kinh doanh với dữ liệu đã được verified.
+Admin needs a read-only operational dashboard for milestone disputes and their
+financial settlement. The dashboard makes the full case and settlement outcome
+auditable without creating an Admin approval step.
 
-## User Story
+`SPEC-MILESTONE-DISPUTER.md` v2.3 remains authoritative for the dispute
+workflow:
 
-**Là một Business user**, tôi muốn hệ thống tự động xác thực MST của tôi khi nộp hồ sơ, để tôi không thể nộp MST sai hoặc trùng với doanh nghiệp khác, và thông tin công ty được tự động điền chính xác từ nguồn chính thức.
+- Assigned Staff is the only role that decides the Expert payout percentage.
+- A valid Staff decision triggers settlement automatically.
+- Admin may observe, audit, and receive a financial report, but may not approve,
+  reject, revise, route, cancel, or alter a milestone dispute or its payout.
+- The dashboard must never hold a valid settlement waiting for Admin action.
 
-**Là một Staff**, tôi muốn thấy dữ liệu MST đã được hệ thống verified từ VietQR, để tôi chỉ cần đối chiếu giấy phép kinh doanh thay vì tự tra cứu MST thủ công.
+## User Stories
+
+**As an Admin**, I want to see all milestone disputes in one dashboard, filter
+them by operational state and Staff owner, and inspect the resulting payout and
+refund so I can monitor risk and reconcile platform financial activity.
+
+**As an Admin**, I want to receive an informational settlement report when a
+dispute is resolved, so I can investigate unusual financial outcomes without
+becoming a second decision-maker.
 
 ## Current Behavior
 
-1. Business gọi `POST /api/v1/profiles/business` với `taxCode`, `companyName`, `address`, `businessLicenseUrl` — toàn bộ do user tự nhập.
-2. `ProfileService.upsertBusiness()` chỉ kiểm tra `taxCode` không blank, không kiểm tra MST có tồn tại hay không.
-3. `BusinessProfileRepository.existsByTaxCode()` đã có nhưng **không được gọi** trong `upsertBusiness()` — 2 doanh nghiệp có thể dùng chung MST.
-4. `TaxCheckService` đã có (gọi VietQR API `https://api.vietqr.io/v2/business/{mst}`) nhưng chỉ truy cập qua endpoint public `GET /api/auth/tax-check/{mst}`, không được tích hợp vào luồng nộp hồ sơ.
-5. Staff duyệt hồ sơ qua `POST /api/v1/profiles/approve/BUSINESS/{id}` mà không có dữ liệu verified để đối chiếu.
+1. Admin can list disputes only one contract at a time through
+   `GET /api/v1/contracts/{contractId}/disputes`.
+2. Admin can inspect one dispute through `GET /api/v1/disputes/{disputeId}`.
+3. Wallet and audit records exist, but there is no single Admin API that joins a
+   dispute with its Staff decision and settlement amounts.
+4. Settlement notifications go to Business and Expert. Admin is notified for a
+   Staff-SLA escalation, not for a completed dispute settlement.
+5. A legacy Admin settlement endpoint may still exist. It is not an approval
+   workflow and is outside the scope of this dashboard change; removal or
+   deprecation requires a separate compatibility decision.
 
 ## Target Behavior
 
-### 1. Business Submit Profile (`POST /api/v1/profiles/business`)
+### 1. Admin Dispute List
 
-**Bước 1 — Validate MST format:**
+Add an Admin-only API:
 
-- MST phải khớp `\d{10}|\d{13}`. Nếu sai -> `AppException("MA SO THUE KHONG HOP LE")`
+```text
+GET /api/v1/admin/disputes
+```
 
-**Bước 2 — Check duplicate MST:**
+Query parameters:
 
-- Gọi `BusinessProfileRepository.existsByTaxCodeExcludingAccount(taxCode, accountId)` — loại trừ profile của chính account đang nộp (để cho phép update lại hồ sơ đã có).
-- Nếu đã có account khác dùng MST này -> `AppException("MA SO THUE DA DUOC SU DUNG BOI TAI KHOAN KHAC")`
+| Parameter | Type | Default | Meaning |
+|---|---|---:|---|
+| `page` | integer >= 0 | `0` | Zero-based page number |
+| `size` | integer 1..100 | `20` | Page size |
+| `status` | enum | — | Exact dispute status |
+| `assignedStaffId` | integer | — | Assigned Staff identifier |
+| `from` | ISO-8601 datetime | — | Created-at lower bound, inclusive |
+| `to` | ISO-8601 datetime | — | Created-at upper bound, inclusive |
+| `q` | string, max 100 | — | Safe exact/partial search over dispute ID and contract ID only |
 
-**Bước 3 — Verify MST via VietQR:**
+Default ordering is newest dispute first by `createdAt DESC`, then `disputeId DESC`.
+Invalid dates, invalid status, invalid pagination, or `from > to` return a clear
+validation error. The API must not interpolate `q` into raw SQL.
 
-- Gọi `TaxCheckService.checkTaxCode(taxCode)` — nếu MST không tồn tại trong database nhà nước -> `NotFoundException("KHONG TIM THAY DOANH NGHIEP VOI MA SO THUE: {mst}")`
-- Nếu VietQR API không reachable -> `BadGatewayException("KHONG GOI DUOC API VIETQR")` — **không cho nộp hồ sơ** khi không verify được.
+Response is a paginated purpose-built DTO, never a raw JPA entity:
 
-**Bước 4 — Auto-fill verified data:**
+```json
+{
+  "content": [
+    {
+      "disputeId": 8,
+      "contractId": 42,
+      "milestoneId": 103,
+      "status": "RESOLVED",
+      "initiatedBy": "BUSINESS",
+      "initiationType": "BUSINESS_REJECTED_DELIVERABLE",
+      "createdAt": "2026-07-11T10:00:00",
+      "assignedStaff": { "staffId": 12, "displayName": "Nguyen Van A" },
+      "staffDecidedAt": "2026-07-12T09:30:00",
+      "expertPayoutPercentage": 70,
+      "expertPayoutAmount": 7000000,
+      "businessRefundAmount": 3000000,
+      "settlementExecutedAt": "2026-07-12T09:30:01",
+      "settlementWalletTransactionId": 1234
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
 
-- Ghi đè `companyName` và `address` từ response VietQR (single source of truth).
-- Lưu `verifiedRepresentative` (người đại diện pháp lý) từ VietQR vào cột mới.
-- User **không cần** tự nhập `companyName` / `address` — hệ thống tự điền từ VietQR.
-- Request body chỉ cần `taxCode` + `businessLicenseUrl`.
+For disputes not yet settled, the payout, refund, settlement timestamp, and
+settlement transaction ID are `null`. The API must not fabricate financial
+amounts before Staff has made a decision.
 
-**Bước 5 — Continue existing flow:**
+### 2. Admin Dispute Detail
 
-- `kyb_status = "Pending"`, account status = `"Pending"`, notify staff (như hiện tại).
+Add an Admin-only API:
 
-### 2. Staff Review
+```text
+GET /api/v1/admin/disputes/{disputeId}
+```
 
-- `GET /api/v1/profiles/business` (list) và `GET /api/v1/profiles/business/{id}` (detail) trả response `BusinessProfileEntity` có thêm field `verifiedRepresentative`.
-- `companyName` và `address` đã là verified data từ VietQR — Staff chỉ cần đối chiếu giấy phép kinh doanh.
-- Staff approve/reject qua `POST /api/v1/profiles/approve/BUSINESS/{id}` — logic approval giữ nguyên.
+The detail response must include the list summary fields plus:
 
-### 3. Tax Check Endpoint
+- dispute reason, escalation reason, evidence summary, and case attachments;
+- Staff report and decision note when present;
+- milestone escrow amount and settlement source fields;
+- immutable settlement ledger entries linked by `reference_type = DISPUTE` and
+  `reference_id = disputeId`;
+- audit-relevant timestamps: created, routed, Staff-decided, resolved, and
+  settlement-executed.
 
-- `GET /api/auth/tax-check/{mst}` giữ nguyên — frontend dùng endpoint này để preview MST trước khi user bấm submit (UX improvement, không bắt buộc).
+The detail response is read-only. It must not expose sensitive data from other
+contracts or unrelated wallet transactions.
+
+### 3. Settlement Report for Admin
+
+After a successful dispute settlement transaction commits, the system sends an
+informational notification/event to every Admin:
+
+```text
+type = DISPUTE_SETTLEMENT_REPORTED
+```
+
+The notification payload contains `disputeId`, `contractId`, `milestoneId`,
+`expertPayoutPercentage`, `expertPayoutAmount`, `businessRefundAmount`, and
+`settlementWalletTransactionId`.
+
+Rules:
+
+- It is an audit/reporting event, not an approval request.
+- It is emitted only after ledger rows, dispute state, and settlement timestamp
+  are persisted successfully.
+- It is emitted at most once for a settlement; retries after an already released
+  escrow must not create duplicate reports.
+- Business and Expert settlement notifications remain unchanged.
+
+## Authorization Rules
+
+| Action | Admin | Staff | Business | Expert |
+|---|---|---|---|---|
+| List Admin dashboard disputes | Yes | No | No | No |
+| View Admin dashboard dispute detail | Yes | No | No | No |
+| Receive settlement report event | Yes | No | No | No |
+| Decide payout percentage | No | Assigned Staff only | No | No |
+| Approve/revise settlement | No | No | No | No |
+| Route or cancel milestone dispute | No | Staff workflow only | Initiator cancellation before route only | Initiator cancellation before route only |
+
+Existing participant and assigned-Staff read APIs stay unchanged. The new Admin
+endpoints are a dashboard projection and must use an explicit `ADMIN` role gate.
+
+## Data Contract And Query Rules
+
+The dashboard joins only records belonging to the same dispute:
+
+- `disputes` for case state, initiator, Staff decision, payout/refund fields,
+  and timestamps;
+- `contracts`, `milestones`, and `contract_milestones` for identity, escrow,
+  and settlement guard/source information;
+- `staff` for the assigned Staff summary;
+- `case_attachments` for dispute evidence in the detail response;
+- `wallet_transactions` for settlement ledger evidence, constrained by
+  `reference_type = DISPUTE` and the dispute ID.
+
+Implement a projection/query service or repository query that avoids N+1
+lookups. Do not return an entity graph directly. Reuse the existing wallet
+metadata and ledger references; do not introduce duplicate financial truth.
+
+## Financial Invariants
+
+- `expertPayoutAmount + businessRefundAmount = milestoneEscrowAmount` for every
+  settled dispute.
+- No milestone escrow may be released twice.
+- A dashboard query and an Admin notification never move wallet balances.
+- Admin reporting cannot delay or alter Staff-triggered automatic settlement.
+- Settlement report data must correspond to the committed dispute and ledger
+  records, not client-supplied amounts.
 
 ## Acceptance Criteria
 
-| #  | Tiêu chi                                                                               | Cách verify              |
-|----|----------------------------------------------------------------------------------------|--------------------------|
-| AC1 | Nộp hồ sơ với MST không hợp lệ (không phải 10/13 số) -> bị chặn `MA SO THUE KHONG HOP LE` | Unit test                |
-| AC2 | Nộp hồ sơ với MST đã được dùng bởi account khác -> bị chặn `MA SO THUE DA DUOC SU DUNG BOI TAI KHOAN KHAC` | Unit test                |
-| AC3 | Nộp hồ sơ với MST không tồn tại trong VietQR -> bị chặn `KHONG TIM THAY DOANH NGHIEP...` | Unit test (mock VietQR)  |
-| AC4 | Nộp hồ sơ hợp lệ -> `companyName`, `address` ghi đè từ VietQR, `verifiedRepresentative` được lưu | Unit test (mock VietQR)  |
-| AC5 | Nộp lại hồ sơ với cùng MST (cùng account) -> thành công, không bị chặn duplicate        | Unit test                |
-| AC6 | Staff xem danh sách/chi tiết hồ sơ -> response có `verifiedRepresentative`             | API test                 |
-| AC7 | VietQR API không reachable -> hồ sơ bị chặn, không vào Pending                         | Unit test (mock BadGateway) |
-| AC8 | Existing flow (notify staff, audit log, kyb_status=Pending) vẫn hoạt động              | Unit test                |
-| AC9 | Migration V52 chạy thành công, thêm cột `verified_representative` vào `business_profiles` | Integration / Flyway     |
-
-## Database Changes
-
-**Migration: `V52__business_profile_verified_data.sql`**
-
-```sql
-ALTER TABLE business_profiles
-    ADD COLUMN IF NOT EXISTS verified_representative VARCHAR(255);
-
-COMMENT ON COLUMN business_profiles.verified_representative
-    IS 'Nguoi dai dien phap ly tu VietQR API, dung de staff doi chieu giay phep kinh doanh';
-```
-
-> Khong migrate du lieu cu — cac ban ghi hien co se co NULL cho `verified_representative`, chap nhan duoc vi ho so da Approved khong can verify lai.
-
-## Entity Changes
-
-**File: `src/main/java/com/aitasker/be/entity/BusinessProfileEntity.java`**
-
-Them 1 field moi:
-
-```java
-@Column(name = "verified_representative", length = 255)
-private String verifiedRepresentative;
-```
-
-## Repository Changes
-
-**File: `src/main/java/com/aitasker/be/repository/BusinessProfileRepository.java`**
-
-Them method check duplicate loai truong account hien tai:
-
-```java
-@Query("SELECT COUNT(b) > 0 FROM BusinessProfileEntity b WHERE b.taxCode = :taxCode AND b.accountId <> :accountId")
-boolean existsByTaxCodeExcludingAccount(@Param("taxCode") String taxCode, @Param("accountId") Integer accountId);
-```
-
-> Giu nguyen `existsByTaxCode(String)` hien co.
-
-## Service Changes
-
-**File: `src/main/java/com/aitasker/be/service/core/ProfileService.java`**
-
-Inject `TaxCheckService` vao constructor.
-
- thay doi logic trong `upsertBusiness()`:
-
-| Step | Action                                                                            | Status     |
-|------|-----------------------------------------------------------------------------------|------------|
-| 1    | `requireRole("BUSINESS")`                                                         | Giu nguyen |
-| 2    | Validate input not null                                                           | Giu nguyen |
-| 3    | Validate `taxCode` not blank                                                      | Giu nguyen |
-| 4    | Validate `taxCode` format: matches `\d{10}\|\d{13}` -> `MA SO THUE KHONG HOP LE`  | **Moi**    |
-| 5    | Check duplicate: `existsByTaxCodeExcludingAccount(taxCode, accountId)` -> `MA SO THUE DA DUOC SU DUNG BOI TAI KHOAN KHAC` | **Moi**    |
-| 6    | Call `TaxCheckService.checkTaxCode(taxCode)` -> `KHONG TIM THAY DOANH NGHIEP...` hoac `KHONG GOI DUOC API VIETQR` | **Moi**    |
-| 7    | Ghi de `entity.companyName = VietQR.companyName`                                   | **Moi**    |
-| 8    | Ghi de `entity.address = VietQR.address`                                           | **Moi**    |
-| 9    | `entity.verifiedRepresentative = VietQR.representative`                            | **Moi**    |
-| 10   | `entity.businessLicenseUrl = input.businessLicenseUrl`                            | Giu nguyen |
-| 11   | `kyb_status = "Pending"`, account status = `"Pending"`                           | Giu nguyen |
-| 12   | Notify staff                                                                       | Giu nguyen |
-
-**File: `src/main/java/com/aitasker/be/service/auth/TaxCheckService.java`**
-
-Khong thay doi — service hien tai da du dung. Chi can inject vao `ProfileService`.
-
-## Controller Changes
-
-Khong thay doi controller — cac endpoint hien tai du. Response `BusinessProfileEntity` tu dong co them field `verifiedRepresentative` nho entity change.
+| # | Criteria | Verification |
+|---|---|---|
+| AC1 | Admin can paginate and filter all disputes through `GET /api/v1/admin/disputes`. | Controller/service integration test |
+| AC2 | Non-Admin receives authorization failure for both new dashboard endpoints. | RBAC tests |
+| AC3 | List ordering, pagination, status/Staff/date/ID filters are deterministic and correct. | Repository/service tests |
+| AC4 | Settled response amounts and transaction ID match persisted dispute and ledger data. | Service/integration test |
+| AC5 | Unsettled disputes expose `null` settlement fields; no estimated payout is shown. | Service test |
+| AC6 | Detail returns only evidence and ledger rows belonging to its dispute. | Authorization/data-isolation test |
+| AC7 | A successful Staff-triggered settlement sends exactly one Admin informational report after commit. | Settlement/notification test |
+| AC8 | Retrying a previously settled case cannot duplicate escrow release or Admin report. | Idempotency test |
+| AC9 | Admin cannot approve, change payout percentage, route, or cancel a milestone dispute through this feature. | Route/RBAC regression tests |
+| AC10 | Swagger/OpenAPI and dashboard documentation describe the new read-only API and notification type. | Docs/OpenAPI validation |
 
 ## Execution Plan
 
-| Step | File                                                                                          | Action   | Details                                                                                          |
-|------|-----------------------------------------------------------------------------------------------|----------|--------------------------------------------------------------------------------------------------|
-| 1    | `src/main/resources/db/migration/V52__business_profile_verified_data.sql`                     | Tao moi  | Migration them cot `verified_representative`                                                     |
-| 2    | `src/main/java/com/aitasker/be/entity/BusinessProfileEntity.java`                            | Sua      | Them field `verifiedRepresentative` voi `@Column` mapping                                         |
-| 3    | `src/main/java/com/aitasker/be/repository/BusinessProfileRepository.java`                    | Sua      | Them method `existsByTaxCodeExcludingAccount(taxCode, accountId)` voi `@Query`                    |
-| 4    | `src/main/java/com/aitasker/be/service/core/ProfileService.java`                             | Sua      | Inject `TaxCheckService`; them logic validate MST format, check duplicate, call VietQR, auto-fill |
-| 5    | `src/test/.../ProfileServiceTest.java`                                                        | Sua/Tao  | Them unit tests cho AC1-AC9, mock `TaxCheckService` va `BusinessProfileRepository`                |
-| 6    | `docs/stories/US-046-kyb-tax-code-verification-hardening/`                                    | Tao      | Tao story folder voi overview.md, design.md, execplan.md, validation.md                           |
-| 7    | `docs/swagger-api-overview.md`, `docs/ARCHITECTURE.md`                                        | Sua      | Cap nhat note ve verified fields trong response                                                   |
-| 8    | —                                                                                             | Run      | `./mvnw test -Dtest=ProfileServiceTest` va `./mvnw compile`                                       |
-
-## Validation
-
-| Layer       | Expected proof                                                                                                    |
-|-------------|-------------------------------------------------------------------------------------------------------------------|
-| Unit        | `ProfileServiceTest` covers: MST format, duplicate check, VietQR call success/failure, auto-fill, resubmit       |
-| Integration | `./mvnw test` voi PostgreSQL chay V52 migration thanh cong                                                        |
-| E2E         | —                                                                                                                  |
-| Platform    | —                                                                                                                  |
+| Step | Area | Action |
+|---|---|---|
+| 1 | Harness | Create a high-risk story and define financial/RBAC proof before implementation. |
+| 2 | DTOs | Add paginated list and detail response DTOs plus filter request/query object. |
+| 3 | Persistence | Add efficient projection queries/repositories with indexed, parameterized filters. Add an additive index only if query-plan evidence requires it. |
+| 4 | Service | Implement explicit Admin gates, list/detail mapping, data isolation, and no-N+1 retrieval. |
+| 5 | Controller | Add the two `/api/v1/admin/disputes` GET routes. |
+| 6 | Notification | Add idempotent post-commit Admin settlement-report notification. |
+| 7 | Tests | Cover AC1–AC9, including settlement financial invariant and retry behavior. |
+| 8 | Documentation | Update Swagger/OpenAPI, API overview/test guide, dispute flow, story proof, and Harness trace. |
 
 ## Non-Goals
 
-- Khong thay doi luong approval cua Staff (approve/reject logic giu nguyen).
-- Khong migrate du lieu verified cho ho so da Approved.
-- Khong thay doi endpoint `GET /api/auth/tax-check/{mst}` (public API giu nguyen).
-- Khong them frontend changes.
-- Khong tu dong approve ho so khi MST verified — Staff van phai duyet de check giay phep kinh doanh.
-- Khong ap dung cho Expert KYC flow (chi ap dung cho Business KYB).
+- No Admin approval queue for Staff decisions or settlement.
+- No Admin override, appeal, or payout percentage adjustment.
+- No modification to the automatic Staff decision → settlement flow.
+- No deletion/deprecation of the legacy Admin settlement endpoint in this change;
+  that requires a separately approved compatibility story.
+- No frontend implementation; this contract defines the backend dashboard API.
 
 ## Risk Checklist
 
-| Flag               | Applies? | Reason                                                              |
-|--------------------|----------|---------------------------------------------------------------------|
-| Data model         | Co       | Them 1 cot DB moi qua migration V52                                 |
-| External systems   | Co       | Goi VietQR API trong luong submit (khong chi public endpoint)       |
-| Public contracts   | Co       | Response `BusinessProfileEntity` them 1 field moi                   |
-| Existing behavior  | Co       | `upsertBusiness()` thay doi logic, them validation chan MST sai/trung |
-| Auth               | Khong    |                                                                     |
-| Authorization      | Khong    |                                                                     |
-| Audit/security     | Khong    |                                                                     |
+| Flag | Applies? | Reason |
+|---|---|---|
+| Financial | Yes | Reports committed escrow payout/refund and must preserve one-release invariants. |
+| Authorization | Yes | New Admin-only aggregate access to dispute and financial records. |
+| Public contract | Yes | Two new public GET APIs and a notification type. |
+| Existing behavior | Yes | Extends the settlement completion path with post-commit reporting. |
+| Data model | Maybe | Prefer existing fields; add only evidence-backed indexes or additive notification persistence if needed. |
 
-**Classification:** normal (4 flags, khong cham hard gate nao ngoai external systems).
+**Classification:** high-risk. Execute focused and full tests, validate ledger
+invariants against PostgreSQL, then record a high-risk Harness trace.

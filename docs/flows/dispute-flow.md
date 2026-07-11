@@ -259,6 +259,8 @@ v2.3 thay đổi so với v2.2:
 | `POST` | `/api/v1/disputes/{disputeId}/cancel` | Initiator | Rút dispute trước Staff routing |
 | `GET` | `/api/v1/contracts/{contractId}/disputes` | Participant/Operator | Danh sách dispute của contract |
 | `GET` | `/api/v1/disputes/{disputeId}` | Participant/Operator/Staff | Chi tiết dispute |
+| `GET` | `/api/v1/admin/disputes` | Admin | Dashboard danh sách dispute có phân trang/bộ lọc |
+| `GET` | `/api/v1/admin/disputes/{disputeId}` | Admin | Dashboard chi tiết dispute kèm ledger + attachments |
 
 ---
 
@@ -273,3 +275,4 @@ v2.3 thay đổi so với v2.2:
 | `DISPUTE_STAFF_DECIDED` | Business + Expert | Khi Staff ra quyết định |
 | `DISPUTE_RESOLVED` | Business + Expert | Khi settlement hoàn tất |
 | `DISPUTE_CANCELLED` | Business + Expert | Khi initiator rút dispute |
+| `DISPUTE_SETTLEMENT_REPORTED` | Admin | Sau khi settlement commit thành công (báo cáo kiểm toán) |

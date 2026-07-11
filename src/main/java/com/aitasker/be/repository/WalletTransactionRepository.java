@@ -19,4 +19,6 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
 
     // Note: Ham `existsByPaymentOrderIdAndTransactionType` truy cap hoac truy van du lieu phuc vu tang service.
     boolean existsByPaymentOrderIdAndTransactionType(Long paymentOrderId, String transactionType);
+
+    List<WalletTransactionEntity> findByReferenceTypeAndReferenceIdOrderByCreatedAtAsc(String referenceType, Long referenceId);
 }

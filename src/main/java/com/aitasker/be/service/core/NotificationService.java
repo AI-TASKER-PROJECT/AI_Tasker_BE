@@ -487,6 +487,25 @@ public class NotificationService {
                 Map.of("contractId", contractId, "disputeId", disputeId));
     }
 
+    public void notifyAdminDisputeSettlementReported(Integer receiverAccountId, Integer actorAccountId,
+            Integer disputeId, Integer contractId, Integer milestoneId,
+            Integer expertPayoutPercentage, java.math.BigDecimal expertPayoutAmount,
+            java.math.BigDecimal businessRefundAmount, Long settlementWalletTransactionId) {
+        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_SETTLEMENT_REPORTED",
+                "Báo cáo quyết toán tranh chấp",
+                "Một tranh chấp đã được quyết toán. Kiểm tra dashboard để biết chi tiết.",
+                "/admin/disputes/" + disputeId,
+                Map.of(
+                        "disputeId", disputeId,
+                        "contractId", contractId,
+                        "milestoneId", milestoneId,
+                        "expertPayoutPercentage", expertPayoutPercentage,
+                        "expertPayoutAmount", formatAmount(expertPayoutAmount),
+                        "businessRefundAmount", formatAmount(businessRefundAmount),
+                        "settlementWalletTransactionId", settlementWalletTransactionId
+                ));
+    }
+
     public void notifyTerminationAcceptedOrExpired(Integer receiverAccountId, Integer actorAccountId,
             Integer contractId, Long terminationRequestId, String type) {
         createAndPush(receiverAccountId, actorAccountId, type,

@@ -65,7 +65,7 @@ Expert start milestone
     │   │   ├── Request #1 → due_at = now + 24h
     │   │   └── Request #2+ → due_at = now + 12h
     │   │
-    │   ├── Tạo milestone_progress_report_requests:
+    │   ├── Tạo :
     │   │   ├── status = PENDING
     │   │   ├── request_number (tăng dần, không reset)
     │   │   └── due_at

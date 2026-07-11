@@ -6,21 +6,22 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
-import com.aitasker.be.dto.admin.AccountRequest;
-import com.aitasker.be.dto.admin.AccountResponse;
-import com.aitasker.be.dto.admin.StaffResponse;
+import com.aitasker.be.dto.admin.*;
 import com.aitasker.be.dto.payment.WalletTransactionHistoryResponse;
 import com.aitasker.be.entity.ReviewEntity;
 import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.entity.SystemWalletEntity;
 import com.aitasker.be.entity.SystemSettingEntity;
+import com.aitasker.be.service.core.AdminDisputeDashboardService;
 import com.aitasker.be.service.core.AdminService;
 import com.aitasker.be.service.core.PaymentWalletService;
 import com.aitasker.be.service.core.SystemWalletService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 // Note: Annotation này biến class thành REST controller để nhận request và trả JSON.
@@ -31,6 +32,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminController {
     private final AdminService adminService;
+    private final AdminDisputeDashboardService adminDisputeDashboardService;
     private final SystemWalletService systemWalletService;
     private final PaymentWalletService paymentWalletService;
 
@@ -143,6 +145,33 @@ public class AdminController {
     // Note: Hàm `updateAccount` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<AccountResponse>> updateAccount(@PathVariable Integer accountId, @RequestBody AccountRequest request) {
         return ResponseEntity.ok(ApiResponse.success("UPDATE ACCOUNT SUCCESS", adminService.updateAccount(accountId, request)));
+    }
+
+    @GetMapping("/disputes")
+    public ResponseEntity<ApiResponse<AdminDisputeListResponse>> listDisputes(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer assignedStaffId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(required = false) String q) {
+        AdminDisputeFilter filter = new AdminDisputeFilter();
+        filter.setPage(page);
+        filter.setSize(size);
+        filter.setStatus(status);
+        filter.setAssignedStaffId(assignedStaffId);
+        filter.setFrom(from);
+        filter.setTo(to);
+        filter.setQ(q);
+        return ResponseEntity.ok(ApiResponse.success("ADMIN DISPUTES LIST SUCCESS",
+                adminDisputeDashboardService.listDisputes(filter)));
+    }
+
+    @GetMapping("/disputes/{disputeId}")
+    public ResponseEntity<ApiResponse<AdminDisputeDetail>> getDisputeDetail(@PathVariable Integer disputeId) {
+        return ResponseEntity.ok(ApiResponse.success("ADMIN DISPUTE DETAIL SUCCESS",
+                adminDisputeDashboardService.getDisputeDetail(disputeId)));
     }
 
     // Note: Annotation này khai báo API cập nhật một phần dữ liệu bằng HTTP PATCH.
