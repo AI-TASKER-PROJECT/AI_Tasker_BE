@@ -1,4 +1,4 @@
-# Admin Dispute & Settlement Dashboard
+# Staff Dispute Inbox & Specialization Routing
 
 ## Status
 
@@ -6,54 +6,140 @@ planned
 
 ## Lane
 
-high-risk (financial data, authorization, public API contract, existing dispute flow)
+high-risk (authorization, data model, public API contract, existing dispute flow)
 
 ## Product Contract
 
-Admin needs a read-only operational dashboard for milestone disputes and their
-financial settlement. The dashboard makes the full case and settlement outcome
-auditable without creating an Admin approval step.
+Staff needs a dedicated inbox containing only assigned milestone disputes, and
+the routing workflow must assign every dispute to Staff whose configured domain
+specialization matches the disputed job.
 
-`SPEC-MILESTONE-DISPUTER.md` v2.3 remains authoritative for the dispute
-workflow:
+`SPEC-MILESTONE-DISPUTER.md` v2.3 remains authoritative for dispute lifecycle
+and settlement behavior:
 
 - Assigned Staff is the only role that decides the Expert payout percentage.
 - A valid Staff decision triggers settlement automatically.
-- Admin may observe, audit, and receive a financial report, but may not approve,
-  reject, revise, route, cancel, or alter a milestone dispute or its payout.
-- The dashboard must never hold a valid settlement waiting for Admin action.
+- Admin does not assign, approve, revise, or cancel a milestone dispute.
+- Domain match is mandatory. Workload alone must never route a dispute to Staff
+  outside the job's domain.
 
 ## User Stories
 
-**As an Admin**, I want to see all milestone disputes in one dashboard, filter
-them by operational state and Staff owner, and inspect the resulting payout and
-refund so I can monitor risk and reconcile platform financial activity.
+**As a Staff member**, I want one paginated inbox containing only disputes
+assigned to me so I can review and resolve my cases without discovering them
+indirectly through contracts.
 
-**As an Admin**, I want to receive an informational settlement report when a
-dispute is resolved, so I can investigate unusual financial outcomes without
-becoming a second decision-maker.
+**As Staff operations**, I want automatic and manual routing to accept only
+Staff whose configured domains match the job, then rank those Staff by relevant
+skills and workload, so every assigned reviewer has appropriate expertise.
+
+**As an Admin**, I want to configure structured domain and skill assignments
+for Staff so routing does not depend on free-text specialization.
 
 ## Current Behavior
 
-1. Admin can list disputes only one contract at a time through
-   `GET /api/v1/contracts/{contractId}/disputes`.
-2. Admin can inspect one dispute through `GET /api/v1/disputes/{disputeId}`.
-3. Wallet and audit records exist, but there is no single Admin API that joins a
-   dispute with its Staff decision and settlement amounts.
-4. Settlement notifications go to Business and Expert. Admin is notified for a
-   Staff-SLA escalation, not for a completed dispute settlement.
-5. A legacy Admin settlement endpoint may still exist. It is not an approval
-   workflow and is outside the scope of this dashboard change; removal or
-   deprecation requires a separate compatibility decision.
+1. Staff can discover assigned work indirectly through
+   `GET /api/v1/contracts`, then list disputes for each contract.
+2. There is no dedicated Staff dispute inbox API.
+3. Once assigned to one dispute, Staff can currently list or read other
+   disputes belonging to the same contract.
+4. `staff.specialization` is a free-text field without structured domain or
+   skill mappings.
+5. Candidate ranking exposes the specialization text but primarily sorts by
+   active dispute workload; it does not compare job domains or skills.
+6. Automatic routing can therefore select a Staff member outside the job's
+   professional domain.
 
 ## Target Behavior
 
-### 1. Admin Dispute List
+### 1. Structured Staff Specialization
 
-Add an Admin-only API:
+Add additive mapping tables:
 
 ```text
-GET /api/v1/admin/disputes
+staff_domains(staff_id, domain_id)
+staff_skills(staff_id, skill_id)
+```
+
+Rules:
+
+- `(staff_id, domain_id)` and `(staff_id, skill_id)` are composite primary keys.
+- Both columns use foreign keys to their owning Staff and catalog records.
+- Add indexes supporting lookup by `domain_id` and `skill_id`.
+- Every Staff account must have at least one configured domain.
+- Skills are optional and are used only for ranking after domain eligibility.
+- Keep the legacy `specialization` string for backward-compatible display, but
+  never use it as routing truth.
+- Backfill demo Staff with explicit domain and skill mappings. Existing Staff
+  whose specialization cannot be mapped safely must be reported for Admin
+  configuration; the migration must not guess from ambiguous free text.
+
+Update the Admin Staff contract:
+
+```text
+POST  /api/v1/admin/staffs
+PATCH /api/v1/admin/staffs/{staffId}
+```
+
+The request accepts `domainIds` and `skillIds`. `domainIds` is required and
+must contain at least one unique, existing domain. `skillIds` may be empty but
+every supplied ID must exist. Staff responses expose structured `domains` and
+`skills` in addition to the legacy specialization display value.
+
+Admin must not remove a Staff member's final domain mapping. Admin must also be
+warned and the update rejected when removing a mapping would leave a domain
+used by active jobs without any eligible Staff coverage.
+
+### 2. Domain-Mandatory Staff Routing
+
+Automatic routing is used by escalation and by:
+
+```text
+POST /api/v1/disputes/{disputeId}/route-staff
+```
+
+when `staffId` is omitted.
+
+Routing algorithm:
+
+1. Resolve the dispute's contract, job, job domains, and required job skills.
+2. Reject routing if the job has no configured domain.
+3. Keep only Staff having at least one `staff_domains` record matching a job
+   domain.
+4. Rank eligible Staff deterministically by:
+   - matched domain count descending;
+   - matched required-skill count descending;
+   - active assigned-dispute workload ascending;
+   - `staffId` ascending.
+5. Assign the first candidate and move the dispute to `STAFF_REVIEWING` using
+   the existing access, SLA, audit, and notification behavior.
+
+Mandatory guards:
+
+- Manual routing with `staffId` must apply the same domain eligibility check.
+- No workload or free-text fallback is permitted for a domain mismatch.
+- If no matching Staff exists, leave the dispute and assignment unchanged,
+  keep `ESCALATION_REQUESTED`, and return
+  `NO_MATCHING_STAFF_FOR_JOB_DOMAIN`.
+- A failed routing attempt must not create access grants, audit assignment
+  events, or assignment notifications.
+
+Update the existing candidate API:
+
+```text
+GET /api/v1/disputes/{disputeId}/staff-candidates
+```
+
+It returns only domain-eligible Staff and includes `matchedDomains`,
+`matchedSkills`, `availability`, `activeDisputeWorkloadCount`, and
+`conflictEligible`. Ordering must be identical to automatic routing.
+
+### 3. Staff Dispute Inbox
+
+Add a Staff-only API:
+
+```text
+GET /api/v1/staff/disputes
 ```
 
 Query parameters:
@@ -62,179 +148,101 @@ Query parameters:
 |---|---|---:|---|
 | `page` | integer >= 0 | `0` | Zero-based page number |
 | `size` | integer 1..100 | `20` | Page size |
-| `status` | enum | — | Exact dispute status |
-| `assignedStaffId` | integer | — | Assigned Staff identifier |
-| `from` | ISO-8601 datetime | — | Created-at lower bound, inclusive |
-| `to` | ISO-8601 datetime | — | Created-at upper bound, inclusive |
-| `q` | string, max 100 | — | Safe exact/partial search over dispute ID and contract ID only |
+| `status` | dispute status | - | Exact optional status filter |
 
-Default ordering is newest dispute first by `createdAt DESC`, then `disputeId DESC`.
-Invalid dates, invalid status, invalid pagination, or `from > to` return a clear
-validation error. The API must not interpolate `q` into raw SQL.
+Default ordering is `createdAt DESC`, then `disputeId DESC`.
 
-Response is a paginated purpose-built DTO, never a raw JPA entity:
+The backend derives `staffId` from the authenticated Staff account. The client
+cannot provide or override `assignedStaffId`.
 
-```json
-{
-  "content": [
-    {
-      "disputeId": 8,
-      "contractId": 42,
-      "milestoneId": 103,
-      "status": "RESOLVED",
-      "initiatedBy": "BUSINESS",
-      "initiationType": "BUSINESS_REJECTED_DELIVERABLE",
-      "createdAt": "2026-07-11T10:00:00",
-      "assignedStaff": { "staffId": 12, "displayName": "Nguyen Van A" },
-      "staffDecidedAt": "2026-07-12T09:30:00",
-      "expertPayoutPercentage": 70,
-      "expertPayoutAmount": 7000000,
-      "businessRefundAmount": 3000000,
-      "settlementExecutedAt": "2026-07-12T09:30:01",
-      "settlementWalletTransactionId": 1234
-    }
-  ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 1,
-  "totalPages": 1
-}
-```
+The paginated response uses a purpose-built DTO containing:
 
-For disputes not yet settled, the payout, refund, settlement timestamp, and
-settlement transaction ID are `null`. The API must not fabricate financial
-amounts before Staff has made a decision.
+- dispute, contract, milestone, and job identifiers;
+- dispute status, reason, initiation type, and creation timestamp;
+- job domains and required skills;
+- matched Staff domains and skills captured from current routing data;
+- evidence deadline, Staff SLA deadline, and review start time;
+- settlement decision status without unrelated wallet or participant-private
+  data.
 
-### 2. Admin Dispute Detail
+### 4. Assigned-Case Authorization
 
-Add an Admin-only API:
+- Only role `STAFF` may call `/api/v1/staff/disputes`.
+- The inbox returns only disputes whose `assigned_staff_id` equals the current
+  Staff profile ID.
+- `GET /api/v1/disputes/{disputeId}` must require that exact dispute assignment
+  for Staff callers.
+- `GET /api/v1/contracts/{contractId}/disputes` must return only disputes
+  assigned to the current Staff, not every dispute in the contract.
+- Staff access to dispute attachments, deliverables, milestone criteria, and
+  supporting contract data must be scoped to the assigned case.
+- Assigned Staff retains `READ_EXECUTE` access and remains the only Staff
+  allowed to submit that dispute's decision.
+- Admin and participant read behavior remains unchanged.
 
-```text
-GET /api/v1/admin/disputes/{disputeId}
-```
+## Data And Compatibility Rules
 
-The detail response must include the list summary fields plus:
-
-- dispute reason, escalation reason, evidence summary, and case attachments;
-- Staff report and decision note when present;
-- milestone escrow amount and settlement source fields;
-- immutable settlement ledger entries linked by `reference_type = DISPUTE` and
-  `reference_id = disputeId`;
-- audit-relevant timestamps: created, routed, Staff-decided, resolved, and
-  settlement-executed.
-
-The detail response is read-only. It must not expose sensitive data from other
-contracts or unrelated wallet transactions.
-
-### 3. Settlement Report for Admin
-
-After a successful dispute settlement transaction commits, the system sends an
-informational notification/event to every Admin:
-
-```text
-type = DISPUTE_SETTLEMENT_REPORTED
-```
-
-The notification payload contains `disputeId`, `contractId`, `milestoneId`,
-`expertPayoutPercentage`, `expertPayoutAmount`, `businessRefundAmount`, and
-`settlementWalletTransactionId`.
-
-Rules:
-
-- It is an audit/reporting event, not an approval request.
-- It is emitted only after ledger rows, dispute state, and settlement timestamp
-  are persisted successfully.
-- It is emitted at most once for a settlement; retries after an already released
-  escrow must not create duplicate reports.
-- Business and Expert settlement notifications remain unchanged.
-
-## Authorization Rules
-
-| Action | Admin | Staff | Business | Expert |
-|---|---|---|---|---|
-| List Admin dashboard disputes | Yes | No | No | No |
-| View Admin dashboard dispute detail | Yes | No | No | No |
-| Receive settlement report event | Yes | No | No | No |
-| Decide payout percentage | No | Assigned Staff only | No | No |
-| Approve/revise settlement | No | No | No | No |
-| Route or cancel milestone dispute | No | Staff workflow only | Initiator cancellation before route only | Initiator cancellation before route only |
-
-Existing participant and assigned-Staff read APIs stay unchanged. The new Admin
-endpoints are a dashboard projection and must use an explicit `ADMIN` role gate.
-
-## Data Contract And Query Rules
-
-The dashboard joins only records belonging to the same dispute:
-
-- `disputes` for case state, initiator, Staff decision, payout/refund fields,
-  and timestamps;
-- `contracts`, `milestones`, and `contract_milestones` for identity, escrow,
-  and settlement guard/source information;
-- `staff` for the assigned Staff summary;
-- `case_attachments` for dispute evidence in the detail response;
-- `wallet_transactions` for settlement ledger evidence, constrained by
-  `reference_type = DISPUTE` and the dispute ID.
-
-Implement a projection/query service or repository query that avoids N+1
-lookups. Do not return an entity graph directly. Reuse the existing wallet
-metadata and ledger references; do not introduce duplicate financial truth.
-
-## Financial Invariants
-
-- `expertPayoutAmount + businessRefundAmount = milestoneEscrowAmount` for every
-  settled dispute.
-- No milestone escrow may be released twice.
-- A dashboard query and an Admin notification never move wallet balances.
-- Admin reporting cannot delay or alter Staff-triggered automatic settlement.
-- Settlement report data must correspond to the committed dispute and ledger
-  records, not client-supplied amounts.
+- Add a new Flyway migration; do not modify migrations that may have run.
+- Repository queries must paginate and filter in the database rather than load
+  every dispute and filter in memory.
+- Candidate matching must use catalog IDs, not localized names or substring
+  matching.
+- Existing `assigned_staff_id` records remain valid. New routing and reassignment
+  operations use the domain guard after deployment.
+- Existing notification types and automatic settlement behavior remain intact.
+- The Admin dispute dashboard from US-049 remains unchanged.
+- Termination-request Staff routing is outside this story.
 
 ## Acceptance Criteria
 
 | # | Criteria | Verification |
 |---|---|---|
-| AC1 | Admin can paginate and filter all disputes through `GET /api/v1/admin/disputes`. | Controller/service integration test |
-| AC2 | Non-Admin receives authorization failure for both new dashboard endpoints. | RBAC tests |
-| AC3 | List ordering, pagination, status/Staff/date/ID filters are deterministic and correct. | Repository/service tests |
-| AC4 | Settled response amounts and transaction ID match persisted dispute and ledger data. | Service/integration test |
-| AC5 | Unsettled disputes expose `null` settlement fields; no estimated payout is shown. | Service test |
-| AC6 | Detail returns only evidence and ledger rows belonging to its dispute. | Authorization/data-isolation test |
-| AC7 | A successful Staff-triggered settlement sends exactly one Admin informational report after commit. | Settlement/notification test |
-| AC8 | Retrying a previously settled case cannot duplicate escrow release or Admin report. | Idempotency test |
-| AC9 | Admin cannot approve, change payout percentage, route, or cancel a milestone dispute through this feature. | Route/RBAC regression tests |
-| AC10 | Swagger/OpenAPI and dashboard documentation describe the new read-only API and notification type. | Docs/OpenAPI validation |
+| AC1 | Admin can create or update Staff with valid structured domains and skills; empty or unknown domains are rejected. | Admin service/controller tests |
+| AC2 | Flyway creates mapping constraints and backfills demo Staff without guessing ambiguous production specialization text. | PostgreSQL migration test |
+| AC3 | Auto-routing only considers Staff sharing at least one job domain. | Routing service test |
+| AC4 | Domain count, skill count, workload, and Staff ID produce deterministic candidate ordering. | Ranking test |
+| AC5 | Manual routing rejects a Staff member with no matching job domain. | Authorization/business-rule test |
+| AC6 | No matching Staff leaves the dispute unchanged in `ESCALATION_REQUESTED` and emits no assignment side effects. | Transactional integration test |
+| AC7 | Candidate API returns only eligible Staff with accurate match and workload fields. | Controller/service test |
+| AC8 | Staff inbox pagination, status filtering, and ordering are correct and derive Staff identity from JWT. | Controller/integration test |
+| AC9 | Staff A cannot list or read Staff B's dispute, attachments, or supporting case data, including disputes in the same contract. | RBAC/data-isolation test |
+| AC10 | Assigned Staff can still decide payout and trigger settlement exactly once. | Dispute settlement regression test |
+| AC11 | Swagger/OpenAPI and dispute-flow documentation describe the inbox, structured specialization, routing error, and tightened read scope. | Docs/OpenAPI validation |
 
 ## Execution Plan
 
 | Step | Area | Action |
 |---|---|---|
-| 1 | Harness | Create a high-risk story and define financial/RBAC proof before implementation. |
-| 2 | DTOs | Add paginated list and detail response DTOs plus filter request/query object. |
-| 3 | Persistence | Add efficient projection queries/repositories with indexed, parameterized filters. Add an additive index only if query-plan evidence requires it. |
-| 4 | Service | Implement explicit Admin gates, list/detail mapping, data isolation, and no-N+1 retrieval. |
-| 5 | Controller | Add the two `/api/v1/admin/disputes` GET routes. |
-| 6 | Notification | Add idempotent post-commit Admin settlement-report notification. |
-| 7 | Tests | Cover AC1–AC9, including settlement financial invariant and retry behavior. |
-| 8 | Documentation | Update Swagger/OpenAPI, API overview/test guide, dispute flow, story proof, and Harness trace. |
+| 1 | Harness | Create a high-risk story and capture authorization, migration, and dispute-settlement proof requirements. |
+| 2 | Data model | Add Staff-domain/skill mappings, repositories, indexes, and safe demo backfill in a new migration. |
+| 3 | Admin Staff API | Replace raw entity input with request DTOs, validate catalog mappings, and return structured specialization data. |
+| 4 | Routing | Implement domain eligibility, deterministic ranking, manual-route guard, and no-match transaction behavior. |
+| 5 | Staff inbox | Add paginated Staff-owned dispute query, response DTO, service, and controller route. |
+| 6 | Authorization | Tighten dispute, contract-dispute, attachment, and supporting-case reads to exact assigned-case scope. |
+| 7 | Tests | Cover AC1-AC10 with focused unit, authorization, migration, and PostgreSQL-backed integration tests. |
+| 8 | Documentation | Refresh Swagger/OpenAPI, API guides, dispute flow, story validation evidence, and Harness trace. |
 
 ## Non-Goals
 
-- No Admin approval queue for Staff decisions or settlement.
-- No Admin override, appeal, or payout percentage adjustment.
-- No modification to the automatic Staff decision → settlement flow.
-- No deletion/deprecation of the legacy Admin settlement endpoint in this change;
-  that requires a separately approved compatibility story.
-- No frontend implementation; this contract defines the backend dashboard API.
+- No frontend implementation.
+- No Staff access to the global Admin dispute dashboard.
+- No fallback assignment to Staff outside the job domain.
+- No change to payout percentages, escrow invariants, or automatic settlement.
+- No Admin approval, override, reassignment, or cancellation workflow for
+  milestone disputes.
+- No redesign of termination-request assignment.
+- No removal of the legacy `specialization` display field in this story.
 
 ## Risk Checklist
 
 | Flag | Applies? | Reason |
 |---|---|---|
-| Financial | Yes | Reports committed escrow payout/refund and must preserve one-release invariants. |
-| Authorization | Yes | New Admin-only aggregate access to dispute and financial records. |
-| Public contract | Yes | Two new public GET APIs and a notification type. |
-| Existing behavior | Yes | Extends the settlement completion path with post-commit reporting. |
-| Data model | Maybe | Prefer existing fields; add only evidence-backed indexes or additive notification persistence if needed. |
+| Authorization | Yes | Tightens Staff ownership and supporting-case access. |
+| Data model | Yes | Adds Staff-domain and Staff-skill mappings. |
+| Public contract | Yes | Adds a Staff inbox and changes Staff administration/candidate DTOs. |
+| Existing behavior | Yes | Replaces workload-only routing and narrows existing Staff reads. |
+| Financial workflow | Yes | Must preserve assigned-Staff decision and one-time settlement behavior. |
 
-**Classification:** high-risk. Execute focused and full tests, validate ledger
-invariants against PostgreSQL, then record a high-risk Harness trace.
+**Classification:** high-risk. Completion requires focused tests, the full test
+suite, PostgreSQL-backed migration validation, updated API documentation, story
+verification, and a completed high-risk Harness trace.

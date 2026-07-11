@@ -1698,6 +1698,21 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### GET `/api/v1/staff/disputes`
+- OperationId: `listStaffDisputes`
+- Auth: Bearer JWT (STAFF role)
+- Giai thich: Staff inbox disputes duoc gan, co phan trang va loc theo status.
+- Params:
+  - `page` (query, optional, integer, default: 0)
+  - `size` (query, optional, integer, default: 20, min: 1, max: 100)
+  - `status` (query, optional, string — loc theo dispute status)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger (StaffDisputeListResponse).
+  - `400`: Validation loi (page < 0, size ngoai 1..100).
+  - `401`/`403`: Sai token, het han token, sai role (chi STAFF).
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ## Notification Flow
 
 - Muc tieu flow: Thong bao trong he thong.

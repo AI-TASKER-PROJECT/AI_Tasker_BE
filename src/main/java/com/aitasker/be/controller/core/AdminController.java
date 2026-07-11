@@ -88,14 +88,14 @@ public class AdminController {
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/staffs")
     // Note: Hàm `createStaff` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<StaffResponse>> createStaff(@RequestBody StaffEntity request) {
+    public ResponseEntity<ApiResponse<StaffResponse>> createStaff(@RequestBody StaffRequest request) {
         return ResponseEntity.ok(ApiResponse.success("CREATE STAFF SUCCESS", adminService.createStaff(request)));
     }
 
     // Note: Annotation này khai báo API cập nhật một phần dữ liệu bằng HTTP PATCH.
     @PatchMapping("/staffs/{staffId}")
     // Note: Hàm `updateStaff` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
-    public ResponseEntity<ApiResponse<StaffResponse>> updateStaff(@PathVariable Integer staffId, @RequestBody StaffEntity request) {
+    public ResponseEntity<ApiResponse<StaffResponse>> updateStaff(@PathVariable Integer staffId, @RequestBody StaffRequest request) {
         return ResponseEntity.ok(ApiResponse.success("UPDATE STAFF SUCCESS", adminService.updateStaff(staffId, request)));
     }
 

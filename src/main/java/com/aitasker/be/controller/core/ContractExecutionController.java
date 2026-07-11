@@ -11,12 +11,15 @@ import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ProgressReportRequest;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
+import com.aitasker.be.dto.core.StaffDisputeFilter;
+import com.aitasker.be.dto.core.StaffDisputeListResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.service.core.AdminService;
 import com.aitasker.be.service.core.ContractExecutionService;
 import com.aitasker.be.service.core.PaymentWalletService;
+import com.aitasker.be.service.core.StaffDisputeService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,7 @@ public class ContractExecutionController {
     private final ContractExecutionService service;
     private final PaymentWalletService paymentWalletService;
     private final AdminService adminService;
+    private final StaffDisputeService staffDisputeService;
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.
     @PostMapping("/contracts/from-proposals/{proposalId}")
@@ -235,6 +239,16 @@ public class ContractExecutionController {
     public ResponseEntity<ApiResponse<List<DisputeEntity>>> escalateOverdueStaffDisputes() {
         return ResponseEntity.ok(ApiResponse.success("ESCALATE STAFF DISPUTE SLA SUCCESS",
                 service.escalateOverdueStaffDisputes()));
+    }
+
+    @GetMapping("/staff/disputes")
+    public ResponseEntity<ApiResponse<StaffDisputeListResponse>> listStaffDisputes(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success("LIST STAFF DISPUTES SUCCESS",
+                staffDisputeService.listDisputes(StaffDisputeFilter.builder()
+                        .page(page).size(size).status(status).build())));
     }
 
     @PostMapping("/contracts/{contractId}/termination-requests")

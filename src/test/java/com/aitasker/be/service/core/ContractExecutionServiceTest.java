@@ -26,6 +26,11 @@ import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.entity.TerminationRequestEntity;
 import com.aitasker.be.entity.WalletTransactionEntity;
+import com.aitasker.be.entity.JobDomainEntity;
+import com.aitasker.be.entity.JobDomainId;
+import com.aitasker.be.entity.DomainEntity;
+import com.aitasker.be.entity.StaffDomainEntity;
+import com.aitasker.be.entity.StaffDomainId;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -95,6 +100,12 @@ class ContractExecutionServiceTest {
     @Mock private PaymentWalletService paymentWalletService;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
+    @Mock private JobDomainRepository jobDomainRepository;
+    @Mock private JobSkillRepository jobSkillRepository;
+    @Mock private StaffDomainRepository staffDomainRepository;
+    @Mock private StaffSkillRepository staffSkillRepository;
+    @Mock private DomainRepository domainRepository;
+    @Mock private SkillRepository skillRepository;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ContractExecutionService contractExecutionService;
@@ -1168,16 +1179,27 @@ class ContractExecutionServiceTest {
     void escalateDispute_shouldAutoRouteToStaffAndNotify() {
         DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(200).status("PENDING_SELF_RESOLVE").build();
         StaffEntity staff = StaffEntity.builder().staffId(9).accountId(5).build();
+        DomainEntity domain = DomainEntity.builder().domainId(2).domainCode("GEN_AI").domainName("Gen AI").isActive(true).sortOrder(1).build();
 
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("BUSINESS").build()).build()
         );
         when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
         when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
-        when(contractRepository.findById(1)).thenReturn(Optional.of(ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").jobId(50).build()));
         when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(staffRepository.findAll()).thenReturn(List.of(staff));
         when(staffRepository.findById(9)).thenReturn(Optional.of(staff));
+        when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
+                new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
+        when(jobSkillRepository.findByIdJobId(50)).thenReturn(List.of());
+        when(staffDomainRepository.findByIdStaffId(9)).thenReturn(List.of(
+                new StaffDomainEntity(new StaffDomainId(9, 2))));
+        when(staffSkillRepository.findByIdStaffId(9)).thenReturn(List.of());
+        when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domain));
+        when(skillRepository.findAllById(any())).thenReturn(List.of());
+        when(disputeRepository.findByAssignedStaffId(any())).thenReturn(List.of());
+        when(accountRepository.findById(5)).thenReturn(Optional.of(AccountEntity.builder().accountId(5).fullName("Staff").role(RoleEntity.builder().roleName("STAFF").build()).build()));
 
         DisputeEntity result = contractExecutionService.escalateDispute(1, "They cheated", "evidence.pdf");
 
@@ -1771,6 +1793,7 @@ class ContractExecutionServiceTest {
     void routeDispute_shouldAutoPickStaffWhenNull() {
         DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(200).status(DisputeEntity.STATUS_ESCALATION_REQUESTED).build();
         StaffEntity staff = StaffEntity.builder().staffId(9).accountId(5).build();
+        DomainEntity domain = DomainEntity.builder().domainId(2).domainCode("GEN_AI").domainName("Gen AI").isActive(true).sortOrder(1).build();
 
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(3).role(RoleEntity.builder().roleName("STAFF").build()).build());
@@ -1778,7 +1801,17 @@ class ContractExecutionServiceTest {
         when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(staffRepository.findById(9)).thenReturn(Optional.of(staff));
         when(staffRepository.findAll()).thenReturn(List.of(staff));
-        when(contractRepository.findById(1)).thenReturn(Optional.of(ContractEntity.builder().contractId(1).businessId(10).expertId(5).build()));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(ContractEntity.builder().contractId(1).businessId(10).expertId(5).jobId(50).build()));
+        when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
+                new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
+        when(jobSkillRepository.findByIdJobId(50)).thenReturn(List.of());
+        when(staffDomainRepository.findByIdStaffId(9)).thenReturn(List.of(
+                new StaffDomainEntity(new StaffDomainId(9, 2))));
+        when(staffSkillRepository.findByIdStaffId(9)).thenReturn(List.of());
+        when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domain));
+        when(skillRepository.findAllById(any())).thenReturn(List.of());
+        when(disputeRepository.findByAssignedStaffId(any())).thenReturn(List.of());
+        when(accountRepository.findById(5)).thenReturn(Optional.of(AccountEntity.builder().accountId(5).fullName("Staff").role(RoleEntity.builder().roleName("STAFF").build()).build()));
 
         DisputeEntity result = contractExecutionService.routeDispute(1, null);
 

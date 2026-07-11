@@ -12,12 +12,16 @@ import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
 import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
+import com.aitasker.be.dto.core.StaffDisputeFilter;
+import com.aitasker.be.dto.core.StaffDisputeListItem;
+import com.aitasker.be.dto.core.StaffDisputeListResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +63,12 @@ public class ContractExecutionService {
     private final PaymentWalletService paymentWalletService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final JobDomainRepository jobDomainRepository;
+    private final JobSkillRepository jobSkillRepository;
+    private final StaffDomainRepository staffDomainRepository;
+    private final StaffSkillRepository staffSkillRepository;
+    private final DomainRepository domainRepository;
+    private final SkillRepository skillRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -1262,13 +1272,25 @@ public class ContractExecutionService {
     }
     // Note: Hàm `listDisputesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<DisputeEntity> listDisputesByContract(Integer contractId) {
+        AccountEntity actor = accessService.currentAccount();
         requireContractParticipantOrOperator(contractId);
+        if ("STAFF".equals(actor.getRole().getRoleName())) {
+            Integer staffId = getCurrentStaffId(actor);
+            return disputeRepository.findByContractId(contractId).stream()
+                    .filter(d -> staffId.equals(d.getAssignedStaffId()))
+                    .toList();
+        }
         return disputeRepository.findByContractId(contractId);
     }
     // Note: Hàm `getDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public DisputeEntity getDispute(Integer disputeId) {
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
-        requireContractParticipantOrOperator(dispute.getContractId());
+        AccountEntity actor = accessService.currentAccount();
+        if ("STAFF".equals(actor.getRole().getRoleName())) {
+            requireAssignedStaff(dispute);
+        } else {
+            requireContractParticipantOrOperator(dispute.getContractId());
+        }
         return dispute;
     }
     // Note: Hàm `matchingByKeyword` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -1310,7 +1332,19 @@ public class ContractExecutionService {
         if (!DisputeEntity.STATUS_ESCALATION_REQUESTED.equals(dispute.getStatus())) {
             throw new AppException("DISPUTE_NOT_READY_FOR_STAFF_ROUTING");
         }
-        Integer routedStaffId = staffId == null ? selectStaffForDispute() : staffId;
+        List<Integer> jobDomainIds = resolveJobDomainIds(dispute.getContractId());
+        if (jobDomainIds.isEmpty()) {
+            throw new AppException("JOB KHONG CO DOMAIN, KHONG THE ROUTE STAFF");
+        }
+        if (staffId != null) {
+            List<Integer> staffDomainIds = staffDomainRepository.findByIdStaffId(staffId).stream()
+                    .map(sd -> sd.getId().getDomainId()).toList();
+            boolean eligible = staffDomainIds.stream().anyMatch(jobDomainIds::contains);
+            if (!eligible) {
+                throw new AppException("STAFF KHONG CO DOMAIN TUONG UNG VOI JOB");
+            }
+        }
+        Integer routedStaffId = staffId == null ? selectStaffForDispute(dispute) : staffId;
         return routeDisputeToStaff(dispute, routedStaffId, accessService.currentAccount().getAccountId());
     }
 
@@ -1543,32 +1577,72 @@ public class ContractExecutionService {
 
     public List<StaffAssignmentCandidateResponse> listStaffCandidates(Integer disputeId) {
         accessService.requireRole("STAFF");
-        disputeRepository.findById(disputeId)
+        DisputeEntity dispute = disputeRepository.findById(disputeId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
-        return rankedStaffCandidates();
+        return rankedStaffCandidates(dispute);
     }
 
-    private List<StaffAssignmentCandidateResponse> rankedStaffCandidates() {
-        return staffRepository.findAll().stream().map(staff -> {
+    private List<StaffAssignmentCandidateResponse> rankedStaffCandidates(DisputeEntity dispute) {
+        List<Integer> jobDomainIds = resolveJobDomainIds(dispute.getContractId());
+        List<Integer> jobSkillIds = resolveJobSkillIds(dispute.getContractId());
+        List<String> jobDomainNames = domainRepository.findAllById(jobDomainIds).stream()
+                .map(DomainEntity::getDomainName).toList();
+        List<String> jobSkillNames = skillRepository.findAllById(jobSkillIds).stream()
+                .map(SkillEntity::getSkillName).toList();
+        List<StaffAssignmentCandidateResponse> candidates = new java.util.ArrayList<>();
+        for (StaffEntity staff : staffRepository.findAll()) {
+            List<Integer> staffDomainIds = staffDomainRepository.findByIdStaffId(staff.getStaffId()).stream()
+                    .map(sd -> sd.getId().getDomainId()).toList();
+            List<Integer> staffSkillIds = staffSkillRepository.findByIdStaffId(staff.getStaffId()).stream()
+                    .map(ss -> ss.getId().getSkillId()).toList();
+            List<Integer> matchedDomainIds = staffDomainIds.stream().filter(jobDomainIds::contains).toList();
+            if (matchedDomainIds.isEmpty()) continue;
+            List<Integer> matchedSkillIds = staffSkillIds.stream().filter(jobSkillIds::contains).toList();
+            List<String> matchedDomainNames = domainRepository.findAllById(matchedDomainIds).stream()
+                    .map(DomainEntity::getDomainName).toList();
+            List<String> matchedSkillNames = skillRepository.findAllById(matchedSkillIds).stream()
+                    .map(SkillEntity::getSkillName).toList();
             int workload = (int) disputeRepository.findByAssignedStaffId(staff.getStaffId()).stream()
                     .filter(item -> activeDisputeStatuses().contains(item.getStatus())).count();
             String displayName = accountRepository.findById(staff.getAccountId())
                     .map(AccountEntity::getFullName).orElse("Staff " + staff.getStaffId());
-            return StaffAssignmentCandidateResponse.builder()
+            candidates.add(StaffAssignmentCandidateResponse.builder()
                     .staffId(staff.getStaffId()).displayName(displayName)
                     .specializationMatch(staff.getSpecialization())
                     .technologyMatchSummary(staff.getSpecialization())
                     .availability(workload == 0 ? "IDLE" : "BUSY")
                     .activeDisputeWorkloadCount(workload)
-                    .conflictEligible(true).build();
-        }).sorted(java.util.Comparator.comparing(StaffAssignmentCandidateResponse::getActiveDisputeWorkloadCount))
-                .toList();
+                    .conflictEligible(true)
+                    .matchedDomains(matchedDomainNames)
+                    .matchedSkills(matchedSkillNames)
+                    .build());
+        }
+        candidates.sort(java.util.Comparator
+                .<StaffAssignmentCandidateResponse>comparingInt(c -> c.getMatchedDomains().size()).reversed()
+                .thenComparing(java.util.Comparator.comparingInt((StaffAssignmentCandidateResponse c) -> c.getMatchedSkills().size()).reversed())
+                .thenComparingInt(StaffAssignmentCandidateResponse::getActiveDisputeWorkloadCount)
+                .thenComparingInt(StaffAssignmentCandidateResponse::getStaffId));
+        return candidates;
     }
 
-    private Integer selectStaffForDispute() {
-        return rankedStaffCandidates().stream().findFirst()
+    private Integer selectStaffForDispute(DisputeEntity dispute) {
+        return rankedStaffCandidates(dispute).stream().findFirst()
                 .map(StaffAssignmentCandidateResponse::getStaffId)
-                .orElseThrow(() -> new AppException("NO_ELIGIBLE_DISPUTE_STAFF"));
+                .orElseThrow(() -> new AppException("NO_MATCHING_STAFF_FOR_JOB_DOMAIN"));
+    }
+
+    private List<Integer> resolveJobDomainIds(Integer contractId) {
+        return contractRepository.findById(contractId)
+                .map(contract -> jobDomainRepository.findByIdJobId(contract.getJobId()).stream()
+                        .map(jd -> jd.getId().getDomainId()).toList())
+                .orElse(List.of());
+    }
+
+    private List<Integer> resolveJobSkillIds(Integer contractId) {
+        return contractRepository.findById(contractId)
+                .map(contract -> jobSkillRepository.findByIdJobId(contract.getJobId()).stream()
+                        .map(js -> js.getId().getSkillId()).toList())
+                .orElse(List.of());
     }
 
     private ContractMilestoneEntity findContractMilestoneForUpdate(Integer contractId, Integer milestoneId) {
@@ -1595,7 +1669,7 @@ public class ContractExecutionService {
         disputeRepository.save(dispute);
         Integer actorAccountId = accessService.currentAccount().getAccountId();
         auditLogService.record("DISPUTE_ESCALATION_REQUESTED", "disputes", String.valueOf(disputeId), actorAccountId);
-        Integer staffId = selectStaffForDispute();
+        Integer staffId = selectStaffForDispute(dispute);
         staffRepository.findById(staffId).ifPresent(staff ->
                 notificationService.notifyDisputeEscalationRequested(staff.getAccountId(), actorAccountId, disputeId));
         return routeDisputeToStaff(dispute, staffId, actorAccountId);
@@ -2323,7 +2397,12 @@ public class ContractExecutionService {
         String normalized = ownerType.trim().toUpperCase();
         if (CaseAttachmentEntity.OWNER_DISPUTE.equals(normalized)) {
             DisputeEntity dispute = disputeRepository.findById(ownerId.intValue()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
-            requireContractParticipantOrOperator(dispute.getContractId());
+            AccountEntity actor = accessService.currentAccount();
+            if ("STAFF".equals(actor.getRole().getRoleName())) {
+                requireAssignedStaff(dispute);
+            } else {
+                requireContractParticipantOrOperator(dispute.getContractId());
+            }
             return;
         }
         if (List.of(CaseAttachmentEntity.OWNER_TERMINATION_REQUEST, CaseAttachmentEntity.OWNER_PARTIAL_EVIDENCE, CaseAttachmentEntity.OWNER_STAFF_REPORT).contains(normalized)) {

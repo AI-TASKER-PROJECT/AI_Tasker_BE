@@ -3,6 +3,8 @@ package com.aitasker.be.dto.core;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class StaffAssignmentCandidateResponse {
@@ -13,4 +15,6 @@ public class StaffAssignmentCandidateResponse {
     private String availability;
     private Integer activeDisputeWorkloadCount;
     private Boolean conflictEligible;
+    private List<String> matchedDomains;
+    private List<String> matchedSkills;
 }

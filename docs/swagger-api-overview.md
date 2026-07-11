@@ -2,7 +2,7 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **153**.
+- Tong so REST endpoint trong Swagger runtime: **154**.
 - Public endpoint: **21**.
 - Endpoint can Bearer JWT: **132**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
@@ -183,6 +183,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 45 | GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Operation getContract. |
 | 46 | GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Operation listMilestones. |
 | 47 | GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Operation listDisputes. |
+| 48 | GET | `/api/v1/staff/disputes` | Bearer JWT | Staff inbox disputes duoc gan, co phan trang/loc status. |
 
 ## Notification Flow
 

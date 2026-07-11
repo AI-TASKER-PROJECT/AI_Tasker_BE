@@ -10,6 +10,7 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.admin.AccountRequest;
 import com.aitasker.be.dto.admin.AccountResponse;
 import com.aitasker.be.dto.admin.AuditLogResponse;
+import com.aitasker.be.dto.admin.StaffRequest;
 import com.aitasker.be.dto.admin.StaffResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
@@ -44,6 +45,10 @@ public class AdminService {
     private final AuditLogService auditLogService;
     private final PaymentWalletService paymentWalletService;
     private final NotificationService notificationService;
+    private final StaffDomainRepository staffDomainRepository;
+    private final StaffSkillRepository staffSkillRepository;
+    private final DomainRepository domainRepository;
+    private final SkillRepository skillRepository;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -131,28 +136,51 @@ public class AdminService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `createStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public StaffResponse createStaff(StaffEntity input) {
+    public StaffResponse createStaff(StaffRequest request) {
         accessService.requireRole("ADMIN");
-        if (input.getAccountId() == null) throw new AppException("ACCOUNT ID KHONG DUOC DE TRONG");
-        AccountEntity account = accountRepository.findById(input.getAccountId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
+        if (request.getAccountId() == null) throw new AppException("ACCOUNT ID KHONG DUOC DE TRONG");
+        AccountEntity account = accountRepository.findById(request.getAccountId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY ACCOUNT"));
         if (!hasRole(account.getRole(), "STAFF")) {
             throw new AppException("ACCOUNT PHAI CO ROLE STAFF");
         }
-        StaffEntity staff = ensureStaffProfile(account.getAccountId(), input.getSpecialization());
-        auditLogService.record(AuditLogService.ACTION_CREATE_STAFF_PROFILE, "staffs", String.valueOf(staff.getStaffId()), accessService.currentAccount().getAccountId());
+        if (request.getDomainIds() == null || request.getDomainIds().isEmpty()) {
+            throw new AppException("DOMAIN IDS KHONG DUOC DE TRONG");
+        }
+        validateCatalogIds(request.getDomainIds(), request.getSkillIds());
+        StaffEntity staff = ensureStaffProfile(account.getAccountId(), request.getSpecialization());
+        syncStaffDomains(staff.getStaffId(), request.getDomainIds());
+        syncStaffSkills(staff.getStaffId(), request.getSkillIds());
+        auditLogService.record(AuditLogService.ACTION_CREATE_STAFF_PROFILE, "staffs",
+                String.valueOf(staff.getStaffId()), accessService.currentAccount().getAccountId());
         return toStaffResponse(staff);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `updateStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public StaffResponse updateStaff(Integer staffId, StaffEntity input) {
+    public StaffResponse updateStaff(Integer staffId, StaffRequest request) {
         accessService.requireRole("ADMIN");
         StaffEntity staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY STAFF"));
-        staff.setSpecialization(normalizeStaffSpecialization(input == null ? null : input.getSpecialization()));
+        if (request.getSpecialization() != null) {
+            staff.setSpecialization(normalizeStaffSpecialization(request.getSpecialization()));
+        }
+        if (request.getDomainIds() != null) {
+            if (request.getDomainIds().isEmpty()) {
+                throw new AppException("DOMAIN IDS KHONG DUOC DE TRONG, STAFF PHAI CO IT NHAT MOT DOMAIN");
+            }
+            validateCatalogIds(request.getDomainIds(), request.getSkillIds());
+            syncStaffDomains(staffId, request.getDomainIds());
+        }
+        if (request.getSkillIds() != null) {
+            validateCatalogIds(request.getDomainIds() != null ? request.getDomainIds() : currentDomainIds(staffId),
+                    request.getSkillIds());
+            syncStaffSkills(staffId, request.getSkillIds());
+        }
         StaffEntity saved = staffRepository.save(staff);
-        auditLogService.record(AuditLogService.ACTION_UPDATE_STAFF_PROFILE, "staffs", String.valueOf(staffId), accessService.currentAccount().getAccountId());
+        auditLogService.record(AuditLogService.ACTION_UPDATE_STAFF_PROFILE, "staffs",
+                String.valueOf(staffId), accessService.currentAccount().getAccountId());
         return toStaffResponse(saved);
     }
 
@@ -392,7 +420,66 @@ public class AdminService {
     // Note: Hàm `toStaffResponse` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private StaffResponse toStaffResponse(StaffEntity staff) {
         AccountEntity account = accountRepository.findById(staff.getAccountId()).orElse(null);
-        return StaffResponse.from(staff, account);
+        StaffResponse response = StaffResponse.from(staff, account);
+        List<StaffDomainEntity> domainMappings = staffDomainRepository.findByIdStaffId(staff.getStaffId());
+        List<StaffSkillEntity> skillMappings = staffSkillRepository.findByIdStaffId(staff.getStaffId());
+        if (!domainMappings.isEmpty()) {
+            List<Integer> domainIds = domainMappings.stream().map(d -> d.getId().getDomainId()).toList();
+            response.setDomains(domainRepository.findAllById(domainIds).stream()
+                    .map(d -> StaffResponse.DomainSummary.builder()
+                            .domainId(d.getDomainId()).domainCode(d.getDomainCode()).domainName(d.getDomainName()).build())
+                    .toList());
+        }
+        if (!skillMappings.isEmpty()) {
+            List<Integer> skillIds = skillMappings.stream().map(s -> s.getId().getSkillId()).toList();
+            response.setSkills(skillRepository.findAllById(skillIds).stream()
+                    .map(s -> StaffResponse.SkillSummary.builder()
+                            .skillId(s.getSkillId()).skillCode(s.getSkillCode()).skillName(s.getSkillName()).build())
+                    .toList());
+        }
+        return response;
+    }
+
+    private void validateCatalogIds(List<Integer> domainIds, List<Integer> skillIds) {
+        if (domainIds != null && !domainIds.isEmpty()) {
+            List<Integer> existing = domainRepository.findAllById(domainIds).stream()
+                    .map(DomainEntity::getDomainId).toList();
+            if (existing.size() != domainIds.stream().distinct().count()) {
+                throw new NotFoundException("MOT SO DOMAIN ID KHONG TON TAI");
+            }
+        }
+        if (skillIds != null && !skillIds.isEmpty()) {
+            List<Integer> existing = skillRepository.findAllById(skillIds).stream()
+                    .map(SkillEntity::getSkillId).toList();
+            if (existing.size() != skillIds.stream().distinct().count()) {
+                throw new NotFoundException("MOT SO SKILL ID KHONG TON TAI");
+            }
+        }
+    }
+
+    private void syncStaffDomains(Integer staffId, List<Integer> domainIds) {
+        staffDomainRepository.deleteByIdStaffId(staffId);
+        if (domainIds != null) {
+            for (Integer domainId : domainIds.stream().distinct().toList()) {
+                staffDomainRepository.save(new StaffDomainEntity(
+                        new com.aitasker.be.entity.StaffDomainId(staffId, domainId)));
+            }
+        }
+    }
+
+    private void syncStaffSkills(Integer staffId, List<Integer> skillIds) {
+        staffSkillRepository.deleteByIdStaffId(staffId);
+        if (skillIds != null) {
+            for (Integer skillId : skillIds.stream().distinct().toList()) {
+                staffSkillRepository.save(new StaffSkillEntity(
+                        new com.aitasker.be.entity.StaffSkillId(staffId, skillId)));
+            }
+        }
+    }
+
+    private List<Integer> currentDomainIds(Integer staffId) {
+        return staffDomainRepository.findByIdStaffId(staffId).stream()
+                .map(d -> d.getId().getDomainId()).toList();
     }
 
     // Note: Hàm `toAccountResponse` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.

@@ -261,6 +261,7 @@ v2.3 thay đổi so với v2.2:
 | `GET` | `/api/v1/disputes/{disputeId}` | Participant/Operator/Staff | Chi tiết dispute |
 | `GET` | `/api/v1/admin/disputes` | Admin | Dashboard danh sách dispute có phân trang/bộ lọc |
 | `GET` | `/api/v1/admin/disputes/{disputeId}` | Admin | Dashboard chi tiết dispute kèm ledger + attachments |
+| `GET` | `/api/v1/staff/disputes` | Staff | Inbox dispute được gán có phân trang/lọc theo status |
 
 ---
 

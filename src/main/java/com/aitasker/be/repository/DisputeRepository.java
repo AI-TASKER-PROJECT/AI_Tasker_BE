@@ -5,6 +5,8 @@
  */
 package com.aitasker.be.repository;
 import com.aitasker.be.entity.DisputeEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 public interface DisputeRepository extends JpaRepository<DisputeEntity, Integer> {
@@ -17,4 +19,6 @@ public interface DisputeRepository extends JpaRepository<DisputeEntity, Integer>
     List<DisputeEntity> findByStatusInOrderByCreatedAtDesc(List<String> statuses);
     List<DisputeEntity> findByAssignedStaffIdOrderByCreatedAtDesc(Integer assignedStaffId);
     long countByStatusIn(List<String> statuses);
+    Page<DisputeEntity> findByAssignedStaffIdOrderByCreatedAtDescDisputeIdDesc(Integer assignedStaffId, Pageable pageable);
+    Page<DisputeEntity> findByAssignedStaffIdAndStatusOrderByCreatedAtDescDisputeIdDesc(Integer assignedStaffId, String status, Pageable pageable);
 }
