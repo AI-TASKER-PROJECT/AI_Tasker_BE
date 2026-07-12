@@ -16,11 +16,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 // Note: Annotation này cho Spring quản lý class như một service chứa nghiệp vụ.
 @Service
@@ -500,14 +502,17 @@ public class NotificationService {
                 Map.of("contractId", contractId, "disputeId", disputeId));
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyAdminDisputeSettlementReported(Integer receiverAccountId, Integer actorAccountId,
             Integer disputeId, Integer contractId, Integer milestoneId,
             Integer expertPayoutPercentage, java.math.BigDecimal expertPayoutAmount,
             java.math.BigDecimal businessRefundAmount, Long settlementWalletTransactionId) {
-        createAndPush(receiverAccountId, actorAccountId, "DISPUTE_SETTLEMENT_REPORTED",
+        String idempotencyKey = "DISPUTE_SETTLEMENT_REPORTED:" + disputeId + ":" + receiverAccountId;
+        createAndPushIdempotent(receiverAccountId, actorAccountId, "DISPUTE_SETTLEMENT_REPORTED",
                 "Báo cáo quyết toán tranh chấp",
                 "Một tranh chấp đã được quyết toán. Kiểm tra dashboard để biết chi tiết.",
                 "/admin/disputes/" + disputeId,
+                idempotencyKey,
                 Map.of(
                         "disputeId", disputeId,
                         "contractId", contractId,
@@ -517,6 +522,36 @@ public class NotificationService {
                         "businessRefundAmount", formatAmount(businessRefundAmount),
                         "settlementWalletTransactionId", settlementWalletTransactionId
                 ));
+    }
+
+    private NotificationResponse createAndPushIdempotent(Integer receiverAccountId, Integer actorAccountId,
+            String type, String title, String message, String targetUrl, String idempotencyKey,
+            Map<String, Object> metadata) {
+        if (receiverAccountId == null) return null;
+        Optional<NotificationEntity> existing = notificationRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) return toResponse(existing.get());
+
+        String metadataJson = null;
+        if (metadata != null && !metadata.isEmpty()) {
+            try {
+                metadataJson = objectMapper.writeValueAsString(metadata);
+            } catch (Exception ignored) {
+            }
+        }
+        NotificationEntity saved = notificationRepository.saveAndFlush(NotificationEntity.builder()
+                .receiverAccountId(receiverAccountId)
+                .actorAccountId(actorAccountId)
+                .type(type)
+                .title(title)
+                .message(message)
+                .targetUrl(targetUrl)
+                .metadata(metadataJson)
+                .idempotencyKey(idempotencyKey)
+                .isRead(Boolean.FALSE)
+                .build());
+        NotificationResponse response = toResponse(saved);
+        messagingTemplate.convertAndSendToUser(String.valueOf(receiverAccountId), "/queue/notifications", response);
+        return response;
     }
 
     public void notifyTerminationAcceptedOrExpired(Integer receiverAccountId, Integer actorAccountId,

@@ -324,9 +324,9 @@ class PaymentWalletServiceTest {
         when(accessService.currentAccount()).thenReturn(businessAccount);
         when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
         when(contractRepository.findById(30)).thenReturn(Optional.of(contract));
-        when(contractDepositRepository.findByContractIdAndOwnerRole(30, "BUSINESS")).thenReturn(Optional.empty());
+        when(contractDepositRepository.findByContractIdAndOwnerRoleForUpdate(30, "BUSINESS")).thenReturn(Optional.empty());
         when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("300000"));
-        when(walletLedgerService.holdEscrowFromAvailable(any(), any(), any(), any(), any(), any()))
+        when(walletLedgerService.holdEscrowFromAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
                 .thenReturn(WalletTransactionEntity.builder().id(70L).build());
         when(contractDepositRepository.save(any(ContractDepositEntity.class))).thenAnswer(invocation -> {
             ContractDepositEntity deposit = invocation.getArgument(0);
@@ -365,6 +365,8 @@ class PaymentWalletServiceTest {
         when(accessService.currentAccount()).thenReturn(expertAccount);
         when(expertProfileRepository.findByAccountId(11)).thenReturn(Optional.of(expert));
         when(contractRepository.findById(30)).thenReturn(Optional.of(contract));
+        when(contractDepositRepository.findByContractIdAndOwnerRoleForUpdate(30, "EXPERT"))
+                .thenReturn(Optional.of(expertDeposit));
         when(contractDepositRepository.findByContractIdAndOwnerRole(30, "EXPERT"))
                 .thenReturn(Optional.of(expertDeposit));
         when(contractDepositRepository.findByContractIdAndOwnerRole(30, "BUSINESS"))
@@ -399,8 +401,8 @@ class PaymentWalletServiceTest {
         request.setAdminNote("Invalid bank info");
 
         when(accessService.currentAccount()).thenReturn(admin);
-        when(withdrawalRequestRepository.findById(90L)).thenReturn(Optional.of(withdrawal));
-        when(walletLedgerService.releaseHoldingToAvailable(any(), any(), any(), any(), any(), any()))
+        when(withdrawalRequestRepository.findByIdForUpdate(90L)).thenReturn(Optional.of(withdrawal));
+        when(walletLedgerService.releaseHoldingToAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
                 .thenReturn(WalletTransactionEntity.builder().id(91L).build());
         when(withdrawalRequestRepository.save(any(WithdrawalRequestEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -434,7 +436,7 @@ class PaymentWalletServiceTest {
         when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("100000"));
         when(systemWalletService.ensureWalletByAccountId(10))
                 .thenReturn(com.aitasker.be.entity.SystemWalletEntity.builder().systemWalletId(20L).build());
-        when(walletLedgerService.holdWithdrawalFromAvailable(any(), any(), any(), any(), any(), any()))
+        when(walletLedgerService.holdWithdrawalFromAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
                 .thenReturn(WalletTransactionEntity.builder().id(30L).build());
         when(withdrawalRequestRepository.save(any(WithdrawalRequestEntity.class))).thenAnswer(invocation -> {
             WithdrawalRequestEntity withdrawal = invocation.getArgument(0);
@@ -462,8 +464,8 @@ class PaymentWalletServiceTest {
                 .build();
 
         when(accessService.currentAccount()).thenReturn(admin);
-        when(withdrawalRequestRepository.findById(90L)).thenReturn(Optional.of(withdrawal));
-        when(walletLedgerService.debitHolding(any(), any(), any(), any(), any(), any()))
+        when(withdrawalRequestRepository.findByIdForUpdate(90L)).thenReturn(Optional.of(withdrawal));
+        when(walletLedgerService.debitHolding(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
                 .thenReturn(WalletTransactionEntity.builder().id(91L).build());
         when(withdrawalRequestRepository.save(any(WithdrawalRequestEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -541,6 +543,58 @@ class PaymentWalletServiceTest {
         assertEquals("Tran Hoang Nam", item.getExpertName());
         assertEquals("Build AI assistant", item.getJobTitle());
         assertTrue(item.getDescription().contains("Nova Retail đã ký quỹ 200000 VND"));
+    }
+
+    @Test
+    void listCurrentWalletTransactions_shouldCollapseOperationKeyEscrowDepositIntoSingleHistoryRow() {
+        AccountEntity businessAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Nova Retail")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 12, 8, 0);
+        WalletTransactionEntity debitTx = WalletTransactionEntity.builder()
+                .id(70L)
+                .accountId(10)
+                .transactionType(WalletTransactionEntity.TX_ESCROW_DEPOSIT)
+                .direction("DEBIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("200000"))
+                .status("POSTED")
+                .referenceType("MILESTONE")
+                .referenceId(30L)
+                .operationKey("MILESTONE_ESCROW_DEPOSIT:1:30")
+                .description("Deposit milestone escrow")
+                .createdAt(createdAt)
+                .build();
+        WalletTransactionEntity holdTx = WalletTransactionEntity.builder()
+                .id(71L)
+                .accountId(10)
+                .transactionType(WalletTransactionEntity.TX_ESCROW_DEPOSIT)
+                .direction("HOLD")
+                .balanceType("ESCROW")
+                .amount(new BigDecimal("200000"))
+                .status("POSTED")
+                .referenceType("MILESTONE")
+                .referenceId(30L)
+                .operationKey("MILESTONE_ESCROW_DEPOSIT:1:30")
+                .description("Deposit milestone escrow")
+                .createdAt(createdAt.plusSeconds(1))
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(businessAccount);
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10)).thenReturn(List.of(holdTx, debitTx));
+        when(walletTransactionRepository.findByOperationKeyOrderByCreatedAtAscIdAsc("MILESTONE_ESCROW_DEPOSIT:1:30"))
+                .thenReturn(List.of(debitTx, holdTx));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals("MILESTONE_ESCROW_DEPOSIT:1:30", item.getOperationKey());
+        assertEquals("MILESTONE_ESCROW_DEPOSIT", item.getTransactionType());
+        assertEquals(createdAt, item.getCreatedAt());
+        assertEquals(new BigDecimal("200000"), item.getAmount());
     }
 
     @Test
@@ -860,7 +914,7 @@ class PaymentWalletServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(1))
                 .thenReturn(List.of(bizDeposit, expDeposit));
-        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any()))
+        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
                 .thenReturn(bizTx, expTx);
         when(contractDepositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -871,7 +925,7 @@ class PaymentWalletServiceTest {
         assertEquals("REFUNDED", expDeposit.getStatus());
         assertEquals("STANDARD_REFUND", bizDeposit.getResolutionType());
         assertNotNull(bizDeposit.getResolvedAt());
-        verify(walletLedgerService, times(2)).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any());
+        verify(walletLedgerService, times(2)).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class));
         verify(auditLogService).record(eq("PARTICIPANT_DEPOSITS_REFUNDED"), any(), any(), eq(1));
     }
 
@@ -890,12 +944,12 @@ class PaymentWalletServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(1))
                 .thenReturn(List.of(bizDeposit, expDeposit));
-        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any())).thenReturn(tx);
+        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class))).thenReturn(tx);
         when(contractDepositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         paymentWalletService.autoRefundParticipantDeposits(1, 1);
 
-        verify(walletLedgerService, times(1)).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any());
+        verify(walletLedgerService, times(1)).releaseEscrowToAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class));
         assertEquals("REFUNDED", expDeposit.getStatus());
         assertEquals("REFUNDED", bizDeposit.getStatus());
     }
@@ -916,7 +970,7 @@ class PaymentWalletServiceTest {
         when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
         when(contractDepositRepository.findByContractIdOrderByOwnerRoleAsc(1))
                 .thenReturn(List.of(bizDeposit, expDeposit));
-        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any()))
+        when(walletLedgerService.releaseEscrowToAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
                 .thenReturn(WalletTransactionEntity.builder().id(704L).build());
         when(contractDepositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(50).build()));

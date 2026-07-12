@@ -25,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.aitasker.be.event.DisputeSettlementCompletedEvent;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -64,6 +66,7 @@ public class ContractExecutionService {
     private final PaymentWalletService paymentWalletService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final JobDomainRepository jobDomainRepository;
     private final JobSkillRepository jobSkillRepository;
     private final StaffDomainRepository staffDomainRepository;
@@ -668,8 +671,21 @@ public class ContractExecutionService {
         }
         ensureEscrowNotReleased(contractMilestone);
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
-        enrichLedger(walletLedgerService.holdEscrowFromAvailable(businessAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_DEPOSIT, "MILESTONE", milestoneId.longValue(), "Deposit milestone escrow"),
-                contractId, milestoneId, walletMetadata("MILESTONE_ESCROW_DEPOSIT", null, null, accessService.currentAccount().getAccountId(), businessAccountId, null, null, contractMilestone.getFinalBudget(), BigDecimal.ZERO));
+        walletLedgerService.holdEscrowFromAvailable(
+                businessAccountId,
+                contractMilestone.getFinalBudget(),
+                WalletTransactionEntity.TX_ESCROW_DEPOSIT,
+                "MILESTONE",
+                milestoneId.longValue(),
+                "Deposit milestone escrow",
+                walletOperationContext(
+                        contractId,
+                        milestoneId,
+                        walletMetadata("MILESTONE_ESCROW_DEPOSIT", null, null, accessService.currentAccount().getAccountId(),
+                                businessAccountId, null, null, contractMilestone.getFinalBudget(), BigDecimal.ZERO),
+                        "MILESTONE_ESCROW_DEPOSIT:" + contractId + ":" + milestoneId,
+                        null
+                ));
         LocalDateTime now = LocalDateTime.now();
         milestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
         milestone.setUpdatedAt(now);
@@ -992,8 +1008,25 @@ public class ContractExecutionService {
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId()).map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
         String metadata = walletMetadata("BUSINESS_APPROVAL", null, null, accessService.currentAccount().getAccountId(), businessAccountId, expertAccountId, BigDecimal.valueOf(100), contractMilestone.getFinalBudget(), BigDecimal.ZERO);
-        enrichLedger(walletLedgerService.debitEscrow(businessAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE", milestoneId.longValue(), "Release approved milestone escrow"), contract.getContractId(), milestoneId, metadata);
-        enrichLedger(walletLedgerService.creditAvailable(expertAccountId, contractMilestone.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE", milestoneId.longValue(), "Milestone approved payout"), contract.getContractId(), milestoneId, metadata);
+        walletLedgerService.debitEscrow(
+                businessAccountId,
+                contractMilestone.getFinalBudget(),
+                WalletTransactionEntity.TX_ESCROW_RELEASE,
+                "MILESTONE",
+                milestoneId.longValue(),
+                "Release approved milestone escrow",
+                walletOperationContext(contract.getContractId(), milestoneId, metadata,
+                        "MILESTONE_ESCROW_RELEASE:" + contract.getContractId() + ":" + milestoneId + ":BUSINESS_APPROVAL", null));
+        walletLedgerService.creditAvailable(
+                expertAccountId,
+                contractMilestone.getFinalBudget(),
+                WalletTransactionEntity.TX_ESCROW_RELEASE,
+                "MILESTONE",
+                milestoneId.longValue(),
+                "Milestone approved payout",
+                walletOperationContext(contract.getContractId(), milestoneId, metadata,
+                        "MILESTONE_ESCROW_RELEASE:" + contract.getContractId() + ":" + milestoneId + ":BUSINESS_APPROVAL",
+                        "EXPERT_AVAILABLE_CREDIT"));
         markEscrowReleased(contractMilestone, "BUSINESS_APPROVAL", milestoneId.longValue());
         milestone.setEscrowReleasedAt(contractMilestone.getEscrowReleasedAt());
         milestone.setSettlementSourceType(contractMilestone.getSettlementSourceType());
@@ -1546,14 +1579,20 @@ public class ContractExecutionService {
         String metadata = walletMetadata("REVIEW_SLA_AUTO_APPROVAL", null, null, actorAccountId,
                 businessAccountId, expertAccountId, BigDecimal.valueOf(100),
                 contractMilestone.getFinalBudget(), BigDecimal.ZERO);
-        enrichLedger(walletLedgerService.debitEscrow(businessAccountId, contractMilestone.getFinalBudget(),
-                        WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE",
-                        milestone.getMilestoneId().longValue(), "Review SLA auto-approval escrow release"),
-                contract.getContractId(), milestone.getMilestoneId(), metadata);
-        enrichLedger(walletLedgerService.creditAvailable(expertAccountId, contractMilestone.getFinalBudget(),
-                        WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE",
-                        milestone.getMilestoneId().longValue(), "Review SLA auto-approval payout"),
-                contract.getContractId(), milestone.getMilestoneId(), metadata);
+        walletLedgerService.debitEscrow(
+                businessAccountId,
+                contractMilestone.getFinalBudget(),
+                WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE",
+                milestone.getMilestoneId().longValue(), "Review SLA auto-approval escrow release",
+                walletOperationContext(contract.getContractId(), milestone.getMilestoneId(), metadata,
+                        "MILESTONE_ESCROW_RELEASE:" + contract.getContractId() + ":" + milestone.getMilestoneId() + ":REVIEW_SLA_AUTO_APPROVAL", null));
+        walletLedgerService.creditAvailable(
+                expertAccountId, contractMilestone.getFinalBudget(),
+                WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE",
+                milestone.getMilestoneId().longValue(), "Review SLA auto-approval payout",
+                walletOperationContext(contract.getContractId(), milestone.getMilestoneId(), metadata,
+                        "MILESTONE_ESCROW_RELEASE:" + contract.getContractId() + ":" + milestone.getMilestoneId() + ":REVIEW_SLA_AUTO_APPROVAL",
+                        "EXPERT_AVAILABLE_CREDIT"));
         markEscrowReleased(contractMilestone, "REVIEW_SLA_AUTO_APPROVAL", milestone.getMilestoneId().longValue());
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_COMPLETED);
         contractMilestoneRepository.save(contractMilestone);
@@ -1851,13 +1890,17 @@ public class ContractExecutionService {
             if (List.of(ContractMilestoneEntity.STATUS_DEPOSITED, ContractMilestoneEntity.STATUS_IN_PROGRESS,
                     ContractMilestoneEntity.STATUS_OVERDUE).contains(item.getStatus())
                     && item.getEscrowReleasedAt() == null) {
-                enrichLedger(walletLedgerService.releaseEscrowToAvailable(
-                                businessAccountId, item.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_REFUND,
-                                "TERMINATION_REQUEST", request.getTerminationRequestId(), "Accepted termination escrow refund"),
-                        contract.getContractId(), item.getJobMilestoneId(),
-                        walletMetadata("TERMINATION", null, request.getTerminationRequestId(),
-                                accessService.currentAccount().getAccountId(), businessAccountId, null,
-                                BigDecimal.ZERO, BigDecimal.ZERO, item.getFinalBudget()));
+                walletLedgerService.releaseEscrowToAvailable(
+                        businessAccountId, item.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_REFUND,
+                        "TERMINATION_REQUEST", request.getTerminationRequestId(), "Accepted termination escrow refund",
+                        walletOperationContext(
+                                contract.getContractId(),
+                                item.getJobMilestoneId(),
+                                walletMetadata("TERMINATION", null, request.getTerminationRequestId(),
+                                        accessService.currentAccount().getAccountId(), businessAccountId, null,
+                                        BigDecimal.ZERO, BigDecimal.ZERO, item.getFinalBudget()),
+                                "MILESTONE_ESCROW_REFUND:" + contract.getContractId() + ":" + item.getJobMilestoneId() + ":TERMINATION",
+                                null));
                 markEscrowReleased(item, "TERMINATION", request.getTerminationRequestId());
             }
             item.setStatus(ContractMilestoneEntity.STATUS_CANCELLED);
@@ -1937,12 +1980,24 @@ public class ContractExecutionService {
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId()).map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
         String metadata = walletMetadata("DISPUTE", disputeId, null, actorAccountId, businessAccountId, expertAccountId, BigDecimal.valueOf(dispute.getStaffDecisionPercentage()), expertPayout, businessRefund);
-        WalletTransactionEntity settlementDebit = enrichLedger(walletLedgerService.debitEscrow(businessAccountId, escrowAmount, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "DISPUTE", disputeId.longValue(), "Dispute settlement debit"), contract.getContractId(), dispute.getMilestoneId(), metadata);
+        WalletTransactionEntity settlementDebit = walletLedgerService.debitEscrow(
+                businessAccountId, escrowAmount, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT,
+                "DISPUTE", disputeId.longValue(), "Dispute settlement debit",
+                walletOperationContext(contract.getContractId(), dispute.getMilestoneId(), metadata,
+                        "DISPUTE_SETTLEMENT:" + disputeId, null));
         if (expertPayout.signum() > 0) {
-            enrichLedger(walletLedgerService.creditAvailable(expertAccountId, expertPayout, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "DISPUTE", disputeId.longValue(), "Dispute expert payout"), contract.getContractId(), dispute.getMilestoneId(), metadata);
+            walletLedgerService.creditAvailable(
+                    expertAccountId, expertPayout, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT,
+                    "DISPUTE", disputeId.longValue(), "Dispute expert payout",
+                    walletOperationContext(contract.getContractId(), dispute.getMilestoneId(), metadata,
+                            "DISPUTE_SETTLEMENT:" + disputeId, "EXPERT_AVAILABLE_CREDIT"));
         }
         if (businessRefund.signum() > 0) {
-            enrichLedger(walletLedgerService.creditAvailable(businessAccountId, businessRefund, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_REFUND, "DISPUTE", disputeId.longValue(), "Dispute business refund"), contract.getContractId(), dispute.getMilestoneId(), metadata);
+            walletLedgerService.creditAvailable(
+                    businessAccountId, businessRefund, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_REFUND,
+                    "DISPUTE", disputeId.longValue(), "Dispute business refund",
+                    walletOperationContext(contract.getContractId(), dispute.getMilestoneId(), metadata,
+                            "DISPUTE_SETTLEMENT:" + disputeId, "BUSINESS_AVAILABLE_CREDIT"));
         }
         markEscrowReleased(contractMilestone, "DISPUTE", disputeId.longValue());
         milestoneRepository.findById(dispute.getMilestoneId()).ifPresent(milestone -> {
@@ -1965,11 +2020,20 @@ public class ContractExecutionService {
         auditLogService.record("DISPUTE_SETTLEMENT_EXECUTED", "disputes", String.valueOf(disputeId), actorAccountId);
         notifyContractParticipantsExcept(contract, actorAccountId,
                 (receiver, actor) -> notificationService.notifyDisputeResolved(receiver, actor, contract.getContractId(), disputeId));
-        notifyAllAdmins(actorAccountId,
-                (receiver, actor) -> notificationService.notifyAdminDisputeSettlementReported(
-                        receiver, actor, disputeId, contract.getContractId(), dispute.getMilestoneId(),
-                        dispute.getStaffDecisionPercentage(), expertPayout, businessRefund,
-                        settlementDebit == null ? null : settlementDebit.getId()));
+        List<Integer> adminAccountIds = accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")
+                .stream()
+                .map(AccountEntity::getAccountId)
+                .toList();
+        applicationEventPublisher.publishEvent(new DisputeSettlementCompletedEvent(
+                actorAccountId,
+                adminAccountIds,
+                disputeId,
+                contract.getContractId(),
+                dispute.getMilestoneId(),
+                dispute.getStaffDecisionPercentage(),
+                expertPayout,
+                businessRefund,
+                settlementDebit == null ? null : settlementDebit.getId()));
         tryCompleteContract(contract, actorAccountId);
         return saved;
     }
@@ -2144,12 +2208,26 @@ public class ContractExecutionService {
             expertPayout = escrowAmount.multiply(expertPercent).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             businessRefund = escrowAmount.subtract(expertPayout);
             String metadata = walletMetadata("TERMINATION_REQUEST", null, terminationRequestId, accessService.currentAccount().getAccountId(), businessAccountId, expertAccountId, expertPercent, expertPayout, businessRefund);
-            WalletTransactionEntity settlementDebit = enrichLedger(walletLedgerService.debitEscrow(businessAccountId, escrowAmount, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "TERMINATION_REQUEST", terminationRequestId, "Termination settlement debit"), contract.getContractId(), current.getJobMilestoneId(), metadata);
+            WalletTransactionEntity settlementDebit = walletLedgerService.debitEscrow(
+                    businessAccountId, escrowAmount, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT,
+                    "TERMINATION_REQUEST", terminationRequestId, "Termination settlement debit",
+                    walletOperationContext(contract.getContractId(), current.getJobMilestoneId(), metadata,
+                            "TERMINATION_SETTLEMENT:" + terminationRequestId + ":" + current.getJobMilestoneId(), null));
             if (expertPayout.signum() > 0) {
-                enrichLedger(walletLedgerService.creditAvailable(expertAccountId, expertPayout, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT, "TERMINATION_REQUEST", terminationRequestId, "Termination expert payout"), contract.getContractId(), current.getJobMilestoneId(), metadata);
+                walletLedgerService.creditAvailable(
+                        expertAccountId, expertPayout, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_PAYOUT,
+                        "TERMINATION_REQUEST", terminationRequestId, "Termination expert payout",
+                        walletOperationContext(contract.getContractId(), current.getJobMilestoneId(), metadata,
+                                "TERMINATION_SETTLEMENT:" + terminationRequestId + ":" + current.getJobMilestoneId(),
+                                "EXPERT_AVAILABLE_CREDIT"));
             }
             if (businessRefund.signum() > 0) {
-                enrichLedger(walletLedgerService.creditAvailable(businessAccountId, businessRefund, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_REFUND, "TERMINATION_REQUEST", terminationRequestId, "Termination business refund"), contract.getContractId(), current.getJobMilestoneId(), metadata);
+                walletLedgerService.creditAvailable(
+                        businessAccountId, businessRefund, WalletTransactionEntity.TX_ESCROW_SETTLEMENT_REFUND,
+                        "TERMINATION_REQUEST", terminationRequestId, "Termination business refund",
+                        walletOperationContext(contract.getContractId(), current.getJobMilestoneId(), metadata,
+                                "TERMINATION_SETTLEMENT:" + terminationRequestId + ":" + current.getJobMilestoneId(),
+                                "BUSINESS_AVAILABLE_CREDIT"));
             }
             markEscrowReleased(current, "TERMINATION_REQUEST", terminationRequestId);
             current.setStatus(expertPayout.signum() > 0 ? ContractMilestoneEntity.STATUS_COMPLETED : ContractMilestoneEntity.STATUS_CANCELLED);
@@ -2498,12 +2576,22 @@ public class ContractExecutionService {
         throw new AppException("ATTACHMENT OWNER TYPE KHONG HOP LE");
     }
 
-    private WalletTransactionEntity enrichLedger(WalletTransactionEntity tx, Integer contractId, Integer milestoneId, String metadata) {
-        if (tx == null) return null;
-        tx.setContractId(contractId);
-        tx.setMilestoneId(milestoneId);
-        tx.setMetadata(metadata);
-        return walletTransactionRepository.save(tx);
+    private WalletLedgerService.WalletOperationContext walletOperationContext(
+            Integer contractId,
+            Integer milestoneId,
+            String metadata,
+            String operationKey,
+            String operationLeg
+    ) {
+        WalletLedgerService.WalletOperationContext.Builder builder = WalletLedgerService.WalletOperationContext.builder()
+                .contractId(contractId)
+                .milestoneId(milestoneId)
+                .metadata(metadata)
+                .operationKey(operationKey);
+        if (operationLeg != null) {
+            builder.operationLeg(operationLeg);
+        }
+        return builder.build();
     }
 
     private String walletMetadata(String sourceType, Integer disputeId, Long terminationRequestId, Integer actorAccountId,

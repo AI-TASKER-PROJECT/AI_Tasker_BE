@@ -13,10 +13,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,6 +29,55 @@ class NotificationServiceTest {
     @Mock private NotificationRepository notificationRepository;
     @Mock private SimpMessagingTemplate messagingTemplate;
     @InjectMocks private NotificationService notificationService;
+
+    @Test
+    void notifyAdminDisputeSettlementReported_shouldPersistIdempotencyKeyAndPushOnce() {
+        when(notificationRepository.findByIdempotencyKey("DISPUTE_SETTLEMENT_REPORTED:1:20"))
+                .thenReturn(Optional.empty());
+        when(notificationRepository.saveAndFlush(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyAdminDisputeSettlementReported(
+                20, 99, 1, 2, 3, 60,
+                new BigDecimal("600.00"), new BigDecimal("400.00"), 77L);
+
+        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository).saveAndFlush(captor.capture());
+        assertEquals("DISPUTE_SETTLEMENT_REPORTED:1:20", captor.getValue().getIdempotencyKey());
+        assertEquals("DISPUTE_SETTLEMENT_REPORTED", captor.getValue().getType());
+        verify(messagingTemplate).convertAndSendToUser(
+                org.mockito.ArgumentMatchers.eq("20"),
+                org.mockito.ArgumentMatchers.eq("/queue/notifications"),
+                any());
+    }
+
+    @Test
+    void notifyAdminDisputeSettlementReported_replayedEventShouldNotPersistOrPushAgain() {
+        NotificationEntity existing = NotificationEntity.builder()
+                .notificationId(5)
+                .receiverAccountId(20)
+                .type("DISPUTE_SETTLEMENT_REPORTED")
+                .title("Báo cáo quyết toán tranh chấp")
+                .message("Đã quyết toán")
+                .idempotencyKey("DISPUTE_SETTLEMENT_REPORTED:1:20")
+                .isRead(false)
+                .build();
+        when(notificationRepository.findByIdempotencyKey("DISPUTE_SETTLEMENT_REPORTED:1:20"))
+                .thenReturn(Optional.of(existing));
+
+        notificationService.notifyAdminDisputeSettlementReported(
+                20, 99, 1, 2, 3, 60,
+                new BigDecimal("600.00"), new BigDecimal("400.00"), 77L);
+
+        verify(notificationRepository, never()).saveAndFlush(any(NotificationEntity.class));
+        verify(messagingTemplate, never()).convertAndSendToUser(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                any());
+    }
 
     @Test
     void notifyDeliverableSubmitted_shouldBuildTargetUrlWithContractAndMilestone() {

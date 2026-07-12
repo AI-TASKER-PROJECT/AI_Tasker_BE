@@ -9,6 +9,7 @@ import com.aitasker.be.entity.NotificationEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface NotificationRepository extends JpaRepository<NotificationEntity, Integer> {
     // Note: Hàm `findByReceiverAccountIdOrderByCreatedAtDesc` lấy thông báo của một tài khoản theo thời gian mới nhất.
@@ -16,4 +17,6 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
 
     // Note: Hàm `countByReceiverAccountIdAndIsReadFalse` đếm số thông báo chưa đọc để hiển thị badge trên giao diện.
     long countByReceiverAccountIdAndIsReadFalse(Integer receiverAccountId);
+
+    Optional<NotificationEntity> findByIdempotencyKey(String idempotencyKey);
 }

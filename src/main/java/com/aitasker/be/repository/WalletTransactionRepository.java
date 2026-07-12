@@ -6,9 +6,12 @@
 package com.aitasker.be.repository;
 
 import com.aitasker.be.entity.WalletTransactionEntity;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface WalletTransactionRepository extends JpaRepository<WalletTransactionEntity, Long> {
     // Note: Ham `findAllByOrderByCreatedAtDesc` lay ledger toan he thong cho admin xem lich su vi nen tang.
@@ -21,4 +24,27 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     boolean existsByPaymentOrderIdAndTransactionType(Long paymentOrderId, String transactionType);
 
     List<WalletTransactionEntity> findByReferenceTypeAndReferenceIdOrderByCreatedAtAsc(String referenceType, Long referenceId);
+
+    Optional<WalletTransactionEntity> findByOperationKeyAndOperationLeg(String operationKey, String operationLeg);
+
+    List<WalletTransactionEntity> findByOperationKeyOrderByCreatedAtAscIdAsc(String operationKey);
+
+    @Query("""
+            select wt
+            from WalletTransactionEntity wt
+            where wt.accountId = :accountId
+              and wt.referenceType = :referenceType
+              and wt.referenceId = :referenceId
+              and wt.transactionType = :transactionType
+              and wt.createdAt between :windowStart and :windowEnd
+            order by wt.createdAt asc, wt.id asc
+            """)
+    List<WalletTransactionEntity> findLegacyOperationWindow(
+            @Param("accountId") Integer accountId,
+            @Param("referenceType") String referenceType,
+            @Param("referenceId") Long referenceId,
+            @Param("transactionType") String transactionType,
+            @Param("windowStart") java.time.LocalDateTime windowStart,
+            @Param("windowEnd") java.time.LocalDateTime windowEnd
+    );
 }

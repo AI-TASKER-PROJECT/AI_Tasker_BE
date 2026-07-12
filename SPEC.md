@@ -1,4 +1,4 @@
-# Staff Dispute Inbox & Specialization Routing
+# Wallet Ledger Idempotency & Escrow History Consolidation
 
 ## Status
 
@@ -6,243 +6,333 @@ planned
 
 ## Lane
 
-high-risk (authorization, data model, public API contract, existing dispute flow)
+high-risk (financial ledger, concurrency, data migration, public wallet history)
+
+## Problem Statement
+
+`GET /api/wallet/transactions` currently consolidates withdrawal ledger rows,
+but returns milestone escrow and contract-deposit ledger rows individually.
+One valid balance transfer creates multiple accounting legs, so users can see
+two rows that appear to describe the same action:
+
+- `MILESTONE_ESCROW_DEPOSIT`: debit `AVAILABLE` and hold `ESCROW`;
+- `CONTRACT_SECURITY_DEPOSIT_REFUND`: release `ESCROW` and credit `AVAILABLE`;
+- equivalent Expert-deposit, milestone-refund, payout, dispute-settlement, and
+  termination-settlement operations.
+
+The ledger writer also has no durable idempotency key. Business-state guards
+reduce ordinary retries, but they do not provide a database-enforced guarantee
+against concurrent or replayed financial commands.
+
+This creates two separate risks:
+
+1. **Presentation duplication:** legitimate accounting legs are exposed as
+   multiple user-facing history items.
+2. **Write duplication:** the same logical financial operation can insert a
+   second set of ledger legs if an unguarded or concurrent path is executed.
 
 ## Product Contract
 
-Staff needs a dedicated inbox containing only assigned milestone disputes, and
-the routing workflow must assign every dispute to Staff whose configured domain
-specialization matches the disputed job.
+- The ledger remains append-only and retains every accounting leg required to
+  reconstruct wallet balances.
+- User wallet history returns one consolidated item per logical financial
+  operation, not one item per internal ledger leg.
+- Retrying the same logical operation must not change a balance or create a
+  second set of ledger legs.
+- Different legitimate operations for the same contract, milestone, dispute,
+  or deposit must remain distinguishable.
+- Admin/platform ledger history may continue exposing raw accounting legs for
+  audit, but each leg must expose its operation identity.
+- Existing withdrawal-history behavior remains unchanged.
+- Existing API paths and response DTO shape remain backward compatible unless
+  this document explicitly adds an optional field.
 
-`SPEC-MILESTONE-DISPUTER.md` v2.3 remains authoritative for dispute lifecycle
-and settlement behavior:
+## Important Accounting Rule
 
-- Assigned Staff is the only role that decides the Expert payout percentage.
-- A valid Staff decision triggers settlement automatically.
-- Admin does not assign, approve, revise, or cancel a milestone dispute.
-- Domain match is mandatory. Workload alone must never route a dispute to Staff
-  outside the job's domain.
-
-## User Stories
-
-**As a Staff member**, I want one paginated inbox containing only disputes
-assigned to me so I can review and resolve my cases without discovering them
-indirectly through contracts.
-
-**As Staff operations**, I want automatic and manual routing to accept only
-Staff whose configured domains match the job, then rank those Staff by relevant
-skills and workload, so every assigned reviewer has appropriate expertise.
-
-**As an Admin**, I want to configure structured domain and skill assignments
-for Staff so routing does not depend on free-text specialization.
-
-## Current Behavior
-
-1. Staff can discover assigned work indirectly through
-   `GET /api/v1/contracts`, then list disputes for each contract.
-2. There is no dedicated Staff dispute inbox API.
-3. Once assigned to one dispute, Staff can currently list or read other
-   disputes belonging to the same contract.
-4. `staff.specialization` is a free-text field without structured domain or
-   skill mappings.
-5. Candidate ranking exposes the specialization text but primarily sorts by
-   active dispute workload; it does not compare job domains or skills.
-6. Automatic routing can therefore select a Staff member outside the job's
-   professional domain.
-
-## Target Behavior
-
-### 1. Structured Staff Specialization
-
-Add additive mapping tables:
+Do **not** create a unique constraint on only:
 
 ```text
-staff_domains(staff_id, domain_id)
-staff_skills(staff_id, skill_id)
+reference_type + reference_id + transaction_type
 ```
 
-Rules:
+A valid transfer intentionally produces two or more rows sharing those fields.
+For example, an escrow deposit creates both an `AVAILABLE/DEBIT` leg and an
+`ESCROW/HOLD` leg.
 
-- `(staff_id, domain_id)` and `(staff_id, skill_id)` are composite primary keys.
-- Both columns use foreign keys to their owning Staff and catalog records.
-- Add indexes supporting lookup by `domain_id` and `skill_id`.
-- Every Staff account must have at least one configured domain.
-- Skills are optional and are used only for ranking after domain eligibility.
-- Keep the legacy `specialization` string for backward-compatible display, but
-  never use it as routing truth.
-- Backfill demo Staff with explicit domain and skill mappings. Existing Staff
-  whose specialization cannot be mapped safely must be reported for Admin
-  configuration; the migration must not guess from ambiguous free text.
+Idempotency must identify the logical operation and its individual accounting
+leg separately.
 
-Update the Admin Staff contract:
+## Target Design
+
+### 1. Logical Operation Identity
+
+Add the following nullable fields to `wallet_transactions` through a new
+Flyway migration:
 
 ```text
-POST  /api/v1/admin/staffs
-PATCH /api/v1/admin/staffs/{staffId}
+operation_key VARCHAR(255)
+operation_leg VARCHAR(50)
 ```
 
-The request accepts `domainIds` and `skillIds`. `domainIds` is required and
-must contain at least one unique, existing domain. `skillIds` may be empty but
-every supplied ID must exist. Staff responses expose structured `domains` and
-`skills` in addition to the legacy specialization display value.
+Definitions:
 
-Admin must not remove a Staff member's final domain mapping. Admin must also be
-warned and the update rejected when removing a mapping would leave a domain
-used by active jobs without any eligible Staff coverage.
+- `operation_key` identifies one logical financial command.
+- `operation_leg` identifies one accounting leg within that command.
 
-### 2. Domain-Mandatory Staff Routing
-
-Automatic routing is used by escalation and by:
+Create a partial unique index:
 
 ```text
-POST /api/v1/disputes/{disputeId}/route-staff
+UNIQUE (operation_key, operation_leg)
+WHERE operation_key IS NOT NULL AND operation_leg IS NOT NULL
 ```
 
-when `staffId` is omitted.
+The index allows multiple legitimate legs while preventing the same leg from
+being inserted twice.
 
-Routing algorithm:
+### 2. Canonical Operation Keys
 
-1. Resolve the dispute's contract, job, job domains, and required job skills.
-2. Reject routing if the job has no configured domain.
-3. Keep only Staff having at least one `staff_domains` record matching a job
-   domain.
-4. Rank eligible Staff deterministically by:
-   - matched domain count descending;
-   - matched required-skill count descending;
-   - active assigned-dispute workload ascending;
-   - `staffId` ascending.
-5. Assign the first candidate and move the dispute to `STAFF_REVIEWING` using
-   the existing access, SLA, audit, and notification behavior.
+Operation keys must be deterministic and built by a single component, not
+assembled independently in controllers or services.
 
-Mandatory guards:
-
-- Manual routing with `staffId` must apply the same domain eligibility check.
-- No workload or free-text fallback is permitted for a domain mismatch.
-- If no matching Staff exists, leave the dispute and assignment unchanged,
-  keep `ESCALATION_REQUESTED`, and return
-  `NO_MATCHING_STAFF_FOR_JOB_DOMAIN`.
-- A failed routing attempt must not create access grants, audit assignment
-  events, or assignment notifications.
-
-Update the existing candidate API:
+Required patterns:
 
 ```text
-GET /api/v1/disputes/{disputeId}/staff-candidates
+MILESTONE_ESCROW_DEPOSIT:{contractId}:{milestoneId}
+MILESTONE_ESCROW_REFUND:{contractId}:{milestoneId}:{settlementSource}
+MILESTONE_ESCROW_RELEASE:{contractId}:{milestoneId}:{settlementSource}
+CONTRACT_DEPOSIT_HOLD:{depositId}
+CONTRACT_DEPOSIT_REFUND:{depositId}:{resolutionType}
+CONTRACT_DEPOSIT_PENALTY:{depositId}:{resolutionType}
+DISPUTE_SETTLEMENT:{disputeId}
+TERMINATION_SETTLEMENT:{terminationRequestId}:{milestoneId}
+WITHDRAWAL:{withdrawalId}:{operationType}
 ```
 
-It returns only domain-eligible Staff and includes `matchedDomains`,
-`matchedSkills`, `availability`, `activeDisputeWorkloadCount`, and
-`conflictEligible`. Ordering must be identical to automatic routing.
-
-### 3. Staff Dispute Inbox
-
-Add a Staff-only API:
+Required leg names include:
 
 ```text
-GET /api/v1/staff/disputes
+AVAILABLE_DEBIT
+AVAILABLE_CREDIT
+ESCROW_HOLD
+ESCROW_RELEASE
+ESCROW_DEBIT
+HOLDING_HOLD
+HOLDING_RELEASE
+HOLDING_DEBIT
 ```
 
-Query parameters:
+Keys must use durable database identifiers. Timestamps, random UUIDs generated
+per retry, descriptions, localized text, and monetary amounts must not be used
+as the idempotency identity.
 
-| Parameter | Type | Default | Meaning |
-|---|---|---:|---|
-| `page` | integer >= 0 | `0` | Zero-based page number |
-| `size` | integer 1..100 | `20` | Page size |
-| `status` | dispute status | - | Exact optional status filter |
+### 3. Atomic Idempotent Ledger Writer
 
-Default ordering is `createdAt DESC`, then `disputeId DESC`.
+Refactor `WalletLedgerService` so every financial transfer accepts an
+`operationKey` and records all required legs atomically.
 
-The backend derives `staffId` from the authenticated Staff account. The client
-cannot provide or override `assignedStaffId`.
+Required behavior:
 
-The paginated response uses a purpose-built DTO containing:
+1. Lock the affected wallet row before reading balances.
+2. Check whether every expected `(operationKey, operationLeg)` already exists.
+3. If all expected legs exist, return the persisted operation result without
+   changing balances or inserting rows.
+4. If no expected leg exists, apply the balance mutation and insert every leg
+   in the same transaction.
+5. If only part of an operation exists, throw
+   `INCOMPLETE_WALLET_LEDGER_OPERATION`; do not guess, repair, or apply another
+   balance mutation inside the request.
+6. Rely on the database unique index as the final concurrency guard.
+7. Convert a unique-key race into an idempotent read of the committed operation
+   when the complete expected leg set exists.
 
-- dispute, contract, milestone, and job identifiers;
-- dispute status, reason, initiation type, and creation timestamp;
-- job domains and required skills;
-- matched Staff domains and skills captured from current routing data;
-- evidence deadline, Staff SLA deadline, and review start time;
-- settlement decision status without unrelated wallet or participant-private
-  data.
+No caller may write escrow/refund ledger rows directly through
+`walletTransactionRepository.save()` after the refactor. Metadata enrichment
+must be supplied to the atomic writer before persistence.
 
-### 4. Assigned-Case Authorization
+### 4. Business-State Guards
 
-- Only role `STAFF` may call `/api/v1/staff/disputes`.
-- The inbox returns only disputes whose `assigned_staff_id` equals the current
-  Staff profile ID.
-- `GET /api/v1/disputes/{disputeId}` must require that exact dispute assignment
-  for Staff callers.
-- `GET /api/v1/contracts/{contractId}/disputes` must return only disputes
-  assigned to the current Staff, not every dispute in the contract.
-- Staff access to dispute attachments, deliverables, milestone criteria, and
-  supporting contract data must be scoped to the assigned case.
-- Assigned Staff retains `READ_EXECUTE` access and remains the only Staff
-  allowed to submit that dispute's decision.
-- Admin and participant read behavior remains unchanged.
+Database idempotency complements, rather than replaces, domain guards.
 
-## Data And Compatibility Rules
+- Milestone deposit still requires the locked contract milestone to be
+  `PENDING`.
+- Milestone release/refund still requires `escrowReleasedAt == null` and must
+  persist settlement source fields atomically with ledger changes.
+- Contract-deposit refund still requires a locked deposit in `HELD` or the
+  explicitly allowed partial-resolution state.
+- Completed/refunded operations return the existing durable result when called
+  with the same operation key.
+- A request that reuses an operation key with a different account, amount,
+  reference, transaction type, or expected leg set must fail with
+  `WALLET_OPERATION_KEY_CONFLICT`.
 
-- Add a new Flyway migration; do not modify migrations that may have run.
-- Repository queries must paginate and filter in the database rather than load
-  every dispute and filter in memory.
-- Candidate matching must use catalog IDs, not localized names or substring
-  matching.
-- Existing `assigned_staff_id` records remain valid. New routing and reassignment
-  operations use the domain guard after deployment.
-- Existing notification types and automatic settlement behavior remain intact.
-- The Admin dispute dashboard from US-049 remains unchanged.
-- Termination-request Staff routing is outside this story.
+Repositories must provide pessimistic-lock queries for contract deposits and
+contract milestones used by financial mutation paths.
+
+### 5. Consolidated User Wallet History
+
+Update `listCurrentWalletTransactions()` to group ledger rows by
+`operationKey` after preserving the existing withdrawal-specific contract.
+
+For every supported operation:
+
+- return exactly one user-facing `WalletTransactionHistoryResponse`;
+- choose the user-visible amount and direction from the economic result, not
+  from an arbitrary first row;
+- use the earliest leg timestamp as operation creation time;
+- expose the existing contract, milestone, dispute, withdrawal, counterparty,
+  and settlement metadata;
+- never sum internal debit/hold or release/credit legs as though they were two
+  separate payments;
+- maintain deterministic order by operation timestamp descending, then stable
+  transaction ID descending.
+
+Recommended optional response field:
+
+```text
+operationKey: string | null
+```
+
+It is optional for backward compatibility and allows frontend troubleshooting
+without exposing internal balance calculations.
+
+Legacy rows without an operation key must use a conservative read-time grouping
+key containing at least:
+
+```text
+accountId + referenceType + referenceId + transactionType
+```
+
+and a bounded time window. Rows must only be consolidated when their leg types
+form one known accounting operation. Ambiguous rows remain separate rather than
+being incorrectly merged.
+
+### 6. Existing Data Audit And Repair
+
+Do not delete wallet ledger rows automatically in the schema migration.
+
+Create a repeatable audit/report command that classifies historical data into:
+
+1. valid multi-leg operation;
+2. exact duplicate leg;
+3. repeated complete operation;
+4. incomplete operation;
+5. ambiguous legacy rows.
+
+The report must include transaction IDs, account ID, reference, transaction
+type, direction, balance type, amount, timestamps, and calculated operation
+group.
+
+Repair procedure:
+
+- back up affected rows before mutation;
+- run in a transaction with a dry-run mode by default;
+- never delete the only leg representing a balance movement;
+- recompute the balance chain for every affected wallet;
+- abort when persisted wallet balances do not match the reconstructed chain;
+- archive removed duplicate IDs and the reason in an audit table or immutable
+  repair report;
+- require explicit operator confirmation before applying production cleanup.
+
+New operation keys may be backfilled only for unambiguous known leg pairs.
+Ambiguous historical records remain nullable and visible to Admin audit.
+
+## Affected Code Paths
+
+At minimum, implementation must audit and migrate:
+
+- milestone escrow deposit;
+- milestone approval payout;
+- milestone cancellation/termination refund;
+- Business and Expert contract-deposit hold;
+- standard and immediate-termination deposit refund;
+- immediate-termination penalty/compensation;
+- dispute settlement;
+- termination settlement;
+- withdrawal hold/approve/reject;
+- wallet top-up and membership/credit purchase callbacks.
+
+No financial writer is assumed safe until its retry and concurrency behavior is
+covered explicitly.
+
+## Migration Strategy
+
+1. Add `operation_key` and `operation_leg` as nullable columns.
+2. Add lookup indexes supporting operation reads.
+3. Backfill only deterministic, unambiguous recent operations.
+4. Produce the legacy-data audit report.
+5. Resolve exact duplicates through an explicit repair step, not Flyway.
+6. Add the partial unique index after the backfill/repair validation proves no
+   conflicting rows remain. If deployment requires a single migration release,
+   use separate additive and enforcement migrations with an operational gate
+   between them.
+7. Deploy idempotent writers before making operation identity mandatory.
+8. Keep columns nullable until all writers and legacy-data rules are verified.
+
+Never modify a migration that may already have run.
 
 ## Acceptance Criteria
 
-| # | Criteria | Verification |
+| # | Criterion | Required proof |
 |---|---|---|
-| AC1 | Admin can create or update Staff with valid structured domains and skills; empty or unknown domains are rejected. | Admin service/controller tests |
-| AC2 | Flyway creates mapping constraints and backfills demo Staff without guessing ambiguous production specialization text. | PostgreSQL migration test |
-| AC3 | Auto-routing only considers Staff sharing at least one job domain. | Routing service test |
-| AC4 | Domain count, skill count, workload, and Staff ID produce deterministic candidate ordering. | Ranking test |
-| AC5 | Manual routing rejects a Staff member with no matching job domain. | Authorization/business-rule test |
-| AC6 | No matching Staff leaves the dispute unchanged in `ESCALATION_REQUESTED` and emits no assignment side effects. | Transactional integration test |
-| AC7 | Candidate API returns only eligible Staff with accurate match and workload fields. | Controller/service test |
-| AC8 | Staff inbox pagination, status filtering, and ordering are correct and derive Staff identity from JWT. | Controller/integration test |
-| AC9 | Staff A cannot list or read Staff B's dispute, attachments, or supporting case data, including disputes in the same contract. | RBAC/data-isolation test |
-| AC10 | Assigned Staff can still decide payout and trigger settlement exactly once. | Dispute settlement regression test |
-| AC11 | Swagger/OpenAPI and dispute-flow documentation describe the inbox, structured specialization, routing error, and tightened read scope. | Docs/OpenAPI validation |
+| AC1 | A milestone escrow deposit produces one logical operation containing exactly one `AVAILABLE_DEBIT` and one `ESCROW_HOLD` leg. | PostgreSQL integration test |
+| AC2 | Retrying the same milestone deposit returns the existing result and does not change balances or row count. | Service + integration test |
+| AC3 | Concurrent calls with the same operation key result in one balance mutation and one complete leg set. | Concurrency integration test |
+| AC4 | Standard contract-deposit refund produces one release/credit operation per participant and retry creates no new rows. | Payment wallet integration test |
+| AC5 | Dispute and termination settlement preserve all legitimate payout/refund legs while rejecting duplicate legs. | Settlement regression tests |
+| AC6 | Reusing an operation key with different financial inputs fails with `WALLET_OPERATION_KEY_CONFLICT`. | Service test |
+| AC7 | An incomplete stored leg set fails safely without another balance mutation. | Corruption-safety integration test |
+| AC8 | User wallet history returns one item for each escrow deposit/refund logical operation. | History service test |
+| AC9 | Withdrawal history remains one item per withdrawal across PENDING, APPROVED, REJECTED, and CANCELLED. | Existing regression tests |
+| AC10 | Admin ledger history retains raw legs and exposes operation identity for audit. | Admin history test |
+| AC11 | Migration validates on PostgreSQL and the unique index allows different legs but rejects the same operation leg twice. | Migration test |
+| AC12 | Dry-run data audit identifies valid, duplicate, repeated, incomplete, and ambiguous groups without changing data. | Audit fixture test |
+| AC13 | Repair mode preserves the reconstructed closing balance and records every removed duplicate. | PostgreSQL repair test |
+| AC14 | Full Maven suite, story verification, route/OpenAPI validation, and high-risk Harness trace pass. | Release proof |
 
 ## Execution Plan
 
 | Step | Area | Action |
 |---|---|---|
-| 1 | Harness | Create a high-risk story and capture authorization, migration, and dispute-settlement proof requirements. |
-| 2 | Data model | Add Staff-domain/skill mappings, repositories, indexes, and safe demo backfill in a new migration. |
-| 3 | Admin Staff API | Replace raw entity input with request DTOs, validate catalog mappings, and return structured specialization data. |
-| 4 | Routing | Implement domain eligibility, deterministic ranking, manual-route guard, and no-match transaction behavior. |
-| 5 | Staff inbox | Add paginated Staff-owned dispute query, response DTO, service, and controller route. |
-| 6 | Authorization | Tighten dispute, contract-dispute, attachment, and supporting-case reads to exact assigned-case scope. |
-| 7 | Tests | Cover AC1-AC10 with focused unit, authorization, migration, and PostgreSQL-backed integration tests. |
-| 8 | Documentation | Refresh Swagger/OpenAPI, API guides, dispute flow, story validation evidence, and Harness trace. |
+| 1 | Harness | Create a high-risk story and map every financial writer to proof before editing. |
+| 2 | Inventory | Enumerate all ledger writers, expected legs, references, guards, and retry entrypoints. |
+| 3 | Data model | Add operation identity columns, repository queries, and additive indexes. |
+| 4 | Ledger core | Implement atomic idempotent multi-leg operations and conflict/incomplete-operation handling. |
+| 5 | Domain locking | Add locked milestone/deposit reads and keep state changes in the ledger transaction. |
+| 6 | Callers | Migrate every affected payment, escrow, refund, withdrawal, dispute, and termination writer. |
+| 7 | History | Consolidate known operation legs for user history while retaining raw Admin audit history. |
+| 8 | Data audit | Implement dry-run classification and balance-chain verification for existing rows. |
+| 9 | Repair | Add separately approved cleanup mode and enforcement migration after audit proof. |
+| 10 | Tests | Run focused unit, retry, rollback, concurrency, migration, and PostgreSQL integration tests. |
+| 11 | Documentation | Update wallet/escrow flows, data dictionary, Swagger/OpenAPI descriptions, and operator runbook. |
+| 12 | Release | Run full suite, story verify, diff checks, and record a detailed high-risk Harness trace. |
 
 ## Non-Goals
 
-- No frontend implementation.
-- No Staff access to the global Admin dispute dashboard.
-- No fallback assignment to Staff outside the job domain.
-- No change to payout percentages, escrow invariants, or automatic settlement.
-- No Admin approval, override, reassignment, or cancellation workflow for
-  milestone disputes.
-- No redesign of termination-request assignment.
-- No removal of the legacy `specialization` display field in this story.
+- Do not collapse or delete legitimate accounting legs from the internal ledger.
+- Do not calculate wallet balances from the user-facing consolidated history.
+- Do not silently repair ambiguous production records.
+- Do not change payout percentages, escrow ownership, settlement authority, or
+  withdrawal approval authority.
+- Do not redesign wallet UI beyond the response behavior required to remove
+  duplicate-looking operations.
+- Do not make `referenceType + referenceId + transactionType` uniquely indexed.
 
-## Risk Checklist
+## Stop Conditions
 
-| Flag | Applies? | Reason |
-|---|---|---|
-| Authorization | Yes | Tightens Staff ownership and supporting-case access. |
-| Data model | Yes | Adds Staff-domain and Staff-skill mappings. |
-| Public contract | Yes | Adds a Staff inbox and changes Staff administration/candidate DTOs. |
-| Existing behavior | Yes | Replaces workload-only routing and narrows existing Staff reads. |
-| Financial workflow | Yes | Must preserve assigned-Staff decision and one-time settlement behavior. |
+Stop implementation and request a decision if:
 
-**Classification:** high-risk. Completion requires focused tests, the full test
-suite, PostgreSQL-backed migration validation, updated API documentation, story
-verification, and a completed high-risk Harness trace.
+- historical duplicates cannot be distinguished safely from legitimate legs;
+- reconstructed balances disagree with persisted balances;
+- an existing caller cannot supply a deterministic operation identity;
+- the proposed unique index conflicts with valid production rows;
+- compatibility requires changing transaction amounts or directions exposed by
+  the public API;
+- a repair would delete or rewrite financial history without an auditable backup.
+
+## Completion Gate
+
+This plan is not complete with compile-only or unit-only evidence. Completion
+requires Docker-backed PostgreSQL migration proof, concurrent retry proof,
+balance-chain verification, focused and full test suites, story verification,
+updated product/API/operator documentation, and a detailed high-risk Harness
+trace.

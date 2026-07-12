@@ -57,6 +57,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -342,7 +343,7 @@ public class PaymentWalletService {
         }
         BigDecimal depositAmount = percentageAmount(contract, requiredPercentage);
         Optional<ContractDepositEntity> existing = contractDepositRepository
-                .findByContractIdAndOwnerRole(contractId, ownerRole);
+                .findByContractIdAndOwnerRoleForUpdate(contractId, ownerRole);
         if (existing.filter(deposit -> "HELD".equals(deposit.getStatus())
                 && money(deposit.getHeldAmount()).compareTo(depositAmount) == 0).isPresent()) {
         boolean activated = activateContractAfterBothDeposits(contract, LocalDateTime.now(), actor.getAccountId());
@@ -384,11 +385,13 @@ public class PaymentWalletService {
                 txType,
                 "CONTRACT_DEPOSIT",
                 Long.valueOf(contractId),
-                ownerRole + " contract deposit"
+                ownerRole + " contract deposit",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .contractId(contractId)
+                        .metadata("{\"ownerRole\":\"" + ownerRole + "\",\"requiredPercentage\":" + requiredPercentage + "}")
+                        .operationKey("CONTRACT_DEPOSIT_HOLD:" + ensurePersistedDepositId(deposit))
+                        .build()
         );
-        tx.setContractId(contractId);
-        tx.setMetadata("{\"ownerRole\":\"" + ownerRole + "\",\"requiredPercentage\":" + requiredPercentage + "}");
-        walletTransactionRepository.save(tx);
         LocalDateTime now = LocalDateTime.now();
         deposit.setOwnerAccountId(actor.getAccountId());
         deposit.setOwnerRole(ownerRole);
@@ -426,7 +429,7 @@ public class PaymentWalletService {
         if (!List.of(ContractEntity.STATUS_COMPLETED, ContractEntity.STATUS_TERMINATED).contains(contract.getStatus())) {
             throw new AppException("CONTRACT_INVALID_STATUS");
         }
-        ContractDepositEntity deposit = contractDepositRepository.findByContractIdAndOwnerRole(contractId, ROLE_BUSINESS)
+        ContractDepositEntity deposit = contractDepositRepository.findByContractIdAndOwnerRoleForUpdate(contractId, ROLE_BUSINESS)
                 .orElseThrow(() -> new NotFoundException("CONTRACT_DEPOSIT_NOT_FOUND"));
         if (!List.of("HELD", "PARTIALLY_REFUNDED").contains(deposit.getStatus())) {
             throw new AppException("DEPOSIT_INVALID_STATUS");
@@ -458,7 +461,11 @@ public class PaymentWalletService {
                     "CONTRACT_SECURITY_DEPOSIT_REFUND",
                     "CONTRACT_DEPOSIT",
                     deposit.getDepositId(),
-                    "Refund contract security deposit"
+                    "Refund contract security deposit",
+                    WalletLedgerService.WalletOperationContext.builder()
+                            .contractId(contractId)
+                            .operationKey("CONTRACT_DEPOSIT_REFUND:" + deposit.getDepositId() + ":STANDARD_REFUND")
+                            .build()
             );
         }
         BigDecimal resolvedAmount = heldAmount.subtract(refundAmount);
@@ -469,7 +476,11 @@ public class PaymentWalletService {
                     "CONTRACT_SECURITY_DEPOSIT_RESOLVED",
                     "CONTRACT_DEPOSIT",
                     deposit.getDepositId(),
-                    "Admin resolved contract security deposit"
+                    "Admin resolved contract security deposit",
+                    WalletLedgerService.WalletOperationContext.builder()
+                            .contractId(contractId)
+                            .operationKey("CONTRACT_DEPOSIT_REFUND:" + deposit.getDepositId() + ":ADMIN_RESOLVED")
+                            .build()
             );
         }
 
@@ -525,9 +536,11 @@ public class PaymentWalletService {
                     deposit.getOwnerAccountId(), held,
                     ROLE_EXPERT.equals(deposit.getOwnerRole())
                             ? "EXPERT_CONTRACT_DEPOSIT_REFUND" : "CONTRACT_SECURITY_DEPOSIT_REFUND",
-                    "CONTRACT_DEPOSIT", deposit.getDepositId(), "Refund participant contract deposit");
-            tx.setContractId(contractId);
-            walletTransactionRepository.save(tx);
+                    "CONTRACT_DEPOSIT", deposit.getDepositId(), "Refund participant contract deposit",
+                    WalletLedgerService.WalletOperationContext.builder()
+                            .contractId(contractId)
+                            .operationKey("CONTRACT_DEPOSIT_REFUND:" + deposit.getDepositId() + ":STANDARD_REFUND")
+                            .build());
             deposit.setHeldAmount(BigDecimal.ZERO);
             deposit.setRefundedAmount(money(deposit.getRefundedAmount()).add(held));
             deposit.setRefundTransactionId(tx.getId());
@@ -554,11 +567,11 @@ public class PaymentWalletService {
     @Transactional
     public ContractEntity immediateTerminateContract(ContractEntity contract, AccountEntity initiator, String initiatingRole) {
         ContractDepositEntity businessDeposit = contractDepositRepository
-                .findByContractIdAndOwnerRole(contract.getContractId(), ROLE_BUSINESS)
+                .findByContractIdAndOwnerRoleForUpdate(contract.getContractId(), ROLE_BUSINESS)
                 .filter(item -> "HELD".equals(item.getStatus()))
                 .orElseThrow(() -> new AppException("BUSINESS_CONTRACT_DEPOSIT_NOT_HELD"));
         ContractDepositEntity expertDeposit = contractDepositRepository
-                .findByContractIdAndOwnerRole(contract.getContractId(), ROLE_EXPERT)
+                .findByContractIdAndOwnerRoleForUpdate(contract.getContractId(), ROLE_EXPERT)
                 .filter(item -> "HELD".equals(item.getStatus()))
                 .orElseThrow(() -> new AppException("EXPERT_CONTRACT_DEPOSIT_NOT_HELD"));
         Integer businessAccountId = businessDeposit.getOwnerAccountId();
@@ -573,10 +586,13 @@ public class PaymentWalletService {
                     && item.getEscrowReleasedAt() == null) {
                 WalletTransactionEntity refund = walletLedgerService.releaseEscrowToAvailable(
                         businessAccountId, item.getFinalBudget(), WalletTransactionEntity.TX_ESCROW_REFUND,
-                        "MILESTONE", item.getJobMilestoneId().longValue(), "Immediate termination milestone refund");
-                refund.setContractId(contract.getContractId());
-                refund.setMilestoneId(item.getJobMilestoneId());
-                walletTransactionRepository.save(refund);
+                        "MILESTONE", item.getJobMilestoneId().longValue(), "Immediate termination milestone refund",
+                        WalletLedgerService.WalletOperationContext.builder()
+                                .contractId(contract.getContractId())
+                                .milestoneId(item.getJobMilestoneId())
+                                .operationKey("MILESTONE_ESCROW_REFUND:" + contract.getContractId() + ":" + item.getJobMilestoneId() + ":IMMEDIATE_TERMINATION")
+                                .metadata("{\"settlementSourceType\":\"IMMEDIATE_TERMINATION\"}")
+                                .build());
                 item.setEscrowReleasedAt(LocalDateTime.now());
                 item.setSettlementSourceType("IMMEDIATE_TERMINATION");
                 item.setSettlementSourceId(contract.getContractId().longValue());
@@ -626,17 +642,22 @@ public class PaymentWalletService {
         }
         WalletTransactionEntity debit = walletLedgerService.debitEscrow(
                 deposit.getOwnerAccountId(), penalty, "IMMEDIATE_TERMINATION_PENALTY",
-                "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination penalty");
-        debit.setContractId(contractId);
-        debit.setMetadata("{\"settlementSourceType\":\"IMMEDIATE_TERMINATION\",\"initiatingRole\":\""
-                + deposit.getOwnerRole() + "\",\"penaltyPercentage\":10,\"penaltyAmount\":" + penalty + "}");
-        walletTransactionRepository.save(debit);
+                "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination penalty",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .contractId(contractId)
+                        .metadata("{\"settlementSourceType\":\"IMMEDIATE_TERMINATION\",\"initiatingRole\":\""
+                                + deposit.getOwnerRole() + "\",\"penaltyPercentage\":10,\"penaltyAmount\":" + penalty + "}")
+                        .operationKey("CONTRACT_DEPOSIT_PENALTY:" + deposit.getDepositId() + ":IMMEDIATE_TERMINATION")
+                        .build());
         WalletTransactionEntity credit = walletLedgerService.creditAvailable(
                 beneficiaryAccountId, penalty, "IMMEDIATE_TERMINATION_COMPENSATION",
-                "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination compensation");
-        credit.setContractId(contractId);
-        credit.setMetadata(debit.getMetadata());
-        walletTransactionRepository.save(credit);
+                "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination compensation",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .contractId(contractId)
+                        .metadata(debit.getMetadata())
+                        .operationKey("CONTRACT_DEPOSIT_PENALTY:" + deposit.getDepositId() + ":IMMEDIATE_TERMINATION")
+                        .operationLeg("BENEFICIARY_AVAILABLE_CREDIT")
+                        .build());
         deposit.setHeldAmount(money(deposit.getHeldAmount()).subtract(penalty));
         deposit.setResolvedAmount(money(deposit.getResolvedAmount()).add(penalty));
         deposit.setPenaltyAmount(penalty);
@@ -653,9 +674,11 @@ public class PaymentWalletService {
                     deposit.getOwnerAccountId(), remainder,
                     ROLE_EXPERT.equals(deposit.getOwnerRole())
                             ? "EXPERT_CONTRACT_DEPOSIT_REFUND" : "CONTRACT_SECURITY_DEPOSIT_REFUND",
-                    "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination deposit refund");
-            refund.setContractId(contractId);
-            walletTransactionRepository.save(refund);
+                    "CONTRACT_DEPOSIT", deposit.getDepositId(), "Immediate termination deposit refund",
+                    WalletLedgerService.WalletOperationContext.builder()
+                            .contractId(contractId)
+                            .operationKey("CONTRACT_DEPOSIT_REFUND:" + deposit.getDepositId() + ":IMMEDIATE_TERMINATION_REFUND")
+                            .build());
             deposit.setRefundTransactionId(refund.getId());
             deposit.setRefundedAmount(money(deposit.getRefundedAmount()).add(remainder));
         }
@@ -678,14 +701,6 @@ public class PaymentWalletService {
             return insufficient(available, amount, "INSUFFICIENT_BALANCE");
         }
         SystemWalletEntity wallet = systemWalletService.ensureWalletByAccountId(actor.getAccountId());
-        WalletTransactionEntity holdTx = walletLedgerService.holdWithdrawalFromAvailable(
-                actor.getAccountId(),
-                amount,
-                "WITHDRAW_HOLD",
-                "WITHDRAW_REQUEST",
-                actor.getAccountId().longValue(),
-                "Withdrawal request"
-        );
         WithdrawalRequestEntity withdrawal = withdrawalRequestRepository.save(WithdrawalRequestEntity.builder()
                 .accountId(actor.getAccountId())
                 .walletId(wallet.getSystemWalletId())
@@ -694,9 +709,21 @@ public class PaymentWalletService {
                 .bankAccountNumber(request.getBankAccountNumber().trim())
                 .bankAccountHolder(request.getBankAccountHolder().trim())
                 .status("PENDING")
-                .holdTransactionId(holdTx.getId())
                 .requestedAt(LocalDateTime.now())
                 .build());
+        WalletTransactionEntity holdTx = walletLedgerService.holdWithdrawalFromAvailable(
+                actor.getAccountId(),
+                amount,
+                "WITHDRAW_HOLD",
+                "WITHDRAW_REQUEST",
+                withdrawal.getWithdrawalId(),
+                "Withdrawal request",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .operationKey("WITHDRAWAL:" + withdrawal.getWithdrawalId() + ":HOLD")
+                        .build()
+        );
+        withdrawal.setHoldTransactionId(holdTx.getId());
+        withdrawalRequestRepository.save(withdrawal);
         auditLogService.record(ACTION_CREATE_WITHDRAWAL, "withdrawal_requests",
                 String.valueOf(withdrawal.getWithdrawalId()), actor.getAccountId());
         notifyAdminsWithdrawalReviewRequested(actor, withdrawal);
@@ -729,7 +756,10 @@ public class PaymentWalletService {
                 "WITHDRAW_APPROVED",
                 "WITHDRAW_REQUEST",
                 withdrawalId,
-                "Withdrawal approved after manual transfer"
+                "Withdrawal approved after manual transfer",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .operationKey("WITHDRAWAL:" + withdrawalId + ":APPROVE")
+                        .build()
         );
         withdrawal.setStatus("APPROVED");
         withdrawal.setAdminId(admin.getAccountId());
@@ -760,7 +790,10 @@ public class PaymentWalletService {
                 "WITHDRAW_REJECTED",
                 "WITHDRAW_REQUEST",
                 withdrawalId,
-                "Withdrawal rejected"
+                "Withdrawal rejected",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .operationKey("WITHDRAWAL:" + withdrawalId + ":REJECT")
+                        .build()
         );
         withdrawal.setStatus("REJECTED");
         withdrawal.setAdminId(admin.getAccountId());
@@ -808,9 +841,7 @@ public class PaymentWalletService {
             result.add(buildWithdrawalHistoryResponse(entry.transaction(), entry.withdrawal(), actor));
         }
 
-        result.addAll(nonWithdrawalTx.stream()
-                .map(tx -> toWalletHistory(tx, actor))
-                .toList());
+        result.addAll(buildConsolidatedWalletHistory(nonWithdrawalTx, actor));
 
         result.sort(Comparator.comparing(WalletTransactionHistoryResponse::getCreatedAt).reversed());
         return result;
@@ -839,6 +870,7 @@ public class PaymentWalletService {
                 .status(tx.getStatus())
                 .referenceType(tx.getReferenceType())
                 .referenceId(tx.getReferenceId())
+                .operationKey(tx.getOperationKey())
                 .rawDescription(tx.getDescription())
                 .createdAt(tx.getCreatedAt());
         AccountEntity walletOwner = currentActor != null && Objects.equals(currentActor.getAccountId(), tx.getAccountId())
@@ -1116,6 +1148,97 @@ public class PaymentWalletService {
         return Optional.empty();
     }
 
+    private List<WalletTransactionHistoryResponse> buildConsolidatedWalletHistory(
+            List<WalletTransactionEntity> transactions,
+            AccountEntity currentActor
+    ) {
+        List<WalletTransactionHistoryResponse> result = new ArrayList<>();
+        Set<Long> consumed = new HashSet<>();
+        for (WalletTransactionEntity tx : transactions) {
+            if (tx.getId() != null && consumed.contains(tx.getId())) {
+                continue;
+            }
+            List<WalletTransactionEntity> group = resolveWalletOperationGroup(tx);
+            group.stream()
+                    .map(WalletTransactionEntity::getId)
+                    .filter(Objects::nonNull)
+                    .forEach(consumed::add);
+            WalletTransactionEntity representative = selectRepresentativeTransaction(group);
+            WalletTransactionHistoryResponse item = toWalletHistory(representative, currentActor);
+            item.setCreatedAt(group.stream()
+                    .map(WalletTransactionEntity::getCreatedAt)
+                    .filter(Objects::nonNull)
+                    .min(LocalDateTime::compareTo)
+                    .orElse(item.getCreatedAt()));
+            if (representative.getOperationKey() == null || representative.getOperationKey().isBlank()) {
+                item.setOperationKey(null);
+            }
+            result.add(item);
+        }
+        return result;
+    }
+
+    private List<WalletTransactionEntity> resolveWalletOperationGroup(WalletTransactionEntity tx) {
+        if (tx.getOperationKey() != null && !tx.getOperationKey().isBlank()) {
+            List<WalletTransactionEntity> operationRows = walletTransactionRepository
+                    .findByOperationKeyOrderByCreatedAtAscIdAsc(tx.getOperationKey())
+                    .stream()
+                    .filter(row -> Objects.equals(row.getAccountId(), tx.getAccountId()))
+                    .toList();
+            if (!operationRows.isEmpty()) {
+                return operationRows;
+            }
+        }
+        if (!supportsLegacyGrouping(tx) || tx.getCreatedAt() == null) {
+            return List.of(tx);
+        }
+        List<WalletTransactionEntity> candidates = walletTransactionRepository.findLegacyOperationWindow(
+                tx.getAccountId(),
+                tx.getReferenceType(),
+                tx.getReferenceId(),
+                tx.getTransactionType(),
+                tx.getCreatedAt().minusSeconds(5),
+                tx.getCreatedAt().plusSeconds(5));
+        if (isKnownLegacyOperationShape(candidates)) {
+            return candidates;
+        }
+        return List.of(tx);
+    }
+
+    private WalletTransactionEntity selectRepresentativeTransaction(List<WalletTransactionEntity> group) {
+        return group.stream()
+                .filter(item -> "CREDIT".equals(item.getDirection()) && "AVAILABLE".equals(item.getBalanceType()))
+                .findFirst()
+                .or(() -> group.stream().filter(item -> "HOLD".equals(item.getDirection())).findFirst())
+                .orElse(group.get(0));
+    }
+
+    private boolean supportsLegacyGrouping(WalletTransactionEntity tx) {
+        return tx.getReferenceType() != null
+                && tx.getReferenceId() != null
+                && Set.of(
+                WalletTransactionEntity.TX_ESCROW_DEPOSIT,
+                WalletTransactionEntity.TX_ESCROW_REFUND,
+                "CONTRACT_SECURITY_DEPOSIT_HOLD",
+                "CONTRACT_SECURITY_DEPOSIT_REFUND",
+                "EXPERT_CONTRACT_DEPOSIT_REFUND",
+                "WITHDRAW_REJECTED")
+                .contains(safe(tx.getTransactionType()));
+    }
+
+    private boolean isKnownLegacyOperationShape(List<WalletTransactionEntity> rows) {
+        if (rows.size() != 2) {
+            return false;
+        }
+        Set<String> directions = rows.stream()
+                .map(row -> safe(row.getDirection()) + ":" + safe(row.getBalanceType()))
+                .collect(Collectors.toSet());
+        return directions.equals(Set.of("DEBIT:AVAILABLE", "HOLD:ESCROW"))
+                || directions.equals(Set.of("RELEASE:ESCROW", "CREDIT:AVAILABLE"))
+                || directions.equals(Set.of("DEBIT:AVAILABLE", "HOLD:HOLDING"))
+                || directions.equals(Set.of("RELEASE:HOLDING", "CREDIT:AVAILABLE"));
+    }
+
     private void attachContractContext(WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder, ContractEntity contract) {
         String businessName = displayBusiness(contract.getBusinessId());
         String expertName = displayExpert(contract.getExpertId());
@@ -1260,6 +1383,13 @@ public class PaymentWalletService {
 
     private String safe(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private Long ensurePersistedDepositId(ContractDepositEntity deposit) {
+        if (deposit.getDepositId() != null) {
+            return deposit.getDepositId();
+        }
+        return contractDepositRepository.save(deposit).getDepositId();
     }
 
     // Note: Ham `requireApprovedBusinessOrExpert` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -1482,7 +1612,7 @@ public class PaymentWalletService {
 
     // Note: Ham `pendingWithdrawal` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private WithdrawalRequestEntity pendingWithdrawal(Long withdrawalId) {
-        WithdrawalRequestEntity withdrawal = withdrawalRequestRepository.findById(withdrawalId)
+        WithdrawalRequestEntity withdrawal = withdrawalRequestRepository.findByIdForUpdate(withdrawalId)
                 .orElseThrow(() -> new NotFoundException("WITHDRAWAL_NOT_FOUND"));
         if (!"PENDING".equals(withdrawal.getStatus())) {
             throw new AppException("WITHDRAWAL_INVALID_STATUS");

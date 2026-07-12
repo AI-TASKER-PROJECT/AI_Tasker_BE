@@ -6,7 +6,11 @@
 package com.aitasker.be.repository;
 
 import com.aitasker.be.entity.ContractDepositEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -14,6 +18,19 @@ public interface ContractDepositRepository extends JpaRepository<ContractDeposit
     // Note: Ham `findByContractId` truy cap hoac truy van du lieu phuc vu tang service.
     Optional<ContractDepositEntity> findByContractIdAndOwnerRole(Integer contractId, String ownerRole);
     java.util.List<ContractDepositEntity> findByContractIdOrderByOwnerRoleAsc(Integer contractId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select cd
+            from ContractDepositEntity cd
+            where cd.contractId = :contractId
+              and cd.ownerRole = :ownerRole
+            """)
+    Optional<ContractDepositEntity> findByContractIdAndOwnerRoleForUpdate(
+            @Param("contractId") Integer contractId,
+            @Param("ownerRole") String ownerRole
+    );
+
     default Optional<ContractDepositEntity> findByContractId(Integer contractId) {
         return findByContractIdAndOwnerRole(contractId, "BUSINESS");
     }

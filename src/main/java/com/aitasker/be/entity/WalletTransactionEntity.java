@@ -105,6 +105,12 @@ public class WalletTransactionEntity {
     @Column(name = "milestone_id")
     private Integer milestoneId;
 
+    @Column(name = "operation_key", length = 255)
+    private String operationKey;
+
+    @Column(name = "operation_leg", length = 50)
+    private String operationLeg;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;

@@ -1,7 +1,7 @@
 # Admin Dispute & Settlement Dashboard — US-049
 
 **Story:** `US-049`  
-**Trace gần nhất:** `#85`  
+**Trace gần nhất:** `#95` (US-054 notification hardening)
 **Phạm vi:** Backend Admin dashboard, chỉ đọc  
 **API prefix:** `/api/v1/admin`
 
@@ -221,22 +221,19 @@ Evidence được ghi trong trace `#85`:
 - Full Maven suite: 252 tests, 0 failures.
 - `openapi-v1.json`: 141 paths và có đủ hai Admin dispute endpoints.
 
-## 7. Giới hạn còn lại sau review trace #85
+## 7. Notification hardening sau review trace #85
 
-Các mục dưới đây chưa nên được mô tả là đã hoàn tất:
+US-054 hoàn thiện ba khoảng trống notification của US-049:
 
-1. `DISPUTE_SETTLEMENT_REPORTED` hiện được gọi bên trong transaction settlement,
-   chưa có cơ chế `afterCommit` thực sự.
-2. Chưa có test executable chứng minh notification Admin chỉ gửi đúng một lần
-   khi retry settlement.
-3. Chưa có test rollback chứng minh transaction thất bại sẽ không phát
-   notification Admin.
-4. Tên public field hiện là `evidenceReport`; nếu contract mong muốn
-   `evidenceSummary` thì cần đổi DTO, test và OpenAPI đồng bộ trong một thay đổi
-   tiếp theo.
+1. Settlement publish `DisputeSettlementCompletedEvent`; listener chỉ xử lý ở
+   `TransactionPhase.AFTER_COMMIT`.
+2. Mỗi Admin/dispute dùng một `idempotency_key` duy nhất trong bảng
+   `notifications`, nên replay hoặc race không tạo bản ghi thứ hai.
+3. Test executable chứng minh commit mới gửi, rollback không gửi, và một Admin
+   bị duplicate không chặn báo cáo cho Admin khác.
 
-Vì vậy Admin dashboard và hai API đọc đã có thể sử dụng, nhưng AC về
-post-commit notification và idempotency notification vẫn cần proof bổ sung.
+Public field tiếp tục là `evidenceReport`. US-054 không đổi sang
+`evidenceSummary` vì chưa có contract mới yêu cầu breaking change này.
 
 ## 8. Các file chính
 
@@ -246,5 +243,9 @@ post-commit notification và idempotency notification vẫn cần proof bổ sun
 - List DTO: `src/main/java/com/aitasker/be/dto/admin/AdminDisputeListResponse.java`
 - Settlement flow: `src/main/java/com/aitasker/be/service/core/ContractExecutionService.java`
 - Notification: `src/main/java/com/aitasker/be/service/core/NotificationService.java`
+- After-commit listener: `src/main/java/com/aitasker/be/service/core/DisputeSettlementNotificationListener.java`
+- Settlement event: `src/main/java/com/aitasker/be/event/DisputeSettlementCompletedEvent.java`
+- Idempotency migration: `src/main/resources/db/migration/V55__notification_idempotency_key.sql`
 - Story validation: `docs/stories/US-049-admin-dispute-settlement-dashboard/validation.md`
+- Follow-up validation: `docs/stories/US-054-post-commit-dispute-settlement-report/validation.md`
 - OpenAPI: `docs/openapi/openapi-v1.json`

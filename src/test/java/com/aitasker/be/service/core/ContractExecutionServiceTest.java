@@ -28,6 +28,7 @@ import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.entity.TerminationRequestEntity;
 import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.entity.JobDomainEntity;
+import com.aitasker.be.event.DisputeSettlementCompletedEvent;
 import com.aitasker.be.entity.JobDomainId;
 import com.aitasker.be.entity.DomainEntity;
 import com.aitasker.be.entity.StaffDomainEntity;
@@ -41,6 +42,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -101,6 +103,7 @@ class ContractExecutionServiceTest {
     @Mock private PaymentWalletService paymentWalletService;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
+    @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private JobDomainRepository jobDomainRepository;
     @Mock private JobSkillRepository jobSkillRepository;
     @Mock private StaffDomainRepository staffDomainRepository;
@@ -214,8 +217,8 @@ class ContractExecutionServiceTest {
         assertEquals("COMPLETED", saved.getStatus());
         assertEquals("COMPLETED", contract.getStatus());
         assertEquals("CLOSED", job.getStatus());
-        verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(7L), any());
-        verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(1000)), any(), any(), eq(7L), any());
+        verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(7L), any(), any(WalletLedgerService.WalletOperationContext.class));
+        verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(1000)), any(), any(), eq(7L), any(), any(WalletLedgerService.WalletOperationContext.class));
     }
 
     @Test
@@ -1015,7 +1018,7 @@ class ContractExecutionServiceTest {
 
         MilestoneEntity result = contractExecutionService.depositMilestoneEscrow(1, 200);
 
-        verify(walletLedgerService).holdEscrowFromAvailable(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any());
+        verify(walletLedgerService).holdEscrowFromAvailable(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any(), any(WalletLedgerService.WalletOperationContext.class));
         assertEquals("IN_PROGRESS", result.getStatus());
         assertEquals("IN_PROGRESS", cm.getStatus());
         assertNotNull(cm.getInProgressStartedAt());
@@ -1045,8 +1048,8 @@ class ContractExecutionServiceTest {
 
         MilestoneEntity result = contractExecutionService.approveMilestone(200);
 
-        verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any());
-        verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any());
+        verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any(), any(WalletLedgerService.WalletOperationContext.class));
+        verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(1000)), any(), any(), eq(200L), any(), any(WalletLedgerService.WalletOperationContext.class));
         assertEquals("COMPLETED", result.getStatus());
         assertEquals("COMPLETED", cm.getStatus());
         assertNotNull(cm.getEscrowReleasedAt());
@@ -1241,18 +1244,25 @@ class ContractExecutionServiceTest {
         when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(contractRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(1L), any())).thenReturn(debit);
-        when(walletTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(1L), any(), any(WalletLedgerService.WalletOperationContext.class))).thenReturn(debit);
+        when(accountRepository.findAllByRoleRoleNameOrderByAccountIdAsc("ADMIN")).thenReturn(List.of(
+                AccountEntity.builder().accountId(80).build(),
+                AccountEntity.builder().accountId(81).build()));
 
         DisputeEntity result = contractExecutionService.staffDecide(1, 60, "Partial fault", null);
 
         assertEquals(DisputeEntity.STATUS_RESOLVED, result.getStatus());
         assertEquals(Integer.valueOf(60), result.getStaffDecisionPercentage());
-        verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(1L), any());
-        verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(600)), any(), any(), eq(1L), any());
-        verify(walletLedgerService).creditAvailable(eq(50), eq(BigDecimal.valueOf(400)), any(), any(), eq(1L), any());
+        verify(walletLedgerService).debitEscrow(eq(50), eq(BigDecimal.valueOf(1000)), any(), any(), eq(1L), any(), any(WalletLedgerService.WalletOperationContext.class));
+        verify(walletLedgerService).creditAvailable(eq(60), eq(BigDecimal.valueOf(600)), any(), any(), eq(1L), any(), any(WalletLedgerService.WalletOperationContext.class));
+        verify(walletLedgerService).creditAvailable(eq(50), eq(BigDecimal.valueOf(400)), any(), any(), eq(1L), any(), any(WalletLedgerService.WalletOperationContext.class));
         assertEquals("COMPLETED", milestone.getStatus());
         assertEquals("COMPLETED", cm.getStatus());
+        ArgumentCaptor<DisputeSettlementCompletedEvent> eventCaptor = ArgumentCaptor.forClass(DisputeSettlementCompletedEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(List.of(80, 81), eventCaptor.getValue().adminAccountIds());
+        assertEquals(new BigDecimal("600"), eventCaptor.getValue().expertPayoutAmount());
+        assertEquals(77L, eventCaptor.getValue().settlementWalletTransactionId());
     }
 
     @Test
@@ -1283,8 +1293,7 @@ class ContractExecutionServiceTest {
         when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(contractRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(500)), any(), any(), eq(1L), any())).thenReturn(debit);
-        when(walletTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(500)), any(), any(), eq(1L), any(), any(WalletLedgerService.WalletOperationContext.class))).thenReturn(debit);
 
         DisputeEntity result = contractExecutionService.staffDecide(1, 100, "Early decision", null);
 
@@ -1519,7 +1528,7 @@ class ContractExecutionServiceTest {
                 () -> contractExecutionService.executeTerminationSettlement(9L));
 
         assertEquals("CAN NOP PARTIAL EVIDENCE TRUOC KHI SETTLEMENT", ex.getMessage());
-        verify(walletLedgerService, never()).debitEscrow(any(), any(), any(), any(), any(), any());
+        verify(walletLedgerService, never()).debitEscrow(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class));
     }
 
     @Test
@@ -1544,10 +1553,9 @@ class ContractExecutionServiceTest {
         when(expertProfileRepository.findById(5)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
         when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(current, future));
         mockLockedContractMilestone(1, 200, current);
-        when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(400)), any(), any(), any(), any())).thenReturn(debit);
-        when(walletLedgerService.creditAvailable(eq(60), eq(BigDecimal.valueOf(100).setScale(2)), any(), any(), any(), any())).thenReturn(WalletTransactionEntity.builder().id(78L).build());
-        when(walletLedgerService.creditAvailable(eq(50), eq(BigDecimal.valueOf(300).setScale(2)), any(), any(), any(), any())).thenReturn(WalletTransactionEntity.builder().id(79L).build());
-        when(walletTransactionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(walletLedgerService.debitEscrow(eq(50), eq(BigDecimal.valueOf(400)), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class))).thenReturn(debit);
+        when(walletLedgerService.creditAvailable(eq(60), eq(BigDecimal.valueOf(100).setScale(2)), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class))).thenReturn(WalletTransactionEntity.builder().id(78L).build());
+        when(walletLedgerService.creditAvailable(eq(50), eq(BigDecimal.valueOf(300).setScale(2)), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class))).thenReturn(WalletTransactionEntity.builder().id(79L).build());
         when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(contractRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(terminationRequestRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -1561,7 +1569,6 @@ class ContractExecutionServiceTest {
         assertEquals(ContractMilestoneEntity.STATUS_COMPLETED, current.getStatus());
         assertEquals(ContractMilestoneEntity.STATUS_CANCELLED, future.getStatus());
         assertEquals(ContractEntity.STATUS_TERMINATED, contract.getStatus());
-        verify(walletTransactionRepository, times(3)).save(any(WalletTransactionEntity.class));
         verify(paymentWalletService).autoRefundParticipantDeposits(eq(1), any());
     }
 
