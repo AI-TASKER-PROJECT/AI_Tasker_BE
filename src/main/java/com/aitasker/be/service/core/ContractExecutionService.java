@@ -1049,6 +1049,11 @@ public class ContractExecutionService {
 
     @Transactional
     public DisputeEntity initiateDispute(Integer contractId, Integer milestoneId, String initiatedBy, String initiationType) {
+        return initiateDispute(contractId, milestoneId, initiatedBy, initiationType, null);
+    }
+
+    @Transactional
+    public DisputeEntity initiateDispute(Integer contractId, Integer milestoneId, String initiatedBy, String initiationType, String reason) {
         requireApprovedForBusinessOrExpert();
         ContractEntity contract = requireContractParticipantOrOperator(contractId);
         if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) {
@@ -1079,6 +1084,7 @@ public class ContractExecutionService {
                 .initiatedBy(normalizeInitiator(actorRole))
                 .initiatedByAccountId(accessService.currentAccount().getAccountId())
                 .initiationType(normalizeInitiationType(initiationType))
+                .evidenceReport(reason == null || reason.isBlank() ? null : reason.trim())
                 .previousMilestoneStatus(previousStatus)
                 .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE)
                 .build();
@@ -1331,9 +1337,12 @@ public class ContractExecutionService {
             Integer staffId = getCurrentStaffId(actor);
             return disputeRepository.findByContractId(contractId).stream()
                     .filter(d -> staffId.equals(d.getAssignedStaffId()))
+                    .map(this::withStaffName)
                     .toList();
         }
-        return disputeRepository.findByContractId(contractId);
+        return disputeRepository.findByContractId(contractId).stream()
+                .map(this::withStaffName)
+                .toList();
     }
     // Note: Hàm `getDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public DisputeEntity getDispute(Integer disputeId) {
@@ -1344,7 +1353,7 @@ public class ContractExecutionService {
         } else {
             requireContractParticipantOrOperator(dispute.getContractId());
         }
-        return dispute;
+        return withStaffName(dispute);
     }
     // Note: Hàm `matchingByKeyword` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<ProposalEntity> matchingByKeyword(Integer jobId) {
@@ -1375,6 +1384,18 @@ public class ContractExecutionService {
         systemWalletService.syncWallet();
         auditLogService.record(AuditLogService.ACTION_UPDATE_TRANSACTION_STATUS, "transactions", String.valueOf(transactionId), accessService.currentAccount().getAccountId());
         return saved;
+    }
+
+    private DisputeEntity withStaffName(DisputeEntity dispute) {
+        if (dispute == null || dispute.getAssignedStaffId() == null) {
+            return dispute;
+        }
+        staffRepository.findById(dispute.getAssignedStaffId())
+                .flatMap(staff -> accountRepository.findById(staff.getAccountId()))
+                .map(AccountEntity::getFullName)
+                .filter(name -> name != null && !name.isBlank())
+                .ifPresent(dispute::setStaffName);
+        return dispute;
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -1424,7 +1445,7 @@ public class ContractExecutionService {
                 notifyContractParticipantsExcept(contract, actorAccountId,
                         (receiver, actor) -> notificationService.notifyDisputeUnderStaffReview(
                                 receiver, actor, contract.getContractId(), dispute.getDisputeId())));
-        return saved;
+        return withStaffName(saved);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -1440,7 +1461,7 @@ public class ContractExecutionService {
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
         auditLogService.record(AuditLogService.ACTION_RESOLVE_DISPUTE, "disputes", String.valueOf(disputeId), accessService.currentAccount().getAccountId());
-        return saved;
+        return withStaffName(saved);
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -1538,7 +1559,7 @@ public class ContractExecutionService {
         auditLogService.record("MILESTONE_REVIEW_SLA_AUTO_APPROVED", "milestones",
                 String.valueOf(milestone.getMilestoneId()), actorAccountId);
         tryCompleteContract(contract, actorAccountId);
-        return saved;
+        return withStaffName(saved);
     }
 
     private Optional<ContractEntity> findContractForMilestone(MilestoneEntity milestone) {
@@ -1711,11 +1732,11 @@ public class ContractExecutionService {
             throw new AppException("CHI DUOC ESCALATE KHI DISPUTE O TRANG THAI PENDING_SELF_RESOLVE");
         }
         requireContractParticipantOrOperator(dispute.getContractId());
-        if (reason == null || reason.isBlank() || evidenceFile == null || evidenceFile.isBlank()) {
-            throw new AppException("DISPUTE_ESCALATION_EVIDENCE_REQUIRED");
+        if (reason == null || reason.isBlank()) {
+            throw new AppException("DISPUTE_ESCALATION_REASON_REQUIRED");
         }
         dispute.setEscalationReason(reason.trim());
-        dispute.setEscalationEvidenceFile(evidenceFile.trim());
+        dispute.setEscalationEvidenceFile(evidenceFile == null || evidenceFile.isBlank() ? null : evidenceFile.trim());
         dispute.setEscalationRequestedByAccountId(accessService.currentAccount().getAccountId());
         dispute.setEscalationRequestedAt(LocalDateTime.now());
         dispute.setStatus(DisputeEntity.STATUS_ESCALATION_REQUESTED);

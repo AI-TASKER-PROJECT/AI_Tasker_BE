@@ -46,6 +46,7 @@ public class DisputeEntity {
     @Column(name = "milestone_id") private Integer milestoneId;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "assigned_staff_id") private Integer assignedStaffId;
+    @Transient private String staffName;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "evidence_report") private String evidenceReport;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
