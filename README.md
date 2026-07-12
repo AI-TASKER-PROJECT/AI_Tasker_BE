@@ -186,3 +186,61 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
 - JWT da nang cap claim role thuc (`BUSINESS/EXPERT/ADMIN/STAFF`) de phuc vu RBAC.
 - API nghiep vu su dung role check trong service (chan goi cheo API sai tham quyen).
 - Cac file da chinh sua duoc bo sung comment huong dan theo ngu canh backend.
+
+## 9) Deploy backend cloud
+
+Khuyen nghi deploy backend len Railway/Render va dung Neon PostgreSQL.
+
+Neon can bat pgvector truoc khi backend chay migration:
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+Build command:
+```bash
+./mvnw -DskipTests package
+```
+
+Start command:
+```bash
+java -jar target/aitasker-0.0.1-SNAPSHOT.jar
+```
+
+Env toi thieu:
+```env
+PORT=8080
+
+DB_HOST=<neon-direct-host>
+DB_PORT=5432
+DB_NAME=neondb
+DB_USER=neondb_owner
+DB_PASSWORD=<neon-password>
+DB_SSLMODE=require
+
+REDIS_HOST=<redis-host>
+REDIS_PORT=<redis-port>
+REDIS_PASSWORD=<redis-password-if-any>
+
+APP_JWT_SECRET=<base64-secret>
+APP_FRONTEND_URL=https://<frontend-domain>
+APP_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://<frontend-domain>,https://*.vercel.app
+
+OPENAI_API_KEY=<openai-api-key>
+MAIL_USERNAME=<smtp-username>
+MAIL_PASSWORD=<smtp-app-password>
+
+PAYOS_CLIENT_ID=<payos-client-id>
+PAYOS_API_KEY=<payos-api-key>
+PAYOS_CHECKSUM_KEY=<payos-checksum-key>
+PAYOS_RETURN_URL=https://<backend-domain>/api/payments/payos/return
+PAYOS_CANCEL_URL=https://<frontend-domain>
+
+FIREBASE_STORAGE_BUCKET=<firebase-storage-bucket>
+FIREBASE_SERVICE_ACCOUNT_JSON=<firebase-service-account-json>
+
+GOOGLE_CLIENT_ID=<google-client-id>
+SWAGGER_ENABLED=false
+```
+
+Neu van chay local bang file service account thi dung `FIREBASE_SERVICE_ACCOUNT_PATH`.
+Khi deploy cloud, uu tien `FIREBASE_SERVICE_ACCOUNT_JSON` de khong phu thuoc file local trong thu muc `secrets`.

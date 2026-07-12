@@ -13,8 +13,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 // Note: Annotation này cho Spring quản lý class như một file cấu hình ứng dụng.
 @Configuration
@@ -25,6 +28,9 @@ public class FirebaseConfig {
     @Value("${firebase.service-account-path:}")
     private String serviceAccountPath;
 
+    @Value("${firebase.service-account-json:}")
+    private String serviceAccountJson;
+
     @Value("${firebase.storage-bucket:}")
     private String storageBucket;
 
@@ -32,18 +38,28 @@ public class FirebaseConfig {
     @PostConstruct
     // Note: Hàm `initializeFirebase` khởi tạo Firebase Admin SDK bằng file service account và bucket đã cấu hình trong .env.
     public void initializeFirebase() throws IOException {
-        if (serviceAccountPath == null || serviceAccountPath.isBlank()
-                || storageBucket == null || storageBucket.isBlank()
-                || !FirebaseApp.getApps().isEmpty()) {
+        if (storageBucket == null || storageBucket.isBlank() || !FirebaseApp.getApps().isEmpty()) {
             return;
         }
 
-        try (FileInputStream serviceAccount = new FileInputStream(serviceAccountPath)) {
+        if ((serviceAccountJson == null || serviceAccountJson.isBlank())
+                && (serviceAccountPath == null || serviceAccountPath.isBlank())) {
+            return;
+        }
+
+        try (InputStream serviceAccount = openServiceAccount()) {
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .setStorageBucket(storageBucket)
                     .build();
             FirebaseApp.initializeApp(options);
         }
+    }
+
+    private InputStream openServiceAccount() throws IOException {
+        if (serviceAccountJson != null && !serviceAccountJson.isBlank()) {
+            return new ByteArrayInputStream(serviceAccountJson.getBytes(StandardCharsets.UTF_8));
+        }
+        return new FileInputStream(serviceAccountPath);
     }
 }
