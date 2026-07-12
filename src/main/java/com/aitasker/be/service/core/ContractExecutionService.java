@@ -1390,11 +1390,18 @@ public class ContractExecutionService {
         if (dispute == null || dispute.getAssignedStaffId() == null) {
             return dispute;
         }
-        staffRepository.findById(dispute.getAssignedStaffId())
-                .flatMap(staff -> accountRepository.findById(staff.getAccountId()))
-                .map(AccountEntity::getFullName)
-                .filter(name -> name != null && !name.isBlank())
-                .ifPresent(dispute::setStaffName);
+        Optional<StaffEntity> staff = staffRepository.findById(dispute.getAssignedStaffId());
+        if (staff.isEmpty()) {
+            return dispute;
+        }
+        Optional<AccountEntity> account = accountRepository.findById(staff.get().getAccountId());
+        if (account.isEmpty()) {
+            return dispute;
+        }
+        String staffName = account.get().getFullName();
+        if (staffName != null && !staffName.isBlank()) {
+            dispute.setStaffName(staffName);
+        }
         return dispute;
     }
 
@@ -1559,7 +1566,7 @@ public class ContractExecutionService {
         auditLogService.record("MILESTONE_REVIEW_SLA_AUTO_APPROVED", "milestones",
                 String.valueOf(milestone.getMilestoneId()), actorAccountId);
         tryCompleteContract(contract, actorAccountId);
-        return withStaffName(saved);
+        return saved;
     }
 
     private Optional<ContractEntity> findContractForMilestone(MilestoneEntity milestone) {
