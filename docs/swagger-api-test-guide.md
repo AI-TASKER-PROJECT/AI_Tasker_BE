@@ -1,4 +1,4 @@
-﻿# Huong dan test API Back-end bang Swagger
+# Huong dan test API Back-end bang Swagger
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow trong Swagger UI.
 
@@ -2022,6 +2022,20 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### DELETE `/api/v1/technologies/{technologyId}`
+- OperationId: `deleteTechnology`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa technology bang `isActive=false`, khong xoa vat ly.
+- Params:
+  - `technologyId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Technology duoc deactivate.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay technology.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ### PATCH `/api/v1/skills/{skillId}`
 - OperationId: `updateSkill`
 - Auth: Bearer JWT
@@ -2038,6 +2052,20 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### DELETE `/api/v1/skills/{skillId}`
+- OperationId: `deleteSkill`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa skill bang `isActive=false`, khong xoa vat ly.
+- Params:
+  - `skillId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Skill duoc deactivate.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay skill.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ### PATCH `/api/v1/domains/{domainId}`
 - OperationId: `updateDomain`
 - Auth: Bearer JWT
@@ -2052,6 +2080,20 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### DELETE `/api/v1/domains/{domainId}`
+- OperationId: `deleteDomain`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa domain bang `isActive=false`, khong xoa vat ly. Domain noi bo `PROFILE_REVIEW` van bi an voi user khong phai admin.
+- Params:
+  - `domainId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Domain duoc deactivate.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay domain.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
 ## AI & Matching Flow
@@ -2187,6 +2229,134 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/admin/settings`
+- OperationId: `createSetting`
+- Auth: Bearer JWT
+- Giai thich: Admin tao system setting moi. `valueType` hop le: `STRING`, `INT`, `DECIMAL`, `BOOLEAN`, `JSON`.
+- Params: Khong co.
+- Body raw:
+```json
+{
+  "settingKey": "approval.sla_days",
+  "settingValue": "3",
+  "valueType": "INT",
+  "description": "So ngay SLA xet duyet",
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Setting duoc tao.
+  - `400`: Thieu key/value/valueType, sai valueType, hoac key da ton tai.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### PUT `/api/v1/admin/settings/{key}`
+- OperationId: `updateSettingBody`
+- Auth: Bearer JWT
+- Giai thich: Admin cap nhat setting bang request body; dung khi can doi value, valueType, description hoac isActive.
+- Params:
+  - `key` (path, required, string)
+- Body raw:
+```json
+{
+  "settingValue": "3",
+  "valueType": "INT",
+  "description": "So ngay SLA xet duyet",
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Setting duoc cap nhat.
+  - `400`: Sai valueType hoac body khong hop le.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay setting.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### DELETE `/api/v1/admin/settings/{key}`
+- OperationId: `deleteSetting`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa setting bang `isActive=false`, khong xoa vat ly.
+- Params:
+  - `key` (path, required, string)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Setting duoc deactivate.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay setting.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/membership/packages`
+- OperationId: `listMembershipPackagesForAdmin`
+- Auth: Bearer JWT
+- Giai thich: Admin xem tat ca package membership; them `activeOnly=true` de chi lay package dang active.
+- Params:
+  - `activeOnly` (query, optional, boolean)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve danh sach package.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/admin/membership/packages`
+- OperationId: `createMembershipPackage`
+- Auth: Bearer JWT
+- Giai thich: Admin tao package membership cho `BUSINESS` hoac `EXPERT`.
+- Params: Khong co.
+- Body raw:
+```json
+{
+  "roleType": "BUSINESS",
+  "packageCode": "BUSINESS_STARTER",
+  "packageName": "Business Starter",
+  "price": 99000,
+  "badgeDurationDays": 30,
+  "jobPostQuota": 5,
+  "proposalQuota": 0,
+  "recommendVisibility": false,
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Package duoc tao.
+  - `400`: Thieu truong bat buoc, role/price/quota khong hop le, hoac packageCode da ton tai.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### PATCH `/api/v1/admin/membership/packages/{packageId}`
+- OperationId: `updateMembershipPackage`
+- Auth: Bearer JWT
+- Giai thich: Admin cap nhat tung phan package membership.
+- Params:
+  - `packageId` (path, required, integer)
+- Body raw:
+```json
+{
+  "packageName": "Business Starter Plus",
+  "price": 149000,
+  "jobPostQuota": 9,
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Package duoc cap nhat.
+  - `400`: Du lieu khong hop le hoac packageCode trung.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay package.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### DELETE `/api/v1/admin/membership/packages/{packageId}`
+- OperationId: `deleteMembershipPackage`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa package bang `isActive=false`, cac lich su mua goi cu van duoc giu.
+- Params:
+  - `packageId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Package duoc deactivate.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay package.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
 ### DELETE `/api/v1/admin/accounts/{accountId}`
@@ -2349,6 +2519,114 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/summary`
+- OperationId: `summary`
+- Auth: Bearer JWT
+- Giai thich: Tra ve card tong quan cho admin dashboard: user, profile backlog, job/proposal, contract, dispute, membership, wallet va withdrawal.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardSummaryResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/revenue`
+- OperationId: `revenue`
+- Auth: Bearer JWT
+- Giai thich: Tra ve series doanh thu/gross movement theo ky va breakdown theo transaction type.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardSeriesResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/contracts`
+- OperationId: `contracts`
+- Auth: Bearer JWT
+- Giai thich: Tra ve contract status breakdown va trend hop dong tao moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardContractsResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/users`
+- OperationId: `users`
+- Auth: Bearer JWT
+- Giai thich: Tra ve user role/status breakdown, pending profile reviews va trend user moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardUsersResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/jobs-proposals`
+- OperationId: `jobsProposals`
+- Auth: Bearer JWT
+- Giai thich: Tra ve funnel job/proposal, acceptance rate va trend job/proposal tao moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardJobsProposalsResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/disputes`
+- OperationId: `disputes`
+- Auth: Bearer JWT
+- Giai thich: Tra ve dispute status breakdown, open/resolved count, overdue SLA count va trend dispute tao moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardDisputesResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/membership`
+- OperationId: `membership`
+- Auth: Bearer JWT
+- Giai thich: Tra ve membership purchase trend, total revenue va package breakdown.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardMembershipResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/finance-breakdown`
+- OperationId: `financeBreakdown`
+- Auth: Bearer JWT
+- Giai thich: Tra ve so du vi he thong, gross transaction volume, withdrawal totals va transaction/withdrawal breakdown.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardFinanceBreakdownResponse`.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 

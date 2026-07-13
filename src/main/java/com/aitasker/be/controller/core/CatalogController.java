@@ -50,6 +50,11 @@ public class CatalogController {
         return ResponseEntity.ok(ApiResponse.success("UPDATE DOMAIN SUCCESS", catalogService.updateDomain(domainId, request)));
     }
 
+    @DeleteMapping("/domains/{domainId}")
+    public ResponseEntity<ApiResponse<DomainEntity>> deleteDomain(@PathVariable Integer domainId) {
+        return ResponseEntity.ok(ApiResponse.success("DELETE DOMAIN SUCCESS", catalogService.deleteDomain(domainId)));
+    }
+
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/skills")
     @SecurityRequirements
@@ -73,6 +78,11 @@ public class CatalogController {
         return ResponseEntity.ok(ApiResponse.success("UPDATE TECHNOLOGY SUCCESS", catalogService.updateTechnology(technologyId, request)));
     }
 
+    @DeleteMapping("/technologies/{technologyId}")
+    public ResponseEntity<ApiResponse<TechnologyEntity>> deleteTechnology(@PathVariable Integer technologyId) {
+        return ResponseEntity.ok(ApiResponse.success("DELETE TECHNOLOGY SUCCESS", catalogService.deleteTechnology(technologyId)));
+    }
+
     @PostMapping("/skills")
     // Note: Hàm `createSkill` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<SkillEntity>> createSkill(@RequestBody SkillRequest request) {
@@ -84,6 +94,11 @@ public class CatalogController {
     // Note: Hàm `updateSkill` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<SkillEntity>> updateSkill(@PathVariable Integer skillId, @RequestBody SkillRequest request) {
         return ResponseEntity.ok(ApiResponse.success("UPDATE SKILL SUCCESS", catalogService.updateSkill(skillId, request)));
+    }
+
+    @DeleteMapping("/skills/{skillId}")
+    public ResponseEntity<ApiResponse<SkillEntity>> deleteSkill(@PathVariable Integer skillId) {
+        return ResponseEntity.ok(ApiResponse.success("DELETE SKILL SUCCESS", catalogService.deleteSkill(skillId)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.

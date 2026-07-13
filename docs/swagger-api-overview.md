@@ -2,9 +2,9 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **166**.
+- Tong so REST endpoint trong Swagger runtime: **184**.
 - Public endpoint: **21**.
-- Endpoint can Bearer JWT: **145**.
+- Endpoint can Bearer JWT: **163**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -210,8 +210,11 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 5 | GET | `/api/v1/domains` | Public | Operation listDomains. |
 | 6 | POST | `/api/v1/domains` | Bearer JWT | Operation createDomain. |
 | 7 | PATCH | `/api/v1/technologies/{technologyId}` | Bearer JWT | Operation updateTechnology. |
-| 8 | PATCH | `/api/v1/skills/{skillId}` | Bearer JWT | Operation updateSkill. |
-| 9 | PATCH | `/api/v1/domains/{domainId}` | Bearer JWT | Operation updateDomain. |
+| 8 | DELETE | `/api/v1/technologies/{technologyId}` | Bearer JWT | Admin soft-deletes/deactivates a technology. |
+| 9 | PATCH | `/api/v1/skills/{skillId}` | Bearer JWT | Operation updateSkill. |
+| 10 | DELETE | `/api/v1/skills/{skillId}` | Bearer JWT | Admin soft-deletes/deactivates a skill. |
+| 11 | PATCH | `/api/v1/domains/{domainId}` | Bearer JWT | Operation updateDomain. |
+| 12 | DELETE | `/api/v1/domains/{domainId}` | Bearer JWT | Admin soft-deletes/deactivates a domain. |
 
 ## AI & Matching Flow
 
@@ -235,18 +238,33 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 6 | POST | `/api/v1/admin/accounts` | Bearer JWT | Operation createAccount. |
 | 7 | PATCH | `/api/v1/admin/staffs/{staffId}` | Bearer JWT | Operation updateStaff. |
 | 8 | PATCH | `/api/v1/admin/settings/{key}` | Bearer JWT | Operation updateSetting. |
-| 9 | DELETE | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Operation deactivateAccount. |
-| 10 | PATCH | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Operation updateAccount. |
-| 11 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Operation setAccountStatus. |
-| 12 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Operation setAccountActive. |
-| 13 | GET | `/api/v1/admin/wallet` | Bearer JWT | Operation systemWallet. |
-| 14 | GET | `/api/v1/admin/wallet/transactions` | Bearer JWT | Operation platformWalletTransactions. |
-| 15 | GET | `/api/v1/admin/settings` | Bearer JWT | Operation listSettings. |
-| 16 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Operation listReviewsByContract. |
-| 17 | GET | `/api/v1/admin/disputes` | Bearer JWT | Operation listDisputes_1. |
-| 18 | GET | `/api/v1/admin/disputes/{disputeId}` | Bearer JWT | Operation getDisputeDetail. |
-| 19 | GET | `/api/v1/admin/audit-logs` | Bearer JWT | Operation listAuditLogs. |
-| 20 | GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Operation analyticsOverview. |
+| 9 | POST | `/api/v1/admin/settings` | Bearer JWT | Admin creates a system setting. |
+| 10 | PUT | `/api/v1/admin/settings/{key}` | Bearer JWT | Admin updates system setting metadata by request body. |
+| 11 | DELETE | `/api/v1/admin/settings/{key}` | Bearer JWT | Admin soft-deletes/deactivates a system setting. |
+| 12 | GET | `/api/v1/admin/membership/packages` | Bearer JWT | Admin lists membership packages, optionally active-only. |
+| 13 | POST | `/api/v1/admin/membership/packages` | Bearer JWT | Admin creates a membership package. |
+| 14 | PATCH | `/api/v1/admin/membership/packages/{packageId}` | Bearer JWT | Admin updates a membership package. |
+| 15 | DELETE | `/api/v1/admin/membership/packages/{packageId}` | Bearer JWT | Admin soft-deletes/deactivates a membership package. |
+| 16 | DELETE | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Operation deactivateAccount. |
+| 17 | PATCH | `/api/v1/admin/accounts/{accountId}` | Bearer JWT | Operation updateAccount. |
+| 18 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Operation setAccountStatus. |
+| 19 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Operation setAccountActive. |
+| 20 | GET | `/api/v1/admin/wallet` | Bearer JWT | Operation systemWallet. |
+| 21 | GET | `/api/v1/admin/wallet/transactions` | Bearer JWT | Operation platformWalletTransactions. |
+| 22 | GET | `/api/v1/admin/settings` | Bearer JWT | Operation listSettings. |
+| 23 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Operation listReviewsByContract. |
+| 24 | GET | `/api/v1/admin/disputes` | Bearer JWT | Operation listDisputes_1. |
+| 25 | GET | `/api/v1/admin/disputes/{disputeId}` | Bearer JWT | Operation getDisputeDetail. |
+| 26 | GET | `/api/v1/admin/audit-logs` | Bearer JWT | Operation listAuditLogs. |
+| 27 | GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Operation analyticsOverview. |
+| 28 | GET | `/api/v1/admin/dashboard/summary` | Bearer JWT | Admin dashboard summary cards. |
+| 29 | GET | `/api/v1/admin/dashboard/revenue` | Bearer JWT | Chart-ready revenue series and transaction-type breakdown. |
+| 30 | GET | `/api/v1/admin/dashboard/contracts` | Bearer JWT | Contract status breakdown and created trend. |
+| 31 | GET | `/api/v1/admin/dashboard/users` | Bearer JWT | User role/status breakdown and new-user trend. |
+| 32 | GET | `/api/v1/admin/dashboard/jobs-proposals` | Bearer JWT | Marketplace job/proposal funnel and trends. |
+| 33 | GET | `/api/v1/admin/dashboard/disputes` | Bearer JWT | Dispute status, SLA, and created trend. |
+| 34 | GET | `/api/v1/admin/dashboard/membership` | Bearer JWT | Membership purchase revenue and package breakdown. |
+| 35 | GET | `/api/v1/admin/dashboard/finance-breakdown` | Bearer JWT | Finance balances, gross volume, withdrawals, and transaction breakdown. |
 
 ## System & Test Flow
 

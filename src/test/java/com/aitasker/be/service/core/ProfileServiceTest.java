@@ -10,16 +10,23 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.auth.TaxCheckResponse;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
+import com.aitasker.be.entity.DomainEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
+import com.aitasker.be.entity.PortfolioEntity;
+import com.aitasker.be.entity.RoleEntity;
+import com.aitasker.be.entity.StaffDomainEntity;
+import com.aitasker.be.entity.StaffDomainId;
 import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.AuditLogRepository;
 import com.aitasker.be.repository.BusinessProfileRepository;
+import com.aitasker.be.repository.DomainRepository;
 import com.aitasker.be.repository.ExpertProfileRepository;
 import com.aitasker.be.repository.JobRepository;
 import com.aitasker.be.repository.PortfolioRepository;
 import com.aitasker.be.repository.ReviewRepository;
+import com.aitasker.be.repository.StaffDomainRepository;
 import com.aitasker.be.repository.StaffRepository;
 import com.aitasker.be.service.auth.TaxCheckService;
 import org.junit.jupiter.api.Test;
@@ -64,6 +71,8 @@ class ProfileServiceTest {
     @Mock private TaxCheckService taxCheckService;
     @Mock private JobRepository jobRepository;
     @Mock private ReviewRepository reviewRepository;
+    @Mock private DomainRepository domainRepository;
+    @Mock private StaffDomainRepository staffDomainRepository;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ProfileService profileService;
@@ -78,7 +87,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void upsertBusiness_shouldNotifyAllStaffWhenVerificationSubmitted() {
+    void upsertBusiness_shouldNotifyOnlyProfileReviewStaffWhenVerificationSubmitted() {
         Integer accountId = 10;
         AccountEntity account = AccountEntity.builder()
                 .accountId(accountId)
@@ -111,10 +120,14 @@ class ProfileServiceTest {
         when(taxCheckService.checkTaxCode("0312345678")).thenReturn(vietQrResponse);
         when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.empty());
         when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenReturn(savedProfile);
-        when(staffRepository.findAll()).thenReturn(List.of(
-                StaffEntity.builder().staffId(1).accountId(40).build(),
-                StaffEntity.builder().staffId(2).accountId(41).build()
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE))
+                .thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.findByIdDomainId(99)).thenReturn(List.of(
+                new StaffDomainEntity(new StaffDomainId(1, 99)),
+                new StaffDomainEntity(new StaffDomainId(2, 99))
         ));
+        when(staffRepository.findById(1)).thenReturn(Optional.of(StaffEntity.builder().staffId(1).accountId(40).build()));
+        when(staffRepository.findById(2)).thenReturn(Optional.of(StaffEntity.builder().staffId(2).accountId(41).build()));
 
         BusinessProfileEntity result = profileService.upsertBusiness(input);
 
@@ -127,7 +140,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void upsertExpert_shouldNotifyAllStaffWhenVerificationSubmitted() {
+    void upsertExpert_shouldNotifyOnlyProfileReviewStaffWhenVerificationSubmitted() {
         Integer accountId = 20;
         AccountEntity account = AccountEntity.builder()
                 .accountId(accountId)
@@ -152,9 +165,12 @@ class ProfileServiceTest {
         when(expertProfileRepository.findByNationalId(input.getNationalId())).thenReturn(Optional.empty());
         when(expertProfileRepository.findByAccountId(accountId)).thenReturn(Optional.empty());
         when(expertProfileRepository.save(any(ExpertProfileEntity.class))).thenReturn(savedProfile);
-        when(staffRepository.findAll()).thenReturn(List.of(
-                StaffEntity.builder().staffId(1).accountId(40).build()
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE))
+                .thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.findByIdDomainId(99)).thenReturn(List.of(
+                new StaffDomainEntity(new StaffDomainId(1, 99))
         ));
+        when(staffRepository.findById(1)).thenReturn(Optional.of(StaffEntity.builder().staffId(1).accountId(40).build()));
 
         ExpertProfileEntity result = profileService.upsertExpert(input);
 
@@ -295,6 +311,10 @@ class ProfileServiceTest {
         BusinessProfileEntity second = BusinessProfileEntity.builder()
                 .businessId(2).accountId(11).companyName("B").taxCode("t2").kybStatus("Pending").build();
 
+        when(accessService.currentAccount()).thenReturn(staffReviewerAccount());
+        when(staffRepository.findByAccountId(99)).thenReturn(Optional.of(StaffEntity.builder().staffId(7).accountId(99).build()));
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(7, 99)).thenReturn(true);
         when(businessProfileRepository.findAll()).thenReturn(List.of(first, second));
         when(accountRepository.findById(10)).thenReturn(Optional.of(AccountEntity.builder()
                 .accountId(10).fullName("Owner A").email("a@corp.com").phone("090").build()));
@@ -307,6 +327,46 @@ class ProfileServiceTest {
         assertBusinessContact(result.get(0), "Owner A", "a@corp.com", "090");
         assertBusinessContact(result.get(1), "Owner B", "b@corp.com", "091");
         verify(accessService).requireRole("STAFF");
+    }
+
+    @Test
+    void allBusinessProfiles_shouldRejectStaffWithoutProfileReviewDomain() {
+        when(accessService.currentAccount()).thenReturn(staffReviewerAccount());
+        when(staffRepository.findByAccountId(99)).thenReturn(Optional.of(StaffEntity.builder().staffId(7).accountId(99).build()));
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(7, 99)).thenReturn(false);
+
+        AppException ex = assertThrows(AppException.class, () -> profileService.allBusinessProfiles());
+
+        assertEquals("STAFF KHONG CO QUYEN XET DUYET HO SO", ex.getMessage());
+        verify(businessProfileRepository, never()).findAll();
+    }
+
+    @Test
+    void allPortfolios_shouldRejectStaffWithoutProfileReviewDomain() {
+        when(accessService.currentAccount()).thenReturn(staffReviewerAccount());
+        when(staffRepository.findByAccountId(99)).thenReturn(Optional.of(StaffEntity.builder().staffId(7).accountId(99).build()));
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(7, 99)).thenReturn(false);
+
+        AppException ex = assertThrows(AppException.class, () -> profileService.allPortfolios());
+
+        assertEquals("STAFF KHONG CO QUYEN XET DUYET HO SO", ex.getMessage());
+        verify(portfolioRepository, never()).findAll();
+    }
+
+    @Test
+    void allPortfolios_shouldAllowBusinessWithoutProfileReviewDomain() {
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder()
+                .accountId(12)
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build());
+        when(portfolioRepository.findAll()).thenReturn(List.of(PortfolioEntity.builder().portfolioId(1).build()));
+
+        List<PortfolioEntity> result = profileService.allPortfolios();
+
+        assertEquals(1, result.size());
+        verifyNoInteractions(domainRepository, staffDomainRepository);
     }
 
     @Test
@@ -403,6 +463,10 @@ class ProfileServiceTest {
                 .expertId(2).accountId(21).nationalId("n2").portfolioUrl("p2")
                 .yearsOfExperience(5).kycStatus("Pending").build();
 
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder()
+                .accountId(12)
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build());
         when(expertProfileRepository.findAll()).thenReturn(List.of(first, second));
         when(accountRepository.findById(20)).thenReturn(Optional.of(AccountEntity.builder()
                 .accountId(20).fullName("Expert A").email("a@expert.com").phone("095").build()));
@@ -454,6 +518,24 @@ class ProfileServiceTest {
     }
 
     @Test
+    void approveProfile_shouldRejectStaffWithoutProfileReviewDomain() {
+        Integer staffAccountId = 99;
+        Integer staffId = 7;
+
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(staffAccountId).build());
+        when(staffRepository.findByAccountId(staffAccountId)).thenReturn(Optional.of(StaffEntity.builder().staffId(staffId).accountId(staffAccountId).build()));
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(staffId, 99)).thenReturn(false);
+
+        AppException ex = assertThrows(AppException.class,
+                () -> profileService.approveProfile("BUSINESS", 1, "Approved", null));
+
+        assertEquals("STAFF KHONG CO QUYEN XET DUYET HO SO", ex.getMessage());
+        verify(accessService).requireRole("STAFF");
+        verifyNoInteractions(businessProfileRepository);
+    }
+
+    @Test
     void approveProfile_shouldStoreTrimmedBusinessRejectionReason() {
         Integer profileId = 1;
         Integer profileAccountId = 10;
@@ -469,6 +551,8 @@ class ProfileServiceTest {
 
         when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(staffAccountId).build());
         when(staffRepository.findByAccountId(staffAccountId)).thenReturn(Optional.of(StaffEntity.builder().staffId(staffId).accountId(staffAccountId).build()));
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(staffId, 99)).thenReturn(true);
         when(businessProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
         when(accountRepository.findById(profileAccountId)).thenReturn(Optional.of(AccountEntity.builder().accountId(profileAccountId).status("Pending").build()));
         when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -499,6 +583,8 @@ class ProfileServiceTest {
 
         when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(staffAccountId).build());
         when(staffRepository.findByAccountId(staffAccountId)).thenReturn(Optional.of(StaffEntity.builder().staffId(staffId).accountId(staffAccountId).build()));
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(staffId, 99)).thenReturn(true);
         when(businessProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
         when(accountRepository.findById(profileAccountId)).thenReturn(Optional.of(AccountEntity.builder().accountId(profileAccountId).status("Rejected").build()));
         when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -581,7 +667,6 @@ class ProfileServiceTest {
         when(taxCheckService.checkTaxCode("0312345678")).thenReturn(vietQr);
         when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.empty());
         when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenReturn(savedProfile);
-        when(staffRepository.findAll()).thenReturn(List.of());
 
         BusinessProfileEntity result = profileService.upsertBusiness(input);
 
@@ -630,7 +715,6 @@ class ProfileServiceTest {
         when(taxCheckService.checkTaxCode("0312345678")).thenReturn(vietQr);
         when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.of(existingProfile));
         when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenReturn(savedProfile);
-        when(staffRepository.findAll()).thenReturn(List.of());
 
         BusinessProfileEntity result = profileService.upsertBusiness(input);
 
@@ -652,5 +736,22 @@ class ProfileServiceTest {
         assertEquals(email, result.getEmail());
         assertEquals(phone, result.getPhone());
         assertNotNull(result.getTitle());
+    }
+
+    private DomainEntity profileReviewDomain() {
+        return DomainEntity.builder()
+                .domainId(99)
+                .domainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)
+                .domainName("Xet duyet ho so")
+                .isActive(true)
+                .sortOrder(999)
+                .build();
+    }
+
+    private AccountEntity staffReviewerAccount() {
+        return AccountEntity.builder()
+                .accountId(99)
+                .role(RoleEntity.builder().roleName("STAFF").build())
+                .build();
     }
 }

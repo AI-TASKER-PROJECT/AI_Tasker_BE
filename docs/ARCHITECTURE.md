@@ -44,7 +44,8 @@ Current product domains:
   credit, quota, contract deposit, withdrawal, system wallet, and legacy
   transaction flows.
 - Dispute assignment, demo testing, technical report, and resolution.
-- Reviews, admin settings, account/staff management, analytics, and audit logs.
+- Reviews, admin settings, account/staff management, analytics, admin
+  dashboard aggregates, and audit logs.
 - Notifications over REST and WebSocket/STOMP.
 - Chatbot/RAG support over local knowledge and optional OpenAI APIs.
 
@@ -56,7 +57,8 @@ Key runtime choices:
 
 - Spring Boot 4.0.6.
 - Spring Web MVC REST controllers.
-- Spring Security with JWT authentication.
+- Spring Security with JWT authentication plus account token-version validation
+  for one active session per account.
 - Spring Data JPA with PostgreSQL.
 - Flyway for database migrations.
 - Spring Validation for request DTO validation.
@@ -112,7 +114,8 @@ focused on persistence. Entities map the Flyway-managed database shape.
 The following service boundaries are established and should be preserved:
 
 - `service/auth/AuthServiceImpl`: registration, login, BCrypt password hashing,
-  JWT issuance.
+  JWT issuance, and active token-version rotation for one active account
+  session.
 - `service/auth/EmailOtpService`: email OTP flow.
 - `service/auth/TaxCheckService`: business tax-code lookup/check.
 - `service/core/AccessService`: current account lookup from JWT and role checks.
@@ -126,12 +129,15 @@ The following service boundaries are established and should be preserved:
 - `service/core/MarketplaceService`: job lifecycle, proposal submission, and
   proposal review.
 - `service/core/CatalogService`: domain, skill, technology, and job metadata
-  mappings.
+  mappings, including admin soft-delete/deactivation for catalog values.
 - `service/core/ContractExecutionService`: contract draft/signature,
   NDA, milestones, criteria, deliverables, finance-adjacent legacy
   transactions, disputes, and SLA simulation.
-- `service/core/AdminService`: reviews, settings, staff, account management,
-  audit logs, and analytics overview.
+- `service/core/AdminService`: reviews, system settings CRUD, staff, account
+  management, audit logs, and analytics overview.
+- `service/core/AdminDashboardService`: admin-only dashboard aggregates for
+  summary cards, revenue, contracts, users, jobs/proposals, disputes,
+  membership, and finance breakdown charts.
 - `service/core/ExpertRecommendationService` and
   `ExpertCandidateRankingService`: candidate search and ranking.
 - `service/core/AiSowGenerationService`, `SowKeywordExtractionService`,
@@ -140,7 +146,8 @@ The following service boundaries are established and should be preserved:
 - `service/core/FirebaseStorageService`: Firebase-backed upload/view-url flows.
 - `service/core/PayOSPaymentService`, `PaymentWalletService`,
   `WalletLedgerService`, and `SystemWalletService`: payment order, wallet,
-  membership, credit, quota, deposit, withdrawal, and system-wallet behavior.
+  membership, membership package CRUD for admins, credit, quota, deposit,
+  withdrawal, and system-wallet behavior.
 - `service/core/NotificationService`: notification records and unread state.
 
 ## API Surface
@@ -182,7 +189,8 @@ Important runtime notes:
   `/api/auth/google/register`.
 - Refresh-token renewal exists at `POST /api/auth/refresh`: it accepts only a
   valid refresh JWT, reloads the account/role, rejects locked accounts, and
-  returns a new access token.
+  returns a new access token. Refresh tokens are bound to the account's current
+  active token version, so a newer login invalidates older refresh tokens.
 - Expert candidate and recommendation endpoints exist under `/api/jobs/...`.
 - PayOS endpoints exist under `/api/payments/payos/...`.
 - Contract activation is now signature-driven through
@@ -235,6 +243,11 @@ JWT includes the real business role used by RBAC:
 - `ADMIN`
 - `STAFF`
 
+JWTs also include `tokenVersion`. The request filter and WebSocket CONNECT
+compare that claim with `account.active_token_version`; a newer successful
+login increments the account value and invalidates older access and refresh
+tokens.
+
 Controllers may declare route-level security, but business authorization must
 also be enforced in services because most workflows depend on ownership and
 state, not only role.
@@ -269,9 +282,14 @@ Current rules to preserve:
   Business can add, update, delete, or reorder them before a contract exists.
   Criteria are not selected from a global catalog.
 - Payout/refund/system finance operations are admin/staff responsibilities.
-- Catalog creation/update is admin-only.
+- Catalog creation/update/delete is admin-only; delete is implemented as
+  `is_active=false` so existing job/profile history keeps referential integrity.
 - Job catalog assignments can be changed by admin or the owning business.
 - Profile approval is staff/admin work and should write audit evidence.
+- Staff profile review is restricted by the internal `PROFILE_REVIEW` domain
+  assignment in `staff_domains`; non-admin catalog and job-domain flows must
+  hide or reject this internal domain so it cannot be used as a marketplace job
+  category.
 - Profile rejection stores a staff-provided `rejection_reason` on the business
   or expert profile; the reason is required when `status=Rejected` and cleared
   when the profile is approved or resubmitted.
@@ -450,9 +468,10 @@ Application logs and audit logs have different jobs:
 - Audit logs are product records for sensitive business actions.
 
 Audit should cover profile approval, account/admin changes, settings changes,
-contract and dispute decisions, transaction/payment state changes, and other
-sensitive operator actions. Audit coverage is not complete yet and should be
-expanded as sensitive flows are hardened.
+membership package changes, contract and dispute decisions,
+transaction/payment state changes, and other sensitive operator actions. Audit
+coverage is not complete yet and should be expanded as sensitive flows are
+hardened.
 
 Admin audit-log responses normalize stored action and entity values into
 Vietnamese business labels for the table-facing fields. Raw technical entity

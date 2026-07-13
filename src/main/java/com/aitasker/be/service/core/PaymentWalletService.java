@@ -7,6 +7,7 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
+import com.aitasker.be.dto.admin.MembershipPackageRequest;
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
@@ -123,6 +124,86 @@ public class PaymentWalletService {
             throw new AppException("INVALID_ROLE");
         }
         return membershipPackageRepository.findByRoleTypeAndIsActiveTrueOrderByPriceAsc(role);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MembershipPackageEntity> listMembershipPackagesForAdmin(Boolean activeOnly) {
+        accessService.requireRole("ADMIN");
+        if (Boolean.TRUE.equals(activeOnly)) {
+            return membershipPackageRepository.findByIsActiveTrueOrderByRoleTypeAscPriceAscPackageNameAsc();
+        }
+        return membershipPackageRepository.findAll();
+    }
+
+    @Transactional
+    public MembershipPackageEntity createMembershipPackage(MembershipPackageRequest request) {
+        accessService.requireRole("ADMIN");
+        AccountEntity actor = accessService.currentAccount();
+        validateMembershipPackageRequest(request, true);
+        String code = normalizePackageCode(request.getPackageCode());
+        if (membershipPackageRepository.findByPackageCodeIgnoreCase(code).isPresent()) {
+            throw new AppException("PACKAGE CODE DA TON TAI");
+        }
+        MembershipPackageEntity entity = MembershipPackageEntity.builder()
+                .roleType(normalizePackageRole(request.getRoleType()))
+                .packageCode(code)
+                .packageName(request.getPackageName().trim())
+                .price(money(request.getPrice()))
+                .badgeDurationDays(request.getBadgeDurationDays())
+                .jobPostQuota(nonNegativeInt(request.getJobPostQuota()))
+                .proposalQuota(nonNegativeInt(request.getProposalQuota()))
+                .recommendVisibility(request.getRecommendVisibility() != null && request.getRecommendVisibility())
+                .isActive(request.getIsActive() == null || request.getIsActive())
+                .build();
+        MembershipPackageEntity saved = membershipPackageRepository.save(entity);
+        auditLogService.record("MEMBERSHIP_PACKAGE_CREATED", "membership_packages", String.valueOf(saved.getPackageId()), actor.getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public MembershipPackageEntity updateMembershipPackage(Long packageId, MembershipPackageRequest request) {
+        accessService.requireRole("ADMIN");
+        AccountEntity actor = accessService.currentAccount();
+        validateMembershipPackageRequest(request, false);
+        MembershipPackageEntity entity = membershipPackageRepository.findById(packageId)
+                .orElseThrow(() -> new NotFoundException("PACKAGE_NOT_FOUND"));
+        if (request.getRoleType() != null && !request.getRoleType().isBlank()) {
+            entity.setRoleType(normalizePackageRole(request.getRoleType()));
+        }
+        if (request.getPackageCode() != null && !request.getPackageCode().isBlank()) {
+            String code = normalizePackageCode(request.getPackageCode());
+            membershipPackageRepository.findByPackageCodeIgnoreCase(code)
+                    .filter(existing -> !existing.getPackageId().equals(packageId))
+                    .ifPresent(existing -> { throw new AppException("PACKAGE CODE DA TON TAI"); });
+            entity.setPackageCode(code);
+        }
+        if (request.getPackageName() != null && !request.getPackageName().isBlank()) {
+            entity.setPackageName(request.getPackageName().trim());
+        }
+        if (request.getPrice() != null) entity.setPrice(money(request.getPrice()));
+        if (request.getBadgeDurationDays() != null) {
+            if (request.getBadgeDurationDays() <= 0) throw new AppException("BADGE DURATION DAYS KHONG HOP LE");
+            entity.setBadgeDurationDays(request.getBadgeDurationDays());
+        }
+        if (request.getJobPostQuota() != null) entity.setJobPostQuota(nonNegativeInt(request.getJobPostQuota()));
+        if (request.getProposalQuota() != null) entity.setProposalQuota(nonNegativeInt(request.getProposalQuota()));
+        if (request.getRecommendVisibility() != null) entity.setRecommendVisibility(request.getRecommendVisibility());
+        if (request.getIsActive() != null) entity.setIsActive(request.getIsActive());
+        MembershipPackageEntity saved = membershipPackageRepository.save(entity);
+        auditLogService.record("MEMBERSHIP_PACKAGE_UPDATED", "membership_packages", String.valueOf(saved.getPackageId()), actor.getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public MembershipPackageEntity deleteMembershipPackage(Long packageId) {
+        accessService.requireRole("ADMIN");
+        AccountEntity actor = accessService.currentAccount();
+        MembershipPackageEntity entity = membershipPackageRepository.findById(packageId)
+                .orElseThrow(() -> new NotFoundException("PACKAGE_NOT_FOUND"));
+        entity.setIsActive(false);
+        MembershipPackageEntity saved = membershipPackageRepository.save(entity);
+        auditLogService.record("MEMBERSHIP_PACKAGE_DELETED", "membership_packages", String.valueOf(saved.getPackageId()), actor.getAccountId());
+        return saved;
     }
 
     @Transactional
@@ -1766,6 +1847,33 @@ public class PaymentWalletService {
     // Note: Ham `money` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private BigDecimal money(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private void validateMembershipPackageRequest(MembershipPackageRequest request, boolean creating) {
+        if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
+        if (creating && (request.getRoleType() == null || request.getRoleType().isBlank())) throw new AppException("ROLE TYPE KHONG DUOC DE TRONG");
+        if (creating && (request.getPackageCode() == null || request.getPackageCode().isBlank())) throw new AppException("PACKAGE CODE KHONG DUOC DE TRONG");
+        if (creating && (request.getPackageName() == null || request.getPackageName().isBlank())) throw new AppException("PACKAGE NAME KHONG DUOC DE TRONG");
+        if (creating && request.getPrice() == null) throw new AppException("PRICE KHONG DUOC DE TRONG");
+        if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) < 0) throw new AppException("PRICE KHONG HOP LE");
+        if (creating && request.getBadgeDurationDays() == null) throw new AppException("BADGE DURATION DAYS KHONG DUOC DE TRONG");
+        if (request.getBadgeDurationDays() != null && request.getBadgeDurationDays() <= 0) throw new AppException("BADGE DURATION DAYS KHONG HOP LE");
+        if (request.getJobPostQuota() != null && request.getJobPostQuota() < 0) throw new AppException("JOB POST QUOTA KHONG HOP LE");
+        if (request.getProposalQuota() != null && request.getProposalQuota() < 0) throw new AppException("PROPOSAL QUOTA KHONG HOP LE");
+    }
+
+    private String normalizePackageCode(String value) {
+        if (value == null || value.isBlank()) throw new AppException("PACKAGE CODE KHONG DUOC DE TRONG");
+        return value.trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "").toUpperCase();
+    }
+
+    private String normalizePackageRole(String value) {
+        if (value == null || value.isBlank()) throw new AppException("ROLE TYPE KHONG DUOC DE TRONG");
+        String role = value.trim().toUpperCase();
+        if (!ROLE_BUSINESS.equals(role) && !ROLE_EXPERT.equals(role)) {
+            throw new AppException("ROLE TYPE KHONG HOP LE");
+        }
+        return role;
     }
 
     // Note: Ham `nonNegativeInt` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
