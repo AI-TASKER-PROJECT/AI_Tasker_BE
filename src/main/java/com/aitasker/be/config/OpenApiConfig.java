@@ -11,8 +11,10 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.tags.Tag;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -30,6 +32,9 @@ import java.util.List;
         bearerFormat = "JWT"
 )
 public class OpenApiConfig {
+
+    @Value("${app.backend-url:}")
+    private String backendUrl;
 
     public static final String BEARER_AUTH = "bearerAuth";
     public static final String AUTH_FLOW = "Auth Flow";
@@ -62,12 +67,18 @@ public class OpenApiConfig {
     @Bean
     // Note: Ham `openAPI` khai bao bean hoac cau hinh dung chung cho ung dung.
     public OpenAPI openAPI() {
-        return new OpenAPI()
+        OpenAPI openAPI = new OpenAPI()
                 .info(new Info()
                         .title("AITASKER Backend API")
                         .version("v1")
                         .description("Interactive API documentation for the AITASKER backend."))
                 .tags(ORDERED_TAGS);
+
+        if (backendUrl != null && !backendUrl.isBlank()) {
+            openAPI.setServers(List.of(new Server().url(backendUrl.trim())));
+        }
+
+        return openAPI;
     }
 
     // Note: Annotation nay khai bao object duoc Spring quan ly va inject khi can.
