@@ -4,6 +4,17 @@
 **Phạm vi:** Backend + Frontend  
 **Mục tiêu:** Giữ bước "Mở tranh chấp" nhưng bổ sung cơ chế phản hồi/thỏa hiệp giữa Business và Expert trước khi yêu cầu Staff can thiệp.
 
+## Trạng thái triển khai backend (2026-07-13)
+
+Backend đã triển khai replies và agreement cho ba action có semantics an toàn:
+
+- `CONTINUE_REVISION`: cả Business và Expert có thể chấp nhận reply của đối phương; milestone trở về `IN_PROGRESS`, escrow giữ nguyên.
+- `ACCEPT_DELIVERABLE` và `CONTINUE_NEXT_MILESTONE`: chỉ Business được chấp nhận vì hai action release escrow 100% cho Expert.
+- `REQUEST_STAFF` không tạo một reply. Client gọi `POST /api/v1/disputes/{disputeId}/escalation-request` để giữ audit escalation tập trung.
+- `PARTIAL_REFUND` và `OTHER` có thể được đề xuất trong timeline nhưng không thể chấp nhận ở v1 vì chưa có settlement rule an toàn.
+
+Frontend dùng ba endpoint ở mục 5. Endpoint response không trả `actorAccountId`.
+
 ---
 
 ## 1. Mục tiêu nghiệp vụ
@@ -616,4 +627,3 @@ Tất cả text tiếng Việt phải là UTF-8 sạch, không dùng chuỗi moj
 - Sau khi chấp nhận thỏa hiệp, có notice và nút "Tiếp tục dự án".
 - Không hiển thị ID kỹ thuật.
 - Không có lỗi tiếng Việt/mojibake.
-

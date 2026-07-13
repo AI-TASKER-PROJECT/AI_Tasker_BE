@@ -8,8 +8,16 @@ import com.aitasker.be.entity.DisputeEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
 import java.util.List;
 public interface DisputeRepository extends JpaRepository<DisputeEntity, Integer> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from DisputeEntity d where d.disputeId = :disputeId")
+    Optional<DisputeEntity> findByIdForUpdate(@Param("disputeId") Integer disputeId);
     // Note: Hàm `findByContractId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<DisputeEntity> findByContractId(Integer contractId);
     // Note: Hàm `findByAssignedStaffId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.

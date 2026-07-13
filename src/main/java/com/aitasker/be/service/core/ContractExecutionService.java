@@ -9,6 +9,9 @@ import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
+import com.aitasker.be.dto.core.AcceptDisputeSelfResolveAgreementRequest;
+import com.aitasker.be.dto.core.CreateDisputeSelfResolveReplyRequest;
+import com.aitasker.be.dto.core.DisputeSelfResolveReplyResponse;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
@@ -54,6 +57,7 @@ public class ContractExecutionService {
     private final DeliverableRepository deliverableRepository;
     private final TransactionRepository transactionRepository;
     private final DisputeRepository disputeRepository;
+    private final DisputeSelfResolveReplyRepository disputeSelfResolveReplyRepository;
     private final TerminationRequestRepository terminationRequestRepository;
     private final CaseAttachmentRepository caseAttachmentRepository;
     private final MilestoneProgressReportRepository milestoneProgressReportRepository;
@@ -1127,6 +1131,235 @@ public class ContractExecutionService {
         notifyContractParticipantsExcept(contract, actorAccountId,
                 (receiver, actor) -> notificationService.notifyDisputeInitiated(receiver, actor, contract.getContractId(), milestoneId, saved.getDisputeId()));
         return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<DisputeSelfResolveReplyResponse> listSelfResolveReplies(Integer disputeId) {
+        DisputeEntity dispute = disputeRepository.findById(disputeId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requireSelfResolveReadAccess(dispute);
+        return disputeSelfResolveReplyRepository.findByDisputeIdOrderByCreatedAtAscReplyIdAsc(disputeId).stream()
+                .map(this::toSelfResolveReplyResponse)
+                .toList();
+    }
+
+    @Transactional
+    public DisputeSelfResolveReplyResponse createSelfResolveReply(
+            Integer disputeId, CreateDisputeSelfResolveReplyRequest request) {
+        ContractEntity contract = requireSelfResolveParticipant(disputeId);
+        DisputeEntity dispute = disputeRepository.findByIdForUpdate(disputeId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requirePendingSelfResolve(dispute);
+        if (request == null) throw new AppException("SELF_RESOLVE_REPLY_REQUEST_REQUIRED");
+
+        String replyType = normalizeSelfResolveReplyType(request.getReplyType());
+        String proposedAction = normalizeSelfResolveProposedAction(request.getProposedAction(), replyType);
+        String message = requireSelfResolveMessage(request.getMessage());
+        if (request.getProposedDueAt() != null && request.getProposedDueAt().isBefore(LocalDateTime.now())) {
+            throw new AppException("SELF_RESOLVE_PROPOSED_DUE_AT_MUST_NOT_BE_PAST");
+        }
+
+        AccountEntity actor = accessService.currentAccount();
+        DisputeSelfResolveReplyEntity saved = disputeSelfResolveReplyRepository.save(
+                DisputeSelfResolveReplyEntity.builder()
+                        .disputeId(disputeId)
+                        .actorAccountId(actor.getAccountId())
+                        .actorRole(actor.getRole().getRoleName())
+                        .replyType(replyType)
+                        .proposedAction(proposedAction)
+                        .message(message)
+                        .proposedDueAt(request.getProposedDueAt())
+                        .build());
+        auditLogService.record("DISPUTE_SELF_RESOLVE_REPLY_CREATED", "dispute_self_resolve_replies",
+                String.valueOf(saved.getReplyId()), actor.getAccountId());
+        notifyContractParticipantsExcept(contract, actor.getAccountId(),
+                (receiver, sender) -> notificationService.notifyDisputeSelfResolveReplyCreated(
+                        receiver, sender, contract.getContractId(), disputeId));
+        return toSelfResolveReplyResponse(saved);
+    }
+
+    @Transactional
+    public DisputeEntity acceptSelfResolveAgreement(
+            Integer disputeId, AcceptDisputeSelfResolveAgreementRequest request) {
+        ContractEntity contract = requireSelfResolveParticipant(disputeId);
+        DisputeEntity dispute = disputeRepository.findByIdForUpdate(disputeId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        requirePendingSelfResolve(dispute);
+        if (request == null || request.getAcceptedReplyId() == null) {
+            throw new AppException("SELF_RESOLVE_ACCEPTED_REPLY_REQUIRED");
+        }
+        AccountEntity actor = accessService.currentAccount();
+        DisputeSelfResolveReplyEntity acceptedReply = disputeSelfResolveReplyRepository
+                .findByReplyIdAndDisputeId(request.getAcceptedReplyId(), disputeId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SELF RESOLVE REPLY"));
+        if (actor.getAccountId().equals(acceptedReply.getActorAccountId())) {
+            throw new AppException("KHONG THE CHAP NHAN PHAN HOI CUA CHINH MINH");
+        }
+        String finalAction = normalizeSupportedSelfResolveFinalAction(request.getFinalAction());
+        if (!finalAction.equals(acceptedReply.getProposedAction())) {
+            throw new AppException("SELF_RESOLVE_FINAL_ACTION_MUST_MATCH_ACCEPTED_REPLY");
+        }
+        if (!"CONTINUE_REVISION".equals(finalAction)) {
+            accessService.requireRole("BUSINESS");
+        }
+        String message = requireSelfResolveMessage(request.getMessage());
+        DisputeSelfResolveReplyEntity acceptance = disputeSelfResolveReplyRepository.save(
+                DisputeSelfResolveReplyEntity.builder()
+                        .disputeId(disputeId)
+                        .actorAccountId(actor.getAccountId())
+                        .actorRole(actor.getRole().getRoleName())
+                        .replyType("ACCEPT_PROPOSAL")
+                        .proposedAction(finalAction)
+                        .message(message)
+                        .acceptedReplyId(acceptedReply.getReplyId())
+                        .build());
+
+        MilestoneEntity milestone = milestoneRepository.findById(dispute.getMilestoneId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        ContractMilestoneEntity contractMilestone = findContractMilestoneForUpdate(contract.getContractId(), milestone.getMilestoneId());
+        if ("CONTINUE_REVISION".equals(finalAction)) {
+            milestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
+            contractMilestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
+            if (contractMilestone.getInProgressStartedAt() == null) {
+                contractMilestone.setInProgressStartedAt(LocalDateTime.now());
+            }
+            dispute.setResolutionType(DisputeEntity.RESOLUTION_SELF_RESOLVE_AGREEMENT_CONTINUE_REVISION);
+        } else {
+            applySelfResolveApproval(contract, dispute, milestone, contractMilestone, finalAction, actor.getAccountId());
+        }
+        dispute.setStatus(DisputeEntity.STATUS_RESOLVED);
+        dispute.setResolvedAt(LocalDateTime.now());
+        contractMilestoneRepository.save(contractMilestone);
+        milestoneRepository.save(milestone);
+        DisputeEntity saved = disputeRepository.save(dispute);
+        auditLogService.record("DISPUTE_SELF_RESOLVE_AGREEMENT_ACCEPTED", "disputes",
+                String.valueOf(disputeId), actor.getAccountId());
+        notifyBothParticipants(contract, actor.getAccountId(),
+                (receiver, sender) -> notificationService.notifyDisputeSelfResolveAgreementAccepted(
+                        receiver, sender, contract.getContractId(), disputeId, finalAction));
+        if (!"CONTINUE_REVISION".equals(finalAction)) {
+            tryCompleteContract(contract, actor.getAccountId());
+        }
+        return saved;
+    }
+
+    private void applySelfResolveApproval(ContractEntity contract, DisputeEntity dispute, MilestoneEntity milestone,
+                                          ContractMilestoneEntity contractMilestone, String finalAction, Integer actorAccountId) {
+        if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) {
+            throw new AppException("CHI DUOC CHAP NHAN THOA HIEP KHI CONTRACT ACTIVE");
+        }
+        ensureEscrowNotReleased(contractMilestone);
+        Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId())
+                .map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
+        Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId())
+                .map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
+        String operationKey = "MILESTONE_ESCROW_RELEASE:" + contract.getContractId() + ":" + milestone.getMilestoneId()
+                + ":SELF_RESOLVE_AGREEMENT";
+        String metadata = walletMetadata("SELF_RESOLVE_AGREEMENT", dispute.getDisputeId(), null, actorAccountId,
+                businessAccountId, expertAccountId, BigDecimal.valueOf(100), contractMilestone.getFinalBudget(), BigDecimal.ZERO);
+        walletLedgerService.debitEscrow(businessAccountId, contractMilestone.getFinalBudget(),
+                WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE", milestone.getMilestoneId().longValue(),
+                "Release self-resolve agreement escrow", walletOperationContext(contract.getContractId(), milestone.getMilestoneId(), metadata, operationKey, null));
+        walletLedgerService.creditAvailable(expertAccountId, contractMilestone.getFinalBudget(),
+                WalletTransactionEntity.TX_ESCROW_RELEASE, "MILESTONE", milestone.getMilestoneId().longValue(),
+                "Self-resolve agreement payout", walletOperationContext(contract.getContractId(), milestone.getMilestoneId(), metadata, operationKey, "EXPERT_AVAILABLE_CREDIT"));
+        markEscrowReleased(contractMilestone, "SELF_RESOLVE_AGREEMENT", dispute.getDisputeId().longValue());
+        milestone.setEscrowReleasedAt(contractMilestone.getEscrowReleasedAt());
+        milestone.setSettlementSourceType(contractMilestone.getSettlementSourceType());
+        milestone.setSettlementSourceId(contractMilestone.getSettlementSourceId());
+        milestone.setStatus(ContractMilestoneEntity.STATUS_COMPLETED);
+        contractMilestone.setStatus(ContractMilestoneEntity.STATUS_COMPLETED);
+        dispute.setResolutionType("ACCEPT_DELIVERABLE".equals(finalAction)
+                ? DisputeEntity.RESOLUTION_SELF_RESOLVE_AGREEMENT_ACCEPT_DELIVERABLE
+                : DisputeEntity.RESOLUTION_SELF_RESOLVE_AGREEMENT_CONTINUE_NEXT_MILESTONE);
+    }
+
+    private ContractEntity requireSelfResolveParticipant(Integer disputeId) {
+        requireApprovedForBusinessOrExpert();
+        AccountEntity actor = accessService.currentAccount();
+        if (!List.of("BUSINESS", "EXPERT").contains(actor.getRole().getRoleName())) {
+            throw new AppException("CHI BUSINESS HOAC EXPERT DUOC THUONG LUONG TRANH CHAP");
+        }
+        DisputeEntity dispute = disputeRepository.findById(disputeId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
+        return requireContractParticipantOrOperator(dispute.getContractId());
+    }
+
+    private void requireSelfResolveReadAccess(DisputeEntity dispute) {
+        AccountEntity actor = accessService.currentAccount();
+        String role = actor.getRole().getRoleName();
+        if ("ADMIN".equals(role)) return;
+        if ("STAFF".equals(role)) {
+            if (DisputeEntity.STATUS_PENDING_SELF_RESOLVE.equals(dispute.getStatus())) {
+                throw new AppException("STAFF CHI DUOC XEM THUONG LUONG SAU KHI ESCALATE");
+            }
+            requireAssignedStaff(dispute);
+            return;
+        }
+        if (!List.of("BUSINESS", "EXPERT").contains(role)) {
+            throw new AppException("BAN KHONG CO QUYEN XEM PHAN HOI THUONG LUONG");
+        }
+        requireApprovedForBusinessOrExpert();
+        requireContractParticipantOrOperator(dispute.getContractId());
+    }
+
+    private void requirePendingSelfResolve(DisputeEntity dispute) {
+        if (!DisputeEntity.STATUS_PENDING_SELF_RESOLVE.equals(dispute.getStatus())) {
+            throw new AppException("DISPUTE KHONG O GIAI DOAN TU THUONG LUONG");
+        }
+    }
+
+    private String normalizeSelfResolveReplyType(String value) {
+        if (value == null || value.isBlank()) throw new AppException("SELF_RESOLVE_REPLY_TYPE_REQUIRED");
+        String normalized = value.trim().toUpperCase();
+        if (!List.of("ACCEPT_REQUEST", "COUNTER_PROPOSAL", "REQUEST_ADJUSTMENT").contains(normalized)) {
+            throw new AppException("SELF_RESOLVE_REPLY_TYPE_KHONG_HOP_LE");
+        }
+        return normalized;
+    }
+
+    private String normalizeSelfResolveProposedAction(String value, String replyType) {
+        boolean required = List.of("ACCEPT_REQUEST", "COUNTER_PROPOSAL", "ACCEPT_PROPOSAL").contains(replyType);
+        if (value == null || value.isBlank()) {
+            if (required) throw new AppException("SELF_RESOLVE_PROPOSED_ACTION_REQUIRED");
+            return null;
+        }
+        String normalized = value.trim().toUpperCase();
+        if (!List.of("CONTINUE_REVISION", "ACCEPT_DELIVERABLE", "CONTINUE_NEXT_MILESTONE", "PARTIAL_REFUND", "OTHER").contains(normalized)) {
+            throw new AppException("SELF_RESOLVE_PROPOSED_ACTION_KHONG_HOP_LE");
+        }
+        return normalized;
+    }
+
+    private String normalizeSupportedSelfResolveFinalAction(String value) {
+        String normalized = normalizeSelfResolveProposedAction(value, "ACCEPT_PROPOSAL");
+        if (!List.of("CONTINUE_REVISION", "ACCEPT_DELIVERABLE", "CONTINUE_NEXT_MILESTONE").contains(normalized)) {
+            throw new AppException("SELF_RESOLVE_FINAL_ACTION_CHUA_DUOC_HO_TRO");
+        }
+        return normalized;
+    }
+
+    private String requireSelfResolveMessage(String value) {
+        if (value == null || value.isBlank()) throw new AppException("SELF_RESOLVE_MESSAGE_REQUIRED");
+        return value.trim();
+    }
+
+    private DisputeSelfResolveReplyResponse toSelfResolveReplyResponse(DisputeSelfResolveReplyEntity reply) {
+        String displayName = accountRepository.findById(reply.getActorAccountId())
+                .map(AccountEntity::getFullName)
+                .filter(name -> !name.isBlank())
+                .orElse("BUSINESS".equals(reply.getActorRole()) ? "Doanh nghiệp" : "Chuyên gia");
+        return DisputeSelfResolveReplyResponse.builder()
+                .replyId(reply.getReplyId())
+                .disputeId(reply.getDisputeId())
+                .actorRole(reply.getActorRole())
+                .actorDisplayName(displayName)
+                .replyType(reply.getReplyType())
+                .proposedAction(reply.getProposedAction())
+                .message(reply.getMessage())
+                .proposedDueAt(reply.getProposedDueAt())
+                .createdAt(reply.getCreatedAt())
+                .build();
     }
 
     // Note: Luong legacy /complete truoc day danh dau COMPLETED ma KHONG release escrow -> Expert khong duoc thanh toan.

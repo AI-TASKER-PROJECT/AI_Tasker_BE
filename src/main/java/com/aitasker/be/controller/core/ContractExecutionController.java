@@ -8,6 +8,9 @@ package com.aitasker.be.controller.core;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
+import com.aitasker.be.dto.core.AcceptDisputeSelfResolveAgreementRequest;
+import com.aitasker.be.dto.core.CreateDisputeSelfResolveReplyRequest;
+import com.aitasker.be.dto.core.DisputeSelfResolveReplyResponse;
 import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
@@ -220,6 +223,27 @@ public class ContractExecutionController {
     @PostMapping("/disputes/{disputeId}/escalation-request")
     public ResponseEntity<ApiResponse<DisputeEntity>> requestEscalation(@PathVariable Integer disputeId, @RequestParam(required = false) String reason, @RequestParam(required = false) String evidenceFile) {
         return ResponseEntity.ok(ApiResponse.success("ESCALATION REQUEST SUCCESS", service.escalateDispute(disputeId, reason, evidenceFile)));
+    }
+
+    @GetMapping("/disputes/{disputeId}/self-resolve-replies")
+    public ResponseEntity<ApiResponse<List<DisputeSelfResolveReplyResponse>>> listSelfResolveReplies(
+            @PathVariable Integer disputeId) {
+        return ResponseEntity.ok(ApiResponse.success("LIST SELF RESOLVE REPLIES SUCCESS",
+                service.listSelfResolveReplies(disputeId)));
+    }
+
+    @PostMapping("/disputes/{disputeId}/self-resolve-replies")
+    public ResponseEntity<ApiResponse<DisputeSelfResolveReplyResponse>> createSelfResolveReply(
+            @PathVariable Integer disputeId, @RequestBody CreateDisputeSelfResolveReplyRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("CREATE SELF RESOLVE REPLY SUCCESS",
+                service.createSelfResolveReply(disputeId, request)));
+    }
+
+    @PostMapping("/disputes/{disputeId}/self-resolve-agreement")
+    public ResponseEntity<ApiResponse<DisputeEntity>> acceptSelfResolveAgreement(
+            @PathVariable Integer disputeId, @RequestBody AcceptDisputeSelfResolveAgreementRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("ACCEPT SELF RESOLVE AGREEMENT SUCCESS",
+                service.acceptSelfResolveAgreement(disputeId, request)));
     }
 
     @PostMapping("/disputes/{disputeId}/route-staff")

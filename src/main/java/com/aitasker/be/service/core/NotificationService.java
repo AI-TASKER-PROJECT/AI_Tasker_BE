@@ -381,6 +381,32 @@ public class NotificationService {
                 Map.of("contractId", contractId, "milestoneId", milestoneId, "disputeId", disputeId));
     }
 
+    public void notifyDisputeSelfResolveReplyCreated(Integer receiverAccountId, Integer actorAccountId,
+                                                      Integer contractId, Integer disputeId) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "DISPUTE_SELF_RESOLVE_REPLY_CREATED",
+                "Có phản hồi tranh chấp mới",
+                "Đối phương đã phản hồi hồ sơ tranh chấp. Vui lòng xem và xác nhận phương án xử lý.",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId)
+        );
+    }
+
+    public void notifyDisputeSelfResolveAgreementAccepted(Integer receiverAccountId, Integer actorAccountId,
+                                                           Integer contractId, Integer disputeId, String finalAction) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "DISPUTE_SELF_RESOLVE_AGREEMENT_ACCEPTED",
+                "Tranh chấp đã được thỏa thuận xử lý",
+                "Hai bên đã thống nhất phương án xử lý tranh chấp: " + finalAction + ".",
+                "/contracts/" + contractId + "/disputes/" + disputeId,
+                Map.of("contractId", contractId, "disputeId", disputeId, "finalAction", finalAction)
+        );
+    }
+
     // Note: Báo cho Staff-ops khi một bên yêu cầu can thiệp tranh chấp.
     public void notifyDisputeEscalationRequested(Integer receiverAccountId, Integer actorAccountId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_ESCALATION_REQUESTED",

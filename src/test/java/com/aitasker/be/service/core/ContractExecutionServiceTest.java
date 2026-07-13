@@ -9,6 +9,9 @@ import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
+import com.aitasker.be.dto.core.AcceptDisputeSelfResolveAgreementRequest;
+import com.aitasker.be.dto.core.CreateDisputeSelfResolveReplyRequest;
+import com.aitasker.be.dto.core.DisputeSelfResolveReplyResponse;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.entity.AccountEntity;
@@ -18,6 +21,7 @@ import com.aitasker.be.entity.ContractEntity;
 import com.aitasker.be.entity.ContractMilestoneEntity;
 import com.aitasker.be.entity.DeliverableEntity;
 import com.aitasker.be.entity.DisputeEntity;
+import com.aitasker.be.entity.DisputeSelfResolveReplyEntity;
 import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MilestoneProgressReportEntity;
@@ -89,6 +93,7 @@ class ContractExecutionServiceTest {
     @Mock private TransactionRepository transactionRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private DisputeRepository disputeRepository;
+    @Mock private DisputeSelfResolveReplyRepository disputeSelfResolveReplyRepository;
     @Mock private TerminationRequestRepository terminationRequestRepository;
     @Mock private CaseAttachmentRepository caseAttachmentRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
@@ -2000,5 +2005,120 @@ class ContractExecutionServiceTest {
 
         verify(paymentWalletService).immediateTerminateContract(any(), any(), any());
         verify(auditLogService).record(eq("CONTRACT_IMMEDIATE_TERMINATED"), eq("contracts"), eq("1"), eq(50));
+    }
+
+    @Test
+    void createSelfResolveReply_shouldPersistParticipantReplyWithoutAccountIdInResponse() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(20).build();
+        DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1)
+                .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE).build();
+        AccountEntity actor = AccountEntity.builder().accountId(100).fullName("Business User")
+                .role(RoleEntity.builder().roleName("BUSINESS").build()).build();
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
+        when(disputeRepository.findByIdForUpdate(1)).thenReturn(Optional.of(dispute));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(100)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(disputeSelfResolveReplyRepository.save(any())).thenAnswer(i -> {
+            DisputeSelfResolveReplyEntity reply = i.getArgument(0);
+            reply.setReplyId(11L);
+            return reply;
+        });
+        when(accountRepository.findById(100)).thenReturn(Optional.of(actor));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().accountId(100).build()));
+        when(expertProfileRepository.findById(20)).thenReturn(Optional.of(ExpertProfileEntity.builder().accountId(200).build()));
+        CreateDisputeSelfResolveReplyRequest request = CreateDisputeSelfResolveReplyRequest.builder()
+                .replyType("COUNTER_PROPOSAL").proposedAction("CONTINUE_REVISION").message("Will revise").build();
+
+        DisputeSelfResolveReplyResponse result = contractExecutionService.createSelfResolveReply(1, request);
+
+        assertEquals(11L, result.getReplyId());
+        assertEquals("BUSINESS", result.getActorRole());
+        assertEquals("Business User", result.getActorDisplayName());
+        assertEquals("CONTINUE_REVISION", result.getProposedAction());
+        verify(notificationService).notifyDisputeSelfResolveReplyCreated(200, 100, 1, 1);
+    }
+
+    @Test
+    void acceptSelfResolveAgreement_shouldRestoreInProgressWithoutEscrowRelease() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(20).status(ContractEntity.STATUS_ACTIVE).build();
+        DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(30)
+                .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE).build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(30).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(30)
+                .status(ContractMilestoneEntity.STATUS_DISPUTED).finalBudget(BigDecimal.valueOf(100)).build();
+        mockBusinessAgreementContext(contract, dispute, milestone, contractMilestone, "CONTINUE_REVISION");
+
+        DisputeEntity result = contractExecutionService.acceptSelfResolveAgreement(1,
+                AcceptDisputeSelfResolveAgreementRequest.builder().acceptedReplyId(9L)
+                        .finalAction("CONTINUE_REVISION").message("Agreed").build());
+
+        assertEquals(DisputeEntity.STATUS_RESOLVED, result.getStatus());
+        assertEquals(DisputeEntity.RESOLUTION_SELF_RESOLVE_AGREEMENT_CONTINUE_REVISION, result.getResolutionType());
+        assertEquals(ContractMilestoneEntity.STATUS_IN_PROGRESS, milestone.getStatus());
+        verify(walletLedgerService, never()).debitEscrow(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void acceptSelfResolveAgreement_shouldReleaseEscrowForAcceptedDeliverable() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(20).status(ContractEntity.STATUS_ACTIVE).build();
+        DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(30)
+                .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE).build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(30).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(30)
+                .status(ContractMilestoneEntity.STATUS_DISPUTED).finalBudget(BigDecimal.valueOf(100)).build();
+        mockBusinessAgreementContext(contract, dispute, milestone, contractMilestone, "ACCEPT_DELIVERABLE");
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(100).build()));
+        when(expertProfileRepository.findById(20)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(20).accountId(200).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(contractMilestone));
+
+        DisputeEntity result = contractExecutionService.acceptSelfResolveAgreement(1,
+                AcceptDisputeSelfResolveAgreementRequest.builder().acceptedReplyId(9L)
+                        .finalAction("ACCEPT_DELIVERABLE").message("Accepted").build());
+
+        assertEquals(DisputeEntity.RESOLUTION_SELF_RESOLVE_AGREEMENT_ACCEPT_DELIVERABLE, result.getResolutionType());
+        assertEquals(ContractMilestoneEntity.STATUS_COMPLETED, milestone.getStatus());
+        verify(walletLedgerService).debitEscrow(eq(100), eq(BigDecimal.valueOf(100)), any(), eq("MILESTONE"), eq(30L), any(), any());
+        verify(walletLedgerService).creditAvailable(eq(200), eq(BigDecimal.valueOf(100)), any(), eq("MILESTONE"), eq(30L), any(), any());
+    }
+
+    @Test
+    void acceptSelfResolveAgreement_shouldRequireBusinessForPayoutAction() {
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10).expertId(20).status(ContractEntity.STATUS_ACTIVE).build();
+        DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(30)
+                .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE).build();
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(30).status(ContractMilestoneEntity.STATUS_DISPUTED).build();
+        ContractMilestoneEntity contractMilestone = ContractMilestoneEntity.builder().contractId(1).jobMilestoneId(30)
+                .status(ContractMilestoneEntity.STATUS_DISPUTED).finalBudget(BigDecimal.valueOf(100)).build();
+        mockBusinessAgreementContext(contract, dispute, milestone, contractMilestone, "ACCEPT_DELIVERABLE");
+        doThrow(new AppException("FORBIDDEN")).when(accessService).requireRole("BUSINESS");
+
+        AppException error = assertThrows(AppException.class, () -> contractExecutionService.acceptSelfResolveAgreement(1,
+                AcceptDisputeSelfResolveAgreementRequest.builder().acceptedReplyId(9L)
+                        .finalAction("ACCEPT_DELIVERABLE").message("Accepted").build()));
+
+        assertEquals("FORBIDDEN", error.getMessage());
+        verify(walletLedgerService, never()).debitEscrow(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    private void mockBusinessAgreementContext(ContractEntity contract, DisputeEntity dispute, MilestoneEntity milestone,
+                                              ContractMilestoneEntity contractMilestone, String action) {
+        AccountEntity actor = AccountEntity.builder().accountId(100).role(RoleEntity.builder().roleName("BUSINESS").build()).build();
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
+        when(disputeRepository.findByIdForUpdate(1)).thenReturn(Optional.of(dispute));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(100)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(disputeSelfResolveReplyRepository.findByReplyIdAndDisputeId(9L, 1)).thenReturn(Optional.of(
+                DisputeSelfResolveReplyEntity.builder().replyId(9L).disputeId(1).actorAccountId(200)
+                        .actorRole("EXPERT").replyType("COUNTER_PROPOSAL").proposedAction(action).message("Proposal").build()));
+        when(disputeSelfResolveReplyRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(milestoneRepository.findById(30)).thenReturn(Optional.of(milestone));
+        mockLockedContractMilestone(1, 30, contractMilestone);
+        when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(contractMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().accountId(100).build()));
+        when(expertProfileRepository.findById(20)).thenReturn(Optional.of(ExpertProfileEntity.builder().accountId(200).build()));
     }
 }
