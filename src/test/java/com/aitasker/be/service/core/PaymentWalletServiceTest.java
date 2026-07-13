@@ -1,5 +1,6 @@
 package com.aitasker.be.service.core;
 
+import com.aitasker.be.dto.admin.MembershipPackageRequest;
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.dto.payment.QuotaResponse;
@@ -80,6 +81,88 @@ class PaymentWalletServiceTest {
     @Mock private NotificationService notificationService;
 
     @InjectMocks private PaymentWalletService paymentWalletService;
+
+    @Test
+    void listMembershipPackagesForAdmin_shouldUseActiveOnlyQuery() {
+        MembershipPackageEntity active = packageEntity(1L, "BUSINESS_PLUS", "Business Plus", 30);
+        when(membershipPackageRepository.findByIsActiveTrueOrderByRoleTypeAscPriceAscPackageNameAsc())
+                .thenReturn(List.of(active));
+
+        List<MembershipPackageEntity> result = paymentWalletService.listMembershipPackagesForAdmin(true);
+
+        assertEquals(List.of(active), result);
+        verify(accessService).requireRole("ADMIN");
+    }
+
+    @Test
+    void createMembershipPackage_shouldPersistNormalizedPackage() {
+        MembershipPackageRequest request = new MembershipPackageRequest();
+        request.setRoleType("business");
+        request.setPackageCode("business starter");
+        request.setPackageName("Business Starter");
+        request.setPrice(new BigDecimal("99000"));
+        request.setBadgeDurationDays(30);
+        request.setJobPostQuota(5);
+        request.setProposalQuota(0);
+        request.setRecommendVisibility(true);
+
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(membershipPackageRepository.findByPackageCodeIgnoreCase("BUSINESS_STARTER")).thenReturn(Optional.empty());
+        when(membershipPackageRepository.save(any(MembershipPackageEntity.class))).thenAnswer(invocation -> {
+            MembershipPackageEntity entity = invocation.getArgument(0);
+            entity.setPackageId(55L);
+            return entity;
+        });
+
+        MembershipPackageEntity saved = paymentWalletService.createMembershipPackage(request);
+
+        assertEquals(Long.valueOf(55), saved.getPackageId());
+        assertEquals("BUSINESS", saved.getRoleType());
+        assertEquals("BUSINESS_STARTER", saved.getPackageCode());
+        assertEquals(new BigDecimal("99000"), saved.getPrice());
+        assertEquals(Boolean.TRUE, saved.getRecommendVisibility());
+        assertEquals(Boolean.TRUE, saved.getIsActive());
+        verify(accessService).requireRole("ADMIN");
+        verify(auditLogService).record("MEMBERSHIP_PACKAGE_CREATED", "membership_packages", "55", 1);
+    }
+
+    @Test
+    void updateMembershipPackage_shouldUpdateMutableFields() {
+        MembershipPackageEntity entity = packageEntity(55L, "BUSINESS_STARTER", "Business Starter", 30);
+        MembershipPackageRequest request = new MembershipPackageRequest();
+        request.setPackageName("Business Starter Plus");
+        request.setPrice(new BigDecimal("149000"));
+        request.setJobPostQuota(9);
+        request.setIsActive(false);
+
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(membershipPackageRepository.findById(55L)).thenReturn(Optional.of(entity));
+        when(membershipPackageRepository.save(any(MembershipPackageEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MembershipPackageEntity saved = paymentWalletService.updateMembershipPackage(55L, request);
+
+        assertEquals("Business Starter Plus", saved.getPackageName());
+        assertEquals(new BigDecimal("149000"), saved.getPrice());
+        assertEquals(Integer.valueOf(9), saved.getJobPostQuota());
+        assertEquals(Boolean.FALSE, saved.getIsActive());
+        verify(accessService).requireRole("ADMIN");
+        verify(auditLogService).record("MEMBERSHIP_PACKAGE_UPDATED", "membership_packages", "55", 1);
+    }
+
+    @Test
+    void deleteMembershipPackage_shouldDeactivatePackage() {
+        MembershipPackageEntity entity = packageEntity(55L, "BUSINESS_STARTER", "Business Starter", 30);
+
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(membershipPackageRepository.findById(55L)).thenReturn(Optional.of(entity));
+        when(membershipPackageRepository.save(any(MembershipPackageEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MembershipPackageEntity saved = paymentWalletService.deleteMembershipPackage(55L);
+
+        assertEquals(Boolean.FALSE, saved.getIsActive());
+        verify(accessService).requireRole("ADMIN");
+        verify(auditLogService).record("MEMBERSHIP_PACKAGE_DELETED", "membership_packages", "55", 1);
+    }
 
     @Test
     void ensureQuotaForAccount_shouldGrantInitialExpertProposalCredits() {
@@ -865,6 +948,14 @@ class PaymentWalletServiceTest {
         return AccountEntity.builder()
                 .accountId(10)
                 .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .status("Approved")
+                .build();
+    }
+
+    private AccountEntity adminAccount() {
+        return AccountEntity.builder()
+                .accountId(1)
+                .role(RoleEntity.builder().roleName("ADMIN").build())
                 .status("Approved")
                 .build();
     }

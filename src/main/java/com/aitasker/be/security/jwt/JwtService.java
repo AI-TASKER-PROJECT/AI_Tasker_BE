@@ -36,15 +36,25 @@ public class JwtService {
 
     // Note: Hàm `generateAccessToken` phục vụ xác thực/phân quyền, xử lý JWT hoặc lấy thông tin người dùng hiện tại.
     public String generateAccessToken(String username, String role) {
+        return generateAccessToken(username, role, 0);
+    }
+
+    public String generateAccessToken(String username, String role, int tokenVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
+        claims.put("tokenVersion", tokenVersion);
         return generateToken(username, accessExpirationMs, claims);
     }
 
     // Note: Hàm `generateRefreshToken` phục vụ xác thực/phân quyền, xử lý JWT hoặc lấy thông tin người dùng hiện tại.
     public String generateRefreshToken(String username) {
+        return generateRefreshToken(username, 0);
+    }
+
+    public String generateRefreshToken(String username, int tokenVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("type", "refresh");
+        claims.put("tokenVersion", tokenVersion);
         return generateToken(username, refreshExpirationMs, claims);
     }
 
@@ -65,6 +75,10 @@ public class JwtService {
 
     public boolean isRefreshToken(String token) {
         return Boolean.TRUE.equals(extractClaim(token, claims -> "refresh".equals(claims.get("type", String.class))));
+    }
+
+    public Integer extractTokenVersion(String token) {
+        return extractClaim(token, claims -> claims.get("tokenVersion", Integer.class));
     }
 
     // Note: Hàm `generateToken` phục vụ xác thực/phân quyền, xử lý JWT hoặc lấy thông tin người dùng hiện tại.

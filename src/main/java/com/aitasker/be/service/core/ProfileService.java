@@ -5,6 +5,7 @@
  */
 package com.aitasker.be.service.core;
 
+import com.aitasker.be.common.exception.ForbiddenException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.auth.TaxCheckResponse;
@@ -35,6 +36,8 @@ public class ProfileService {
     private final NotificationService notificationService;
     private final ReviewRepository reviewRepository;
     private final TaxCheckService taxCheckService;
+    private final DomainRepository domainRepository;
+    private final StaffDomainRepository staffDomainRepository;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
     // Note: Annotation nay dam bao cac thao tac database trong ham chay cung mot transaction.
@@ -122,6 +125,7 @@ public class ProfileService {
         String normalizedReason = normalizeRejectionReason(status, reason);
         AccountEntity actor = accessService.currentAccount();
         Integer staffId = resolveStaffId(actor.getAccountId());
+        requireProfileReviewDomain(staffId);
         if ("BUSINESS".equalsIgnoreCase(type)) {
             BusinessProfileEntity b = businessProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
             b.setKybStatus(status);
@@ -215,6 +219,7 @@ public class ProfileService {
 
     public List<BusinessProfileEntity> allBusinessProfiles() {
         accessService.requireRole("STAFF");
+        requireCurrentStaffProfileReviewDomain();
         return businessProfileRepository.findAll().stream()
                 .map(this::attachBusinessAccountInfo)
                 .toList();
@@ -222,12 +227,23 @@ public class ProfileService {
     // Note: Hàm `allExpertProfiles` cho STAFF quản trị hồ sơ và BUSINESS đọc thông tin expert khi xem proposal.
     public List<ExpertProfileEntity> allExpertProfiles() {
         accessService.requireRole("STAFF", "BUSINESS");
+        AccountEntity actor = accessService.currentAccount();
+        if (actor.getRole() != null && "STAFF".equals(actor.getRole().getRoleName())) {
+            requireProfileReviewDomain(resolveStaffId(actor.getAccountId()));
+        }
         return expertProfileRepository.findAll().stream()
                 .map(this::attachExpertAccountInfo)
                 .toList();
     }
     // Note: Hàm `allPortfolios` cho STAFF quản trị portfolio và BUSINESS xem năng lực expert trong màn proposal.
-    public List<PortfolioEntity> allPortfolios() { accessService.requireRole("STAFF", "BUSINESS"); return portfolioRepository.findAll(); }
+    public List<PortfolioEntity> allPortfolios() {
+        accessService.requireRole("STAFF", "BUSINESS");
+        AccountEntity actor = accessService.currentAccount();
+        if (actor.getRole() != null && "STAFF".equals(actor.getRole().getRoleName())) {
+            requireProfileReviewDomain(resolveStaffId(actor.getAccountId()));
+        }
+        return portfolioRepository.findAll();
+    }
 
     // Note: Hàm `uploadBusinessLicense` upload file giấy phép kinh doanh lên Firebase Storage và trả về storage path để lưu vào hồ sơ KYB.
     public String uploadBusinessLicense(MultipartFile file) {
@@ -359,13 +375,18 @@ public class ProfileService {
     }
 
     private void notifyStaffProfileSubmitted(String profileType, Integer profileId, Integer submitterAccountId, String displayName) {
-        staffRepository.findAll().forEach(staff -> notificationService.notifyProfileSubmitted(
-                staff.getAccountId(),
-                submitterAccountId,
-                profileType,
-                profileId,
-                displayName
-        ));
+        domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)
+                .ifPresent(domain -> staffDomainRepository.findByIdDomainId(domain.getDomainId()).forEach(mapping ->
+                        staffRepository.findById(mapping.getId().getStaffId()).ifPresent(staff ->
+                                notificationService.notifyProfileSubmitted(
+                                        staff.getAccountId(),
+                                        submitterAccountId,
+                                        profileType,
+                                        profileId,
+                                        displayName
+                                )
+                        )
+                ));
     }
 
     // BAT BUOC TAI KHOAN STAFF PHAI CO BAN GHI TRONG BANG staffs DE LUU approvedBy.
@@ -374,5 +395,18 @@ public class ProfileService {
         return staffRepository.findByAccountId(accountId)
                 .map(StaffEntity::getStaffId)
                 .orElseThrow(() -> new AppException("TAI KHOAN STAFF CHUA DUOC KHOI TAO HO SO NHAN SU (staffs)"));
+    }
+
+    private void requireCurrentStaffProfileReviewDomain() {
+        AccountEntity actor = accessService.currentAccount();
+        requireProfileReviewDomain(resolveStaffId(actor.getAccountId()));
+    }
+
+    private void requireProfileReviewDomain(Integer staffId) {
+        DomainEntity profileReviewDomain = domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)
+                .orElseThrow(() -> new AppException("CHUA CAU HINH DOMAIN XET DUYET HO SO"));
+        if (!staffDomainRepository.existsByIdStaffIdAndIdDomainId(staffId, profileReviewDomain.getDomainId())) {
+            throw new ForbiddenException("STAFF KHONG CO QUYEN XET DUYET HO SO");
+        }
     }
 }

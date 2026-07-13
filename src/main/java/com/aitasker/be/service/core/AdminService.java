@@ -12,6 +12,7 @@ import com.aitasker.be.dto.admin.AccountResponse;
 import com.aitasker.be.dto.admin.AuditLogResponse;
 import com.aitasker.be.dto.admin.StaffRequest;
 import com.aitasker.be.dto.admin.StaffResponse;
+import com.aitasker.be.dto.admin.SystemSettingRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -104,6 +105,28 @@ public class AdminService {
         return systemSettingRepository.findAll();
     }
 
+    @Transactional
+    public SystemSettingEntity createSetting(SystemSettingRequest request) {
+        accessService.requireRole("ADMIN");
+        validateSettingRequest(request, true);
+        String key = normalizeSettingKey(request.getSettingKey());
+        if (systemSettingRepository.existsById(key)) {
+            throw new AppException("SYSTEM SETTING DA TON TAI");
+        }
+        AccountEntity actor = accessService.currentAccount();
+        SystemSettingEntity setting = SystemSettingEntity.builder()
+                .settingKey(key)
+                .settingValue(request.getSettingValue().trim())
+                .valueType(normalizeValueType(request.getValueType()))
+                .description(request.getDescription())
+                .isActive(request.getIsActive() == null || request.getIsActive())
+                .updatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId())
+                .build();
+        SystemSettingEntity saved = systemSettingRepository.save(setting);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", key, actor.getAccountId());
+        return saved;
+    }
+
     // Note: Hàm `listAuditLogs` chỉ cho admin lấy danh sách audit log và lọc theo nhóm role nội bộ/bên ngoài.
     public List<AuditLogResponse> listAuditLogs(String actorGroup) {
         return auditLogService.listForAdmin(actorGroup);
@@ -122,6 +145,42 @@ public class AdminService {
         setting.setUpdatedByRoleId(actor.getRole().getRoleId());
         SystemSettingEntity saved = systemSettingRepository.save(setting);
         auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", key, actor.getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public SystemSettingEntity updateSetting(String key, SystemSettingRequest request) {
+        accessService.requireRole("ADMIN");
+        if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
+        String normalizedKey = normalizeSettingKey(key);
+        SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
+        if (request.getSettingValue() != null && !request.getSettingValue().isBlank()) {
+            setting.setSettingValue(request.getSettingValue().trim());
+        }
+        if (request.getValueType() != null && !request.getValueType().isBlank()) {
+            setting.setValueType(normalizeValueType(request.getValueType()));
+        }
+        if (request.getDescription() != null) setting.setDescription(request.getDescription());
+        if (request.getIsActive() != null) setting.setIsActive(request.getIsActive());
+        AccountEntity actor = accessService.currentAccount();
+        setting.setUpdatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId());
+        SystemSettingEntity saved = systemSettingRepository.save(setting);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", normalizedKey, actor.getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public SystemSettingEntity deleteSetting(String key) {
+        accessService.requireRole("ADMIN");
+        String normalizedKey = normalizeSettingKey(key);
+        SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
+        setting.setIsActive(false);
+        AccountEntity actor = accessService.currentAccount();
+        setting.setUpdatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId());
+        SystemSettingEntity saved = systemSettingRepository.save(setting);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", normalizedKey, actor.getAccountId());
         return saved;
     }
 
@@ -389,6 +448,34 @@ public class AdminService {
     }
 
     // Note: Hàm `trimToNull` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    private void validateSettingRequest(SystemSettingRequest request, boolean creating) {
+        if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
+        if (creating && (request.getSettingKey() == null || request.getSettingKey().isBlank())) {
+            throw new AppException("SETTING KEY KHONG DUOC DE TRONG");
+        }
+        if (creating && (request.getSettingValue() == null || request.getSettingValue().isBlank())) {
+            throw new AppException("SETTING VALUE KHONG DUOC DE TRONG");
+        }
+        if (creating && (request.getValueType() == null || request.getValueType().isBlank())) {
+            throw new AppException("VALUE TYPE KHONG DUOC DE TRONG");
+        }
+    }
+
+    private String normalizeSettingKey(String key) {
+        if (key == null || key.isBlank()) throw new AppException("SETTING KEY KHONG DUOC DE TRONG");
+        return key.trim();
+    }
+
+    private String normalizeValueType(String valueType) {
+        String normalized = trimToNull(valueType);
+        if (normalized == null) throw new AppException("VALUE TYPE KHONG DUOC DE TRONG");
+        String upper = normalized.toUpperCase();
+        for (String allowed : List.of("STRING", "INT", "DECIMAL", "BOOLEAN", "JSON")) {
+            if (allowed.equals(upper)) return upper;
+        }
+        throw new AppException("VALUE TYPE KHONG HOP LE");
+    }
+
     private String trimToNull(String value) {
         if (value == null) return null;
         String trimmed = value.trim();

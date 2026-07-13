@@ -5,6 +5,8 @@
  */
 package com.aitasker.be.security.filter;
 
+import com.aitasker.be.entity.AccountEntity;
+import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.security.jwt.JwtService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -28,6 +30,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AccountRepository accountRepository;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Override
@@ -51,9 +54,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authParts[1];
         String username;
+        boolean allowAnonymousAuthEndpoint = request.getRequestURI().startsWith("/api/auth/");
         try {
             username = jwtService.extractUsername(token);
         } catch (JwtException | IllegalArgumentException ex) {
+            if (allowAnonymousAuthEndpoint) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             SecurityContextHolder.clearContext();
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
@@ -61,21 +69,51 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            if (jwtService.isTokenValid(token, username)) {
-                String role = jwtService.extractRole(token);
-                if (role != null && !role.isBlank()) {
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    username,
-                                    null,
-                                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                            );
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                AccountEntity account = accountRepository.findByEmailWithRole(username).orElse(null);
+                if (account == null
+                        || !jwtService.isTokenValid(token, username)
+                        || !isCurrentTokenVersion(token, account)) {
+                    if (allowAnonymousAuthEndpoint) {
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"success\":false,\"message\":\"Invalid or expired token\",\"data\":null}");
+                    return;
                 }
+
+                    String role = account.getRole() == null ? null : account.getRole().getRoleName();
+                    if (role != null && !role.isBlank()) {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(
+                                        username,
+                                        null,
+                                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                                );
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
             }
+        } catch (JwtException | IllegalArgumentException ex) {
+            if (allowAnonymousAuthEndpoint) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            SecurityContextHolder.clearContext();
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"success\":false,\"message\":\"Invalid or expired token\",\"data\":null}");
+            return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isCurrentTokenVersion(String token, AccountEntity account) {
+        Integer tokenVersion = jwtService.extractTokenVersion(token);
+        return tokenVersion != null && tokenVersion == account.getActiveTokenVersion();
     }
 }

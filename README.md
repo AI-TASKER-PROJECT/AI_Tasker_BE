@@ -81,6 +81,8 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `GET /api/auth/me`
   - `POST /api/auth/email/send-otp`
   - `POST /api/auth/email/verify-otp`
+  - JWT access/refresh tokens are bound to `account.active_token_version`;
+    a newer successful login invalidates older tokens for the same account.
 - Profile/KYC-KYB:
   - `POST /api/v1/profiles/business`
   - `GET /api/v1/profiles/business/{businessId}`
@@ -156,6 +158,10 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `GET /api/wallet/transactions`
   - `GET /api/membership/packages`
   - `POST /api/membership/packages/{packageId}/purchase`
+  - `GET /api/v1/admin/membership/packages`
+  - `POST /api/v1/admin/membership/packages`
+  - `PATCH /api/v1/admin/membership/packages/{packageId}`
+  - `DELETE /api/v1/admin/membership/packages/{packageId}`
   - `POST /api/credits/job-post/purchase`
   - `POST /api/credits/proposal/purchase`
   - `GET /api/users/me/quota`
@@ -173,14 +179,35 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/admin/reviews`
   - `GET /api/v1/admin/reviews/contracts/{contractId}`
   - `GET /api/v1/admin/settings`
+  - `POST /api/v1/admin/settings`
   - `PATCH /api/v1/admin/settings/{key}?value=...&isActive=...`
+  - `PUT /api/v1/admin/settings/{key}`
+  - `DELETE /api/v1/admin/settings/{key}`
   - `GET /api/v1/admin/staffs`
   - `POST /api/v1/admin/staffs`
   - `GET /api/v1/admin/analytics/overview`
+  - `GET /api/v1/admin/dashboard/summary`
+  - `GET /api/v1/admin/dashboard/revenue?from=...&to=...&groupBy=month`
+  - `GET /api/v1/admin/dashboard/contracts?from=...&to=...&groupBy=month`
+  - `GET /api/v1/admin/dashboard/users?from=...&to=...&groupBy=month`
+  - `GET /api/v1/admin/dashboard/jobs-proposals?from=...&to=...&groupBy=month`
+  - `GET /api/v1/admin/dashboard/disputes?from=...&to=...&groupBy=month`
+  - `GET /api/v1/admin/dashboard/membership?from=...&to=...&groupBy=month`
+  - `GET /api/v1/admin/dashboard/finance-breakdown?from=...&to=...`
   - `GET /api/v1/admin/wallet/transactions`
   - `GET /api/v1/admin/disputes`
   - `GET /api/v1/admin/disputes/{disputeId}`
   - `GET /api/v1/staff/disputes`
+- Catalog Admin:
+  - `POST /api/v1/domains`
+  - `PATCH /api/v1/domains/{domainId}`
+  - `DELETE /api/v1/domains/{domainId}`
+  - `POST /api/v1/skills`
+  - `PATCH /api/v1/skills/{skillId}`
+  - `DELETE /api/v1/skills/{skillId}`
+  - `POST /api/v1/technologies`
+  - `PATCH /api/v1/technologies/{technologyId}`
+  - `DELETE /api/v1/technologies/{technologyId}`
 
 ## 8) Luu y nghiep vu
 - JWT da nang cap claim role thuc (`BUSINESS/EXPERT/ADMIN/STAFF`) de phuc vu RBAC.

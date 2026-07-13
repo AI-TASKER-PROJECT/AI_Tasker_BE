@@ -8,5 +8,7 @@ import java.util.List;
 
 public interface StaffDomainRepository extends JpaRepository<StaffDomainEntity, StaffDomainId> {
     List<StaffDomainEntity> findByIdStaffId(Integer staffId);
+    List<StaffDomainEntity> findByIdDomainId(Integer domainId);
+    boolean existsByIdStaffIdAndIdDomainId(Integer staffId, Integer domainId);
     void deleteByIdStaffId(Integer staffId);
 }

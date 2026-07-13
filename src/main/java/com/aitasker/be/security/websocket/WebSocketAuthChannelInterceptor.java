@@ -49,6 +49,10 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             }
             AccountEntity account = accountRepository.findByEmailWithRole(email)
                     .orElseThrow(() -> new ForbiddenException("TAI KHOAN WEBSOCKET KHONG TON TAI"));
+            Integer tokenVersion = jwtService.extractTokenVersion(token);
+            if (tokenVersion == null || tokenVersion != account.getActiveTokenVersion()) {
+                throw new ForbiddenException("PHIEN DANG NHAP WEBSOCKET DA HET HIEU LUC");
+            }
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     String.valueOf(account.getAccountId()),
                     null,

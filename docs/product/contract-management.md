@@ -105,9 +105,11 @@ Alternate exits:
   before Staff review; Admin can cancel invalid active disputes.
 - When every contract milestone is `COMPLETED`, the system moves the contract
   to `COMPLETED` and the job to `CLOSED`.
-- SLA auto-approval of an overdue reviewed milestone uses the same finalization
-  rule: if the auto-approved milestone completes the last remaining contract
-  milestone, the contract becomes `COMPLETED` and the job becomes `CLOSED`.
+- SLA auto-approval of an overdue reviewed milestone runs after the configured
+  `default_sla_days` window, currently 3 days after the latest deliverable
+  submission. It uses the same finalization rule: if the auto-approved
+  milestone completes the last remaining contract milestone, the contract
+  becomes `COMPLETED` and the job becomes `CLOSED`.
 - Termination requests move eligible active contracts to
   `TERMINATION_PENDING`. Admin assigns Staff review; assigned Staff approves or
   rejects. Approved requests either await milestone escrow settlement or move

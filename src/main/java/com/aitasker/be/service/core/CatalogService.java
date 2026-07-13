@@ -14,6 +14,7 @@ import com.aitasker.be.dto.catalog.SkillRequest;
 import com.aitasker.be.dto.catalog.TechnologyRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
+import com.aitasker.be.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,8 @@ import java.util.Set;
 // Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class CatalogService {
+    public static final String PROFILE_REVIEW_DOMAIN_CODE = "PROFILE_REVIEW";
+
     private final AccessService accessService;
     private final DomainRepository domainRepository;
     private final SkillRepository skillRepository;
@@ -39,8 +42,15 @@ public class CatalogService {
 
     // Note: Hàm `listDomains` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<DomainEntity> listDomains(Boolean activeOnly) {
-        if (Boolean.TRUE.equals(activeOnly)) return domainRepository.findByIsActiveTrueOrderBySortOrderAscDomainNameAsc();
-        return domainRepository.findAll();
+        List<DomainEntity> domains = Boolean.TRUE.equals(activeOnly)
+                ? domainRepository.findByIsActiveTrueOrderBySortOrderAscDomainNameAsc()
+                : domainRepository.findAll();
+        if (SecurityUtils.hasRole("ADMIN")) {
+            return domains;
+        }
+        return domains.stream()
+                .filter(domain -> !isProfileReviewDomain(domain))
+                .toList();
     }
 
     // Note: Hàm `listSkills` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -93,6 +103,14 @@ public class CatalogService {
         return domainRepository.save(entity);
     }
 
+    @Transactional
+    public DomainEntity deleteDomain(Integer domainId) {
+        accessService.requireRole("ADMIN");
+        DomainEntity entity = domainRepository.findById(domainId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DOMAIN"));
+        entity.setIsActive(false);
+        return domainRepository.save(entity);
+    }
+
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `createSkill` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
@@ -126,6 +144,14 @@ public class CatalogService {
         if (request.getSkillName() != null && !request.getSkillName().isBlank()) entity.setSkillName(request.getSkillName().trim());
         if (request.getDescription() != null) entity.setDescription(request.getDescription());
         if (request.getIsActive() != null) entity.setIsActive(request.getIsActive());
+        return skillRepository.save(entity);
+    }
+
+    @Transactional
+    public SkillEntity deleteSkill(Integer skillId) {
+        accessService.requireRole("ADMIN");
+        SkillEntity entity = skillRepository.findById(skillId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SKILL"));
+        entity.setIsActive(false);
         return skillRepository.save(entity);
     }
 
@@ -165,6 +191,14 @@ public class CatalogService {
         return technologyRepository.save(entity);
     }
 
+    @Transactional
+    public TechnologyEntity deleteTechnology(Integer technologyId) {
+        accessService.requireRole("ADMIN");
+        TechnologyEntity entity = technologyRepository.findById(technologyId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY TECHNOLOGY"));
+        entity.setIsActive(false);
+        return technologyRepository.save(entity);
+    }
+
     // Note: Hàm `listJobDomains` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<JobDomainEntity> listJobDomains(Integer jobId) {
         jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
@@ -190,7 +224,10 @@ public class CatalogService {
         requireJobOwnerOrAdmin(jobId);
         Set<Integer> ids = new LinkedHashSet<>(domainIds == null ? List.of() : domainIds);
         for (Integer domainId : ids) {
-            domainRepository.findById(domainId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DOMAIN " + domainId));
+            DomainEntity domain = domainRepository.findById(domainId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DOMAIN " + domainId));
+            if (isProfileReviewDomain(domain) && !SecurityUtils.hasRole("ADMIN")) {
+                throw new AppException("DOMAIN XET DUYET HO SO KHONG DUOC GAN CHO JOB");
+            }
         }
         jobDomainRepository.deleteByIdJobId(jobId);
         ids.forEach(domainId -> jobDomainRepository.save(JobDomainEntity.builder()
@@ -273,6 +310,10 @@ public class CatalogService {
     // Note: Hàm `normalizeCode` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     private String normalizeCode(String value) {
         return value.trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "").toUpperCase();
+    }
+
+    public static boolean isProfileReviewDomain(DomainEntity domain) {
+        return domain != null && PROFILE_REVIEW_DOMAIN_CODE.equalsIgnoreCase(domain.getDomainCode());
     }
 
 }

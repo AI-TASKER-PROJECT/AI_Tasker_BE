@@ -8,10 +8,12 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.admin.AccountRequest;
+import com.aitasker.be.dto.admin.SystemSettingRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.ReviewEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.StaffEntity;
+import com.aitasker.be.entity.SystemSettingEntity;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +67,76 @@ class AdminServiceTest {
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private AdminService adminService;
+
+    @Test
+    void createSetting_shouldPersistNewSystemSetting() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingKey("approval.sla_days");
+        request.setSettingValue("3");
+        request.setValueType("INT");
+        request.setDescription("So ngay SLA xet duyet");
+
+        AccountEntity admin = adminAccount();
+        when(systemSettingRepository.existsById("approval.sla_days")).thenReturn(false);
+        when(accessService.currentAccount()).thenReturn(admin);
+        when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SystemSettingEntity saved = adminService.createSetting(request);
+
+        assertEquals("approval.sla_days", saved.getSettingKey());
+        assertEquals("3", saved.getSettingValue());
+        assertEquals("INT", saved.getValueType());
+        assertEquals(Boolean.TRUE, saved.getIsActive());
+        assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "approval.sla_days", 1);
+    }
+
+    @Test
+    void updateSettingBody_shouldUpdateMutableFields() {
+        SystemSettingEntity setting = SystemSettingEntity.builder()
+                .settingKey("approval.sla_days")
+                .settingValue("7")
+                .valueType("INT")
+                .isActive(true)
+                .build();
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingValue("3");
+        request.setValueType("int");
+        request.setDescription("SLA xet duyet moi");
+        request.setIsActive(false);
+
+        when(systemSettingRepository.findById("approval.sla_days")).thenReturn(Optional.of(setting));
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SystemSettingEntity saved = adminService.updateSetting("approval.sla_days", request);
+
+        assertEquals("3", saved.getSettingValue());
+        assertEquals("INT", saved.getValueType());
+        assertEquals("SLA xet duyet moi", saved.getDescription());
+        assertEquals(Boolean.FALSE, saved.getIsActive());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "approval.sla_days", 1);
+    }
+
+    @Test
+    void deleteSetting_shouldDeactivateSetting() {
+        SystemSettingEntity setting = SystemSettingEntity.builder()
+                .settingKey("approval.sla_days")
+                .settingValue("3")
+                .valueType("INT")
+                .isActive(true)
+                .build();
+
+        when(systemSettingRepository.findById("approval.sla_days")).thenReturn(Optional.of(setting));
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SystemSettingEntity saved = adminService.deleteSetting("approval.sla_days");
+
+        assertEquals(Boolean.FALSE, saved.getIsActive());
+        assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "approval.sla_days", 1);
+    }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
@@ -167,5 +239,12 @@ class AdminServiceTest {
         adminService.createAccount(request);
 
         verify(notificationService).notifyNewAccountCreated(1, 101, "New Expert", "new.expert@mail.com", "EXPERT");
+    }
+
+    private AccountEntity adminAccount() {
+        return AccountEntity.builder()
+                .accountId(1)
+                .role(RoleEntity.builder().roleId(1).roleName("ADMIN").build())
+                .build();
     }
 }

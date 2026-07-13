@@ -8,6 +8,7 @@ package com.aitasker.be.controller.core;
 import com.aitasker.be.common.response.ApiResponse;
 import com.aitasker.be.dto.admin.*;
 import com.aitasker.be.dto.payment.WalletTransactionHistoryResponse;
+import com.aitasker.be.entity.MembershipPackageEntity;
 import com.aitasker.be.entity.ReviewEntity;
 import com.aitasker.be.entity.StaffEntity;
 import com.aitasker.be.entity.SystemWalletEntity;
@@ -57,6 +58,11 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success("LIST SYSTEM SETTINGS SUCCESS", adminService.listSettings()));
     }
 
+    @PostMapping("/settings")
+    public ResponseEntity<ApiResponse<SystemSettingEntity>> createSetting(@RequestBody SystemSettingRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("CREATE SYSTEM SETTING SUCCESS", adminService.createSetting(request)));
+    }
+
     // Note: Annotation này khai báo API cập nhật một phần dữ liệu bằng HTTP PATCH.
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/audit-logs")
@@ -76,6 +82,18 @@ public class AdminController {
             // Note: Annotation này lấy query parameter đưa vào tham số hàm.
             @RequestParam(required = false) Boolean isActive) {
         return ResponseEntity.ok(ApiResponse.success("UPDATE SYSTEM SETTING SUCCESS", adminService.updateSetting(key, value, isActive)));
+    }
+
+    @PutMapping("/settings/{key}")
+    public ResponseEntity<ApiResponse<SystemSettingEntity>> updateSettingBody(
+            @PathVariable String key,
+            @RequestBody SystemSettingRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("UPDATE SYSTEM SETTING SUCCESS", adminService.updateSetting(key, request)));
+    }
+
+    @DeleteMapping("/settings/{key}")
+    public ResponseEntity<ApiResponse<SystemSettingEntity>> deleteSetting(@PathVariable String key) {
+        return ResponseEntity.ok(ApiResponse.success("DELETE SYSTEM SETTING SUCCESS", adminService.deleteSetting(key)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
@@ -104,6 +122,34 @@ public class AdminController {
     // Note: Hàm `analyticsOverview` xử lý một API endpoint, nhận request, gọi service và trả kết quả cho client.
     public ResponseEntity<ApiResponse<Object>> analyticsOverview() {
         return ResponseEntity.ok(ApiResponse.success("ANALYTICS OVERVIEW SUCCESS", adminService.analyticsOverview()));
+    }
+
+    @GetMapping("/membership/packages")
+    public ResponseEntity<ApiResponse<List<MembershipPackageEntity>>> listMembershipPackages(
+            @RequestParam(defaultValue = "false") Boolean activeOnly) {
+        return ResponseEntity.ok(ApiResponse.success("LIST ADMIN MEMBERSHIP PACKAGES SUCCESS",
+                paymentWalletService.listMembershipPackagesForAdmin(activeOnly)));
+    }
+
+    @PostMapping("/membership/packages")
+    public ResponseEntity<ApiResponse<MembershipPackageEntity>> createMembershipPackage(
+            @RequestBody MembershipPackageRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("CREATE MEMBERSHIP PACKAGE SUCCESS",
+                paymentWalletService.createMembershipPackage(request)));
+    }
+
+    @PatchMapping("/membership/packages/{packageId}")
+    public ResponseEntity<ApiResponse<MembershipPackageEntity>> updateMembershipPackage(
+            @PathVariable Long packageId,
+            @RequestBody MembershipPackageRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("UPDATE MEMBERSHIP PACKAGE SUCCESS",
+                paymentWalletService.updateMembershipPackage(packageId, request)));
+    }
+
+    @DeleteMapping("/membership/packages/{packageId}")
+    public ResponseEntity<ApiResponse<MembershipPackageEntity>> deleteMembershipPackage(@PathVariable Long packageId) {
+        return ResponseEntity.ok(ApiResponse.success("DELETE MEMBERSHIP PACKAGE SUCCESS",
+                paymentWalletService.deleteMembershipPackage(packageId)));
     }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
