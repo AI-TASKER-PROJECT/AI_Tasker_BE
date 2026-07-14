@@ -32,6 +32,10 @@ public class SowKeywordExtractionService {
             rule("API Integration", "api", "api integration", "tich hop", "tích hợp", "integration", "tich hop api"),
             rule("Spring Boot", "spring boot", "java spring", "java spring boot"),
             rule("NLP", "natural language processing", "xu ly ngon ngu", "xử lý ngôn ngữ", "xu ly ngon ngu tu nhien", "xử lý ngôn ngữ tự nhiên"),
+            rule("API Testing", "api testing", "swagger", "postman", "contract testing", "regression testing"),
+            rule("BI Dashboard", "bi dashboard", "business intelligence dashboard", "kpi dashboard", "data visualization"),
+            rule("Computer Vision", "computer vision", "object detection", "image classification", "ocr pipeline"),
+            rule("Data Pipeline", "data pipeline", "etl", "elt", "data warehouse", "data engineering"),
             rule("Testing", "kiem thu", "kiểm thử", "testing", "test", "qa"),
             rule("Deployment", "trien khai", "triển khai", "deployment", "deploy", "devops", "ci cd", "ci/cd")
     );
@@ -40,7 +44,10 @@ public class SowKeywordExtractionService {
             rule("Customer Support", "cham soc khach hang", "chăm sóc khách hàng", "customer support", "customer service", "ho tro khach hang", "hỗ trợ khách hàng"),
             rule("E-commerce", "e commerce", "e-commerce", "ecommerce", "thuong mai dien tu", "thương mại điện tử", "ban hang", "bán hàng", "retail"),
             rule("CRM", "customer relationship management"),
-            rule("Order Management", "don hang", "đơn hàng", "order", "order management")
+            rule("Order Management", "don hang", "đơn hàng", "order", "order management"),
+            rule("Business Intelligence", "business intelligence", "bi dashboard", "analytics dashboard", "kpi reporting"),
+            rule("Computer Vision", "computer vision", "object detection", "image classification", "ocr"),
+            rule("Data Engineering", "data engineering", "data pipeline", "etl", "elt", "data warehouse")
     );
 
     private static final Map<String, List<String>> SKILL_ALIASES = aliasesByLabel(SKILL_RULES);

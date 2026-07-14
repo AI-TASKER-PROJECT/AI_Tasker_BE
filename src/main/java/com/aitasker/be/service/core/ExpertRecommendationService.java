@@ -42,12 +42,10 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -83,16 +81,28 @@ public class ExpertRecommendationService {
         JobEntity job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
 
+        List<ExpertRecommendationEntity> existingRecommendations = expertRecommendationRepository
+                .findByJobPostingIdOrderByRankPositionAsc(jobPostingId);
+        Set<Long> previouslySelectedExpertIds = existingRecommendations.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getBusinessSelected()))
+                .map(ExpertRecommendationEntity::getExpertId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
         ExpertCandidateSearchResponse candidateSearch = expertCandidateRankingService.findTopCandidatesByJobPostingId(jobId);
         List<ExpertCandidateResponse> candidates = defaultList(candidateSearch.getCandidates());
 
         if (candidates.isEmpty()) {
-            expertRecommendationRepository.deleteByJobPostingId(jobPostingId);
+            List<ExpertRecommendationResponse> selectedRecommendations = existingRecommendations.stream()
+                    .filter(item -> Boolean.TRUE.equals(item.getBusinessSelected()))
+                    .map(this::toResponse)
+                    .toList();
             return ExpertRecommendationListResponse.builder()
                     .jobPostingId(jobPostingId)
-                    .recommendations(List.of())
+                    .recommendations(selectedRecommendations)
                     .generatedByAi(false)
-                    .message("No expert candidates found.")
+                    .message(selectedRecommendations.isEmpty()
+                            ? "No eligible expert candidates found."
+                            : "No new eligible candidates found; existing Business selection was preserved.")
                     .build();
         }
 
@@ -105,15 +115,16 @@ public class ExpertRecommendationService {
 
         List<ExpertRecommendationResponse> normalizedRecommendations = normalizeRecommendations(
                 generationResult.recommendations(),
-                candidates
+                candidates,
+                previouslySelectedExpertIds
         );
-        if (normalizedRecommendations.isEmpty() && Boolean.TRUE.equals(generationResult.generatedByAi())) {
+        if (Boolean.TRUE.equals(generationResult.generatedByAi())
+                && !hasUsableAiReason(generationResult.recommendations(), normalizedRecommendations)) {
             generationResult = RecommendationGenerationResult.builder()
-                    .recommendations(fallbackRecommendations(candidates))
+                    .recommendations(generationResult.recommendations())
                     .generatedByAi(false)
                     .message("AI recommendation failed, fallback to rule-based ranking.")
                     .build();
-            normalizedRecommendations = normalizeRecommendations(generationResult.recommendations(), candidates);
         }
 
         expertRecommendationRepository.deleteByJobPostingId(jobPostingId);
@@ -300,17 +311,12 @@ public class ExpertRecommendationService {
                 Candidate list Top 20:
                 %s
 
-                Chọn tối đa 5 expert phù hợp nhất. Chỉ dùng expertId/portfolioId có trong candidate list.
+                Không thay đổi thứ tự, điểm hoặc bằng chứng của backend. Chỉ viết lý do ngắn cho expertId có trong candidate list.
                 JSON response bắt buộc:
                 {
                   "recommendations": [
                     {
                       "expertId": 1,
-                      "portfolioId": 10,
-                      "rankPosition": 1,
-                      "matchScore": 92.5,
-                      "matchedSkills": ["AI", "Chatbot", "RAG"],
-                      "matchedDomains": ["Customer Support"],
                       "reason": "Expert phù hợp vì có kinh nghiệm xây dựng chatbot AI chăm sóc khách hàng và mô tả portfolio khớp với yêu cầu SoW."
                     }
                   ]
@@ -387,11 +393,6 @@ public class ExpertRecommendationService {
         for (JsonNode node : recommendationsNode) {
             recommendations.add(ExpertRecommendationResponse.builder()
                     .expertId(readLong(node, "expertId"))
-                    .portfolioId(readLong(node, "portfolioId"))
-                    .rankPosition(readInteger(node, "rankPosition"))
-                    .matchScore(readDouble(node, "matchScore"))
-                    .matchedSkills(readStringList(node, "matchedSkills"))
-                    .matchedDomains(readStringList(node, "matchedDomains"))
                     .reason(readText(node, "reason"))
                     .build());
         }
@@ -401,48 +402,65 @@ public class ExpertRecommendationService {
     // Note: Ham `normalizeRecommendations` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private List<ExpertRecommendationResponse> normalizeRecommendations(
             List<ExpertRecommendationResponse> rawRecommendations,
-            List<ExpertCandidateResponse> candidates
+            List<ExpertCandidateResponse> candidates,
+            Set<Long> previouslySelectedExpertIds
     ) {
-        Map<Long, ExpertCandidateResponse> candidateByExpertId = new LinkedHashMap<>();
-        for (ExpertCandidateResponse candidate : candidates) {
-            if (candidate.getExpertId() != null) {
-                candidateByExpertId.put(Long.valueOf(candidate.getExpertId()), candidate);
+        Map<Long, String> aiReasonsByExpertId = new LinkedHashMap<>();
+        for (ExpertRecommendationResponse raw : defaultList(rawRecommendations)) {
+            Long expertId = raw.getExpertId();
+            String reason = sanitizeReason(raw.getReason());
+            if (expertId != null && !reason.isBlank()) {
+                aiReasonsByExpertId.putIfAbsent(expertId, reason);
             }
         }
+
+        List<ExpertCandidateResponse> orderedCandidates = new ArrayList<>();
+        candidates.stream()
+                .filter(candidate -> previouslySelectedExpertIds.contains(toLong(candidate.getExpertId())))
+                .forEach(orderedCandidates::add);
+        candidates.stream()
+                .filter(candidate -> !previouslySelectedExpertIds.contains(toLong(candidate.getExpertId())))
+                .forEach(orderedCandidates::add);
 
         List<ExpertRecommendationResponse> normalized = new ArrayList<>();
-        Set<Long> selectedExpertIds = new LinkedHashSet<>();
-        int nextRank = 1;
-
-        for (ExpertRecommendationResponse raw : defaultList(rawRecommendations)) {
-            if (normalized.size() >= MAX_RECOMMENDATIONS) {
-                break;
-            }
-
-            Long expertId = raw.getExpertId();
-            ExpertCandidateResponse candidate = candidateByExpertId.get(expertId);
-            if (expertId == null || candidate == null || !selectedExpertIds.add(expertId)) {
-                continue;
-            }
-
+        for (ExpertCandidateResponse candidate : orderedCandidates.stream().limit(MAX_RECOMMENDATIONS).toList()) {
+            Long expertId = toLong(candidate.getExpertId());
             normalized.add(ExpertRecommendationResponse.builder()
                     .expertId(expertId)
-                    .portfolioId(raw.getPortfolioId() == null ? toLong(candidate.getPortfolioId()) : raw.getPortfolioId())
-                    .rankPosition(raw.getRankPosition() == null ? nextRank : raw.getRankPosition())
-                    .matchScore(clampScore(raw.getMatchScore() == null ? candidate.getMatchScore() : raw.getMatchScore()))
-                    .matchedSkills(isEmpty(raw.getMatchedSkills()) ? defaultList(candidate.getMatchedSkills()) : raw.getMatchedSkills())
-                    .matchedDomains(isEmpty(raw.getMatchedDomains()) ? defaultList(candidate.getMatchedDomains()) : raw.getMatchedDomains())
-                    .reason(isBlank(raw.getReason()) ? FALLBACK_REASON : raw.getReason())
-                    .businessSelected(Boolean.FALSE)
+                    .portfolioId(toLong(candidate.getPortfolioId()))
+                    .rankPosition(normalized.size() + 1)
+                    .matchScore(clampScore(candidate.getMatchScore()))
+                    .matchedSkills(defaultList(candidate.getMatchedSkills()))
+                    .matchedDomains(defaultList(candidate.getMatchedDomains()))
+                    .reason(aiReasonsByExpertId.getOrDefault(expertId, FALLBACK_REASON))
+                    .businessSelected(previouslySelectedExpertIds.contains(expertId))
                     .build());
-            nextRank++;
-        }
-
-        normalized.sort(Comparator.comparing(ExpertRecommendationResponse::getRankPosition));
-        for (int i = 0; i < normalized.size(); i++) {
-            normalized.get(i).setRankPosition(i + 1);
         }
         return normalized;
+    }
+
+    private String sanitizeReason(String reason) {
+        if (reason == null) {
+            return "";
+        }
+        String sanitized = reason.replaceAll("[\\p{Cntrl}&&[^\\r\\n\\t]]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return truncate(sanitized, 800);
+    }
+
+    private boolean hasUsableAiReason(
+            List<ExpertRecommendationResponse> aiRecommendations,
+            List<ExpertRecommendationResponse> normalizedRecommendations
+    ) {
+        Set<Long> normalizedExpertIds = normalizedRecommendations.stream()
+                .map(ExpertRecommendationResponse::getExpertId)
+                .collect(java.util.stream.Collectors.toSet());
+        return defaultList(aiRecommendations).stream().anyMatch(item ->
+                item.getExpertId() != null
+                        && normalizedExpertIds.contains(item.getExpertId())
+                        && !sanitizeReason(item.getReason()).isBlank()
+        );
     }
 
     // Note: Ham `fallbackRecommendations` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -479,7 +497,7 @@ public class ExpertRecommendationService {
                         .aiReason(response.getReason())
                         .matchedSkills(writeStringList(response.getMatchedSkills()))
                         .matchedDomains(writeStringList(response.getMatchedDomains()))
-                        .businessSelected(Boolean.FALSE)
+                        .businessSelected(Boolean.TRUE.equals(response.getBusinessSelected()))
                         .build())
                 .toList();
     }
@@ -527,38 +545,10 @@ public class ExpertRecommendationService {
         return value.isNumber() ? value.asLong() : null;
     }
 
-    // Note: Ham `readInteger` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private Integer readInteger(JsonNode node, String fieldName) {
-        JsonNode value = node.path(fieldName);
-        return value.isNumber() ? value.asInt() : null;
-    }
-
-    // Note: Ham `readDouble` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private Double readDouble(JsonNode node, String fieldName) {
-        JsonNode value = node.path(fieldName);
-        return value.isNumber() ? value.asDouble() : null;
-    }
-
     // Note: Ham `readText` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String readText(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         return value.isTextual() ? value.asText() : null;
-    }
-
-    // Note: Ham `readStringList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private List<String> readStringList(JsonNode node, String fieldName) {
-        JsonNode value = node.path(fieldName);
-        if (!value.isArray()) {
-            return List.of();
-        }
-
-        List<String> items = new ArrayList<>();
-        for (JsonNode item : value) {
-            if (item.isTextual() && !item.asText().isBlank()) {
-                items.add(item.asText());
-            }
-        }
-        return items;
     }
 
     // Note: Ham `writeStringList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -626,16 +616,6 @@ public class ExpertRecommendationService {
     // Note: Ham `defaultList` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private <T> List<T> defaultList(List<T> values) {
         return values == null ? List.of() : values;
-    }
-
-    // Note: Ham `isEmpty` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private boolean isEmpty(List<?> values) {
-        return values == null || values.isEmpty();
-    }
-
-    // Note: Ham `isBlank` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 
     // Note: Ham `addPart` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.

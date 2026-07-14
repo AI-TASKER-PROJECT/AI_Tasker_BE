@@ -102,7 +102,7 @@ class ExpertRecommendationServiceTest {
     }
 
     @Test
-    void generateRecommendations_whenAiReturnsJson_shouldValidateAndPersistAiChoices() {
+    void generateRecommendations_whenAiReturnsJson_shouldKeepBackendIdentityScoreRankAndEvidence() {
         openAiProperties.setApiKey("test-key");
         when(jobRepository.findById(1)).thenReturn(Optional.of(JobEntity.builder().jobId(1).title("AI chatbot").build()));
         when(sowRepository.findByJobId(1)).thenReturn(Optional.of(SowEntity.builder()
@@ -147,18 +147,74 @@ class ExpertRecommendationServiceTest {
         ExpertRecommendationListResponse response = service.generateRecommendations(1L);
 
         assertTrue(response.getGeneratedByAi());
-        assertEquals(1, response.getRecommendations().size());
-        assertEquals(2L, response.getRecommendations().get(0).getExpertId());
+        assertEquals(2, response.getRecommendations().size());
+        assertEquals(1L, response.getRecommendations().get(0).getExpertId());
         assertEquals(1, response.getRecommendations().get(0).getRankPosition());
-        assertEquals(100.0, response.getRecommendations().get(0).getMatchScore());
+        assertEquals(95.0, response.getRecommendations().get(0).getMatchScore());
         assertEquals(List.of("AI", "Chatbot"), response.getRecommendations().get(0).getMatchedSkills());
+        assertEquals(2L, response.getRecommendations().get(1).getExpertId());
+        assertEquals(90.0, response.getRecommendations().get(1).getMatchScore());
+        assertEquals("Phu hop voi chatbot AI", response.getRecommendations().get(1).getReason());
 
         ArgumentCaptor<Iterable<ExpertRecommendationEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
         verify(expertRecommendationRepository).saveAll(captor.capture());
         verify(paymentWalletService).requirePremiumRecommendationAccess(1L);
         List<ExpertRecommendationEntity> saved = toList(captor.getValue());
-        assertEquals(1, saved.size());
-        assertEquals(2L, saved.get(0).getExpertId());
+        assertEquals(2, saved.size());
+        assertEquals(1L, saved.get(0).getExpertId());
+        assertEquals(95.0, saved.get(0).getMatchScore().doubleValue());
+    }
+
+    @Test
+    void generateRecommendations_shouldPinAndPreserveExistingBusinessSelection() {
+        openAiProperties.setApiKey("");
+        when(jobRepository.findById(1)).thenReturn(Optional.of(JobEntity.builder().jobId(1).title("AI chatbot").build()));
+        when(expertRecommendationRepository.findByJobPostingIdOrderByRankPositionAsc(1L)).thenReturn(List.of(
+                ExpertRecommendationEntity.builder()
+                        .jobPostingId(1L)
+                        .expertId(2L)
+                        .portfolioId(20L)
+                        .rankPosition(2)
+                        .businessSelected(true)
+                        .build()
+        ));
+        when(expertCandidateRankingService.findTopCandidatesByJobPostingId(1)).thenReturn(candidateSearch(List.of(
+                candidate(1, 10, 95.0),
+                candidate(2, 20, 90.0),
+                candidate(3, 30, 85.0)
+        )));
+
+        ExpertRecommendationListResponse response = service.generateRecommendations(1L);
+
+        assertEquals(2L, response.getRecommendations().get(0).getExpertId());
+        assertTrue(response.getRecommendations().get(0).getBusinessSelected());
+        ArgumentCaptor<Iterable<ExpertRecommendationEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(expertRecommendationRepository).saveAll(captor.capture());
+        assertTrue(toList(captor.getValue()).get(0).getBusinessSelected());
+    }
+
+    @Test
+    void generateRecommendations_whenAiOnlyInventsExpert_shouldUseBackendFallback() {
+        openAiProperties.setApiKey("test-key");
+        when(jobRepository.findById(1)).thenReturn(Optional.of(JobEntity.builder().jobId(1).title("AI chatbot").build()));
+        when(sowRepository.findByJobId(1)).thenReturn(Optional.empty());
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(1)).thenReturn(List.of());
+        when(expertCandidateRankingService.findTopCandidatesByJobPostingId(1))
+                .thenReturn(candidateSearch(List.of(candidate(1, 10, 95.0))));
+        when(restTemplate.exchange(
+                eq(openAiProperties.getChatCompletionsUrl()),
+                eq(HttpMethod.POST),
+                any(HttpEntity.class),
+                eq(Map.class)
+        )).thenReturn(ResponseEntity.ok(openAiResponse("""
+                {"recommendations":[{"expertId":999,"reason":"Invented"}]}
+                """)));
+
+        ExpertRecommendationListResponse response = service.generateRecommendations(1L);
+
+        assertFalse(response.getGeneratedByAi());
+        assertEquals(1L, response.getRecommendations().get(0).getExpertId());
+        assertEquals(95.0, response.getRecommendations().get(0).getMatchScore());
     }
 
     @Test
