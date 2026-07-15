@@ -26,6 +26,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.multipart.MultipartFile;
 import com.aitasker.be.event.DisputeSettlementCompletedEvent;
 
 import java.math.BigDecimal;
@@ -66,6 +67,7 @@ public class ContractExecutionService {
     private final PaymentWalletService paymentWalletService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final FirebaseStorageService firebaseStorageService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final JobDomainRepository jobDomainRepository;
     private final JobSkillRepository jobSkillRepository;
@@ -604,7 +606,20 @@ public class ContractExecutionService {
     @Transactional public DeliverableEntity submitDeliverable(DeliverableEntity input) {
         accessService.requireRole("EXPERT");
         accessService.requireApprovedAccount();
+        if (input == null || (isBlank(input.getSourceCodeUrl()) && isBlank(input.getSourceCodeFileUrl()))) {
+            throw new AppException("PHAI CUNG CAP SOURCE CODE URL HOAC FILE SOURCE CODE");
+        }
+        input.setSourceCodeUrl(trimToNull(input.getSourceCodeUrl()));
+        input.setSourceCodeFileUrl(trimToNull(input.getSourceCodeFileUrl()));
         MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        AccountEntity actor = accessService.currentAccount();
+        if (input.getSourceCodeFileUrl() != null) {
+            String requiredPrefix = "milestone-source-code/milestones/" + milestone.getMilestoneId()
+                    + "/accounts/" + actor.getAccountId() + "/";
+            if (!input.getSourceCodeFileUrl().startsWith(requiredPrefix)) {
+                throw new AppException("FILE SOURCE CODE KHONG THUOC MILESTONE HOAC EXPERT HIEN TAI");
+            }
+        }
         ContractEntity contract = requireExpertOwnedContractByJob(milestone.getJobId());
         if (!"ACTIVE".equals(contract.getStatus())) throw new AppException("CHI DUOC SUBMIT DELIVERABLE KHI CONTRACT ACTIVE");
         if (contract.getBusinessNdaSignedAt() == null || contract.getExpertNdaSignedAt() == null) {
@@ -644,6 +659,38 @@ public class ContractExecutionService {
                         milestone.getMilestoneName()
                 ));
         return saved;
+    }
+
+    public String uploadMilestoneSourceCode(Integer milestoneId, MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        accessService.requireApprovedAccount();
+        AccountEntity actor = accessService.currentAccount();
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        ContractEntity contract = requireExpertOwnedContractByJob(milestone.getJobId());
+        if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) {
+            throw new AppException("CHI DUOC UPLOAD SOURCE CODE KHI CONTRACT ACTIVE");
+        }
+        if (contract.getBusinessNdaSignedAt() == null || contract.getExpertNdaSignedAt() == null) {
+            throw new AppException("HAI BEN PHAI KY NDA TRUOC KHI UPLOAD SOURCE CODE");
+        }
+        if (!List.of(ContractMilestoneEntity.STATUS_IN_PROGRESS, ContractMilestoneEntity.STATUS_OVERDUE)
+                .contains(milestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA SAN SANG DE UPLOAD SOURCE CODE");
+        }
+        ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestoneId);
+        ensureEscrowNotReleased(contractMilestone);
+        String path = firebaseStorageService.uploadSourceCodeArchive(
+                file,
+                "milestone-source-code/milestones/" + milestoneId + "/accounts/" + actor.getAccountId()
+        );
+        auditLogService.record(
+                AuditLogService.ACTION_UPLOAD_MILESTONE_SOURCE_CODE,
+                "milestones",
+                String.valueOf(milestoneId),
+                actor.getAccountId()
+        );
+        return path;
     }
 
     @Transactional
@@ -777,6 +824,7 @@ public class ContractExecutionService {
                 .percentComplete(percentComplete)
                 .attachmentUrl(attachmentUrl)
                 .sourceCodeUrl(request.getSourceCodeUrl())
+                .sourceCodeFileUrl(request.getSourceCodeFileUrl())
                 .demoLink(request.getDemoLink())
                 .submissionNotes(request.getSubmissionNotes())
                 .isLate(isLate)
@@ -2719,6 +2767,14 @@ public class ContractExecutionService {
                 .map(String::toLowerCase)
                 .map(v -> v.equals("true") || v.equals("1"))
                 .orElse(false);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String trimToNull(String value) {
+        return isBlank(value) ? null : value.trim();
     }
 
     private void validateDuration(Integer duration, String durationUnit) {

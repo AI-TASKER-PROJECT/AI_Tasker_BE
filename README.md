@@ -121,6 +121,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/milestones/{milestoneId}/start`
   - `POST /api/v1/milestones/{milestoneId}/deliverables`
   - `GET /api/v1/milestones/{milestoneId}/deliverables`
+  - `POST /api/v1/milestones/{milestoneId}/source-code-file` (multipart ZIP, tối đa 50 MB)
   - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
   - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
   - `POST /api/v1/milestones/{milestoneId}/approve`

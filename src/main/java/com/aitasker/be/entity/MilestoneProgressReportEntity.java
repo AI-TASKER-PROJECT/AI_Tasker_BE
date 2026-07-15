@@ -37,6 +37,8 @@ public class MilestoneProgressReportEntity {
     private String attachmentUrl;
     @Column(name = "source_code_url")
     private String sourceCodeUrl;
+    @Column(name = "source_code_file_url")
+    private String sourceCodeFileUrl;
     @Column(name = "demo_link")
     private String demoLink;
     @Column(name = "submission_notes")

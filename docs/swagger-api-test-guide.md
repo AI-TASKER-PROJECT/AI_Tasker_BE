@@ -1265,13 +1265,31 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `milestoneId` (path, required, integer)
 - Body raw:
 ```json
-{ "schema": "DeliverableEntity" }
+{
+  "sourceCodeUrl": "https://github.com/expert/project",
+  "sourceCodeFileUrl": "milestone-source-code/milestones/10/accounts/99/source.zip",
+  "demoLink": "https://demo.example.com",
+  "submissionNotes": "Release v1.0"
+}
 ```
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/milestones/{milestoneId}/source-code-file`
+- OperationId: `uploadMilestoneSourceCode`
+- Auth: Bearer JWT (approved assigned EXPERT)
+- Giai thich: Upload source code ZIP toi da 50 MB; tra ve Firebase storage path de gan vao `sourceCodeFileUrl`.
+- Params:
+  - `milestoneId` (path, required, integer)
+- Body: `multipart/form-data`, key `file`, chi nhan `.zip`.
+- Ma phan hoi thuong gap:
+  - `200`: Upload thanh cong, `data` la storage path.
+  - `400`: File rong, sai dinh dang, qua 50 MB, contract/milestone sai trang thai.
+  - `401`/`403`: Sai token, sai role, Expert khong thuoc contract.
+  - `500`: Firebase chua cau hinh hoac upload that bai.
 
 ### GET `/api/v1/milestones/{milestoneId}/criteria`
 - OperationId: `listCriteria`
@@ -1533,7 +1551,15 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `milestoneId` (path, required, integer)
 - Body raw:
 ```json
-{ "schema": "ProgressReportRequest" }
+{
+  "content": "Da hoan thanh API va giao dien chinh",
+  "percentComplete": 70,
+  "attachmentUrl": "https://docs.example.com/report",
+  "sourceCodeUrl": "https://github.com/expert/project",
+  "sourceCodeFileUrl": "milestone-source-code/milestones/10/accounts/99/source.zip",
+  "demoLink": "https://demo.example.com",
+  "submissionNotes": "Checkpoint lan 1"
+}
 ```
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.

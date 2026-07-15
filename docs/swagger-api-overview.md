@@ -2,9 +2,9 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **184**.
+- Tong so REST endpoint trong Swagger runtime: **185**.
 - Public endpoint: **21**.
-- Endpoint can Bearer JWT: **163**.
+- Endpoint can Bearer JWT: **164**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -185,6 +185,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 57 | GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Operation getContract. |
 | 58 | GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Operation listMilestones. |
 | 59 | GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Operation listDisputes. |
+| 60 | POST | `/api/v1/milestones/{milestoneId}/source-code-file` | Bearer JWT | Approved assigned Expert uploads one ZIP source archive, maximum 50 MB. |
 
 ## Notification Flow
 

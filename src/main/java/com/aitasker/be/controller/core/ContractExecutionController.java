@@ -27,6 +27,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 // Note: Annotation này biến class thành REST controller để nhận request và trả JSON.
 @RestController
@@ -162,6 +163,17 @@ public class ContractExecutionController {
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports")
     public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> submitProgressReport(@PathVariable Integer contractId, @PathVariable Integer milestoneId, @RequestBody ProgressReportRequest request) {
         return ResponseEntity.ok(ApiResponse.success("SUBMIT PROGRESS REPORT SUCCESS", service.submitProgressReport(contractId, milestoneId, request)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/source-code-file")
+    public ResponseEntity<ApiResponse<String>> uploadMilestoneSourceCode(
+            @PathVariable Integer milestoneId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "UPLOAD MILESTONE SOURCE CODE SUCCESS",
+                service.uploadMilestoneSourceCode(milestoneId, file)
+        ));
     }
 
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-report-request")

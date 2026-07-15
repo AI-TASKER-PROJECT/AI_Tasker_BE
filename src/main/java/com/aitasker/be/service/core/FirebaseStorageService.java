@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +26,7 @@ import java.util.UUID;
 @Service
 public class FirebaseStorageService {
     private static final long MAX_FILE_SIZE_BYTES = 10L * 1024 * 1024;
+    private static final long MAX_SOURCE_CODE_ARCHIVE_SIZE_BYTES = 50L * 1024 * 1024;
     private static final List<String> ALLOWED_CONTENT_TYPES = List.of(
             "image/jpeg",
             "image/png",
@@ -38,6 +40,17 @@ public class FirebaseStorageService {
         validateFirebaseReady();
         validateFile(file);
 
+        return store(file, folder);
+    }
+
+    public String uploadSourceCodeArchive(MultipartFile file, String folder) {
+        validateFirebaseReady();
+        validateSourceCodeArchive(file);
+
+        return store(file, folder);
+    }
+
+    private String store(MultipartFile file, String folder) {
         String objectName = folder + "/" + UUID.randomUUID() + "-" + sanitizeFileName(file.getOriginalFilename());
         try {
             Bucket bucket = StorageClient.getInstance().bucket();
@@ -47,6 +60,41 @@ public class FirebaseStorageService {
             throw new AppException("KHONG DOC DUOC FILE CAN UPLOAD");
         } catch (RuntimeException ex) {
             throw new AppException("UPLOAD FIREBASE STORAGE THAT BAI");
+        }
+    }
+
+    void validateSourceCodeArchive(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException("FILE SOURCE CODE KHONG HOP LE");
+        }
+        if (file.getSize() > MAX_SOURCE_CODE_ARCHIVE_SIZE_BYTES) {
+            throw new AppException("FILE SOURCE CODE KHONG DUOC VUOT QUA 50MB");
+        }
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || !originalName.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
+            throw new AppException("FILE SOURCE CODE PHAI CO DINH DANG ZIP");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !List.of(
+                "application/zip",
+                "application/x-zip-compressed",
+                "application/octet-stream"
+        ).contains(contentType)) {
+            throw new AppException("DINH DANG FILE SOURCE CODE KHONG DUOC HO TRO");
+        }
+        try (InputStream input = file.getInputStream()) {
+            byte[] signature = input.readNBytes(4);
+            boolean validZipSignature = signature.length == 4
+                    && signature[0] == 0x50
+                    && signature[1] == 0x4B
+                    && ((signature[2] == 0x03 && signature[3] == 0x04)
+                    || (signature[2] == 0x05 && signature[3] == 0x06)
+                    || (signature[2] == 0x07 && signature[3] == 0x08));
+            if (!validZipSignature) {
+                throw new AppException("FILE SOURCE CODE KHONG PHAI ZIP HOP LE");
+            }
+        } catch (IOException ex) {
+            throw new AppException("KHONG DOC DUOC FILE SOURCE CODE");
         }
     }
 

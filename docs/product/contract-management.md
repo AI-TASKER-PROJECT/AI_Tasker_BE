@@ -72,6 +72,11 @@ Alternate exits:
   is `ACTIVE`, both NDA signatures exist, and the milestone is `IN_PROGRESS` or
   `OVERDUE`. First submission and correction/resubmission use the same endpoint,
   retain submission rounds, and move the milestone to `UNDER_REVIEW`.
+- Final deliverables must include at least one source-code handoff:
+  `sourceCodeUrl` for a repository or `sourceCodeFileUrl` for an uploaded ZIP;
+  both are allowed. `demoLink` remains a separate runnable-product URL. Source
+  archives are uploaded first through the milestone-scoped authenticated route,
+  accept ZIP only, and are capped at 50 MB.
 - The owning business can deposit milestone escrow only from `PENDING`; a
   successful deposit automatically moves both milestone records to
   `IN_PROGRESS` and starts the execution timeline. The Expert start endpoint is
@@ -168,6 +173,7 @@ Alternate exits:
 - `POST /api/v1/termination-requests/{terminationRequestId}/withdraw`
 - `POST /api/v1/milestones/{milestoneId}/deliverables`
 - `GET /api/v1/milestones/{milestoneId}/deliverables`
+- `POST /api/v1/milestones/{milestoneId}/source-code-file`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`

@@ -11,6 +11,7 @@ import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
+import com.aitasker.be.dto.core.ProgressReportRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.AcceptanceCriteriaEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
@@ -43,6 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -103,6 +105,7 @@ class ContractExecutionServiceTest {
     @Mock private PaymentWalletService paymentWalletService;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
+    @Mock private FirebaseStorageService firebaseStorageService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private JobDomainRepository jobDomainRepository;
     @Mock private JobSkillRepository jobSkillRepository;
@@ -828,7 +831,8 @@ class ContractExecutionServiceTest {
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
                 .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("IN_PROGRESS")
                 .build();
-        DeliverableEntity input = DeliverableEntity.builder().milestoneId(10).build();
+        DeliverableEntity input = DeliverableEntity.builder().milestoneId(10)
+                .sourceCodeUrl("https://github.com/expert/project").build();
         DeliverableEntity saved = DeliverableEntity.builder()
                 .deliverableId(100).milestoneId(10).build();
         BusinessProfileEntity business = BusinessProfileEntity.builder()
@@ -872,7 +876,8 @@ class ContractExecutionServiceTest {
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
                 .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("IN_PROGRESS")
                 .build();
-        DeliverableEntity input = DeliverableEntity.builder().milestoneId(10).build();
+        DeliverableEntity input = DeliverableEntity.builder().milestoneId(10)
+                .sourceCodeUrl("https://github.com/expert/project").build();
         DeliverableEntity saved = DeliverableEntity.builder()
                 .deliverableId(100).milestoneId(10).build();
         BusinessProfileEntity business = BusinessProfileEntity.builder()
@@ -920,7 +925,8 @@ class ContractExecutionServiceTest {
         when(expertProfileRepository.findByAccountId(99)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
 
         AppException ex = assertThrows(AppException.class,
-                () -> contractExecutionService.submitDeliverable(DeliverableEntity.builder().milestoneId(10).build()));
+                () -> contractExecutionService.submitDeliverable(DeliverableEntity.builder().milestoneId(10)
+                        .sourceCodeUrl("https://github.com/expert/project").build()));
 
         assertEquals("MILESTONE CHUA SAN SANG DE SUBMIT DELIVERABLE", ex.getMessage());
         verify(deliverableRepository, never()).save(any());
@@ -955,10 +961,78 @@ class ContractExecutionServiceTest {
         when(milestoneRepository.save(any(MilestoneEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(businessProfileRepository.findById(10)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).accountId(20).build()));
 
-        contractExecutionService.submitDeliverable(DeliverableEntity.builder().milestoneId(10).build());
+        contractExecutionService.submitDeliverable(DeliverableEntity.builder().milestoneId(10)
+                .sourceCodeFileUrl("milestone-source-code/milestones/10/accounts/99/source.zip").build());
 
         assertEquals("UNDER_REVIEW", milestone.getStatus());
         assertEquals("UNDER_REVIEW", cm.getStatus());
+    }
+
+    @Test
+    void submitDeliverable_shouldRejectWhenRepositoryUrlAndFileAreBothMissing() {
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.submitDeliverable(
+                        DeliverableEntity.builder().milestoneId(10).build()));
+
+        assertEquals("PHAI CUNG CAP SOURCE CODE URL HOAC FILE SOURCE CODE", ex.getMessage());
+        verify(milestoneRepository, never()).findById(any());
+        verify(deliverableRepository, never()).save(any());
+    }
+
+    @Test
+    void submitDeliverable_shouldRejectSourceArchiveFromAnotherExpertFolder() {
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99)
+                        .role(RoleEntity.builder().roleName("EXPERT").build()).build());
+        when(milestoneRepository.findById(10)).thenReturn(Optional.of(
+                MilestoneEntity.builder().milestoneId(10).jobId(2).build()));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.submitDeliverable(DeliverableEntity.builder()
+                        .milestoneId(10)
+                        .sourceCodeFileUrl("milestone-source-code/milestones/10/accounts/88/source.zip")
+                        .build()));
+
+        assertEquals("FILE SOURCE CODE KHONG THUOC MILESTONE HOAC EXPERT HIEN TAI", ex.getMessage());
+        verify(deliverableRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadMilestoneSourceCode_shouldDelegateToDedicatedZipStorageAndAudit() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(10).jobId(2).contractId(1).status("IN_PROGRESS").build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).jobId(2).businessId(10).expertId(5)
+                .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .expertNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .status("ACTIVE")
+                .build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10)
+                .status("IN_PROGRESS").build();
+        AccountEntity actor = AccountEntity.builder().accountId(99)
+                .role(RoleEntity.builder().roleName("EXPERT").build()).build();
+        MultipartFile file = org.mockito.Mockito.mock(MultipartFile.class);
+        String expectedPath = "milestone-source-code/milestones/10/accounts/99/source.zip";
+
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(milestoneRepository.findById(10)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findByJobId(2)).thenReturn(Optional.of(contract));
+        when(expertProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(firebaseStorageService.uploadSourceCodeArchive(
+                file, "milestone-source-code/milestones/10/accounts/99"))
+                .thenReturn(expectedPath);
+
+        String result = contractExecutionService.uploadMilestoneSourceCode(10, file);
+
+        assertEquals(expectedPath, result);
+        verify(firebaseStorageService).uploadSourceCodeArchive(
+                file, "milestone-source-code/milestones/10/accounts/99");
+        verify(auditLogService).record(
+                AuditLogService.ACTION_UPLOAD_MILESTONE_SOURCE_CODE,
+                "milestones", "10", 99);
     }
 
     @Test
@@ -1174,10 +1248,16 @@ class ContractExecutionServiceTest {
         when(milestoneProgressReportRepository.findByMilestoneIdOrderByCreatedAtAsc(200)).thenReturn(List.of());
         when(milestoneProgressReportRepository.save(any(MilestoneProgressReportEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        MilestoneProgressReportEntity result = contractExecutionService.submitProgressReport(1, 200, "Progress", 50, null);
+        ProgressReportRequest request = new ProgressReportRequest();
+        request.setContent("Progress");
+        request.setPercentComplete(50);
+        request.setSourceCodeFileUrl("milestone-source-code/milestones/200/source.zip");
+
+        MilestoneProgressReportEntity result = contractExecutionService.submitProgressReport(1, 200, request);
 
         assertNull(result.getCheckpointType());
         assertFalse(result.getIsLate());
+        assertEquals("milestone-source-code/milestones/200/source.zip", result.getSourceCodeFileUrl());
     }
 
     @Test
