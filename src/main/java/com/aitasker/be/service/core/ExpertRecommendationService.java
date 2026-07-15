@@ -128,6 +128,7 @@ public class ExpertRecommendationService {
         }
 
         expertRecommendationRepository.deleteByJobPostingId(jobPostingId);
+        expertRecommendationRepository.flush();
         expertRecommendationRepository.saveAll(toEntities(jobPostingId, normalizedRecommendations));
 
         return ExpertRecommendationListResponse.builder()
