@@ -69,9 +69,11 @@ Alternate exits:
 - Expert rejection is allowed only from `DRAFT` or `PENDING`; it moves the
   contract to `CANCELLED` and the job back to `OPEN`.
 - Deliverables can be submitted only by the contract Expert while the contract
-  is `ACTIVE`, both NDA signatures exist, and the milestone is `IN_PROGRESS` or
-  `OVERDUE`. First submission and correction/resubmission use the same endpoint,
-  retain submission rounds, and move the milestone to `UNDER_REVIEW`.
+  is `ACTIVE`, both NDA signatures exist, the milestone is `IN_PROGRESS`, and
+  the contract snapshot deadline has not passed. First submission and
+  correction/resubmission use the same endpoint, retain submission rounds, and
+  move the milestone to `UNDER_REVIEW`; neither is accepted after the original
+  execution deadline. Source-code ZIP upload follows the same deadline rule.
 - Final deliverables must include at least one source-code handoff:
   `sourceCodeUrl` for a repository or `sourceCodeFileUrl` for an uploaded ZIP;
   both are allowed. `demoLink` remains a separate runnable-product URL. Source
@@ -101,8 +103,8 @@ Alternate exits:
   must explicitly invoke the dispute API for a genuine disagreement.
 - Business on-demand progress-report requests use a durable request history:
   the first response SLA is 24 hours and later requests use 12 hours. Reports
-  and deliverables remain accepted in `OVERDUE`; missed deadlines do not move
-  money automatically.
+  remain accepted in `OVERDUE`; final deliverables and source-code ZIP uploads
+  do not. Missed deadlines do not move money automatically.
 - Staff decision is separate from settlement execution: assigned Staff moves a
   dispute to `STAFF_DECIDED`; Admin settlement execution then splits escrow,
   marks the milestone `COMPLETED`, sets the dispute `RESOLVED`, and records the

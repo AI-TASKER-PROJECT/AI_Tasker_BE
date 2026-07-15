@@ -45,6 +45,8 @@ public class ContractExecutionService {
     private static final int DEFAULT_STAFF_MAX_ACTIVE_DISPUTES = 5;
     private static final double MIN_STAFF_SPECIALIZATION_SCORE = 0.70d;
     private static final double STAFF_SPECIALIZATION_TOLERANCE = 0.20d;
+    private static final String MILESTONE_DELIVERABLE_DEADLINE_EXCEEDED =
+            "MILESTONE_DA_QUA_HAN_NOP_SAN_PHAM";
 
     private final AccessService accessService;
     private final AccountRepository accountRepository;
@@ -639,7 +641,12 @@ public class ContractExecutionService {
                 .contains(milestone.getStatus())) {
             throw new AppException("MILESTONE CHUA SAN SANG DE SUBMIT DELIVERABLE");
         }
-        ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestone.getMilestoneId());
+        ContractMilestoneEntity contractMilestone = findContractMilestone(
+                contract.getContractId(), milestone.getMilestoneId());
+        requireDeliverableSubmissionBeforeDeadline(contractMilestone);
+        if (!ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(contractMilestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA SAN SANG DE SUBMIT DELIVERABLE");
+        }
         ensureEscrowNotReleased(contractMilestone);
         List<DeliverableEntity> prior = deliverableRepository
                 .findByMilestoneIdOrderBySubmissionRoundDesc(milestone.getMilestoneId());
@@ -689,6 +696,10 @@ public class ContractExecutionService {
             throw new AppException("MILESTONE CHUA SAN SANG DE UPLOAD SOURCE CODE");
         }
         ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestoneId);
+        requireDeliverableSubmissionBeforeDeadline(contractMilestone);
+        if (!ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(contractMilestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA SAN SANG DE UPLOAD SOURCE CODE");
+        }
         ensureEscrowNotReleased(contractMilestone);
         String path = firebaseStorageService.uploadSourceCodeArchive(
                 file,
@@ -1014,6 +1025,17 @@ public class ContractExecutionService {
     private LocalDateTime milestoneDueAt(ContractMilestoneEntity item) {
         if (item.getInProgressStartedAt() == null || item.getDuration() == null || item.getDuration() <= 0) return null;
         return item.getInProgressStartedAt().plusDays(durationToDays(item.getDuration(), item.getDurationUnit()));
+    }
+
+    private void requireDeliverableSubmissionBeforeDeadline(ContractMilestoneEntity milestone) {
+        if (ContractMilestoneEntity.STATUS_OVERDUE.equals(milestone.getStatus())) {
+            throw new AppException(MILESTONE_DELIVERABLE_DEADLINE_EXCEEDED);
+        }
+        if (!ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(milestone.getStatus())) return;
+        LocalDateTime dueAt = milestoneDueAt(milestone);
+        if (dueAt != null && LocalDateTime.now().isAfter(dueAt)) {
+            throw new AppException(MILESTONE_DELIVERABLE_DEADLINE_EXCEEDED);
+        }
     }
 
     // Note: Bao cao dau tien nop cho checkpoint MIDPOINT, sau do PRE_DEADLINE; qua 2 moc thi bao cao them khong gan checkpoint (checkpointType = null).

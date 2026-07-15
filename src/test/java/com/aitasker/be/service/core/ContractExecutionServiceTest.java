@@ -62,6 +62,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
@@ -832,6 +833,8 @@ class ContractExecutionServiceTest {
                 .build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
                 .contractMilestoneId(100).contractId(1).jobMilestoneId(10).status("IN_PROGRESS")
+                .inProgressStartedAt(LocalDateTime.now().minusHours(1))
+                .duration(1).durationUnit("DAY")
                 .build();
         DeliverableEntity input = DeliverableEntity.builder().milestoneId(10)
                 .sourceCodeUrl("https://github.com/expert/project").build();
@@ -982,6 +985,79 @@ class ContractExecutionServiceTest {
     }
 
     @Test
+    void submitDeliverable_shouldRejectLateResubmissionEvenWhenStatusIsStillInProgress() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(10).jobId(2).contractId(1)
+                .milestoneName("Milestone X").status("IN_PROGRESS")
+                .build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).jobId(2).businessId(10).expertId(5)
+                .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .expertNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .status("ACTIVE")
+                .build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10)
+                .status("IN_PROGRESS").resubmitCount(1)
+                .inProgressStartedAt(LocalDateTime.now().minusDays(2))
+                .duration(1).durationUnit("DAY")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99)
+                        .role(RoleEntity.builder().roleName("EXPERT").build()).build());
+        when(milestoneRepository.findById(10)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findByJobId(2)).thenReturn(Optional.of(contract));
+        when(expertProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.submitDeliverable(DeliverableEntity.builder()
+                        .milestoneId(10).sourceCodeUrl("https://github.com/expert/project").build()));
+
+        assertEquals("MILESTONE_DA_QUA_HAN_NOP_SAN_PHAM", ex.getMessage());
+        verify(deliverableRepository, never()).save(any());
+        verify(milestoneRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void submitDeliverable_shouldRejectMilestoneAlreadyMarkedOverdue() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(10).jobId(2).contractId(1)
+                .milestoneName("Milestone X").status("OVERDUE")
+                .build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).jobId(2).businessId(10).expertId(5)
+                .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .expertNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .status("ACTIVE")
+                .build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10)
+                .status("OVERDUE")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99)
+                        .role(RoleEntity.builder().roleName("EXPERT").build()).build());
+        when(milestoneRepository.findById(10)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findByJobId(2)).thenReturn(Optional.of(contract));
+        when(expertProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.submitDeliverable(DeliverableEntity.builder()
+                        .milestoneId(10).sourceCodeUrl("https://github.com/expert/project").build()));
+
+        assertEquals("MILESTONE_DA_QUA_HAN_NOP_SAN_PHAM", ex.getMessage());
+        verify(deliverableRepository, never()).save(any());
+        verify(milestoneRepository, never()).save(any());
+    }
+
+    @Test
     void submitDeliverable_shouldRejectSourceArchiveFromAnotherExpertFolder() {
         when(accessService.currentAccount()).thenReturn(
                 AccountEntity.builder().accountId(99)
@@ -1011,7 +1087,10 @@ class ContractExecutionServiceTest {
                 .build();
         ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
                 .contractMilestoneId(100).contractId(1).jobMilestoneId(10)
-                .status("IN_PROGRESS").build();
+                .status("IN_PROGRESS")
+                .inProgressStartedAt(LocalDateTime.now().minusHours(1))
+                .duration(1).durationUnit("DAY")
+                .build();
         AccountEntity actor = AccountEntity.builder().accountId(99)
                 .role(RoleEntity.builder().roleName("EXPERT").build()).build();
         MultipartFile file = org.mockito.Mockito.mock(MultipartFile.class);
@@ -1035,6 +1114,41 @@ class ContractExecutionServiceTest {
         verify(auditLogService).record(
                 AuditLogService.ACTION_UPLOAD_MILESTONE_SOURCE_CODE,
                 "milestones", "10", 99);
+    }
+
+    @Test
+    void uploadMilestoneSourceCode_shouldRejectAfterDeadlineWithoutUploading() {
+        MilestoneEntity milestone = MilestoneEntity.builder()
+                .milestoneId(10).jobId(2).contractId(1).status("IN_PROGRESS").build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).jobId(2).businessId(10).expertId(5)
+                .businessNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .expertNdaSignedAt(LocalDateTime.now().minusDays(1))
+                .status("ACTIVE")
+                .build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(10)
+                .status("IN_PROGRESS")
+                .inProgressStartedAt(LocalDateTime.now().minusDays(8))
+                .duration(1).durationUnit("WEEK")
+                .build();
+        AccountEntity actor = AccountEntity.builder().accountId(99)
+                .role(RoleEntity.builder().roleName("EXPERT").build()).build();
+        MultipartFile file = org.mockito.Mockito.mock(MultipartFile.class);
+
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(milestoneRepository.findById(10)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findByJobId(2)).thenReturn(Optional.of(contract));
+        when(expertProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.uploadMilestoneSourceCode(10, file));
+
+        assertEquals("MILESTONE_DA_QUA_HAN_NOP_SAN_PHAM", ex.getMessage());
+        verifyNoInteractions(firebaseStorageService);
+        verifyNoInteractions(auditLogService);
     }
 
     @Test

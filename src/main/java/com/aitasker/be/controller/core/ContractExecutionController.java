@@ -155,6 +155,8 @@ public class ContractExecutionController {
     }
 
     @PostMapping("/milestones/{milestoneId}/deliverables")
+    @Operation(summary = "Submit milestone deliverable",
+            description = "The assigned Expert submits the final deliverable before the contract milestone deadline. First submissions and resubmissions are rejected after the deadline or when the milestone is OVERDUE.")
     public ResponseEntity<ApiResponse<DeliverableEntity>> submitMilestoneDeliverable(@PathVariable Integer milestoneId, @RequestBody DeliverableEntity request) {
         request.setMilestoneId(milestoneId);
         return ResponseEntity.ok(ApiResponse.success("SUBMIT DELIVERABLE SUCCESS", service.submitDeliverable(request)));
@@ -166,6 +168,8 @@ public class ContractExecutionController {
     }
 
     @PostMapping("/milestones/{milestoneId}/source-code-file")
+    @Operation(summary = "Upload milestone source-code ZIP",
+            description = "The assigned Expert uploads a ZIP source archive before the contract milestone deadline. Upload is rejected after the deadline or when the milestone is OVERDUE.")
     public ResponseEntity<ApiResponse<String>> uploadMilestoneSourceCode(
             @PathVariable Integer milestoneId,
             @RequestParam("file") MultipartFile file

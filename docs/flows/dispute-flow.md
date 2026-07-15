@@ -1,8 +1,8 @@
 # Flow Tranh Chấp (Dispute)
 
-**Phiên bản:** v2.3  
-**Spec:** `SPEC-MILESTONE-DISPUTER.md` mục 10  
-**Implement:** US-045 + US-048
+**Phiên bản:** v2.4
+**Spec:** `SPEC-MILESTONE-DISPUTER.md` mục 10
+**Implement:** US-045 + US-048 + US-050 + US-062
 
 ---
 
@@ -22,6 +22,15 @@ v2.3 thay đổi so với v2.2:
 - Staff decision **tự động trigger settlement** (không cần Admin execute riêng)
 - `INTERVENTION_REJECTED` không còn là valid status cho dispute mới
 
+v2.4 bổ sung cân bằng tải Staff:
+- Chỉ Staff có account `Approved`, khớp domain và không trùng tài khoản participant mới đủ điều kiện
+- Tạo nhóm đủ chuyên môn từ domain coverage 60% + skill coverage 40%
+- Trong nhóm đủ chuyên môn, ưu tiên workload thấp nhất
+- Giới hạn tải bằng `dispute_staff_max_active_cases`, mặc định `5`
+- Hết capacity thì giữ dispute ở `ESCALATION_REQUESTED`, không gán quá tải
+- Khóa Staff pool trong transaction để hai request đồng thời không đọc cùng workload cũ
+- Seed bảo đảm mỗi business domain có tối thiểu 2 Staff
+
 ---
 
 ## Sơ đồ trạng thái Dispute
@@ -31,7 +40,8 @@ v2.3 thay đổi so với v2.2:
                     /        |          \
                    /         |           \
         ESCALATION_REQUESTED |            CANCELLED (initiator withdraw)
-              |              | RESOLVED (Business approve sau self-resolve)
+              |\             | RESOLVED (Business approve sau self-resolve)
+              | \-- no eligible/capacity --> giữ ESCALATION_REQUESTED
               |              |
         STAFF_REVIEWING       |
               |               |
@@ -90,7 +100,7 @@ v2.3 thay đổi so với v2.2:
     │   │
     │   ├── Actor: Business hoặc Expert
     │   ├── [Gate] dispute status = PENDING_SELF_RESOLVE
-    │   ├── [Gate] cần reason + evidenceFile (không được rỗng)
+    │   ├── [Gate] cần reason không được rỗng; evidenceFile là tùy chọn
     │   │
     │   ├── Lưu escalationReason, escalationEvidenceFile
     │   ├── escalationRequestedByAccountId + escalationRequestedAt
@@ -186,6 +196,181 @@ v2.3 thay đổi so với v2.2:
             └── Nếu tất cả milestones COMPLETED → contract COMPLETED
                 └── Auto refund participant deposits → contract CLOSED
 ```
+
+---
+
+## Luồng chọn và cân bằng Staff (US-062)
+
+### 1. Dữ liệu đầu vào
+
+```text
+dispute
+  -> contract
+      -> job_domains
+      -> job_skills
+
+system_settings
+  -> dispute_staff_max_active_cases (default = 5)
+
+staffs
+  -> account.status
+  -> staff_domains
+  -> staff_skills
+  -> active disputes hiện tại
+  -> staffReviewStartedAt gần nhất
+```
+
+### 2. Khóa và tạo danh sách ứng viên
+
+Khi auto-route hoặc `route-staff` thủ công, backend chạy trong một transaction:
+
+```text
+1. Lock toàn bộ Staff rows theo staffId ASC (PESSIMISTIC_WRITE)
+2. Đọc lại workload sau khi lấy lock
+3. Tính ứng viên và chọn Staff
+4. Gán assignedStaffId + lưu dispute
+5. Commit -> giải phóng lock
+```
+
+Việc lock theo cùng một thứ tự giúp hai request routing đồng thời không cùng chọn
+một Staff dựa trên workload cũ và giảm nguy cơ deadlock.
+
+### 3. Hard eligibility gates
+
+Một Staff chỉ đi tiếp khi thỏa toàn bộ điều kiện:
+
+```text
+account.status = Approved
+AND matchedJobDomains >= 1
+AND staff.accountId không thuộc Business/Expert participant của contract
+```
+
+Staff không khớp domain, account chưa được duyệt hoặc xung đột participant sẽ bị
+loại trước khi tính điểm. `PROFILE_REVIEW` vẫn tách biệt và không được dùng làm
+fallback cho tranh chấp hợp đồng.
+
+### 4. Tính điểm chuyên môn
+
+Khi job có cả domain và skill:
+
+```text
+domainCoverage = matchedDomainCount / totalJobDomainCount
+skillCoverage  = matchedSkillCount  / totalJobSkillCount
+
+specializationScore = domainCoverage * 60% + skillCoverage * 40%
+```
+
+Nếu job không có skill, điểm chuyên môn bằng `domainCoverage`.
+
+Ngưỡng nhóm đủ chuyên môn:
+
+```text
+bestScore = điểm cao nhất trong danh sách eligible
+
+Nếu bestScore >= 70%:
+  threshold = max(70%, bestScore - 20%)
+Nếu bestScore < 70%:
+  threshold = max(0%, bestScore - 20%)
+
+qualified = specializationScore >= threshold
+```
+
+Cơ chế này giữ Staff đủ gần với ứng viên tốt nhất, nhưng không để một Staff hơn
+nhẹ về chuyên môn nhận toàn bộ đơn.
+
+### 5. Capacity và workload
+
+```text
+active workload = số dispute được gán có status thuộc:
+  - PENDING_SELF_RESOLVE
+  - ESCALATION_REQUESTED
+  - STAFF_REVIEWING
+  - STAFF_DECIDED
+
+capacity = dispute_staff_max_active_cases (default 5)
+available = active workload < capacity
+```
+
+Giá trị `availability` trả về trong candidate response:
+
+| Giá trị | Điều kiện |
+|---|---|
+| `IDLE` | workload = 0 |
+| `BUSY` | 0 < workload < capacity |
+| `AT_CAPACITY` | workload >= capacity |
+
+### 6. Thứ tự auto-route
+
+Auto-route chỉ chọn Staff vừa `qualified` vừa `available`, sau đó sắp xếp:
+
+```text
+1. active workload ASC
+2. specializationScore DESC
+3. lastAssignedAt ASC (chưa từng nhận được ưu tiên trước)
+4. staffId ASC
+```
+
+Ví dụ hai Staff ngang chuyên môn và cùng capacity:
+
+```text
+6 dispute liên tiếp
+  -> Staff A: 3 dispute
+  -> Staff B: 3 dispute
+```
+
+### 7. Kết quả auto-route
+
+```text
+Có qualified Staff còn capacity
+  -> assignedStaffId = selectedStaffId
+  -> status = STAFF_REVIEWING
+  -> tạo evidence/SLA deadlines
+  -> notify assigned Staff + contract participants
+
+Không có Staff khớp domain/Approved/conflict-free
+  -> status giữ ESCALATION_REQUESTED
+  -> assignedStaffId giữ null
+
+Có Staff đủ chuyên môn nhưng tất cả đạt capacity
+  -> status giữ ESCALATION_REQUESTED
+  -> assignedStaffId giữ null
+```
+
+Không có fallback sang Staff ngoài domain và không gán vượt capacity.
+
+### 8. Route thủ công
+
+`POST /api/v1/disputes/{disputeId}/route-staff?staffId=...`
+
+```text
+staffId = null
+  -> chạy đúng auto-route algorithm
+
+staffId có giá trị
+  -> bắt buộc account Approved
+  -> bắt buộc khớp ít nhất 1 domain
+  -> bắt buộc không xung đột participant
+  -> bắt buộc workload < capacity
+  -> Staff có thể override thứ tự specialization trong nhóm eligible
+```
+
+Các kết quả lỗi khi gọi routing trực tiếp:
+
+| Mã lỗi | Khi nào |
+|---|---|
+| `NO_MATCHING_STAFF_FOR_JOB_DOMAIN` | Auto-route không có Staff eligible |
+| `NO_AVAILABLE_STAFF_CAPACITY` | Auto-route có ứng viên nhưng không còn capacity |
+| `STAFF KHONG HOAT DONG HOAC KHONG CO DOMAIN TUONG UNG VOI JOB` | Staff chỉ định không eligible |
+| `STAFF_DA_DAT_GIOI_HAN_DISPUTE_DANG_XU_LY` | Staff chỉ định đã đạt capacity |
+
+### 9. PostgreSQL support
+
+| Thành phần | Vai trò |
+|---|---|
+| `idx_disputes_active_staff_workload` | Hỗ trợ đếm active workload theo Staff |
+| `idx_disputes_staff_last_assigned` | Hỗ trợ tie-break theo lần nhận gần nhất |
+| V60 | Capacity setting + mở rộng độ phủ domain |
+| V61 | Index lịch sử assignment |
 
 ---
 
