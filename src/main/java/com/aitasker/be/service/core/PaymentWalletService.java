@@ -264,6 +264,7 @@ public class PaymentWalletService {
             grantQuota(actor.getAccountId(), QUOTA_PROPOSAL, membershipPackage.getProposalQuota(), "MEMBERSHIP", purchase.getPurchaseId());
         }
 
+        systemWalletService.syncWallet();
         auditLogService.record(ACTION_PURCHASE_MEMBERSHIP, "membership_purchases",
                 String.valueOf(purchase.getPurchaseId()), actor.getAccountId());
         return completed(purchase, "MEMBERSHIP_PURCHASE_SUCCESS");

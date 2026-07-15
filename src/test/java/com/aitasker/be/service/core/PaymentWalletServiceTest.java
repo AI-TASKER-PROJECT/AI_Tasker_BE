@@ -284,6 +284,7 @@ class PaymentWalletServiceTest {
         assertNotNull(premiumExpiredAt);
         assertEquals(premiumExpiredAt, quota.getPremiumExpiredAt());
         assertTrue(quota.getPremiumExpiredAt().isAfter(LocalDateTime.now()));
+        verify(systemWalletService, org.mockito.Mockito.times(2)).syncWallet();
     }
 
     @Test

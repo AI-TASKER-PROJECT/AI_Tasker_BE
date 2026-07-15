@@ -1081,11 +1081,13 @@ public class ContractExecutionService {
     }
 
     @Transactional
+    // Chức năng 1: Khởi tạo hồ sơ tranh chấp cho milestone với thông tin mặc định.
     public DisputeEntity initiateDispute(Integer contractId, Integer milestoneId, String initiatedBy, String initiationType) {
         return initiateDispute(contractId, milestoneId, initiatedBy, initiationType, null);
     }
 
     @Transactional
+    // Chức năng 2: Khởi tạo hồ sơ tranh chấp cho milestone kèm lý do ban đầu.
     public DisputeEntity initiateDispute(Integer contractId, Integer milestoneId, String initiatedBy, String initiationType, String reason) {
         requireApprovedForBusinessOrExpert();
         ContractEntity contract = requireContractParticipantOrOperator(contractId);
@@ -1363,6 +1365,7 @@ public class ContractExecutionService {
         return transactionRepository.findByMilestoneId(milestoneId);
     }
     // Note: Hàm `listDisputesByContract` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 3: Lấy danh sách tranh chấp thuộc một hợp đồng.
     public List<DisputeEntity> listDisputesByContract(Integer contractId) {
         AccountEntity actor = accessService.currentAccount();
         requireContractParticipantOrOperator(contractId);
@@ -1378,6 +1381,7 @@ public class ContractExecutionService {
                 .toList();
     }
     // Note: Hàm `getDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 4: Lấy chi tiết hồ sơ tranh chấp để hiển thị và xử lý.
     public DisputeEntity getDispute(Integer disputeId) {
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
         AccountEntity actor = accessService.currentAccount();
@@ -1440,6 +1444,7 @@ public class ContractExecutionService {
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
+    // Chức năng 5: Gán tranh chấp cho Staff xử lý sau khi đã yêu cầu can thiệp.
     public DisputeEntity routeDispute(Integer disputeId, Integer staffId) {
         accessService.requireRole("STAFF");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
@@ -1462,6 +1467,7 @@ public class ContractExecutionService {
         return routeDisputeToStaff(dispute, routedStaffId, accessService.currentAccount().getAccountId());
     }
 
+    // Chức năng 6: Cập nhật trạng thái tranh chấp sang Staff reviewing và lưu Staff phụ trách.
     private DisputeEntity routeDisputeToStaff(DisputeEntity dispute, Integer staffId, Integer actorAccountId) {
         staffRepository.findById(staffId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY STAFF"));
         dispute.setAssignedStaffId(staffId);
@@ -1491,6 +1497,7 @@ public class ContractExecutionService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `resolveDispute` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 7: Admin xử lý tranh chấp theo hướng giải quyết thủ công.
     public DisputeEntity resolveDispute(Integer disputeId, String proposedAction) {
         accessService.requireRole("ADMIN");
         // ADMIN CHOT PHUONG AN XU LY TRANH CHAP VA DONG CASE.
@@ -1542,6 +1549,7 @@ public class ContractExecutionService {
     }
 
     @Transactional
+    // Chức năng 8: Đánh dấu các tranh chấp quá hạn SLA xử lý của Staff.
     public List<DisputeEntity> escalateOverdueStaffDisputes() {
         accessService.requireRole("ADMIN");
         Integer actorAccountId = accessService.currentAccount().getAccountId();
@@ -1695,6 +1703,7 @@ public class ContractExecutionService {
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY CONTRACT MILESTONE"));
     }
 
+    // Chức năng 9: Liệt kê Staff phù hợp để xử lý tranh chấp theo domain và skill.
     public List<StaffAssignmentCandidateResponse> listStaffCandidates(Integer disputeId) {
         accessService.requireRole("STAFF");
         DisputeEntity dispute = disputeRepository.findById(disputeId)
@@ -1771,6 +1780,7 @@ public class ContractExecutionService {
     }
 
     @Transactional
+    // Chức năng 10: Gửi yêu cầu Staff can thiệp và chuyển tranh chấp sang hàng đợi Staff.
     public DisputeEntity escalateDispute(Integer disputeId, String reason, String evidenceFile) {
         requireApprovedForBusinessOrExpert();
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
@@ -1796,6 +1806,7 @@ public class ContractExecutionService {
     }
 
     @Transactional
+    // Chức năng 11: Staff ra quyết định tỷ lệ phân bổ tiền và ghi báo cáo xử lý tranh chấp.
     public DisputeEntity staffDecide(Integer disputeId, Integer expertPercent, String note, String staffReport) {
         accessService.requireRole("STAFF");
         if (expertPercent == null || expertPercent < 0 || expertPercent > 100) {
@@ -1955,6 +1966,7 @@ public class ContractExecutionService {
     }
 
     @Transactional
+    // Chức năng 12: Thực hiện quyết toán ví theo quyết định cuối cùng của Staff.
     public DisputeEntity executeDisputeSettlement(Integer disputeId) {
         accessService.requireRole("ADMIN");
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
@@ -2039,6 +2051,7 @@ public class ContractExecutionService {
     }
 
     @Transactional
+    // Chức năng 13: Rút hoặc hủy hồ sơ tranh chấp khi chưa cần tiếp tục xử lý.
     public DisputeEntity cancelDispute(Integer disputeId, String reason) {
         DisputeEntity dispute = disputeRepository.findById(disputeId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
         AccountEntity actor = accessService.currentAccount();

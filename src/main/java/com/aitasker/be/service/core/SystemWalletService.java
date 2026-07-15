@@ -25,6 +25,7 @@ public class SystemWalletService {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final SystemWalletRepository systemWalletRepository;
+    private final MembershipPurchaseRepository membershipPurchaseRepository;
     private final BusinessProfileRepository businessProfileRepository;
     private final ExpertProfileRepository expertProfileRepository;
     private final MilestoneRepository milestoneRepository;
@@ -59,7 +60,8 @@ public class SystemWalletService {
         AccountEntity admin = accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN")
                 .orElseThrow(() -> new NotFoundException("CHUA CO TAI KHOAN ADMIN DE QUAN LY SYSTEM WALLET"));
         Long latestTransactionId = resolveLatestTransactionId();
-        BigDecimal totalRevenue = nonNegativeMoney(transactionRepository.sumSuccessfulCommissionFee());
+        BigDecimal totalRevenue = nonNegativeMoney(transactionRepository.sumSuccessfulCommissionFee())
+                .add(nonNegativeMoney(membershipPurchaseRepository.sumSuccessfulMembershipRevenue()));
         BigDecimal holdingBalance = nonNegativeMoney(transactionRepository.calculateHoldingBalance());
         BigDecimal disputedBalance = nonNegativeMoney(transactionRepository.calculateDisputedBalance());
 
