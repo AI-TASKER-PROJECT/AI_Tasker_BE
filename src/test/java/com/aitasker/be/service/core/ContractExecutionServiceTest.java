@@ -26,6 +26,7 @@ import com.aitasker.be.entity.MilestoneEntity;
 import com.aitasker.be.entity.ProposalEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.StaffEntity;
+import com.aitasker.be.entity.SystemSettingEntity;
 import com.aitasker.be.entity.TerminationRequestEntity;
 import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.entity.JobDomainEntity;
@@ -53,6 +54,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.doNothing;
@@ -1273,7 +1275,7 @@ class ContractExecutionServiceTest {
         when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
         when(contractRepository.findById(1)).thenReturn(Optional.of(ContractEntity.builder().contractId(1).businessId(10).expertId(5).status("ACTIVE").jobId(50).build()));
         when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(staffRepository.findAll()).thenReturn(List.of(staff));
+        when(staffRepository.findAllForDisputeRouting()).thenReturn(List.of(staff));
         when(staffRepository.findById(9)).thenReturn(Optional.of(staff));
         when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
                 new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
@@ -1284,7 +1286,8 @@ class ContractExecutionServiceTest {
         when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domain));
         when(skillRepository.findAllById(any())).thenReturn(List.of());
         when(disputeRepository.findByAssignedStaffId(any())).thenReturn(List.of());
-        when(accountRepository.findById(5)).thenReturn(Optional.of(AccountEntity.builder().accountId(5).fullName("Staff").role(RoleEntity.builder().roleName("STAFF").build()).build()));
+        when(accountRepository.findById(5)).thenReturn(Optional.of(AccountEntity.builder().accountId(5).fullName("Staff")
+                .role(RoleEntity.builder().roleName("STAFF").build()).status("Approved").build()));
 
         DisputeEntity result = contractExecutionService.escalateDispute(1, "They cheated", "evidence.pdf");
 
@@ -1294,6 +1297,48 @@ class ContractExecutionServiceTest {
         assertEquals(Integer.valueOf(9), result.getAssignedStaffId());
         verify(notificationService).notifyDisputeEscalationRequested(eq(5), eq(99), eq(1));
         verify(notificationService).notifyDisputeAssigned(eq(5), eq(99), eq(1));
+    }
+
+    @Test
+    void escalateDispute_shouldRemainRequestedWhenQualifiedStaffIsAtCapacity() {
+        DisputeEntity dispute = DisputeEntity.builder().disputeId(1).contractId(1).milestoneId(200)
+                .status(DisputeEntity.STATUS_PENDING_SELF_RESOLVE).build();
+        StaffEntity staff = StaffEntity.builder().staffId(9).accountId(5).build();
+        DomainEntity domain = DomainEntity.builder().domainId(2).domainCode("GEN_AI")
+                .domainName("Gen AI").isActive(true).sortOrder(1).build();
+        SystemSettingEntity capacity = SystemSettingEntity.builder()
+                .settingKey("dispute_staff_max_active_cases").settingValue("5")
+                .valueType("INT").isActive(true).build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("BUSINESS").build()).build());
+        when(businessProfileRepository.findByAccountId(99))
+                .thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(ContractEntity.builder()
+                .contractId(1).businessId(10).expertId(5).status("ACTIVE").jobId(50).build()));
+        when(disputeRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(staffRepository.findAllForDisputeRouting()).thenReturn(List.of(staff));
+        when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
+                new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
+        when(jobSkillRepository.findByIdJobId(50)).thenReturn(List.of());
+        when(staffDomainRepository.findByIdStaffId(9)).thenReturn(List.of(
+                new StaffDomainEntity(new StaffDomainId(9, 2))));
+        when(staffSkillRepository.findByIdStaffId(9)).thenReturn(List.of());
+        when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domain));
+        when(skillRepository.findAllById(any())).thenReturn(List.of());
+        when(accountRepository.findById(5)).thenReturn(Optional.of(AccountEntity.builder()
+                .accountId(5).fullName("Staff").role(RoleEntity.builder().roleName("STAFF").build())
+                .status("Approved").build()));
+        when(systemSettingRepository.findById("dispute_staff_max_active_cases"))
+                .thenReturn(Optional.of(capacity));
+        when(disputeRepository.countByAssignedStaffIdAndStatusIn(eq(9), any())).thenReturn(5L);
+
+        DisputeEntity result = contractExecutionService.escalateDispute(1, "Need intervention", null);
+
+        assertEquals(DisputeEntity.STATUS_ESCALATION_REQUESTED, result.getStatus());
+        assertNull(result.getAssignedStaffId());
+        verify(notificationService, never()).notifyDisputeAssigned(anyInt(), anyInt(), anyInt());
     }
 
     @Test
@@ -2003,7 +2048,7 @@ class ContractExecutionServiceTest {
         when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
         when(disputeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(staffRepository.findById(9)).thenReturn(Optional.of(staff));
-        when(staffRepository.findAll()).thenReturn(List.of(staff));
+        when(staffRepository.findAllForDisputeRouting()).thenReturn(List.of(staff));
         when(contractRepository.findById(1)).thenReturn(Optional.of(ContractEntity.builder().contractId(1).businessId(10).expertId(5).jobId(50).build()));
         when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
                 new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
@@ -2014,7 +2059,8 @@ class ContractExecutionServiceTest {
         when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domain));
         when(skillRepository.findAllById(any())).thenReturn(List.of());
         when(disputeRepository.findByAssignedStaffId(any())).thenReturn(List.of());
-        when(accountRepository.findById(5)).thenReturn(Optional.of(AccountEntity.builder().accountId(5).fullName("Staff").role(RoleEntity.builder().roleName("STAFF").build()).build()));
+        when(accountRepository.findById(5)).thenReturn(Optional.of(AccountEntity.builder().accountId(5).fullName("Staff")
+                .role(RoleEntity.builder().roleName("STAFF").build()).status("Approved").build()));
 
         DisputeEntity result = contractExecutionService.routeDispute(1, null);
 

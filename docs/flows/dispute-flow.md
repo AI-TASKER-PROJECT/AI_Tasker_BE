@@ -97,11 +97,12 @@ v2.3 thay đổi so với v2.2:
     │   ├── status = ESCALATION_REQUESTED
     │   │
     │   ├── Auto-route tới Staff (v2.3)
-    │   │   ├── selectStaffForDispute() — chọn Staff tốt nhất theo:
-    │   │   │   ├── Job domain + skills
-    │   │   │   ├── Staff availability (IDLE / BUSY)
-    │   │   │   ├── Active dispute workload
-    │   │   │   └── Conflict-of-interest
+    │   │   ├── selectStaffForDispute() — chọn Staff theo:
+    │   │   │   ├── Bắt buộc khớp ít nhất 1 Job domain + account Approved
+    │   │   │   ├── Nhóm đủ chuyên môn: domain coverage 60% + skill coverage 40%
+    │   │   │   ├── Chưa đạt dispute_staff_max_active_cases
+    │   │   │   ├── Active workload ASC, specialization score DESC
+    │   │   │   └── Last assigned ASC, staffId ASC
     │   │   │
     │   │   └── routeDisputeToStaff:
     │   │       ├── assignedStaffId
@@ -242,6 +243,8 @@ v2.3 thay đổi so với v2.2:
 | 1 active dispute / milestone | `uq_disputes_one_active_per_milestone` partial unique index |
 | Escrow release once | `milestones.escrow_released_at IS NULL` check trước settlement |
 | Staff assigned only | `requireAssignedStaff` — `staffId == dispute.assignedStaffId` |
+| Staff routing capacity | `active workload < dispute_staff_max_active_cases` |
+| Concurrent routing | Pessimistic lock Staff pool trong transaction chọn và gán |
 | Settlement idempotent | `DISPUTE_NOT_STAFF_DECIDED` nếu dispute không ở đúng status |
 
 ---

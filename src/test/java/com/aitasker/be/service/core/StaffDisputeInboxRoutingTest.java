@@ -14,7 +14,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -125,7 +127,8 @@ class StaffDisputeInboxRoutingTest {
         when(accountRepository.findById(10)).thenReturn(Optional.of(staffActor));
 
         AccountEntity staffBAccount = AccountEntity.builder().accountId(11).fullName("Staff Two")
-                .role(RoleEntity.builder().roleId(4).roleName("STAFF").build()).build();
+                .role(RoleEntity.builder().roleId(4).roleName("STAFF").build())
+                .status("Approved").build();
         when(accountRepository.findById(11)).thenReturn(Optional.of(staffBAccount));
 
         List<StaffAssignmentCandidateResponse> candidates = contractService.listStaffCandidates(1);
@@ -207,5 +210,111 @@ class StaffDisputeInboxRoutingTest {
         AppException ex = assertThrows(AppException.class,
                 () -> contractService.routeDispute(1, null));
         assertTrue(ex.getMessage().contains("NO_MATCHING_STAFF_FOR_JOB_DOMAIN"));
+    }
+
+    @Test
+    void routeDispute_balancesRepeatedAssignmentsAcrossEquallyQualifiedStaff() {
+        DomainEntity domainGenAi = DomainEntity.builder().domainId(2).domainCode("GEN_AI")
+                .domainName("Generative AI").isActive(true).sortOrder(1).build();
+        AccountEntity staffBAccount = AccountEntity.builder().accountId(11).fullName("Staff Two")
+                .role(RoleEntity.builder().roleId(4).roleName("STAFF").build())
+                .status("Approved").build();
+        Map<Integer, Integer> workload = new HashMap<>();
+        workload.put(1, 0);
+        workload.put(2, 0);
+
+        when(contractRepository.findById(100)).thenReturn(Optional.of(contract));
+        when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
+                new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
+        when(jobSkillRepository.findByIdJobId(50)).thenReturn(List.of());
+        when(staffRepository.findAllForDisputeRouting()).thenReturn(List.of(staff1, staff2));
+        when(staffRepository.findById(1)).thenReturn(Optional.of(staff1));
+        when(staffRepository.findById(2)).thenReturn(Optional.of(staff2));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(staffActor));
+        when(accountRepository.findById(11)).thenReturn(Optional.of(staffBAccount));
+        when(staffDomainRepository.findByIdStaffId(anyInt())).thenAnswer(invocation -> List.of(
+                new StaffDomainEntity(new StaffDomainId(invocation.getArgument(0), 2))));
+        when(staffSkillRepository.findByIdStaffId(anyInt())).thenReturn(List.of());
+        when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domainGenAi));
+        when(skillRepository.findAllById(any())).thenReturn(List.of());
+        when(disputeRepository.countByAssignedStaffIdAndStatusIn(anyInt(), any()))
+                .thenAnswer(invocation -> workload.get(invocation.getArgument(0)).longValue());
+        when(disputeRepository.findById(anyInt())).thenAnswer(invocation -> Optional.of(
+                DisputeEntity.builder().disputeId(invocation.getArgument(0)).contractId(100).milestoneId(10)
+                        .status(DisputeEntity.STATUS_ESCALATION_REQUESTED).build()));
+        when(disputeRepository.save(any())).thenAnswer(invocation -> {
+            DisputeEntity saved = invocation.getArgument(0);
+            workload.compute(saved.getAssignedStaffId(), (staffId, count) -> count + 1);
+            return saved;
+        });
+
+        for (int disputeId = 1; disputeId <= 6; disputeId++) {
+            contractService.routeDispute(disputeId, null);
+        }
+
+        assertEquals(3, workload.get(1));
+        assertEquals(3, workload.get(2));
+        verify(staffRepository, times(6)).findAllForDisputeRouting();
+    }
+
+    @Test
+    void routeDispute_rejectsWhenEveryQualifiedStaffIsAtCapacity() {
+        DomainEntity domainGenAi = DomainEntity.builder().domainId(2).domainCode("GEN_AI")
+                .domainName("Generative AI").isActive(true).sortOrder(1).build();
+        SystemSettingEntity capacity = SystemSettingEntity.builder()
+                .settingKey("dispute_staff_max_active_cases").settingValue("1")
+                .valueType("INT").isActive(true).build();
+
+        when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
+        when(contractRepository.findById(100)).thenReturn(Optional.of(contract));
+        when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
+                new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
+        when(jobSkillRepository.findByIdJobId(50)).thenReturn(List.of());
+        when(staffRepository.findAllForDisputeRouting()).thenReturn(List.of(staff1));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(staffActor));
+        when(staffDomainRepository.findByIdStaffId(1)).thenReturn(List.of(
+                new StaffDomainEntity(new StaffDomainId(1, 2))));
+        when(staffSkillRepository.findByIdStaffId(1)).thenReturn(List.of());
+        when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domainGenAi));
+        when(skillRepository.findAllById(any())).thenReturn(List.of());
+        when(systemSettingRepository.findById("dispute_staff_max_active_cases")).thenReturn(Optional.of(capacity));
+        when(disputeRepository.countByAssignedStaffIdAndStatusIn(eq(1), any())).thenReturn(1L);
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractService.routeDispute(1, null));
+
+        assertEquals("NO_AVAILABLE_STAFF_CAPACITY", ex.getMessage());
+        verify(disputeRepository, never()).save(any());
+    }
+
+    @Test
+    void listStaffCandidates_excludesContractParticipantAccountConflict() {
+        DomainEntity domainGenAi = DomainEntity.builder().domainId(2).domainCode("GEN_AI")
+                .domainName("Generative AI").isActive(true).sortOrder(1).build();
+        AccountEntity staffBAccount = AccountEntity.builder().accountId(11).fullName("Staff Two")
+                .role(RoleEntity.builder().roleId(4).roleName("STAFF").build())
+                .status("Approved").build();
+
+        when(disputeRepository.findById(1)).thenReturn(Optional.of(dispute));
+        when(contractRepository.findById(100)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findById(1)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(1).accountId(10).build()));
+        when(jobDomainRepository.findByIdJobId(50)).thenReturn(List.of(
+                new JobDomainEntity(new JobDomainId(50, 2), LocalDateTime.now())));
+        when(jobSkillRepository.findByIdJobId(50)).thenReturn(List.of());
+        when(staffRepository.findAll()).thenReturn(List.of(staff1, staff2));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(staffActor));
+        when(accountRepository.findById(11)).thenReturn(Optional.of(staffBAccount));
+        when(staffDomainRepository.findByIdStaffId(anyInt())).thenAnswer(invocation -> List.of(
+                new StaffDomainEntity(new StaffDomainId(invocation.getArgument(0), 2))));
+        when(staffSkillRepository.findByIdStaffId(anyInt())).thenReturn(List.of());
+        when(domainRepository.findAllById(List.of(2))).thenReturn(List.of(domainGenAi));
+        when(skillRepository.findAllById(any())).thenReturn(List.of());
+
+        List<StaffAssignmentCandidateResponse> candidates = contractService.listStaffCandidates(1);
+
+        assertEquals(1, candidates.size());
+        assertEquals(2, candidates.get(0).getStaffId());
+        assertTrue(candidates.get(0).getConflictEligible());
     }
 }

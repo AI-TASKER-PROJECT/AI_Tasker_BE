@@ -188,6 +188,14 @@ Alternate exits:
 - `POST /api/v1/milestones/{milestoneId}/complete` (compatibility alias for
   approval/release)
 - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...`
+
+Staff dispute routing keeps the mandatory job-domain gate. Automatic routing
+locks the Staff pool, keeps only approved Staff below
+`dispute_staff_max_active_cases`, builds a qualified pool from normalized
+domain (60%) and skill (40%) coverage, then orders by active workload,
+specialization score, oldest assignment time, and Staff id. If no Staff has
+capacity, the dispute remains `ESCALATION_REQUESTED` for later routing.
+
 - `POST /api/v1/disputes/{disputeId}/escalation-request`
 - `POST /api/v1/disputes/{disputeId}/route-staff`
 - `GET /api/v1/disputes/{disputeId}/staff-candidates`
