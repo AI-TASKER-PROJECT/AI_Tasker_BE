@@ -102,6 +102,7 @@ class ExpertRecommendationServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void generateRecommendations_whenAiReturnsJson_shouldKeepBackendIdentityScoreRankAndEvidence() {
         openAiProperties.setApiKey("test-key");
         when(jobRepository.findById(1)).thenReturn(Optional.of(JobEntity.builder().jobId(1).title("AI chatbot").build()));
@@ -125,20 +126,7 @@ class ExpertRecommendationServiceTest {
                   "recommendations": [
                     {
                       "expertId": 2,
-                      "portfolioId": 20,
-                      "matchScore": 120,
-                      "matchedSkills": [],
-                      "matchedDomains": [],
                       "reason": "Phu hop voi chatbot AI"
-                    },
-                    {
-                      "expertId": 999,
-                      "portfolioId": 999,
-                      "rankPosition": 2,
-                      "matchScore": 80,
-                      "matchedSkills": ["AI"],
-                      "matchedDomains": [],
-                      "reason": "Invalid expert"
                     }
                   ]
                 }
@@ -156,6 +144,36 @@ class ExpertRecommendationServiceTest {
         assertEquals(90.0, response.getRecommendations().get(1).getMatchScore());
         assertEquals("Phu hop voi chatbot AI", response.getRecommendations().get(1).getReason());
 
+        ArgumentCaptor<HttpEntity<Map<String, Object>>> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).exchange(
+                eq(openAiProperties.getChatCompletionsUrl()),
+                eq(HttpMethod.POST),
+                requestCaptor.capture(),
+                eq(Map.class)
+        );
+        Map<String, Object> requestBody = requestCaptor.getValue().getBody();
+        Map<String, Object> responseFormat = (Map<String, Object>) requestBody.get("response_format");
+        assertEquals("json_schema", responseFormat.get("type"));
+        Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
+        assertEquals("expert_recommendations", jsonSchema.get("name"));
+        assertEquals(Boolean.TRUE, jsonSchema.get("strict"));
+        Map<String, Object> rootSchema = (Map<String, Object>) jsonSchema.get("schema");
+        assertEquals(Boolean.FALSE, rootSchema.get("additionalProperties"));
+        Map<String, Object> rootProperties = (Map<String, Object>) rootSchema.get("properties");
+        Map<String, Object> recommendationsSchema = (Map<String, Object>) rootProperties.get("recommendations");
+        assertEquals(1, recommendationsSchema.get("minItems"));
+        assertEquals(5, recommendationsSchema.get("maxItems"));
+        Map<String, Object> itemSchema = (Map<String, Object>) recommendationsSchema.get("items");
+        assertEquals(Boolean.FALSE, itemSchema.get("additionalProperties"));
+        Map<String, Object> itemProperties = (Map<String, Object>) itemSchema.get("properties");
+        Map<String, Object> expertIdSchema = (Map<String, Object>) itemProperties.get("expertId");
+        assertEquals("integer", expertIdSchema.get("type"));
+        assertEquals(List.of(1L, 2L), expertIdSchema.get("enum"));
+        Map<String, Object> reasonSchema = (Map<String, Object>) itemProperties.get("reason");
+        assertEquals("string", reasonSchema.get("type"));
+        assertEquals(1, reasonSchema.get("minLength"));
+        assertEquals(800, reasonSchema.get("maxLength"));
+
         ArgumentCaptor<Iterable<ExpertRecommendationEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
         verify(expertRecommendationRepository).saveAll(captor.capture());
         verify(paymentWalletService).requirePremiumRecommendationAccess(1L);
@@ -163,6 +181,56 @@ class ExpertRecommendationServiceTest {
         assertEquals(2, saved.size());
         assertEquals(1L, saved.get(0).getExpertId());
         assertEquals(95.0, saved.get(0).getMatchScore().doubleValue());
+    }
+
+    @Test
+    void generateRecommendations_whenAiReturnsExpertIdAsString_shouldUseBackendFallback() {
+        openAiProperties.setApiKey("test-key");
+        when(jobRepository.findById(1)).thenReturn(Optional.of(JobEntity.builder().jobId(1).title("AI chatbot").build()));
+        when(sowRepository.findByJobId(1)).thenReturn(Optional.empty());
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(1)).thenReturn(List.of());
+        when(expertCandidateRankingService.findTopCandidatesByJobPostingId(1))
+                .thenReturn(candidateSearch(List.of(candidate(1, 10, 95.0))));
+        when(restTemplate.exchange(
+                eq(openAiProperties.getChatCompletionsUrl()),
+                eq(HttpMethod.POST),
+                any(HttpEntity.class),
+                eq(Map.class)
+        )).thenReturn(ResponseEntity.ok(openAiResponse("""
+                {"recommendations":[{"expertId":"1","reason":"Phu hop voi chatbot AI"}]}
+                """)));
+
+        ExpertRecommendationListResponse response = service.generateRecommendations(1L);
+
+        assertFalse(response.getGeneratedByAi());
+        assertEquals("AI recommendation failed, fallback to rule-based ranking.", response.getMessage());
+        assertEquals(1L, response.getRecommendations().get(0).getExpertId());
+        assertEquals(95.0, response.getRecommendations().get(0).getMatchScore());
+    }
+
+    @Test
+    void generateRecommendations_whenAiReturnsBlankReason_shouldUseBackendFallback() {
+        openAiProperties.setApiKey("test-key");
+        when(jobRepository.findById(1)).thenReturn(Optional.of(JobEntity.builder().jobId(1).title("AI chatbot").build()));
+        when(sowRepository.findByJobId(1)).thenReturn(Optional.empty());
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(1)).thenReturn(List.of());
+        when(expertCandidateRankingService.findTopCandidatesByJobPostingId(1))
+                .thenReturn(candidateSearch(List.of(candidate(1, 10, 95.0))));
+        when(restTemplate.exchange(
+                eq(openAiProperties.getChatCompletionsUrl()),
+                eq(HttpMethod.POST),
+                any(HttpEntity.class),
+                eq(Map.class)
+        )).thenReturn(ResponseEntity.ok(openAiResponse("""
+                {"recommendations":[{"expertId":1,"reason":"   "}]}
+                """)));
+
+        ExpertRecommendationListResponse response = service.generateRecommendations(1L);
+
+        assertFalse(response.getGeneratedByAi());
+        assertEquals("AI recommendation failed, fallback to rule-based ranking.", response.getMessage());
+        assertEquals(1L, response.getRecommendations().get(0).getExpertId());
+        assertEquals(95.0, response.getRecommendations().get(0).getMatchScore());
     }
 
     @Test
