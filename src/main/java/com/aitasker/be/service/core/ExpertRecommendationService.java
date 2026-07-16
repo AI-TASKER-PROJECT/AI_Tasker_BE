@@ -192,7 +192,7 @@ public class ExpertRecommendationService {
         }
 
         try {
-            String aiResponse = callOpenAi(buildPrompt(job, candidateSearch));
+            String aiResponse = callOpenAi(buildPrompt(job, candidateSearch), candidateSearch.getCandidates());
             List<ExpertRecommendationResponse> recommendations = parseAiRecommendations(aiResponse);
             if (recommendations.isEmpty()) {
                 return Optional.empty();
@@ -208,8 +208,11 @@ public class ExpertRecommendationService {
     }
 
     // Note: Ham `callOpenAi` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private String callOpenAi(String prompt) {
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(buildRequestBody(prompt), buildHeaders());
+    private String callOpenAi(String prompt, List<ExpertCandidateResponse> candidates) {
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(
+                buildRequestBody(prompt, candidates),
+                buildHeaders()
+        );
         RestClientResponseException lastException = null;
 
         for (int attempt = 1; attempt <= 2; attempt++) {
@@ -235,7 +238,7 @@ public class ExpertRecommendationService {
     }
 
     // Note: Ham `buildRequestBody` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private Map<String, Object> buildRequestBody(String prompt) {
+    private Map<String, Object> buildRequestBody(String prompt, List<ExpertCandidateResponse> candidates) {
         Map<String, Object> systemMessage = new LinkedHashMap<>();
         systemMessage.put("role", "system");
         systemMessage.put("content", AI_SYSTEM_MESSAGE);
@@ -244,8 +247,60 @@ public class ExpertRecommendationService {
         userMessage.put("role", "user");
         userMessage.put("content", prompt);
 
+        List<Long> allowedExpertIds = defaultList(candidates).stream()
+                .limit(20)
+                .map(candidate -> toLong(candidate.getExpertId()))
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (allowedExpertIds.isEmpty()) {
+            throw new IllegalArgumentException("No valid Expert ids available for AI recommendation schema");
+        }
+
+        Map<String, Object> expertIdSchema = new LinkedHashMap<>();
+        expertIdSchema.put("type", "integer");
+        expertIdSchema.put("enum", allowedExpertIds);
+        expertIdSchema.put("description", "Expert id selected from the backend candidate list.");
+
+        Map<String, Object> reasonSchema = new LinkedHashMap<>();
+        reasonSchema.put("type", "string");
+        reasonSchema.put("minLength", 1);
+        reasonSchema.put("maxLength", 800);
+        reasonSchema.put("description", "Non-empty Vietnamese explanation grounded in candidate evidence.");
+
+        Map<String, Object> recommendationProperties = new LinkedHashMap<>();
+        recommendationProperties.put("expertId", expertIdSchema);
+        recommendationProperties.put("reason", reasonSchema);
+
+        Map<String, Object> recommendationItemSchema = new LinkedHashMap<>();
+        recommendationItemSchema.put("type", "object");
+        recommendationItemSchema.put("properties", recommendationProperties);
+        recommendationItemSchema.put("required", List.of("expertId", "reason"));
+        recommendationItemSchema.put("additionalProperties", false);
+
+        Map<String, Object> recommendationsSchema = new LinkedHashMap<>();
+        recommendationsSchema.put("type", "array");
+        recommendationsSchema.put("items", recommendationItemSchema);
+        recommendationsSchema.put("minItems", 1);
+        recommendationsSchema.put("maxItems", MAX_RECOMMENDATIONS);
+
+        Map<String, Object> rootProperties = new LinkedHashMap<>();
+        rootProperties.put("recommendations", recommendationsSchema);
+
+        Map<String, Object> rootSchema = new LinkedHashMap<>();
+        rootSchema.put("type", "object");
+        rootSchema.put("properties", rootProperties);
+        rootSchema.put("required", List.of("recommendations"));
+        rootSchema.put("additionalProperties", false);
+
+        Map<String, Object> jsonSchema = new LinkedHashMap<>();
+        jsonSchema.put("name", "expert_recommendations");
+        jsonSchema.put("strict", true);
+        jsonSchema.put("schema", rootSchema);
+
         Map<String, Object> responseFormat = new LinkedHashMap<>();
-        responseFormat.put("type", "json_object");
+        responseFormat.put("type", "json_schema");
+        responseFormat.put("json_schema", jsonSchema);
 
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model", openAiProperties.getModel());
