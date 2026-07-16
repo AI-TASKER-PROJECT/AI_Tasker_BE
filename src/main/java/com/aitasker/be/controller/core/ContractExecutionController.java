@@ -27,6 +27,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 // Note: Annotation này biến class thành REST controller để nhận request và trả JSON.
 @RestController
@@ -154,6 +155,8 @@ public class ContractExecutionController {
     }
 
     @PostMapping("/milestones/{milestoneId}/deliverables")
+    @Operation(summary = "Submit milestone deliverable",
+            description = "The assigned Expert submits the final deliverable before the contract milestone deadline. First submissions and resubmissions are rejected after the deadline or when the milestone is OVERDUE.")
     public ResponseEntity<ApiResponse<DeliverableEntity>> submitMilestoneDeliverable(@PathVariable Integer milestoneId, @RequestBody DeliverableEntity request) {
         request.setMilestoneId(milestoneId);
         return ResponseEntity.ok(ApiResponse.success("SUBMIT DELIVERABLE SUCCESS", service.submitDeliverable(request)));
@@ -162,6 +165,19 @@ public class ContractExecutionController {
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports")
     public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> submitProgressReport(@PathVariable Integer contractId, @PathVariable Integer milestoneId, @RequestBody ProgressReportRequest request) {
         return ResponseEntity.ok(ApiResponse.success("SUBMIT PROGRESS REPORT SUCCESS", service.submitProgressReport(contractId, milestoneId, request)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/source-code-file")
+    @Operation(summary = "Upload milestone source-code ZIP",
+            description = "The assigned Expert uploads a ZIP source archive before the contract milestone deadline. Upload is rejected after the deadline or when the milestone is OVERDUE.")
+    public ResponseEntity<ApiResponse<String>> uploadMilestoneSourceCode(
+            @PathVariable Integer milestoneId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "UPLOAD MILESTONE SOURCE CODE SUCCESS",
+                service.uploadMilestoneSourceCode(milestoneId, file)
+        ));
     }
 
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-report-request")

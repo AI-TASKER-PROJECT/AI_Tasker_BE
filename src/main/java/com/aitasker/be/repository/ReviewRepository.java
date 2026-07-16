@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 
 public interface ReviewRepository extends JpaRepository<ReviewEntity, Integer> {
@@ -20,4 +21,18 @@ public interface ReviewRepository extends JpaRepository<ReviewEntity, Integer> {
 
     @Query(value = "SELECT AVG(rating) FROM reviews WHERE reviewee_id = :revieweeId", nativeQuery = true)
     BigDecimal averageRatingByRevieweeId(@Param("revieweeId") Integer revieweeId);
+
+    @Query(value = """
+            SELECT ep.expert_id AS expertId, AVG(r.rating) AS averageRating
+            FROM expert_profiles ep
+            JOIN reviews r ON r.reviewee_id = ep.account_id
+            WHERE ep.expert_id IN (:expertIds)
+            GROUP BY ep.expert_id
+            """, nativeQuery = true)
+    List<ExpertRatingProjection> findAverageRatingsByExpertIds(@Param("expertIds") Collection<Integer> expertIds);
+
+    interface ExpertRatingProjection {
+        Integer getExpertId();
+        BigDecimal getAverageRating();
+    }
 }

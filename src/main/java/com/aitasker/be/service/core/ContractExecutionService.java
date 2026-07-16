@@ -26,6 +26,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.multipart.MultipartFile;
 import com.aitasker.be.event.DisputeSettlementCompletedEvent;
 
 import java.math.BigDecimal;
@@ -41,6 +42,12 @@ import java.util.Optional;
 // Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class ContractExecutionService {
+    private static final int DEFAULT_STAFF_MAX_ACTIVE_DISPUTES = 5;
+    private static final double MIN_STAFF_SPECIALIZATION_SCORE = 0.70d;
+    private static final double STAFF_SPECIALIZATION_TOLERANCE = 0.20d;
+    private static final String MILESTONE_DELIVERABLE_DEADLINE_EXCEEDED =
+            "MILESTONE_DA_QUA_HAN_NOP_SAN_PHAM";
+
     private final AccessService accessService;
     private final AccountRepository accountRepository;
     private final BusinessProfileRepository businessProfileRepository;
@@ -66,6 +73,7 @@ public class ContractExecutionService {
     private final PaymentWalletService paymentWalletService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final FirebaseStorageService firebaseStorageService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final JobDomainRepository jobDomainRepository;
     private final JobSkillRepository jobSkillRepository;
@@ -74,6 +82,12 @@ public class ContractExecutionService {
     private final DomainRepository domainRepository;
     private final SkillRepository skillRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private record StaffRoutingCandidate(
+            StaffAssignmentCandidateResponse response,
+            double specializationScore,
+            LocalDateTime lastAssignedAt) {
+    }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -604,7 +618,20 @@ public class ContractExecutionService {
     @Transactional public DeliverableEntity submitDeliverable(DeliverableEntity input) {
         accessService.requireRole("EXPERT");
         accessService.requireApprovedAccount();
+        if (input == null || (isBlank(input.getSourceCodeUrl()) && isBlank(input.getSourceCodeFileUrl()))) {
+            throw new AppException("PHAI CUNG CAP SOURCE CODE URL HOAC FILE SOURCE CODE");
+        }
+        input.setSourceCodeUrl(trimToNull(input.getSourceCodeUrl()));
+        input.setSourceCodeFileUrl(trimToNull(input.getSourceCodeFileUrl()));
         MilestoneEntity milestone = milestoneRepository.findById(input.getMilestoneId()).orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        AccountEntity actor = accessService.currentAccount();
+        if (input.getSourceCodeFileUrl() != null) {
+            String requiredPrefix = "milestone-source-code/milestones/" + milestone.getMilestoneId()
+                    + "/accounts/" + actor.getAccountId() + "/";
+            if (!input.getSourceCodeFileUrl().startsWith(requiredPrefix)) {
+                throw new AppException("FILE SOURCE CODE KHONG THUOC MILESTONE HOAC EXPERT HIEN TAI");
+            }
+        }
         ContractEntity contract = requireExpertOwnedContractByJob(milestone.getJobId());
         if (!"ACTIVE".equals(contract.getStatus())) throw new AppException("CHI DUOC SUBMIT DELIVERABLE KHI CONTRACT ACTIVE");
         if (contract.getBusinessNdaSignedAt() == null || contract.getExpertNdaSignedAt() == null) {
@@ -614,7 +641,12 @@ public class ContractExecutionService {
                 .contains(milestone.getStatus())) {
             throw new AppException("MILESTONE CHUA SAN SANG DE SUBMIT DELIVERABLE");
         }
-        ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestone.getMilestoneId());
+        ContractMilestoneEntity contractMilestone = findContractMilestone(
+                contract.getContractId(), milestone.getMilestoneId());
+        requireDeliverableSubmissionBeforeDeadline(contractMilestone);
+        if (!ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(contractMilestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA SAN SANG DE SUBMIT DELIVERABLE");
+        }
         ensureEscrowNotReleased(contractMilestone);
         List<DeliverableEntity> prior = deliverableRepository
                 .findByMilestoneIdOrderBySubmissionRoundDesc(milestone.getMilestoneId());
@@ -644,6 +676,42 @@ public class ContractExecutionService {
                         milestone.getMilestoneName()
                 ));
         return saved;
+    }
+
+    public String uploadMilestoneSourceCode(Integer milestoneId, MultipartFile file) {
+        accessService.requireRole("EXPERT");
+        accessService.requireApprovedAccount();
+        AccountEntity actor = accessService.currentAccount();
+        MilestoneEntity milestone = milestoneRepository.findById(milestoneId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY MILESTONE"));
+        ContractEntity contract = requireExpertOwnedContractByJob(milestone.getJobId());
+        if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) {
+            throw new AppException("CHI DUOC UPLOAD SOURCE CODE KHI CONTRACT ACTIVE");
+        }
+        if (contract.getBusinessNdaSignedAt() == null || contract.getExpertNdaSignedAt() == null) {
+            throw new AppException("HAI BEN PHAI KY NDA TRUOC KHI UPLOAD SOURCE CODE");
+        }
+        if (!List.of(ContractMilestoneEntity.STATUS_IN_PROGRESS, ContractMilestoneEntity.STATUS_OVERDUE)
+                .contains(milestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA SAN SANG DE UPLOAD SOURCE CODE");
+        }
+        ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestoneId);
+        requireDeliverableSubmissionBeforeDeadline(contractMilestone);
+        if (!ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(contractMilestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA SAN SANG DE UPLOAD SOURCE CODE");
+        }
+        ensureEscrowNotReleased(contractMilestone);
+        String path = firebaseStorageService.uploadSourceCodeArchive(
+                file,
+                "milestone-source-code/milestones/" + milestoneId + "/accounts/" + actor.getAccountId()
+        );
+        auditLogService.record(
+                AuditLogService.ACTION_UPLOAD_MILESTONE_SOURCE_CODE,
+                "milestones",
+                String.valueOf(milestoneId),
+                actor.getAccountId()
+        );
+        return path;
     }
 
     @Transactional
@@ -777,6 +845,7 @@ public class ContractExecutionService {
                 .percentComplete(percentComplete)
                 .attachmentUrl(attachmentUrl)
                 .sourceCodeUrl(request.getSourceCodeUrl())
+                .sourceCodeFileUrl(request.getSourceCodeFileUrl())
                 .demoLink(request.getDemoLink())
                 .submissionNotes(request.getSubmissionNotes())
                 .isLate(isLate)
@@ -956,6 +1025,17 @@ public class ContractExecutionService {
     private LocalDateTime milestoneDueAt(ContractMilestoneEntity item) {
         if (item.getInProgressStartedAt() == null || item.getDuration() == null || item.getDuration() <= 0) return null;
         return item.getInProgressStartedAt().plusDays(durationToDays(item.getDuration(), item.getDurationUnit()));
+    }
+
+    private void requireDeliverableSubmissionBeforeDeadline(ContractMilestoneEntity milestone) {
+        if (ContractMilestoneEntity.STATUS_OVERDUE.equals(milestone.getStatus())) {
+            throw new AppException(MILESTONE_DELIVERABLE_DEADLINE_EXCEEDED);
+        }
+        if (!ContractMilestoneEntity.STATUS_IN_PROGRESS.equals(milestone.getStatus())) return;
+        LocalDateTime dueAt = milestoneDueAt(milestone);
+        if (dueAt != null && LocalDateTime.now().isAfter(dueAt)) {
+            throw new AppException(MILESTONE_DELIVERABLE_DEADLINE_EXCEEDED);
+        }
     }
 
     // Note: Bao cao dau tien nop cho checkpoint MIDPOINT, sau do PRE_DEADLINE; qua 2 moc thi bao cao them khong gan checkpoint (checkpointType = null).
@@ -1451,19 +1531,12 @@ public class ContractExecutionService {
         if (!DisputeEntity.STATUS_ESCALATION_REQUESTED.equals(dispute.getStatus())) {
             throw new AppException("DISPUTE_NOT_READY_FOR_STAFF_ROUTING");
         }
-        List<Integer> jobDomainIds = resolveJobDomainIds(dispute.getContractId());
-        if (jobDomainIds.isEmpty()) {
+        if (resolveJobDomainIds(dispute.getContractId()).isEmpty()) {
             throw new AppException("JOB KHONG CO DOMAIN, KHONG THE ROUTE STAFF");
         }
-        if (staffId != null) {
-            List<Integer> staffDomainIds = staffDomainRepository.findByIdStaffId(staffId).stream()
-                    .map(sd -> sd.getId().getDomainId()).toList();
-            boolean eligible = staffDomainIds.stream().anyMatch(jobDomainIds::contains);
-            if (!eligible) {
-                throw new AppException("STAFF KHONG CO DOMAIN TUONG UNG VOI JOB");
-            }
-        }
-        Integer routedStaffId = staffId == null ? selectStaffForDispute(dispute) : staffId;
+        Integer routedStaffId = staffId == null
+                ? selectStaffForDispute(dispute)
+                : validateManualStaffForDispute(dispute, staffId);
         return routeDisputeToStaff(dispute, routedStaffId, accessService.currentAccount().getAccountId());
     }
 
@@ -1708,18 +1781,28 @@ public class ContractExecutionService {
         accessService.requireRole("STAFF");
         DisputeEntity dispute = disputeRepository.findById(disputeId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY DISPUTE"));
-        return rankedStaffCandidates(dispute);
+        return rankedStaffCandidates(dispute, false).stream()
+                .map(StaffRoutingCandidate::response)
+                .toList();
     }
 
-    private List<StaffAssignmentCandidateResponse> rankedStaffCandidates(DisputeEntity dispute) {
+    private List<StaffRoutingCandidate> rankedStaffCandidates(DisputeEntity dispute, boolean lockForRouting) {
         List<Integer> jobDomainIds = resolveJobDomainIds(dispute.getContractId());
         List<Integer> jobSkillIds = resolveJobSkillIds(dispute.getContractId());
-        List<String> jobDomainNames = domainRepository.findAllById(jobDomainIds).stream()
-                .map(DomainEntity::getDomainName).toList();
-        List<String> jobSkillNames = skillRepository.findAllById(jobSkillIds).stream()
-                .map(SkillEntity::getSkillName).toList();
-        List<StaffAssignmentCandidateResponse> candidates = new java.util.ArrayList<>();
-        for (StaffEntity staff : staffRepository.findAll()) {
+        List<Integer> participantAccountIds = resolveContractParticipantAccountIds(dispute.getContractId());
+        int maxActiveDisputes = staffMaxActiveDisputes();
+        List<StaffRoutingCandidate> candidates = new java.util.ArrayList<>();
+        List<StaffEntity> staffPool = lockForRouting
+                ? staffRepository.findAllForDisputeRouting()
+                : staffRepository.findAll();
+        for (StaffEntity staff : staffPool) {
+            AccountEntity staffAccount = accountRepository.findById(staff.getAccountId()).orElse(null);
+            if (staffAccount == null || !"Approved".equalsIgnoreCase(staffAccount.getStatus())) {
+                continue;
+            }
+            if (participantAccountIds.contains(staff.getAccountId())) {
+                continue;
+            }
             List<Integer> staffDomainIds = staffDomainRepository.findByIdStaffId(staff.getStaffId()).stream()
                     .map(sd -> sd.getId().getDomainId()).toList();
             List<Integer> staffSkillIds = staffSkillRepository.findByIdStaffId(staff.getStaffId()).stream()
@@ -1731,33 +1814,105 @@ public class ContractExecutionService {
                     .map(DomainEntity::getDomainName).toList();
             List<String> matchedSkillNames = skillRepository.findAllById(matchedSkillIds).stream()
                     .map(SkillEntity::getSkillName).toList();
-            int workload = (int) disputeRepository.findByAssignedStaffId(staff.getStaffId()).stream()
-                    .filter(item -> activeDisputeStatuses().contains(item.getStatus())).count();
-            String displayName = accountRepository.findById(staff.getAccountId())
-                    .map(AccountEntity::getFullName).orElse("Staff " + staff.getStaffId());
-            candidates.add(StaffAssignmentCandidateResponse.builder()
+            int workload = Math.toIntExact(disputeRepository.countByAssignedStaffIdAndStatusIn(
+                    staff.getStaffId(), activeDisputeStatuses()));
+            LocalDateTime lastAssignedAt = disputeRepository
+                    .findTopByAssignedStaffIdAndStaffReviewStartedAtIsNotNullOrderByStaffReviewStartedAtDescDisputeIdDesc(
+                            staff.getStaffId())
+                    .map(DisputeEntity::getStaffReviewStartedAt)
+                    .orElse(null);
+            String displayName = staffAccount.getFullName() == null || staffAccount.getFullName().isBlank()
+                    ? "Staff " + staff.getStaffId()
+                    : staffAccount.getFullName();
+            String availability = workload >= maxActiveDisputes ? "AT_CAPACITY" : workload == 0 ? "IDLE" : "BUSY";
+            double specializationScore = specializationScore(
+                    matchedDomainIds.size(), jobDomainIds.size(), matchedSkillIds.size(), jobSkillIds.size());
+            StaffAssignmentCandidateResponse response = StaffAssignmentCandidateResponse.builder()
                     .staffId(staff.getStaffId()).displayName(displayName)
                     .specializationMatch(staff.getSpecialization())
                     .technologyMatchSummary(staff.getSpecialization())
-                    .availability(workload == 0 ? "IDLE" : "BUSY")
+                    .availability(availability)
                     .activeDisputeWorkloadCount(workload)
                     .conflictEligible(true)
                     .matchedDomains(matchedDomainNames)
                     .matchedSkills(matchedSkillNames)
-                    .build());
+                    .build();
+            candidates.add(new StaffRoutingCandidate(response, specializationScore, lastAssignedAt));
         }
+
+        double bestScore = candidates.stream()
+                .mapToDouble(StaffRoutingCandidate::specializationScore)
+                .max()
+                .orElse(0d);
         candidates.sort(java.util.Comparator
-                .<StaffAssignmentCandidateResponse>comparingInt(c -> c.getMatchedDomains().size()).reversed()
-                .thenComparing(java.util.Comparator.comparingInt((StaffAssignmentCandidateResponse c) -> c.getMatchedSkills().size()).reversed())
-                .thenComparingInt(StaffAssignmentCandidateResponse::getActiveDisputeWorkloadCount)
-                .thenComparingInt(StaffAssignmentCandidateResponse::getStaffId));
+                .comparingInt((StaffRoutingCandidate candidate) ->
+                        isQualified(candidate.specializationScore(), bestScore) ? 0 : 1)
+                .thenComparingInt(candidate ->
+                        candidate.response().getActiveDisputeWorkloadCount() < maxActiveDisputes ? 0 : 1)
+                .thenComparingInt(candidate -> candidate.response().getActiveDisputeWorkloadCount())
+                .thenComparing(java.util.Comparator.comparingDouble(StaffRoutingCandidate::specializationScore).reversed())
+                .thenComparing(StaffRoutingCandidate::lastAssignedAt,
+                        java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder()))
+                .thenComparingInt(candidate -> candidate.response().getStaffId()));
         return candidates;
     }
 
     private Integer selectStaffForDispute(DisputeEntity dispute) {
-        return rankedStaffCandidates(dispute).stream().findFirst()
-                .map(StaffAssignmentCandidateResponse::getStaffId)
-                .orElseThrow(() -> new AppException("NO_MATCHING_STAFF_FOR_JOB_DOMAIN"));
+        List<StaffRoutingCandidate> candidates = rankedStaffCandidates(dispute, true);
+        if (candidates.isEmpty()) {
+            throw new AppException("NO_MATCHING_STAFF_FOR_JOB_DOMAIN");
+        }
+        double bestScore = candidates.stream().mapToDouble(StaffRoutingCandidate::specializationScore).max().orElse(0d);
+        int maxActiveDisputes = staffMaxActiveDisputes();
+        return candidates.stream()
+                .filter(candidate -> isQualified(candidate.specializationScore(), bestScore))
+                .filter(candidate -> candidate.response().getActiveDisputeWorkloadCount() < maxActiveDisputes)
+                .findFirst()
+                .map(candidate -> candidate.response().getStaffId())
+                .orElseThrow(() -> new AppException("NO_AVAILABLE_STAFF_CAPACITY"));
+    }
+
+    private Integer validateManualStaffForDispute(DisputeEntity dispute, Integer staffId) {
+        StaffRoutingCandidate candidate = rankedStaffCandidates(dispute, true).stream()
+                .filter(item -> staffId.equals(item.response().getStaffId()))
+                .findFirst()
+                .orElseThrow(() -> new AppException("STAFF KHONG HOAT DONG HOAC KHONG CO DOMAIN TUONG UNG VOI JOB"));
+        if (candidate.response().getActiveDisputeWorkloadCount() >= staffMaxActiveDisputes()) {
+            throw new AppException("STAFF_DA_DAT_GIOI_HAN_DISPUTE_DANG_XU_LY");
+        }
+        return staffId;
+    }
+
+    private boolean isQualified(double score, double bestScore) {
+        double threshold = bestScore >= MIN_STAFF_SPECIALIZATION_SCORE
+                ? Math.max(MIN_STAFF_SPECIALIZATION_SCORE, bestScore - STAFF_SPECIALIZATION_TOLERANCE)
+                : Math.max(0d, bestScore - STAFF_SPECIALIZATION_TOLERANCE);
+        return score + 0.000001d >= threshold;
+    }
+
+    private double specializationScore(int matchedDomains, int totalDomains, int matchedSkills, int totalSkills) {
+        double domainCoverage = totalDomains == 0 ? 0d : (double) matchedDomains / totalDomains;
+        if (totalSkills == 0) {
+            return domainCoverage;
+        }
+        double skillCoverage = (double) matchedSkills / totalSkills;
+        return domainCoverage * 0.60d + skillCoverage * 0.40d;
+    }
+
+    private int staffMaxActiveDisputes() {
+        return systemSettingRepository.findById("dispute_staff_max_active_cases")
+                .filter(setting -> Boolean.TRUE.equals(setting.getIsActive()))
+                .map(SystemSettingEntity::getSettingValue)
+                .map(String::trim)
+                .flatMap(value -> {
+                    try {
+                        return Optional.of(Integer.parseInt(value));
+                    } catch (NumberFormatException ignored) {
+                        return Optional.empty();
+                    }
+                })
+                .filter(value -> value > 0)
+                .orElse(DEFAULT_STAFF_MAX_ACTIVE_DISPUTES);
     }
 
     private List<Integer> resolveJobDomainIds(Integer contractId) {
@@ -1772,6 +1927,21 @@ public class ContractExecutionService {
                 .map(contract -> jobSkillRepository.findByIdJobId(contract.getJobId()).stream()
                         .map(js -> js.getId().getSkillId()).toList())
                 .orElse(List.of());
+    }
+
+    private List<Integer> resolveContractParticipantAccountIds(Integer contractId) {
+        Optional<ContractEntity> contract = contractRepository.findById(contractId);
+        if (contract.isEmpty()) {
+            return List.of();
+        }
+        List<Integer> accountIds = new java.util.ArrayList<>();
+        businessProfileRepository.findById(contract.get().getBusinessId())
+                .map(BusinessProfileEntity::getAccountId)
+                .ifPresent(accountIds::add);
+        expertProfileRepository.findById(contract.get().getExpertId())
+                .map(ExpertProfileEntity::getAccountId)
+                .ifPresent(accountIds::add);
+        return accountIds;
     }
 
     private ContractMilestoneEntity findContractMilestoneForUpdate(Integer contractId, Integer milestoneId) {
@@ -1799,7 +1969,16 @@ public class ContractExecutionService {
         disputeRepository.save(dispute);
         Integer actorAccountId = accessService.currentAccount().getAccountId();
         auditLogService.record("DISPUTE_ESCALATION_REQUESTED", "disputes", String.valueOf(disputeId), actorAccountId);
-        Integer staffId = selectStaffForDispute(dispute);
+        Integer staffId;
+        try {
+            staffId = selectStaffForDispute(dispute);
+        } catch (AppException exception) {
+            if ("NO_MATCHING_STAFF_FOR_JOB_DOMAIN".equals(exception.getMessage())
+                    || "NO_AVAILABLE_STAFF_CAPACITY".equals(exception.getMessage())) {
+                return dispute;
+            }
+            throw exception;
+        }
         staffRepository.findById(staffId).ifPresent(staff ->
                 notificationService.notifyDisputeEscalationRequested(staff.getAccountId(), actorAccountId, disputeId));
         return routeDisputeToStaff(dispute, staffId, actorAccountId);
@@ -2732,6 +2911,14 @@ public class ContractExecutionService {
                 .map(String::toLowerCase)
                 .map(v -> v.equals("true") || v.equals("1"))
                 .orElse(false);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String trimToNull(String value) {
+        return isBlank(value) ? null : value.trim();
     }
 
     private void validateDuration(Integer duration, String durationUnit) {

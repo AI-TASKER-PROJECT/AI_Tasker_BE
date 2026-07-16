@@ -12,6 +12,7 @@ public class ProgressReportRequest {
     private Integer percentComplete;
     private String attachmentUrl;
     private String sourceCodeUrl;
+    private String sourceCodeFileUrl;
     private String demoLink;
     private String submissionNotes;
 }
