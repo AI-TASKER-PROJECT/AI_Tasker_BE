@@ -12,6 +12,8 @@
   Broad substring `LIKE` matching is not part of Release A.
 - Mandatory skills are eligibility gates. Skill, domain, technology, and rating
   scoring is deterministic and normalized across active components.
+- Active scoring weights are skill 35%, domain 30%, technology 25%, and rating
+  10%. Experience is a deterministic tie-breaker rather than a score component.
 - Backend owns expert/portfolio identity, score, rank, and matched evidence.
   OpenAI may add only sanitized reason text and is optional.
 - Results contain at most five unique Experts. Regeneration pins and preserves a

@@ -4,6 +4,7 @@ import com.aitasker.be.dto.candidate.SowKeywordExtractionResult;
 import com.aitasker.be.entity.PortfolioEntity;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,39 @@ class ExpertMatchScoringServiceTest {
         var result = service.score(portfolio("2,3", "7", "9"), requirements(), null, false).orElseThrow();
         assertEquals(100.0, result.score());
         assertEquals(Set.of("RAG Architecture", "API Testing"), Set.copyOf(result.matchedSkills()));
+    }
+
+    @Test
+    void score_shouldApplyCalibratedTaxonomyAndRatingWeights() {
+        var partialSkill = service.score(
+                portfolio("2", "7", "9"),
+                requirements(),
+                new BigDecimal("5.0"),
+                true
+        ).orElseThrow();
+        var missingDomain = service.score(
+                portfolio("2,3", "", "9"),
+                requirements(),
+                new BigDecimal("5.0"),
+                true
+        ).orElseThrow();
+        var missingTechnology = service.score(
+                portfolio("2,3", "7", ""),
+                requirements(),
+                new BigDecimal("5.0"),
+                true
+        ).orElseThrow();
+        var zeroRating = service.score(
+                portfolio("2,3", "7", "9"),
+                requirements(),
+                BigDecimal.ZERO,
+                true
+        ).orElseThrow();
+
+        assertEquals(82.5, partialSkill.score());
+        assertEquals(70.0, missingDomain.score());
+        assertEquals(75.0, missingTechnology.score());
+        assertEquals(90.0, zeroRating.score());
     }
 
     private ResolvedJobRequirements requirements() {

@@ -29,7 +29,7 @@ negative fixtures.
 ```text
 command: .\mvnw.cmd "-Dtest=SowKeywordExtractionServiceTest,JobRequirementResolverTest,ExpertMatchScoringServiceTest,ExpertCandidateRankingServiceTest,ExpertRecommendationQualityBenchmarkTest,ExpertRecommendationServiceTest" test
 result: PASS
-notes: 26 tests, 0 failures, 0 errors, 0 skipped. Six benchmark groups each reached Recall@20=1.00, Precision@5=1.00, NDCG@5=1.00.
+notes: 27 tests, 0 failures, 0 errors, 0 skipped after calibrating active weights to skill 35%, domain 30%, technology 25%, and rating 10%. Six benchmark groups remain covered.
 
 command: TEST_DB_URL=<fresh-v58-db> .\mvnw.cmd "-Dtest=ExpertCandidateRepositoryIntegrationTest" test
 result: PASS

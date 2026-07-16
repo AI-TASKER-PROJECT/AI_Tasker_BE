@@ -13,10 +13,10 @@ import java.util.Set;
 
 @Service
 public class ExpertMatchScoringService {
-    private static final double SKILL_WEIGHT = 45.0;
-    private static final double DOMAIN_WEIGHT = 25.0;
-    private static final double TECHNOLOGY_WEIGHT = 15.0;
-    private static final double RATING_WEIGHT = 5.0;
+    private static final double SKILL_WEIGHT = 35.0;
+    private static final double DOMAIN_WEIGHT = 30.0;
+    private static final double TECHNOLOGY_WEIGHT = 25.0;
+    private static final double RATING_WEIGHT = 10.0;
 
     public Optional<ScoredPortfolio> score(
             PortfolioEntity portfolio,

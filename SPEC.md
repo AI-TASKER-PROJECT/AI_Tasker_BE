@@ -157,11 +157,10 @@ Initial calibration weights:
 
 | Component | Weight |
 |---|---:|
-| Required skill coverage | 45% |
-| Domain coverage | 25% |
-| Technology coverage | 15% |
-| Experience against the job requirement | 10% |
-| Rating or accepted trust signal | 5% |
+| Required skill coverage | 35% |
+| Domain coverage | 30% |
+| Technology coverage | 25% |
+| Rating or accepted trust signal | 10% |
 
 These weights are an initial hypothesis, not proof of quality. They may be
 changed only with benchmark evidence.
@@ -171,17 +170,14 @@ Scoring rules:
 - Re-normalize across active components when a job legitimately lacks one
   component. A skill-only job must not be capped at 80 and a domain-only job
   must not be capped at 50.
-- Zero years of experience receives zero experience credit.
-- Experience credit is calculated against a job requirement when present; a
-  fixed five-year saturation rule is not sufficient for every job.
 - Mandatory skill failure excludes the candidate instead of being hidden by
-  high experience or description scores.
+  high rating or description scores.
 - Certificate and self-description text are supporting evidence only. They
   must not outweigh structured taxonomy.
 - Every score component is clamped and the final score is rounded to two
   decimals between 0 and 100.
-- Ties are resolved deterministically by structured coverage, experience, and
-  stable Expert or portfolio id.
+- Experience remains a deterministic tie-breaker rather than a score
+  component. Remaining ties use stable Expert or portfolio ids.
 - The minimum recommendation score must be calibrated from the benchmark and
   must not be introduced as an unexplained constant.
 
