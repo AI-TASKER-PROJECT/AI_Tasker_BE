@@ -2180,7 +2180,7 @@ class ContractExecutionServiceTest {
 
         assertEquals(DisputeEntity.STATUS_STAFF_REVIEWING, result.getStatus());
         assertEquals(Integer.valueOf(9), result.getAssignedStaffId());
-        verify(auditLogService).record(eq("DISPUTE_STAFF_ROUTED"), eq("disputes"), eq("1"), eq(3));
+        verify(auditLogService).record(eq("DISPUTE_STAFF_AUTO_ASSIGNED"), eq("disputes"), eq("1"), eq(3));
     }
 
     @Test

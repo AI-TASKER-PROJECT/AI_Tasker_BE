@@ -51,6 +51,7 @@ public class AuditRequestFilter extends OncePerRequestFilter {
         if (response.getStatus() < 200 || response.getStatus() >= 300) return;
         if (Boolean.TRUE.equals(request.getAttribute(AuditLogService.REQUEST_ATTRIBUTE_LOGGED))) return;
         if (isPublicAuthRequest(request)) return;
+        if (isPayOsSyncRequest(request)) return;
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null) return;
@@ -68,6 +69,11 @@ public class AuditRequestFilter extends OncePerRequestFilter {
     // Note: Hàm `isPublicAuthRequest` bỏ qua login/register/OTP vì các request này chưa đại diện cho một phiên role đã xác thực.
     private boolean isPublicAuthRequest(HttpServletRequest request) {
         return request.getRequestURI().startsWith("/api/auth/");
+    }
+
+    private boolean isPayOsSyncRequest(HttpServletRequest request) {
+        return "POST".equals(request.getMethod())
+                && request.getRequestURI().matches("^/api/payments/payos/\\d+/sync$");
     }
 
     // Note: Hàm `resolveAction` chuyển request thành action tiếng Việt khi endpoint chưa tự khai báo action cụ thể.

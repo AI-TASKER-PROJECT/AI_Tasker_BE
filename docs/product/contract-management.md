@@ -197,6 +197,9 @@ locks the Staff pool, keeps only approved Staff below
 domain (60%) and skill (40%) coverage, then orders by active workload,
 specialization score, oldest assignment time, and Staff id. If no Staff has
 capacity, the dispute remains `ESCALATION_REQUESTED` for later routing.
+Automatic routing records an audit event that identifies the assigned Staff and
+displays the dispute as the Business/Expert participant pair instead of the
+Staff actor.
 
 - `POST /api/v1/disputes/{disputeId}/escalation-request`
 - `POST /api/v1/disputes/{disputeId}/route-staff`
@@ -219,4 +222,8 @@ capacity, the dispute remains `ESCALATION_REQUESTED` for later routing.
 The backend records audit events for draft creation, signing, NDA signing,
 deposit activation, milestone start/completion, dispute cancellation and
 settlement, termination request review/settlement/refund, contract completion,
-deliverable submission, and termination.
+deliverable submission, and termination. PayOS wallet top-up sync records audit
+only when a payment order first reaches a terminal outcome (`PAID`, `FAILED`,
+`CANCELLED`, or `EXPIRED`), so repeated sync polling does not spam audit logs.
+Dispute decision and settlement audit rows display the two contract participants
+as the business object context.

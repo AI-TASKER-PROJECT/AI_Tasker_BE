@@ -91,6 +91,9 @@ public class AuditLogService {
     public static final String ACTION_REFUND_TERMINATION_DEPOSIT = "Hoàn ký quỹ sau chấm dứt";
     public static final String ACTION_CREATE_CASE_ATTACHMENT = "Thêm tệp đính kèm hồ sơ";
 
+    public static final String ACTION_WALLET_TOPUP_SUCCEEDED = "Nạp tiền vào ví thành công";
+    public static final String ACTION_WALLET_TOPUP_FAILED = "Nạp tiền vào ví thất bại";
+
     public static final String REQUEST_ATTRIBUTE_LOGGED = "aitasker.audit.logged";
 
     private final AccessService accessService;
@@ -192,8 +195,11 @@ public class AuditLogService {
                     .map(transaction -> response.attachEntityInfo(transactionDisplay(transaction), "Giao dịch", null))
                     .orElseGet(() -> response.attachEntityInfo("Giao dịch", "Giao dịch", null));
             case "disputes" -> disputeRepository.findById(id)
-                    .map(dispute -> response.attachEntityInfo(disputeDisplay(dispute), "Tranh chấp", null))
+                    .map(dispute -> response.attachEntityInfo(disputeDisplay(dispute), "Tranh chấp", disputeOwner(dispute)))
                     .orElseGet(() -> response.attachEntityInfo("Tranh chấp", "Tranh chấp", null));
+            case "payment_order" -> paymentOrderRepository.findById(Long.valueOf(id))
+                    .map(order -> response.attachEntityInfo(paymentOrderDisplay(order), "Thanh toán", accountByLongId(order.getAccountId())))
+                    .orElseGet(() -> response.attachEntityInfo("Thanh toán", "Thanh toán", null));
             case "staffs" -> staffRepository.findById(id)
                     .map(staff -> {
                         AccountEntity owner = accountById(staff.getAccountId());
@@ -207,6 +213,12 @@ public class AuditLogService {
                     })
                     .orElseGet(() -> response.attachEntityInfo("Đánh giá", "Đánh giá", null));
             case "system_settings" -> response.attachEntityInfo("Cài đặt hệ thống: " + log.getEntityId(), "Cài đặt hệ thống", null);
+            case "milestone_progress_reports" -> response.attachEntityInfo("Báo cáo tiến độ milestone", "Báo cáo tiến độ", null);
+            case "milestone_progress_report_requests" -> response.attachEntityInfo("Yêu cầu báo cáo tiến độ", "Yêu cầu báo cáo", null);
+            case "case_attachments" -> response.attachEntityInfo("Tệp đính kèm hồ sơ", "Tệp đính kèm", null);
+            case "membership_packages" -> membershipPackageRepository.findById(Long.valueOf(id))
+                    .map(pkg -> response.attachEntityInfo("Gói thành viên: " + pkg.getPackageName(), "Gói thành viên", null))
+                    .orElseGet(() -> response.attachEntityInfo("Gói thành viên", "Gói thành viên", null));
             case "acceptance_criteria" -> acceptanceCriteriaRepository.findById(id)
                     .map(criteria -> response.attachEntityInfo("Tiêu chí nghiệm thu: " + criteria.getDescription(), "Tiêu chí nghiệm thu", null))
                     .orElseGet(() -> response.attachEntityInfo("Tiêu chí nghiệm thu", "Tiêu chí nghiệm thu", null));
@@ -325,10 +337,12 @@ public class AuditLogService {
             case "DISPUTE_ESCALATION_REQUESTED" -> ACTION_ESCALATE_DISPUTE;
             case "DISPUTE_STAFF_ASSIGNED" -> ACTION_ASSIGN_DISPUTE;
             case "DISPUTE_STAFF_ROUTED" -> ACTION_ASSIGN_DISPUTE;
+            case "DISPUTE_STAFF_AUTO_ASSIGNED" -> "Tự động phân công tranh chấp";
             case "DISPUTE_STAFF_SLA_ESCALATED" -> "Escalate SLA xử lý tranh chấp";
             case "DISPUTE_STAFF_DECIDED" -> ACTION_STAFF_DECIDE_DISPUTE;
             case "DISPUTE_SETTLEMENT_EXECUTED" -> ACTION_EXECUTE_DISPUTE_SETTLEMENT;
             case "DISPUTE_CANCELLED" -> ACTION_CANCEL_DISPUTE;
+            case "CONTRACT_COMPLETED" -> ACTION_COMPLETE_CONTRACT;
             case "TERMINATION_REQUESTED" -> ACTION_REQUEST_TERMINATION;
             case "TERMINATION_ACCEPTED_BY_EXPERT" -> "Chuyên gia chấp nhận chấm dứt";
             case "TERMINATION_DISPUTED_BY_EXPERT" -> "Chuyên gia tranh chấp yêu cầu chấm dứt";
@@ -349,6 +363,9 @@ public class AuditLogService {
             case "TERMINATION_CANCELLED" -> ACTION_CANCEL_TERMINATION;
             case "TERMINATION_DEPOSIT_REFUNDED" -> ACTION_REFUND_TERMINATION_DEPOSIT;
             case "CASE_ATTACHMENT_CREATED" -> ACTION_CREATE_CASE_ATTACHMENT;
+            case "WALLET_TOPUP_SUCCEEDED" -> ACTION_WALLET_TOPUP_SUCCEEDED;
+            case "WALLET_TOPUP_FAILED" -> ACTION_WALLET_TOPUP_FAILED;
+            case "PROGRESS_REPORT_FEEDBACK_RECORDED" -> "Ghi nhận phản hồi báo cáo tiến độ";
             case "Mua goi thanh vien" -> "Mua gói thành viên";
             case "Mua credit" -> "Mua lượt sử dụng";
             case "Su dung quota" -> "Sử dụng quota";
@@ -444,6 +461,13 @@ public class AuditLogService {
                 .orElse(null);
     }
 
+    private AccountEntity disputeOwner(DisputeEntity dispute) {
+        return dispute == null ? null : contractRepository.findById(dispute.getContractId())
+                .map(ContractEntity::getBusinessId)
+                .map(this::businessOwnerByBusinessId)
+                .orElse(null);
+    }
+
     private String proposalDisplay(ProposalEntity proposal) {
         String expert = expertName(proposal.getExpertId());
         String job = jobTitle(proposal.getJobId());
@@ -461,9 +485,18 @@ public class AuditLogService {
     }
 
     private String disputeDisplay(DisputeEntity dispute) {
-        return contractRepository.findById(dispute.getContractId())
-                .map(contract -> "Tranh chấp của " + lowerFirst(contractDisplay(contract)))
+        String display = contractRepository.findById(dispute.getContractId())
+                .map(contract -> "Tranh chấp giữa " + businessName(contract.getBusinessId()) + " và " + expertName(contract.getExpertId()))
                 .orElse("Tranh chấp");
+        if (dispute.getAssignedStaffId() != null) {
+            String staffName = staffRepository.findById(dispute.getAssignedStaffId())
+                    .map(StaffEntity::getAccountId)
+                    .map(this::accountById)
+                    .map(this::displayAccount)
+                    .orElse("staff");
+            return display + " - staff phụ trách: " + staffName;
+        }
+        return display;
     }
 
     private String membershipPurchaseDisplay(MembershipPurchaseEntity purchase) {

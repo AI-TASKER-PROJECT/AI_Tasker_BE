@@ -31,6 +31,13 @@ import java.util.Map;
 // Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class AdminService {
+    private static final List<String> SUPPORTED_SYSTEM_SETTINGS = List.of(
+            "default_sla_days",
+            "dispute_staff_max_active_cases",
+            "credit.job_post.price_vnd",
+            "credit.proposal.price_vnd"
+    );
+
     private final AccessService accessService;
     private final ContractRepository contractRepository;
     private final DisputeRepository disputeRepository;
@@ -102,7 +109,9 @@ public class AdminService {
     // Note: Hàm `listSettings` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<SystemSettingEntity> listSettings() {
         accessService.requireRole("ADMIN");
-        return systemSettingRepository.findAll();
+        return systemSettingRepository.findAllById(SUPPORTED_SYSTEM_SETTINGS).stream()
+                .sorted(java.util.Comparator.comparing(SystemSettingEntity::getSettingKey))
+                .toList();
     }
 
     @Transactional
@@ -110,6 +119,7 @@ public class AdminService {
         accessService.requireRole("ADMIN");
         validateSettingRequest(request, true);
         String key = normalizeSettingKey(request.getSettingKey());
+        requireSupportedSettingKey(key);
         if (systemSettingRepository.existsById(key)) {
             throw new AppException("SYSTEM SETTING DA TON TAI");
         }
@@ -137,14 +147,16 @@ public class AdminService {
     // Note: Hàm `updateSetting` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public SystemSettingEntity updateSetting(String key, String value, Boolean isActive) {
         accessService.requireRole("ADMIN");
-        SystemSettingEntity setting = systemSettingRepository.findById(key).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
+        String normalizedKey = normalizeSettingKey(key);
+        requireSupportedSettingKey(normalizedKey);
+        SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         // CHI CHO PHEP CAP NHAT GIA TRI/CO HIEU LUC, KHONG CHO DOI VALUE_TYPE TRANH VO HOP DONG DU LIEU.
         if (value != null && !value.isBlank()) setting.setSettingValue(value);
         if (isActive != null) setting.setIsActive(isActive);
         AccountEntity actor = accessService.currentAccount();
         setting.setUpdatedByRoleId(actor.getRole().getRoleId());
         SystemSettingEntity saved = systemSettingRepository.save(setting);
-        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", key, actor.getAccountId());
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", normalizedKey, actor.getAccountId());
         return saved;
     }
 
@@ -153,6 +165,7 @@ public class AdminService {
         accessService.requireRole("ADMIN");
         if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         String normalizedKey = normalizeSettingKey(key);
+        requireSupportedSettingKey(normalizedKey);
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         if (request.getSettingValue() != null && !request.getSettingValue().isBlank()) {
@@ -174,6 +187,7 @@ public class AdminService {
     public SystemSettingEntity deleteSetting(String key) {
         accessService.requireRole("ADMIN");
         String normalizedKey = normalizeSettingKey(key);
+        requireSupportedSettingKey(normalizedKey);
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         setting.setIsActive(false);
@@ -464,6 +478,12 @@ public class AdminService {
     private String normalizeSettingKey(String key) {
         if (key == null || key.isBlank()) throw new AppException("SETTING KEY KHONG DUOC DE TRONG");
         return key.trim();
+    }
+
+    private void requireSupportedSettingKey(String key) {
+        if (!SUPPORTED_SYSTEM_SETTINGS.contains(key)) {
+            throw new AppException("SYSTEM SETTING KHONG DUOC HO TRO");
+        }
     }
 
     private String normalizeValueType(String valueType) {

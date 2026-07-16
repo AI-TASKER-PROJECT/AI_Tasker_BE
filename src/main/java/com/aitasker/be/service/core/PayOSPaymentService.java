@@ -46,6 +46,7 @@ public class PayOSPaymentService {
     private final AccessService accessService;
     private final WalletLedgerService walletLedgerService;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     // Note: Ham `createPayment` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -144,7 +145,25 @@ public class PayOSPaymentService {
             }
         }
 
+        if (previousStatus != mappedStatus && isTerminalStatus(mappedStatus)) {
+            auditLogService.record(
+                    mappedStatus == PaymentStatus.PAID
+                            ? AuditLogService.ACTION_WALLET_TOPUP_SUCCEEDED
+                            : AuditLogService.ACTION_WALLET_TOPUP_FAILED,
+                    "payment_order",
+                    String.valueOf(paymentOrder.getId()),
+                    Math.toIntExact(paymentOrder.getAccountId())
+            );
+        }
+
         return paymentOrderRepository.save(paymentOrder);
+    }
+
+    private boolean isTerminalStatus(PaymentStatus status) {
+        return status == PaymentStatus.PAID
+                || status == PaymentStatus.FAILED
+                || status == PaymentStatus.CANCELLED
+                || status == PaymentStatus.EXPIRED;
     }
 
     // Note: Ham `validateCreateRequest` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.

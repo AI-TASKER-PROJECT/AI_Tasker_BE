@@ -40,6 +40,8 @@ public class WalletLedgerService {
     public static final String LEG_HOLDING_HOLD = "HOLDING_HOLD";
     public static final String LEG_HOLDING_RELEASE = "HOLDING_RELEASE";
     public static final String LEG_HOLDING_DEBIT = "HOLDING_DEBIT";
+    public static final String LEG_PURCHASER_AVAILABLE_DEBIT = "PURCHASER_AVAILABLE_DEBIT";
+    public static final String LEG_PLATFORM_REVENUE_CREDIT = "PLATFORM_REVENUE_CREDIT";
 
     private final SystemWalletRepository systemWalletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
@@ -136,6 +138,36 @@ public class WalletLedgerService {
 
         return saveSingleLegWithRaceGuard(wallet, accountId, transactionType, "DEBIT", BALANCE_AVAILABLE,
                 amount, before, balance(wallet, BALANCE_AVAILABLE), referenceType, referenceId, description, normalized);
+    }
+
+    @Transactional
+    public WalletTransactionEntity creditPlatformRevenue(
+            Integer platformAccountId,
+            BigDecimal amount,
+            String transactionType,
+            String referenceType,
+            Long referenceId,
+            String description,
+            WalletOperationContext context
+    ) {
+        amount = positiveAmount(amount);
+        SystemWalletEntity wallet = walletForAccount(platformAccountId);
+        WalletOperationContext normalized = ensureLeg(normalizeContext(context), LEG_PLATFORM_REVENUE_CREDIT);
+        WalletTransactionEntity existing = loadExistingSingleLeg(normalized, platformAccountId, transactionType,
+                "CREDIT", BALANCE_AVAILABLE, amount, referenceType, referenceId, description);
+        if (existing != null) {
+            return existing;
+        }
+
+        BigDecimal availableBefore = balance(wallet, BALANCE_AVAILABLE);
+        wallet.setAvailableBalance(availableBefore.add(amount));
+        wallet.setTotalRevenue(nonNegativeMoney(wallet.getTotalRevenue()).add(amount));
+        recomputeCurrentBalance(wallet);
+        systemWalletRepository.save(wallet);
+
+        return saveSingleLegWithRaceGuard(wallet, platformAccountId, transactionType, "CREDIT", BALANCE_AVAILABLE,
+                amount, availableBefore, balance(wallet, BALANCE_AVAILABLE), referenceType, referenceId,
+                description, normalized);
     }
 
     @Transactional

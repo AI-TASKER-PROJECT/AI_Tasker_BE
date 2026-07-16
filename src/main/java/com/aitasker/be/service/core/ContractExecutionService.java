@@ -1534,14 +1534,15 @@ public class ContractExecutionService {
         if (resolveJobDomainIds(dispute.getContractId()).isEmpty()) {
             throw new AppException("JOB KHONG CO DOMAIN, KHONG THE ROUTE STAFF");
         }
-        Integer routedStaffId = staffId == null
+        boolean automaticRouting = staffId == null;
+        Integer routedStaffId = automaticRouting
                 ? selectStaffForDispute(dispute)
                 : validateManualStaffForDispute(dispute, staffId);
-        return routeDisputeToStaff(dispute, routedStaffId, accessService.currentAccount().getAccountId());
+        return routeDisputeToStaff(dispute, routedStaffId, accessService.currentAccount().getAccountId(), automaticRouting);
     }
 
     // Chức năng 6: Cập nhật trạng thái tranh chấp sang Staff reviewing và lưu Staff phụ trách.
-    private DisputeEntity routeDisputeToStaff(DisputeEntity dispute, Integer staffId, Integer actorAccountId) {
+    private DisputeEntity routeDisputeToStaff(DisputeEntity dispute, Integer staffId, Integer actorAccountId, boolean automaticRouting) {
         staffRepository.findById(staffId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY STAFF"));
         dispute.setAssignedStaffId(staffId);
         dispute.setStatus(DisputeEntity.STATUS_STAFF_REVIEWING);
@@ -1553,7 +1554,8 @@ public class ContractExecutionService {
         dispute.setStaffSlaDueAt(now.plusHours(48).plusDays(3));
         DisputeEntity saved = disputeRepository.save(dispute);
         systemWalletService.syncWallet();
-        auditLogService.record("DISPUTE_STAFF_ROUTED", "disputes", String.valueOf(dispute.getDisputeId()), actorAccountId);
+        auditLogService.record(automaticRouting ? "DISPUTE_STAFF_AUTO_ASSIGNED" : "DISPUTE_STAFF_ASSIGNED",
+                "disputes", String.valueOf(dispute.getDisputeId()), actorAccountId);
         staffRepository.findById(staffId)
                 .ifPresent(staff -> notificationService.notifyDisputeAssigned(
                         staff.getAccountId(),
@@ -1591,6 +1593,7 @@ public class ContractExecutionService {
         accessService.requireRole("ADMIN");
         // MO PHONG JOB SLA: TU DONG RELEASE MILESTONE NEU QUA SO NGAY CAU HINH SAU KHI CO DELIVERABLE.
         int slaDays = systemSettingRepository.findById("default_sla_days")
+                .filter(setting -> Boolean.TRUE.equals(setting.getIsActive()))
                 .map(SystemSettingEntity::getSettingValue)
                 .map(v -> {
                     try { return Integer.parseInt(v); } catch (Exception e) { return 7; }
@@ -1981,7 +1984,7 @@ public class ContractExecutionService {
         }
         staffRepository.findById(staffId).ifPresent(staff ->
                 notificationService.notifyDisputeEscalationRequested(staff.getAccountId(), actorAccountId, disputeId));
-        return routeDisputeToStaff(dispute, staffId, actorAccountId);
+        return routeDisputeToStaff(dispute, staffId, actorAccountId, true);
     }
 
     @Transactional

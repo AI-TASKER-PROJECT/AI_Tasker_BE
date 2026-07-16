@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -253,6 +254,92 @@ class PaymentWalletServiceTest {
     }
 
     @Test
+    void purchaseMembership_shouldPostPurchaserDebitAndPlatformRevenueCredit() {
+        AccountEntity business = businessAccount();
+        MembershipPackageEntity membershipPackage = packageEntity(
+                1L, "BUSINESS_PLUS", "Business Plus", 30);
+        membershipPackage.setPrice(new BigDecimal("500"));
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(business);
+        when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L))
+                .thenReturn(Optional.of(membershipPackage));
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("1000"));
+        stubPlatformPurchaseDebit(100L);
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> {
+            MembershipPurchaseEntity purchase = invocation.getArgument(0);
+            purchase.setPurchaseId(20L);
+            return purchase;
+        });
+
+        PaymentActionResponse<MembershipPurchaseEntity> response = paymentWalletService.purchaseMembership(1L);
+
+        assertTrue(response.isCompleted());
+        assertEquals(new BigDecimal("500"), response.getData().getAmount());
+        verifyPlatformRevenuePosting(10, new BigDecimal("500"), "MEMBERSHIP_PURCHASE");
+    }
+
+    @Test
+    void purchaseJobPostCredits_shouldPostPurchaserDebitAndPlatformRevenueCredit() {
+        AccountEntity business = businessAccount();
+        CreditPurchaseRequest request = new CreditPurchaseRequest();
+        request.setQuantity(2);
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(business);
+        when(systemSettingRepository.findById("credit.job_post.price_vnd")).thenReturn(Optional.empty());
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("1000"));
+        stubPlatformPurchaseDebit(101L);
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentActionResponse<UserQuotaEntity> response = paymentWalletService.purchaseJobPostCredits(request);
+
+        assertTrue(response.isCompleted());
+        assertEquals(2, response.getData().getJobPostQuotaBalance());
+        verifyPlatformRevenuePosting(10, new BigDecimal("400"), "CREDIT_PURCHASE");
+    }
+
+    @Test
+    void purchaseProposalCredits_shouldPostPurchaserDebitAndPlatformRevenueCredit() {
+        AccountEntity expert = AccountEntity.builder()
+                .accountId(11)
+                .role(RoleEntity.builder().roleName("EXPERT").build())
+                .status("Approved")
+                .build();
+        CreditPurchaseRequest request = new CreditPurchaseRequest();
+        request.setQuantity(3);
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(11)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(expert);
+        when(systemSettingRepository.findById("credit.proposal.price_vnd")).thenReturn(Optional.empty());
+        when(walletLedgerService.availableBalance(11)).thenReturn(new BigDecimal("1000"));
+        stubPlatformPurchaseDebit(102L);
+        when(userQuotaRepository.findByAccountIdForUpdate(11)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentActionResponse<UserQuotaEntity> response = paymentWalletService.purchaseProposalCredits(request);
+
+        assertTrue(response.isCompleted());
+        assertEquals(3, response.getData().getProposalQuotaBalance());
+        verifyPlatformRevenuePosting(11, new BigDecimal("300"), "CREDIT_PURCHASE");
+    }
+
+    @Test
     void purchaseMembership_shouldKeepPremiumActiveWhenLowerTierIsBoughtBeforePremiumExpires() {
         AccountEntity business = businessAccount();
         UserQuotaEntity quota = UserQuotaEntity.builder()
@@ -267,8 +354,7 @@ class PaymentWalletServiceTest {
         when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L)).thenReturn(Optional.of(premium));
         when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(2L)).thenReturn(Optional.of(plus));
         when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("3000000"));
-        when(walletLedgerService.debitAvailable(any(), any(), any(), any(), any(), any()))
-                .thenReturn(WalletTransactionEntity.builder().id(100L).build());
+        stubPlatformPurchaseDebit(100L);
         when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
         when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> {
@@ -300,8 +386,7 @@ class PaymentWalletServiceTest {
         when(accessService.currentAccount()).thenReturn(business);
         when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L)).thenReturn(Optional.of(premium));
         when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("3000000"));
-        when(walletLedgerService.debitAvailable(any(), any(), any(), any(), any(), any()))
-                .thenReturn(WalletTransactionEntity.builder().id(100L).build());
+        stubPlatformPurchaseDebit(100L);
         when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
         when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -906,6 +991,16 @@ class PaymentWalletServiceTest {
                 .referenceId(1L)
                 .description("Premium Business")
                 .build();
+        WalletTransactionEntity platformRevenueCredit = WalletTransactionEntity.builder()
+                .id(61L)
+                .accountId(1)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("CREDIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("500000"))
+                .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                .description("Premium Business")
+                .build();
         WithdrawalRequestEntity withdrawal = WithdrawalRequestEntity.builder()
                 .withdrawalId(90L)
                 .accountId(11)
@@ -925,7 +1020,8 @@ class PaymentWalletServiceTest {
         MembershipPackageEntity membershipPackage = packageEntity(1L, "BUSINESS_PREMIUM", "Premium Business", 30);
 
         when(walletTransactionRepository.findAllByOrderByCreatedAtDesc())
-                .thenReturn(List.of(skippedWithdrawDebit, withdrawHold, creditPurchase, membershipPurchase));
+                .thenReturn(List.of(skippedWithdrawDebit, withdrawHold, creditPurchase, membershipPurchase,
+                        platformRevenueCredit));
         when(accountRepository.findById(10)).thenReturn(Optional.of(businessAccount));
         when(accountRepository.findById(11)).thenReturn(Optional.of(expertAccount));
         when(withdrawalRequestRepository.findByHoldTransactionId(40L)).thenReturn(Optional.of(withdrawal));
@@ -951,6 +1047,34 @@ class PaymentWalletServiceTest {
                 .role(RoleEntity.builder().roleName("BUSINESS").build())
                 .status("Approved")
                 .build();
+    }
+
+    private void stubPlatformPurchaseDebit(Long transactionId) {
+        when(accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN"))
+                .thenReturn(Optional.of(adminAccount()));
+        when(walletLedgerService.debitAvailable(
+                any(), any(), any(), any(), any(), any(),
+                any(WalletLedgerService.WalletOperationContext.class)))
+                .thenReturn(WalletTransactionEntity.builder().id(transactionId).build());
+    }
+
+    private void verifyPlatformRevenuePosting(Integer purchaserAccountId, BigDecimal amount, String transactionType) {
+        ArgumentCaptor<WalletLedgerService.WalletOperationContext> debitContext =
+                ArgumentCaptor.forClass(WalletLedgerService.WalletOperationContext.class);
+        ArgumentCaptor<WalletLedgerService.WalletOperationContext> creditContext =
+                ArgumentCaptor.forClass(WalletLedgerService.WalletOperationContext.class);
+
+        verify(walletLedgerService).debitAvailable(
+                eq(purchaserAccountId), eq(amount), eq(transactionType), any(), any(), any(), debitContext.capture());
+        verify(walletLedgerService).creditPlatformRevenue(
+                eq(1), eq(amount), eq(transactionType), any(), any(), any(), creditContext.capture());
+
+        assertNotNull(debitContext.getValue().operationKey());
+        assertEquals(debitContext.getValue().operationKey(), creditContext.getValue().operationKey());
+        assertEquals(WalletLedgerService.LEG_PURCHASER_AVAILABLE_DEBIT,
+                debitContext.getValue().operationLeg());
+        assertEquals(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT,
+                creditContext.getValue().operationLeg());
     }
 
     private AccountEntity adminAccount() {

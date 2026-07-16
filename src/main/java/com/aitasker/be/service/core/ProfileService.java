@@ -55,6 +55,9 @@ public class ProfileService {
         AccountEntity account = accessService.currentAccount();
 
         // KIEM TRA TRUNG MST — MOT MST CHI THUOC VE MOT ACCOUNT.
+        BusinessProfileEntity entity = businessProfileRepository.findByAccountId(account.getAccountId()).orElseGet(BusinessProfileEntity::new);
+        ProfileSubmissionMode submissionMode = resolveBusinessSubmissionMode(entity);
+
         if (businessProfileRepository.existsByTaxCodeExcludingAccount(input.getTaxCode(), account.getAccountId())) {
             throw new AppException("MA SO THUE DA DUOC SU DUNG BOI TAI KHOAN KHAC");
         }
@@ -62,7 +65,6 @@ public class ProfileService {
         // XAC THUC MST VOI VIETQR — HE THONG TU DONG DIEN THONG TIN DOANH NGHIEP TU NGUON CHINH THUC.
         TaxCheckResponse vietQrData = taxCheckService.checkTaxCode(input.getTaxCode());
 
-        BusinessProfileEntity entity = businessProfileRepository.findByAccountId(account.getAccountId()).orElseGet(BusinessProfileEntity::new);
         entity.setAccountId(account.getAccountId());
         entity.setTaxCode(input.getTaxCode());
         entity.setCompanyName(vietQrData.getCompanyName());
@@ -70,14 +72,18 @@ public class ProfileService {
         entity.setVerifiedRepresentative(vietQrData.getRepresentative());
         entity.setBusinessLicenseUrl(input.getBusinessLicenseUrl());
         // Moi lan nop/cap nhat KYB deu dua account ve Pending de staff duyet lai.
-        entity.setKybStatus("Pending");
-        entity.setApprovedBy(null);
-        entity.setRejectionReason(null);
-        account.setStatus("Pending");
-        accountRepository.save(account);
+        if (submissionMode.reopensReview()) {
+            entity.setKybStatus("Pending");
+            entity.setApprovedBy(null);
+            entity.setRejectionReason(null);
+            account.setStatus("Pending");
+            accountRepository.save(account);
+        }
         BusinessProfileEntity saved = businessProfileRepository.save(entity);
         auditLogService.record(AuditLogService.ACTION_UPSERT_BUSINESS_PROFILE, "business_profiles", String.valueOf(saved.getBusinessId()), account.getAccountId());
-        notifyStaffProfileSubmitted("BUSINESS", saved.getBusinessId(), account.getAccountId(), saved.getCompanyName());
+        if (submissionMode.reopensReview()) {
+            notifyStaffProfileSubmitted("BUSINESS", saved.getBusinessId(), account.getAccountId(), saved.getCompanyName());
+        }
         return saved;
     }
 
@@ -94,23 +100,28 @@ public class ProfileService {
         if (input.getPortfolioUrl() == null || input.getPortfolioUrl().isBlank()) throw new AppException("PORTFOLIO URL KHONG DUOC DE TRONG");
         if (input.getYearsOfExperience() == null || input.getYearsOfExperience() < 0) throw new AppException("YEARS OF EXPERIENCE KHONG HOP LE");
         AccountEntity account = accessService.currentAccount();
+        ExpertProfileEntity entity = expertProfileRepository.findByAccountId(account.getAccountId()).orElseGet(ExpertProfileEntity::new);
+        ProfileSubmissionMode submissionMode = resolveExpertSubmissionMode(entity);
         expertProfileRepository.findByNationalId(input.getNationalId().trim())
                 .filter(existing -> !existing.getAccountId().equals(account.getAccountId()))
                 .ifPresent(existing -> { throw new AppException("NATIONAL ID DA DUOC SU DUNG"); });
-        ExpertProfileEntity entity = expertProfileRepository.findByAccountId(account.getAccountId()).orElseGet(ExpertProfileEntity::new);
         entity.setAccountId(account.getAccountId());
         entity.setNationalId(input.getNationalId().trim());
         entity.setPortfolioUrl(input.getPortfolioUrl().trim());
         entity.setYearsOfExperience(input.getYearsOfExperience());
         // Moi lan nop/cap nhat KYC deu dua account ve Pending de staff duyet lai.
-        entity.setKycStatus("Pending");
-        entity.setApprovedBy(null);
-        entity.setRejectionReason(null);
-        account.setStatus("Pending");
-        accountRepository.save(account);
+        if (submissionMode.reopensReview()) {
+            entity.setKycStatus("Pending");
+            entity.setApprovedBy(null);
+            entity.setRejectionReason(null);
+            account.setStatus("Pending");
+            accountRepository.save(account);
+        }
         ExpertProfileEntity saved = expertProfileRepository.save(entity);
         auditLogService.record(AuditLogService.ACTION_UPSERT_EXPERT_PROFILE, "expert_profiles", String.valueOf(saved.getExpertId()), account.getAccountId());
-        notifyStaffProfileSubmitted("EXPERT", saved.getExpertId(), account.getAccountId(), account.getFullName());
+        if (submissionMode.reopensReview()) {
+            notifyStaffProfileSubmitted("EXPERT", saved.getExpertId(), account.getAccountId(), account.getFullName());
+        }
         return saved;
     }
 
@@ -131,6 +142,7 @@ public class ProfileService {
         requireProfileReviewDomain(staffId);
         if ("BUSINESS".equalsIgnoreCase(type)) {
             BusinessProfileEntity b = businessProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
+            requirePendingProfileStatus(b.getKybStatus());
             b.setKybStatus(status);
             b.setApprovedBy(staffId);
             b.setRejectionReason(normalizedReason);
@@ -144,6 +156,7 @@ public class ProfileService {
             throw new AppException("TYPE PROFILE KHONG HOP LE");
         }
         ExpertProfileEntity e = expertProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
+        requirePendingProfileStatus(e.getKycStatus());
         e.setKycStatus(status);
         e.setApprovedBy(staffId);
         e.setRejectionReason(normalizedReason);
@@ -388,6 +401,41 @@ public class ProfileService {
             throw new AppException("LY DO TU CHOI KHONG DUOC VUOT QUA 500 KY TU");
         }
         return normalized;
+    }
+
+    private ProfileSubmissionMode resolveBusinessSubmissionMode(BusinessProfileEntity entity) {
+        if (entity.getBusinessId() == null) return ProfileSubmissionMode.REOPEN_REVIEW;
+        return resolveSubmissionMode(entity.getKybStatus());
+    }
+
+    private ProfileSubmissionMode resolveExpertSubmissionMode(ExpertProfileEntity entity) {
+        if (entity.getExpertId() == null) return ProfileSubmissionMode.REOPEN_REVIEW;
+        return resolveSubmissionMode(entity.getKycStatus());
+    }
+
+    private ProfileSubmissionMode resolveSubmissionMode(String currentStatus) {
+        if ("Pending".equalsIgnoreCase(currentStatus)) {
+            throw new AppException("HO SO DANG CHO DUYET, VUI LONG DOI KET QUA XET DUYET");
+        }
+        if ("Approved".equalsIgnoreCase(currentStatus)) {
+            return ProfileSubmissionMode.UPDATE_APPROVED_ONLY;
+        }
+        return ProfileSubmissionMode.REOPEN_REVIEW;
+    }
+
+    private void requirePendingProfileStatus(String currentStatus) {
+        if (!"Pending".equalsIgnoreCase(currentStatus)) {
+            throw new AppException("CHI DUOC XET DUYET HO SO DANG CHO DUYET");
+        }
+    }
+
+    private enum ProfileSubmissionMode {
+        REOPEN_REVIEW,
+        UPDATE_APPROVED_ONLY;
+
+        boolean reopensReview() {
+            return this == REOPEN_REVIEW;
+        }
     }
 
     private void notifyStaffProfileSubmitted(String profileType, Integer profileId, Integer submitterAccountId, String displayName) {
