@@ -508,6 +508,10 @@ public class AdminService {
     private StaffResponse toStaffResponse(StaffEntity staff) {
         AccountEntity account = accountRepository.findById(staff.getAccountId()).orElse(null);
         StaffResponse response = StaffResponse.from(staff, account);
+        response.setActiveTickets(disputeRepository.countByAssignedStaffIdAndStatusIn(
+                staff.getStaffId(),
+                List.of(DisputeEntity.STATUS_STAFF_REVIEWING)
+        ));
         List<StaffDomainEntity> domainMappings = staffDomainRepository.findByIdStaffId(staff.getStaffId());
         List<StaffSkillEntity> skillMappings = staffSkillRepository.findByIdStaffId(staff.getStaffId());
         if (!domainMappings.isEmpty()) {

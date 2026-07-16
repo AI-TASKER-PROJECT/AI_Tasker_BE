@@ -20,6 +20,7 @@ public class StaffResponse {
     private LocalDateTime updatedAt;
     private List<DomainSummary> domains;
     private List<SkillSummary> skills;
+    private Long activeTickets;
 
     @Data @Builder
     public static class DomainSummary {
