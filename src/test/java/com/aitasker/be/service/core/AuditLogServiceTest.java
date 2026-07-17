@@ -11,6 +11,7 @@ import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -211,6 +212,47 @@ class AuditLogServiceTest {
         assertEquals("Gói Premium của Nova Retail", response.getEntityDisplayName());
         assertEquals("Gói thành viên", response.getEntityName());
         assertNull(response.getEntityId());
+    }
+
+    @Test
+    void listForAdmin_shouldRenderEnglishWithdrawalActionAsVietnameseDisplay() {
+        AccountEntity expert = account(20, "Expert AI", "expert@aitasker.local", "EXPERT");
+        when(accountRepository.findById(20)).thenReturn(Optional.of(expert));
+        when(auditLogRepository.findTop200ByOrderByCreatedAtDesc()).thenReturn(List.of(log(
+                "WITHDRAWAL_REQUEST_CREATED",
+                "withdrawal_requests",
+                "legacy",
+                20
+        )));
+
+        AuditLogResponse response = auditLogService.listForAdmin(null).get(0);
+
+        assertEquals("Tạo yêu cầu rút tiền", response.getAction());
+        assertEquals("Yêu cầu rút tiền", response.getEntityName());
+        assertNull(response.getEntityId());
+    }
+
+    @Test
+    void record_shouldPersistEnglishRawActionForLegacyVietnameseInput() {
+        ArgumentCaptor<AuditLogEntity> captor = ArgumentCaptor.forClass(AuditLogEntity.class);
+
+        auditLogService.record("Tao yeu cau rut tien", "withdrawal_requests", "5", 20);
+
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("WITHDRAWAL_REQUEST_CREATED", captor.getValue().getAction());
+        assertEquals("withdrawal_requests", captor.getValue().getEntityName());
+        assertEquals("5", captor.getValue().getEntityId());
+        assertEquals(20, captor.getValue().getActorAccountId());
+    }
+
+    @Test
+    void record_shouldPersistEnglishRawActionForLegacyUriInput() {
+        ArgumentCaptor<AuditLogEntity> captor = ArgumentCaptor.forClass(AuditLogEntity.class);
+
+        auditLogService.record("POST /api/payments/payos/create", "/api/payments/payos/create", "legacy", 20);
+
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("CREATE_PAYOS_PAYMENT_REQUEST", captor.getValue().getAction());
     }
 
     @Test
