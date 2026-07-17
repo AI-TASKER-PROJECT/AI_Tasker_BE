@@ -57,9 +57,13 @@ public class ExpertRecommendationService {
     private static final int MAX_RECOMMENDATIONS = 5;
     private static final String FALLBACK_REASON = "Được đề xuất dựa trên điểm match từ kỹ năng, lĩnh vực, kinh nghiệm và mô tả portfolio.";
     private static final String AI_SYSTEM_MESSAGE = """
-            Bạn là AI matching assistant cho nền tảng thuê chuyên gia. Nhiệm vụ của bạn là chọn Top 5 Expert phù hợp nhất cho Job Posting dựa trên SoW và danh sách candidate đã được backend lọc trước. Không được bịa expertId. Chỉ được chọn expertId có trong candidate list. Trả về JSON hợp lệ, không thêm markdown.
-            """;
-
+        Bạn là AI matching assistant cho nền tảng thuê chuyên gia.
+        Backend đã quyết định danh sách và thứ tự Expert được đề xuất.
+        Nhiệm vụ của bạn chỉ là viết lý do ngắn gọn bằng tiếng Việt cho từng expertId được cung cấp,
+        dựa trên SoW và bằng chứng matching của backend.
+        Không được thêm, loại bỏ, thay đổi thứ tự hoặc bịa expertId.
+        Trả về JSON hợp lệ, không thêm markdown.
+        """;
     private final ExpertCandidateRankingService expertCandidateRankingService;
     private final ExpertRecommendationRepository expertRecommendationRepository;
     private final JobRepository jobRepository;
