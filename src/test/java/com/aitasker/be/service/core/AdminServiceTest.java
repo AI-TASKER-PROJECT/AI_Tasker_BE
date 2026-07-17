@@ -71,30 +71,30 @@ class AdminServiceTest {
     @Test
     void createSetting_shouldPersistNewSystemSetting() {
         SystemSettingRequest request = new SystemSettingRequest();
-        request.setSettingKey("approval.sla_days");
+        request.setSettingKey("default_sla_days");
         request.setSettingValue("3");
         request.setValueType("INT");
         request.setDescription("So ngay SLA xet duyet");
 
         AccountEntity admin = adminAccount();
-        when(systemSettingRepository.existsById("approval.sla_days")).thenReturn(false);
+        when(systemSettingRepository.existsById("default_sla_days")).thenReturn(false);
         when(accessService.currentAccount()).thenReturn(admin);
         when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SystemSettingEntity saved = adminService.createSetting(request);
 
-        assertEquals("approval.sla_days", saved.getSettingKey());
+        assertEquals("default_sla_days", saved.getSettingKey());
         assertEquals("3", saved.getSettingValue());
         assertEquals("INT", saved.getValueType());
         assertEquals(Boolean.TRUE, saved.getIsActive());
         assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
-        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "approval.sla_days", 1);
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "default_sla_days", 1);
     }
 
     @Test
     void updateSettingBody_shouldUpdateMutableFields() {
         SystemSettingEntity setting = SystemSettingEntity.builder()
-                .settingKey("approval.sla_days")
+                .settingKey("default_sla_days")
                 .settingValue("7")
                 .valueType("INT")
                 .isActive(true)
@@ -105,37 +105,49 @@ class AdminServiceTest {
         request.setDescription("SLA xet duyet moi");
         request.setIsActive(false);
 
-        when(systemSettingRepository.findById("approval.sla_days")).thenReturn(Optional.of(setting));
+        when(systemSettingRepository.findById("default_sla_days")).thenReturn(Optional.of(setting));
         when(accessService.currentAccount()).thenReturn(adminAccount());
         when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        SystemSettingEntity saved = adminService.updateSetting("approval.sla_days", request);
+        SystemSettingEntity saved = adminService.updateSetting("default_sla_days", request);
 
         assertEquals("3", saved.getSettingValue());
         assertEquals("INT", saved.getValueType());
         assertEquals("SLA xet duyet moi", saved.getDescription());
         assertEquals(Boolean.FALSE, saved.getIsActive());
-        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "approval.sla_days", 1);
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "default_sla_days", 1);
     }
 
     @Test
     void deleteSetting_shouldDeactivateSetting() {
         SystemSettingEntity setting = SystemSettingEntity.builder()
-                .settingKey("approval.sla_days")
+                .settingKey("default_sla_days")
                 .settingValue("3")
                 .valueType("INT")
                 .isActive(true)
                 .build();
 
-        when(systemSettingRepository.findById("approval.sla_days")).thenReturn(Optional.of(setting));
+        when(systemSettingRepository.findById("default_sla_days")).thenReturn(Optional.of(setting));
         when(accessService.currentAccount()).thenReturn(adminAccount());
         when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        SystemSettingEntity saved = adminService.deleteSetting("approval.sla_days");
+        SystemSettingEntity saved = adminService.deleteSetting("default_sla_days");
 
         assertEquals(Boolean.FALSE, saved.getIsActive());
         assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
-        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "approval.sla_days", 1);
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "default_sla_days", 1);
+    }
+
+    @Test
+    void createSetting_shouldRejectUnsupportedSettingKey() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingKey("platform_fee_percent");
+        request.setSettingValue("10");
+        request.setValueType("DECIMAL");
+
+        AppException ex = assertThrows(AppException.class, () -> adminService.createSetting(request));
+
+        assertEquals("SYSTEM SETTING KHONG DUOC HO TRO", ex.getMessage());
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.

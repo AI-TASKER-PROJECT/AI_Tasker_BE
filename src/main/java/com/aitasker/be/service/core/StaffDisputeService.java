@@ -30,6 +30,7 @@ public class StaffDisputeService {
     private final DomainRepository domainRepository;
     private final SkillRepository skillRepository;
 
+    // Chức năng 1: Lấy danh sách tranh chấp Staff được phân công hoặc phù hợp để xử lý.
     public StaffDisputeListResponse listDisputes(StaffDisputeFilter filter) {
         accessService.requireRole("STAFF");
         AccountEntity actor = accessService.currentAccount();
@@ -67,6 +68,7 @@ public class StaffDisputeService {
                 .build();
     }
 
+    // Chức năng 2: Chuyển hồ sơ tranh chấp sang DTO danh sách cho màn Staff.
     private StaffDisputeListItem toListItem(DisputeEntity dispute) {
         List<Integer> jobDomainIds = contractRepository.findById(dispute.getContractId())
                 .map(c -> jobDomainRepository.findByIdJobId(c.getJobId()).stream()

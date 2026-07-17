@@ -11,6 +11,7 @@ import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -211,6 +212,96 @@ class AuditLogServiceTest {
         assertEquals("Gói Premium của Nova Retail", response.getEntityDisplayName());
         assertEquals("Gói thành viên", response.getEntityName());
         assertNull(response.getEntityId());
+    }
+
+    @Test
+    void listForAdmin_shouldRenderEnglishWithdrawalActionAsVietnameseDisplay() {
+        AccountEntity expert = account(20, "Expert AI", "expert@aitasker.local", "EXPERT");
+        when(accountRepository.findById(20)).thenReturn(Optional.of(expert));
+        when(auditLogRepository.findTop200ByOrderByCreatedAtDesc()).thenReturn(List.of(log(
+                "WITHDRAWAL_REQUEST_CREATED",
+                "withdrawal_requests",
+                "legacy",
+                20
+        )));
+
+        AuditLogResponse response = auditLogService.listForAdmin(null).get(0);
+
+        assertEquals("Tạo yêu cầu rút tiền", response.getAction());
+        assertEquals("Yêu cầu rút tiền", response.getEntityName());
+        assertNull(response.getEntityId());
+    }
+
+    @Test
+    void record_shouldPersistEnglishRawActionForLegacyVietnameseInput() {
+        ArgumentCaptor<AuditLogEntity> captor = ArgumentCaptor.forClass(AuditLogEntity.class);
+
+        auditLogService.record("Tao yeu cau rut tien", "withdrawal_requests", "5", 20);
+
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("WITHDRAWAL_REQUEST_CREATED", captor.getValue().getAction());
+        assertEquals("withdrawal_requests", captor.getValue().getEntityName());
+        assertEquals("5", captor.getValue().getEntityId());
+        assertEquals(20, captor.getValue().getActorAccountId());
+    }
+
+    @Test
+    void record_shouldPersistEnglishRawActionForLegacyUriInput() {
+        ArgumentCaptor<AuditLogEntity> captor = ArgumentCaptor.forClass(AuditLogEntity.class);
+
+        auditLogService.record("POST /api/payments/payos/create", "/api/payments/payos/create", "legacy", 20);
+
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("CREATE_PAYOS_PAYMENT_REQUEST", captor.getValue().getAction());
+    }
+
+    @Test
+    void listForAdmin_shouldRenderDisputeDecisionObjectAsParticipantsInsteadOfStaffActor() {
+        AccountEntity staffActor = account(99, "Staff Reviewer", "staff@aitasker.local", "STAFF");
+        AccountEntity business = account(10, "Nova Retail", "business@aitasker.local", "BUSINESS");
+        AccountEntity expert = account(20, "Expert AI", "expert@aitasker.local", "EXPERT");
+
+        when(accountRepository.findById(99)).thenReturn(Optional.of(staffActor));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(business));
+        when(accountRepository.findById(20)).thenReturn(Optional.of(expert));
+        doReturn(Optional.of(BusinessProfileEntity.builder()
+                .businessId(1)
+                .accountId(10)
+                .companyName("Nova Retail")
+                .build())).when(businessProfileRepository).findById(any());
+        doReturn(Optional.of(ExpertProfileEntity.builder()
+                .expertId(2)
+                .accountId(20)
+                .build())).when(expertProfileRepository).findById(any());
+        doReturn(Optional.of(ContractEntity.builder()
+                .contractId(30)
+                .businessId(1)
+                .expertId(2)
+                .build())).when(contractRepository).findById(any());
+        doReturn(Optional.of(DisputeEntity.builder()
+                .disputeId(9)
+                .contractId(30)
+                .assignedStaffId(7)
+                .build())).when(disputeRepository).findById(any());
+        doReturn(Optional.of(StaffEntity.builder()
+                .staffId(7)
+                .accountId(99)
+                .build())).when(staffRepository).findById(any());
+        when(auditLogRepository.findTop200ByOrderByCreatedAtDesc()).thenReturn(List.of(log(
+                "DISPUTE_STAFF_AUTO_ASSIGNED",
+                "disputes",
+                "9",
+                99
+        )));
+
+        AuditLogResponse response = auditLogService.listForAdmin(null).get(0);
+
+        assertEquals("Tự động phân công tranh chấp", response.getAction());
+        assertEquals("Tranh chấp giữa Nova Retail và Expert AI - staff phụ trách: Staff Reviewer", response.getEntityDisplayName());
+        assertEquals("Nova Retail", response.getEntityOwner());
+        assertEquals("BUSINESS", response.getEntityOwnerRole());
+        assertEquals("Staff Reviewer", response.getActor());
+        assertEquals("STAFF", response.getActorRole());
     }
 
     private AuditLogEntity log(String action, String entityName, String entityId, Integer actorId) {

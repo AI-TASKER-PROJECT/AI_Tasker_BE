@@ -61,6 +61,7 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `createJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 1: Tạo Job nháp cho doanh nghiệp sau khi kiểm tra quyền và quota.
     public JobEntity createJob(JobEntity input) {
         accessService.requireRole("BUSINESS");
         // VALIDATE CAC TRUONG BAT BUOC CUA JOB DE DUNG VOI BR DANG TUYEN BAI TOAN.
@@ -87,6 +88,7 @@ public class MarketplaceService {
     }
 
     @Transactional
+    // Chức năng 2: Cập nhật nội dung Job nháp trước khi doanh nghiệp đăng bài.
     public JobEntity updateDraftJob(Integer jobId, JobEntity input) {
         accessService.requireRole("BUSINESS");
         if (input == null) throw new AppException("JOB UPDATE BODY KHONG DUOC DE TRONG");
@@ -112,11 +114,13 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `listJobs` chỉ lấy job OPEN để marketplace không làm lộ job nháp của doanh nghiệp.
+    // Chức năng 3: Lấy danh sách Job để hiển thị marketplace và cơ hội cho chuyên gia.
     public List<JobEntity> listJobs() {
         return attachJobDetails(jobRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc("OPEN"));
     }
 
     // Note: Hàm `listMyJobs` lấy toàn bộ job của business hiện tại, bao gồm DRAFT để doanh nghiệp kiểm tra trước khi public.
+    // Chức năng 4: Lấy danh sách Job thuộc doanh nghiệp hiện tại.
     public List<JobEntity> listMyJobs() {
         accessService.requireRole("BUSINESS");
         BusinessProfileEntity business = currentApprovedBusiness();
@@ -124,6 +128,7 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `getJob` kiểm soát quyền xem chi tiết job theo trạng thái public hoặc quyền sở hữu job nháp.
+    // Chức năng 5: Lấy chi tiết Job kèm domain, skill, technology, SOW và milestone.
     public JobEntity getJob(Integer id) {
         JobEntity job = jobRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         if ("OPEN".equalsIgnoreCase(job.getStatus())) return attachJobDetails(job);
@@ -140,6 +145,7 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `submitProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 6: Chuyên gia nộp proposal cho Job đang mở và tiêu thụ quota proposal.
     public ProposalEntity submitProposal(ProposalRequest request) {
         accessService.requireRole("EXPERT");
         // CHI CHO EXPERT DA KYC APPROVED NOP PROPOSAL CHO JOB DA MO CONG KHAI.
@@ -184,6 +190,7 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `uploadProposalFile` upload file proposal của chuyên gia lên Firebase và trả path để gán vào proposal.
+    // Chức năng 7: Upload file đính kèm proposal và trả về đường dẫn lưu trữ.
     public String uploadProposalFile(MultipartFile file) {
         accessService.requireRole("EXPERT");
         ExpertProfileEntity expert = currentApprovedExpert();
@@ -191,6 +198,7 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `listProposalsByJob` lấy proposal theo job và chỉ cho doanh nghiệp sở hữu job xem danh sách này.
+    // Chức năng 8: Lấy danh sách proposal của một Job cho doanh nghiệp quản lý.
     public List<ProposalEntity> listProposalsByJob(Integer jobId) {
         accessService.requireRole("BUSINESS");
         requireBusinessOwnedJob(jobId);
@@ -198,6 +206,7 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `listMyProposals` lấy các proposal của expert hiện tại để chuyên gia theo dõi trạng thái sau khi nộp.
+    // Chức năng 9: Lấy danh sách proposal mà chuyên gia hiện tại đã gửi.
     public List<ProposalEntity> listMyProposals() {
         accessService.requireRole("EXPERT");
         Integer expertId = currentApprovedExpert().getExpertId();
@@ -207,6 +216,7 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `updateJobStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 10: Cập nhật trạng thái Job, bao gồm publish Job sang OPEN.
     public JobEntity updateJobStatus(Integer jobId, String status) {
         accessService.requireRole("BUSINESS");
         AccountEntity actor = accessService.currentAccount();
@@ -237,6 +247,7 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `reviewProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 11: Doanh nghiệp chấp nhận hoặc từ chối proposal của chuyên gia.
     public ProposalEntity reviewProposal(Integer proposalId, String status) {
         accessService.requireRole("BUSINESS");
         // CHI CHO PHEP DOANH NGHIEP PHE DUYET HOAC TU CHOI PROPOSAL.

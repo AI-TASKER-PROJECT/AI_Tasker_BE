@@ -4,8 +4,12 @@ import com.aitasker.be.dto.candidate.SowKeywordExtractionResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,5 +82,31 @@ class SowKeywordExtractionServiceTest {
         assertTrue(result.getSkills().contains("API Integration"));
         assertTrue(result.getSkills().contains("Deployment"));
         assertEquals(List.of("Order Management"), result.getDomains());
+    }
+
+    @ParameterizedTest
+    @MethodSource("benchmarkFixtures")
+    void extractKeywordsFromSow_shouldCoverRecommendationBenchmarkGroups(
+            String sow,
+            String expectedSkill,
+            String expectedDomain
+    ) {
+        SowKeywordExtractionResult result = service.extractKeywordsFromSow(sow);
+
+        assertTrue(result.getSkills().contains(expectedSkill), () -> "Missing skill for: " + sow);
+        if (expectedDomain != null) {
+            assertTrue(result.getDomains().contains(expectedDomain), () -> "Missing domain for: " + sow);
+        }
+    }
+
+    private static Stream<Arguments> benchmarkFixtures() {
+        return Stream.of(
+                Arguments.of("Swagger and Postman API testing with regression testing", "API Testing", null),
+                Arguments.of("BI dashboard for KPI reporting and business intelligence", "BI Dashboard", "Business Intelligence"),
+                Arguments.of("Computer vision object detection and OCR pipeline", "Computer Vision", "Computer Vision"),
+                Arguments.of("Data pipeline ETL into a data warehouse", "Data Pipeline", "Data Engineering"),
+                Arguments.of("Build an artificial intelligence assistant", "AI", null),
+                Arguments.of("Customer support chatbot using RAG knowledge base", "Chatbot", "Customer Support")
+        );
     }
 }

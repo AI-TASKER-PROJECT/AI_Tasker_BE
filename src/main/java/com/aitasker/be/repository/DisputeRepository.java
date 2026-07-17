@@ -9,11 +9,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
+import java.util.Optional;
 public interface DisputeRepository extends JpaRepository<DisputeEntity, Integer> {
     // Note: Hàm `findByContractId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<DisputeEntity> findByContractId(Integer contractId);
     // Note: Hàm `findByAssignedStaffId` khai báo truy vấn dữ liệu để Spring Data JPA tự sinh logic truy cập database.
     List<DisputeEntity> findByAssignedStaffId(Integer assignedStaffId);
+    long countByAssignedStaffIdAndStatusIn(Integer assignedStaffId, List<String> statuses);
+    Optional<DisputeEntity> findTopByAssignedStaffIdAndStaffReviewStartedAtIsNotNullOrderByStaffReviewStartedAtDescDisputeIdDesc(
+            Integer assignedStaffId);
     List<DisputeEntity> findByMilestoneIdAndStatusIn(Integer milestoneId, List<String> statuses);
     List<DisputeEntity> findAllByOrderByCreatedAtDesc();
     List<DisputeEntity> findByStatusInOrderByCreatedAtDesc(List<String> statuses);

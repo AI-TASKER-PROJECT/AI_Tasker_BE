@@ -577,7 +577,7 @@ class ProfileServiceTest {
                 .accountId(profileAccountId)
                 .taxCode("0312345678")
                 .companyName("Nova Retail")
-                .kybStatus("Rejected")
+                .kybStatus("Pending")
                 .rejectionReason("Old reason")
                 .build();
 
@@ -586,7 +586,7 @@ class ProfileServiceTest {
         when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
         when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(staffId, 99)).thenReturn(true);
         when(businessProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
-        when(accountRepository.findById(profileAccountId)).thenReturn(Optional.of(AccountEntity.builder().accountId(profileAccountId).status("Rejected").build()));
+        when(accountRepository.findById(profileAccountId)).thenReturn(Optional.of(AccountEntity.builder().accountId(profileAccountId).status("Pending").build()));
         when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         BusinessProfileEntity saved = (BusinessProfileEntity) profileService.approveProfile("BUSINESS", profileId, "Approved", null);
@@ -723,6 +723,100 @@ class ProfileServiceTest {
         assertEquals("Rep", result.getVerifiedRepresentative());
         verify(businessProfileRepository).existsByTaxCodeExcludingAccount("0312345678", accountId);
         verify(taxCheckService).checkTaxCode("0312345678");
+    }
+
+    @Test
+    void upsertBusiness_shouldRejectResubmitWhilePending() {
+        Integer accountId = 10;
+        AccountEntity account = AccountEntity.builder().accountId(accountId).fullName("Owner").status("Pending").build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder()
+                .taxCode("0312345678")
+                .businessLicenseUrl("licenses/new.pdf")
+                .build();
+        BusinessProfileEntity existingProfile = BusinessProfileEntity.builder()
+                .businessId(5)
+                .accountId(accountId)
+                .taxCode("0312345678")
+                .companyName("Pending Company")
+                .kybStatus("Pending")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.of(existingProfile));
+
+        AppException ex = assertThrows(AppException.class, () -> profileService.upsertBusiness(input));
+
+        assertEquals("HO SO DANG CHO DUYET, VUI LONG DOI KET QUA XET DUYET", ex.getMessage());
+        verify(businessProfileRepository, never()).existsByTaxCodeExcludingAccount(anyString(), anyInt());
+        verifyNoInteractions(taxCheckService);
+        verify(businessProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void upsertBusiness_shouldUpdateApprovedProfileWithoutReopeningReview() {
+        Integer accountId = 10;
+        AccountEntity account = AccountEntity.builder().accountId(accountId).fullName("Owner").status("Approved").build();
+        TaxCheckResponse vietQr = TaxCheckResponse.builder()
+                .taxCode("0312345678")
+                .companyName("Approved Company")
+                .address("New Address")
+                .representative("Rep")
+                .status("FOUND")
+                .build();
+        BusinessProfileEntity input = BusinessProfileEntity.builder()
+                .taxCode("0312345678")
+                .businessLicenseUrl("licenses/updated.pdf")
+                .build();
+        BusinessProfileEntity existingProfile = BusinessProfileEntity.builder()
+                .businessId(5)
+                .accountId(accountId)
+                .taxCode("0312345678")
+                .companyName("Old Company")
+                .kybStatus("Approved")
+                .approvedBy(7)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(accountId)).thenReturn(Optional.of(existingProfile));
+        when(businessProfileRepository.existsByTaxCodeExcludingAccount("0312345678", accountId)).thenReturn(false);
+        when(taxCheckService.checkTaxCode("0312345678")).thenReturn(vietQr);
+        when(businessProfileRepository.save(any(BusinessProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessProfileEntity result = profileService.upsertBusiness(input);
+
+        assertEquals("Approved", result.getKybStatus());
+        assertEquals(Integer.valueOf(7), result.getApprovedBy());
+        assertEquals("Approved Company", result.getCompanyName());
+        assertEquals("licenses/updated.pdf", result.getBusinessLicenseUrl());
+        verify(accountRepository, never()).save(any());
+        verify(notificationService, never()).notifyProfileSubmitted(anyInt(), anyInt(), anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void approveProfile_shouldRejectAlreadyApprovedBusinessProfile() {
+        Integer profileId = 1;
+        Integer staffAccountId = 99;
+        Integer staffId = 7;
+        BusinessProfileEntity profile = BusinessProfileEntity.builder()
+                .businessId(profileId)
+                .accountId(10)
+                .taxCode("0312345678")
+                .companyName("Nova Retail")
+                .kybStatus("Approved")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(AccountEntity.builder().accountId(staffAccountId).build());
+        when(staffRepository.findByAccountId(staffAccountId)).thenReturn(Optional.of(StaffEntity.builder().staffId(staffId).accountId(staffAccountId).build()));
+        when(domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)).thenReturn(Optional.of(profileReviewDomain()));
+        when(staffDomainRepository.existsByIdStaffIdAndIdDomainId(staffId, 99)).thenReturn(true);
+        when(businessProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> profileService.approveProfile("BUSINESS", profileId, "Rejected", "reason"));
+
+        assertEquals("CHI DUOC XET DUYET HO SO DANG CHO DUYET", ex.getMessage());
+        verify(accountRepository, never()).save(any());
+        verify(businessProfileRepository, never()).save(any());
     }
 
     private void assertBusinessContact(BusinessProfileEntity result, String fullName, String email, String phone) {

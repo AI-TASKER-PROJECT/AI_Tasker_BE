@@ -30,6 +30,7 @@ public class WalletTransactionHistoryResponse {
     private String referenceType;
     private Long referenceId;
     private String operationKey;
+    private String operationLeg;
     private String rawDescription;
     private LocalDateTime createdAt;
 

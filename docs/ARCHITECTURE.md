@@ -412,7 +412,10 @@ services/config:
 
 Current MVP limitations:
 
-- AI Job Assistant and matching are still simplified.
+- Expert recommendation uses structured-first taxonomy resolution, exact numeric
+  portfolio catalog IDs, eligibility filters, deterministic backend scoring,
+  and optional explanation-only AI. Portfolio taxonomy normalization remains a
+  future Release B concern.
 - Matching relies on tags, keywords, proposal text, and ranking heuristics; it
   is not yet a full portfolio/skill/domain scoring engine.
 - Firebase/file upload coverage is not complete for all deliverable/license

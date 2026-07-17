@@ -24,11 +24,13 @@ public class SystemWalletService {
     private final AccessService accessService;
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
+    private final WalletTransactionRepository walletTransactionRepository;
     private final SystemWalletRepository systemWalletRepository;
     private final BusinessProfileRepository businessProfileRepository;
     private final ExpertProfileRepository expertProfileRepository;
     private final MilestoneRepository milestoneRepository;
     private final ContractRepository contractRepository;
+    private final ContractMilestoneRepository contractMilestoneRepository;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -58,13 +60,22 @@ public class SystemWalletService {
     public SystemWalletEntity syncWallet() {
         AccountEntity admin = accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN")
                 .orElseThrow(() -> new NotFoundException("CHUA CO TAI KHOAN ADMIN DE QUAN LY SYSTEM WALLET"));
+        ensureWallet(admin);
+        SystemWalletEntity lockedAdminWallet = systemWalletRepository.findByAccountIdForUpdate(admin.getAccountId())
+                .orElseThrow(() -> new NotFoundException("CHUA CO VI HE THONG"));
         Long latestTransactionId = resolveLatestTransactionId();
-        BigDecimal totalRevenue = nonNegativeMoney(transactionRepository.sumSuccessfulCommissionFee());
-        BigDecimal holdingBalance = nonNegativeMoney(transactionRepository.calculateHoldingBalance());
-        BigDecimal disputedBalance = nonNegativeMoney(transactionRepository.calculateDisputedBalance());
+        BigDecimal commissionRevenue = nonNegativeMoney(transactionRepository.sumSuccessfulCommissionFee());
+        BigDecimal purchaseRevenue = nonNegativeMoney(walletTransactionRepository.sumPostedPlatformPurchaseRevenue());
+        BigDecimal totalRevenue = commissionRevenue.add(purchaseRevenue);
+        BigDecimal legacyHoldingBalance = nonNegativeMoney(transactionRepository.calculateHoldingBalance());
+        BigDecimal walletEscrowBalance = nonNegativeMoney(walletTransactionRepository.calculatePostedEscrowBalance());
+        BigDecimal holdingBalance = legacyHoldingBalance.add(walletEscrowBalance);
+        BigDecimal disputedBalance = nonNegativeMoney(contractMilestoneRepository.calculateActiveDisputedEscrowBalance());
 
         for (AccountEntity account : accountRepository.findAll()) {
-            SystemWalletEntity wallet = systemWalletRepository.findByAccountId(account.getAccountId())
+            SystemWalletEntity wallet = admin.getAccountId().equals(account.getAccountId())
+                    ? lockedAdminWallet
+                    : systemWalletRepository.findByAccountId(account.getAccountId())
                     .orElseGet(() -> SystemWalletEntity.builder()
                             .accountId(account.getAccountId())
                             .currency("VND")

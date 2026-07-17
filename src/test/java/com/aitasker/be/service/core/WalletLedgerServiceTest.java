@@ -17,7 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -121,5 +123,98 @@ class WalletLedgerServiceTest {
         assertEquals(2L, result.getId());
         assertEquals(new BigDecimal("100000"), wallet.getAvailableBalance());
         verify(systemWalletRepository, never()).save(wallet);
+    }
+
+    @Test
+    void creditPlatformRevenue_shouldIncreaseAvailableBalanceAndTotalRevenue() {
+        SystemWalletEntity platformWallet = SystemWalletEntity.builder()
+                .systemWalletId(1L)
+                .accountId(1)
+                .availableBalance(new BigDecimal("100"))
+                .escrowBalance(BigDecimal.ZERO)
+                .holdingBalance(BigDecimal.ZERO)
+                .disputedBalance(BigDecimal.ZERO)
+                .currentBalance(new BigDecimal("100"))
+                .totalRevenue(new BigDecimal("80"))
+                .build();
+        when(systemWalletRepository.findByAccountIdForUpdate(1)).thenReturn(Optional.of(platformWallet));
+        when(walletTransactionRepository.findByOperationKeyAndOperationLeg(
+                "MEMBERSHIP_PURCHASE:test", WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT))
+                .thenReturn(Optional.empty());
+        when(walletTransactionRepository.save(any(WalletTransactionEntity.class))).thenAnswer(invocation -> {
+            WalletTransactionEntity tx = invocation.getArgument(0);
+            tx.setId(50L);
+            return tx;
+        });
+
+        WalletTransactionEntity result = walletLedgerService.creditPlatformRevenue(
+                1,
+                new BigDecimal("30"),
+                "MEMBERSHIP_PURCHASE",
+                "MEMBERSHIP",
+                2L,
+                "Business Plus",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .operationKey("MEMBERSHIP_PURCHASE:test")
+                        .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                        .build()
+        );
+
+        assertEquals(new BigDecimal("130"), platformWallet.getAvailableBalance());
+        assertEquals(new BigDecimal("110"), platformWallet.getTotalRevenue());
+        assertEquals(new BigDecimal("130"), platformWallet.getCurrentBalance());
+        assertEquals("CREDIT", result.getDirection());
+        assertEquals(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT, result.getOperationLeg());
+        verify(systemWalletRepository).save(platformWallet);
+    }
+
+    @Test
+    void creditPlatformRevenue_whenOperationAlreadyExists_shouldNotCreditAgain() {
+        SystemWalletEntity platformWallet = SystemWalletEntity.builder()
+                .systemWalletId(1L)
+                .accountId(1)
+                .availableBalance(new BigDecimal("130"))
+                .escrowBalance(BigDecimal.ZERO)
+                .holdingBalance(BigDecimal.ZERO)
+                .disputedBalance(BigDecimal.ZERO)
+                .currentBalance(new BigDecimal("130"))
+                .totalRevenue(new BigDecimal("110"))
+                .build();
+        WalletTransactionEntity existing = WalletTransactionEntity.builder()
+                .id(50L)
+                .accountId(1)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("CREDIT")
+                .balanceType(WalletLedgerService.BALANCE_AVAILABLE)
+                .amount(new BigDecimal("30"))
+                .referenceType("MEMBERSHIP")
+                .referenceId(2L)
+                .operationKey("MEMBERSHIP_PURCHASE:test")
+                .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                .description("Business Plus")
+                .build();
+        when(systemWalletRepository.findByAccountIdForUpdate(1)).thenReturn(Optional.of(platformWallet));
+        when(walletTransactionRepository.findByOperationKeyAndOperationLeg(
+                "MEMBERSHIP_PURCHASE:test", WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT))
+                .thenReturn(Optional.of(existing));
+
+        WalletTransactionEntity result = walletLedgerService.creditPlatformRevenue(
+                1,
+                new BigDecimal("30"),
+                "MEMBERSHIP_PURCHASE",
+                "MEMBERSHIP",
+                2L,
+                "Business Plus",
+                WalletLedgerService.WalletOperationContext.builder()
+                        .operationKey("MEMBERSHIP_PURCHASE:test")
+                        .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                        .build()
+        );
+
+        assertSame(existing, result);
+        assertEquals(new BigDecimal("130"), platformWallet.getAvailableBalance());
+        assertEquals(new BigDecimal("110"), platformWallet.getTotalRevenue());
+        verify(systemWalletRepository, never()).save(platformWallet);
+        verify(walletTransactionRepository, never()).save(any(WalletTransactionEntity.class));
     }
 }

@@ -69,9 +69,16 @@ Alternate exits:
 - Expert rejection is allowed only from `DRAFT` or `PENDING`; it moves the
   contract to `CANCELLED` and the job back to `OPEN`.
 - Deliverables can be submitted only by the contract Expert while the contract
-  is `ACTIVE`, both NDA signatures exist, and the milestone is `IN_PROGRESS` or
-  `OVERDUE`. First submission and correction/resubmission use the same endpoint,
-  retain submission rounds, and move the milestone to `UNDER_REVIEW`.
+  is `ACTIVE`, both NDA signatures exist, the milestone is `IN_PROGRESS`, and
+  the contract snapshot deadline has not passed. First submission and
+  correction/resubmission use the same endpoint, retain submission rounds, and
+  move the milestone to `UNDER_REVIEW`; neither is accepted after the original
+  execution deadline. Source-code ZIP upload follows the same deadline rule.
+- Final deliverables must include at least one source-code handoff:
+  `sourceCodeUrl` for a repository or `sourceCodeFileUrl` for an uploaded ZIP;
+  both are allowed. `demoLink` remains a separate runnable-product URL. Source
+  archives are uploaded first through the milestone-scoped authenticated route,
+  accept ZIP only, and are capped at 50 MB.
 - The owning business can deposit milestone escrow only from `PENDING`; a
   successful deposit automatically moves both milestone records to
   `IN_PROGRESS` and starts the execution timeline. The Expert start endpoint is
@@ -96,8 +103,8 @@ Alternate exits:
   must explicitly invoke the dispute API for a genuine disagreement.
 - Business on-demand progress-report requests use a durable request history:
   the first response SLA is 24 hours and later requests use 12 hours. Reports
-  and deliverables remain accepted in `OVERDUE`; missed deadlines do not move
-  money automatically.
+  remain accepted in `OVERDUE`; final deliverables and source-code ZIP uploads
+  do not. Missed deadlines do not move money automatically.
 - Staff decision is separate from settlement execution: assigned Staff moves a
   dispute to `STAFF_DECIDED`; Admin settlement execution then splits escrow,
   marks the milestone `COMPLETED`, sets the dispute `RESOLVED`, and records the
@@ -168,6 +175,7 @@ Alternate exits:
 - `POST /api/v1/termination-requests/{terminationRequestId}/withdraw`
 - `POST /api/v1/milestones/{milestoneId}/deliverables`
 - `GET /api/v1/milestones/{milestoneId}/deliverables`
+- `POST /api/v1/milestones/{milestoneId}/source-code-file`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`
@@ -182,6 +190,17 @@ Alternate exits:
 - `POST /api/v1/milestones/{milestoneId}/complete` (compatibility alias for
   approval/release)
 - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...`
+
+Staff dispute routing keeps the mandatory job-domain gate. Automatic routing
+locks the Staff pool, keeps only approved Staff below
+`dispute_staff_max_active_cases`, builds a qualified pool from normalized
+domain (60%) and skill (40%) coverage, then orders by active workload,
+specialization score, oldest assignment time, and Staff id. If no Staff has
+capacity, the dispute remains `ESCALATION_REQUESTED` for later routing.
+Automatic routing records an audit event that identifies the assigned Staff and
+displays the dispute as the Business/Expert participant pair instead of the
+Staff actor.
+
 - `POST /api/v1/disputes/{disputeId}/escalation-request`
 - `POST /api/v1/disputes/{disputeId}/route-staff`
 - `GET /api/v1/disputes/{disputeId}/staff-candidates`
@@ -203,4 +222,8 @@ Alternate exits:
 The backend records audit events for draft creation, signing, NDA signing,
 deposit activation, milestone start/completion, dispute cancellation and
 settlement, termination request review/settlement/refund, contract completion,
-deliverable submission, and termination.
+deliverable submission, and termination. PayOS wallet top-up sync records audit
+only when a payment order first reaches a terminal outcome (`PAID`, `FAILED`,
+`CANCELLED`, or `EXPIRED`), so repeated sync polling does not spam audit logs.
+Dispute decision and settlement audit rows display the two contract participants
+as the business object context.

@@ -27,6 +27,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 // Note: Annotation này biến class thành REST controller để nhận request và trả JSON.
 @RestController
@@ -154,6 +155,8 @@ public class ContractExecutionController {
     }
 
     @PostMapping("/milestones/{milestoneId}/deliverables")
+    @Operation(summary = "Submit milestone deliverable",
+            description = "The assigned Expert submits the final deliverable before the contract milestone deadline. First submissions and resubmissions are rejected after the deadline or when the milestone is OVERDUE.")
     public ResponseEntity<ApiResponse<DeliverableEntity>> submitMilestoneDeliverable(@PathVariable Integer milestoneId, @RequestBody DeliverableEntity request) {
         request.setMilestoneId(milestoneId);
         return ResponseEntity.ok(ApiResponse.success("SUBMIT DELIVERABLE SUCCESS", service.submitDeliverable(request)));
@@ -162,6 +165,19 @@ public class ContractExecutionController {
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-reports")
     public ResponseEntity<ApiResponse<MilestoneProgressReportEntity>> submitProgressReport(@PathVariable Integer contractId, @PathVariable Integer milestoneId, @RequestBody ProgressReportRequest request) {
         return ResponseEntity.ok(ApiResponse.success("SUBMIT PROGRESS REPORT SUCCESS", service.submitProgressReport(contractId, milestoneId, request)));
+    }
+
+    @PostMapping("/milestones/{milestoneId}/source-code-file")
+    @Operation(summary = "Upload milestone source-code ZIP",
+            description = "The assigned Expert uploads a ZIP source archive before the contract milestone deadline. Upload is rejected after the deadline or when the milestone is OVERDUE.")
+    public ResponseEntity<ApiResponse<String>> uploadMilestoneSourceCode(
+            @PathVariable Integer milestoneId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "UPLOAD MILESTONE SOURCE CODE SUCCESS",
+                service.uploadMilestoneSourceCode(milestoneId, file)
+        ));
     }
 
     @PostMapping("/contracts/{contractId}/milestones/{milestoneId}/progress-report-request")
@@ -213,21 +229,25 @@ public class ContractExecutionController {
     }
 
     @PostMapping("/milestones/{milestoneId}/disputes")
+    // Chức năng 1: Nhận request tạo hồ sơ tranh chấp cho milestone.
     public ResponseEntity<ApiResponse<DisputeEntity>> initiateMilestoneDispute(@PathVariable Integer milestoneId, @RequestParam Integer contractId, @RequestParam(required = false) String initiatedBy, @RequestParam(required = false) String initiationType, @RequestParam(required = false) String reason) {
         return ResponseEntity.ok(ApiResponse.success("INITIATE DISPUTE SUCCESS", service.initiateDispute(contractId, milestoneId, initiatedBy, initiationType, reason)));
     }
 
     @PostMapping("/disputes/{disputeId}/escalation-request")
+    // Chức năng 2: Nhận request yêu cầu Staff can thiệp vào tranh chấp.
     public ResponseEntity<ApiResponse<DisputeEntity>> requestEscalation(@PathVariable Integer disputeId, @RequestParam(required = false) String reason, @RequestParam(required = false) String evidenceFile) {
         return ResponseEntity.ok(ApiResponse.success("ESCALATION REQUEST SUCCESS", service.escalateDispute(disputeId, reason, evidenceFile)));
     }
 
     @PostMapping("/disputes/{disputeId}/route-staff")
+    // Chức năng 3: Nhận request gán Staff xử lý tranh chấp.
     public ResponseEntity<ApiResponse<DisputeEntity>> routeDisputeStaff(@PathVariable Integer disputeId, @RequestParam(required = false) Integer staffId) {
         return ResponseEntity.ok(ApiResponse.success("ROUTE DISPUTE STAFF SUCCESS", service.routeDispute(disputeId, staffId)));
     }
 
     @GetMapping("/disputes/{disputeId}/staff-candidates")
+    // Chức năng 4: Trả danh sách Staff phù hợp để xử lý tranh chấp.
     public ResponseEntity<ApiResponse<List<StaffAssignmentCandidateResponse>>> listStaffCandidates(
             @PathVariable Integer disputeId) {
         return ResponseEntity.ok(ApiResponse.success("LIST STAFF CANDIDATES SUCCESS",
@@ -235,27 +255,32 @@ public class ContractExecutionController {
     }
 
     @PostMapping("/disputes/{disputeId}/staff-decision")
+    // Chức năng 5: Nhận quyết định xử lý tranh chấp từ Staff.
     public ResponseEntity<ApiResponse<DisputeEntity>> staffDecideAlias(@PathVariable Integer disputeId, @RequestParam Integer expertPercent, @RequestParam(required = false) String note, @RequestParam(required = false) String staffReport) {
         return ResponseEntity.ok(ApiResponse.success("STAFF DECISION SUCCESS", service.staffDecide(disputeId, expertPercent, note, staffReport)));
     }
 
     @PostMapping("/disputes/{disputeId}/execute-settlement")
+    // Chức năng 6: Nhận request thực hiện quyết toán tranh chấp theo quyết định Staff.
     public ResponseEntity<ApiResponse<DisputeEntity>> executeDisputeSettlementAlias(@PathVariable Integer disputeId) {
         return ResponseEntity.ok(ApiResponse.success("EXECUTE DISPUTE SETTLEMENT SUCCESS", service.executeDisputeSettlement(disputeId)));
     }
 
     @PostMapping("/disputes/{disputeId}/cancel")
+    // Chức năng 7: Nhận request rút hoặc hủy hồ sơ tranh chấp.
     public ResponseEntity<ApiResponse<DisputeEntity>> cancelDispute(@PathVariable Integer disputeId, @RequestParam(required = false) String reason) {
         return ResponseEntity.ok(ApiResponse.success("CANCEL DISPUTE SUCCESS", service.cancelDispute(disputeId, reason)));
     }
 
     @PostMapping("/disputes/staff-sla-escalate")
+    // Chức năng 8: Nhận request đánh dấu tranh chấp quá hạn SLA Staff.
     public ResponseEntity<ApiResponse<List<DisputeEntity>>> escalateOverdueStaffDisputes() {
         return ResponseEntity.ok(ApiResponse.success("ESCALATE STAFF DISPUTE SLA SUCCESS",
                 service.escalateOverdueStaffDisputes()));
     }
 
     @GetMapping("/staff/disputes")
+    // Chức năng 9: Trả danh sách tranh chấp được phân công hoặc phù hợp với Staff.
     public ResponseEntity<ApiResponse<StaffDisputeListResponse>> listStaffDisputes(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -363,10 +388,12 @@ public class ContractExecutionController {
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/contracts/{contractId}/disputes")
+    // Chức năng 10: Trả danh sách tranh chấp thuộc một hợp đồng.
     public ResponseEntity<ApiResponse<Object>> listDisputes(@PathVariable Integer contractId) { return ResponseEntity.ok(ApiResponse.success("LIST DISPUTES SUCCESS", service.listDisputesByContract(contractId))); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.
     @GetMapping("/disputes/{disputeId}")
+    // Chức năng 11: Trả chi tiết một hồ sơ tranh chấp.
     public ResponseEntity<ApiResponse<DisputeEntity>> getDispute(@PathVariable Integer disputeId) { return ResponseEntity.ok(ApiResponse.success("GET DISPUTE SUCCESS", service.getDispute(disputeId))); }
 
     // Note: Annotation này khai báo API đọc dữ liệu bằng HTTP GET.

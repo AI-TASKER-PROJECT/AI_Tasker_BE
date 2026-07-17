@@ -65,6 +65,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -223,8 +224,8 @@ public class PaymentWalletService {
             return insufficient(available, price, "INSUFFICIENT_BALANCE");
         }
 
-        WalletTransactionEntity walletTransaction = walletLedgerService.debitAvailable(
-                actor.getAccountId(),
+        WalletTransactionEntity walletTransaction = postPlatformPurchaseRevenue(
+                actor,
                 price,
                 "MEMBERSHIP_PURCHASE",
                 "MEMBERSHIP",
@@ -264,6 +265,7 @@ public class PaymentWalletService {
             grantQuota(actor.getAccountId(), QUOTA_PROPOSAL, membershipPackage.getProposalQuota(), "MEMBERSHIP", purchase.getPurchaseId());
         }
 
+        systemWalletService.syncWallet();
         auditLogService.record(ACTION_PURCHASE_MEMBERSHIP, "membership_purchases",
                 String.valueOf(purchase.getPurchaseId()), actor.getAccountId());
         return completed(purchase, "MEMBERSHIP_PURCHASE_SUCCESS");
@@ -280,16 +282,14 @@ public class PaymentWalletService {
         if (available.compareTo(requiredAmount) < 0) {
             return insufficient(available, requiredAmount, "INSUFFICIENT_BALANCE");
         }
-        WalletTransactionEntity tx = walletLedgerService.debitAvailable(
-                actor.getAccountId(),
+        WalletTransactionEntity tx = postPlatformPurchaseRevenue(
+                actor,
                 requiredAmount,
                 "CREDIT_PURCHASE",
                 "CREDIT_PURCHASE",
                 actor.getAccountId().longValue(),
                 "Buy job-post credits: " + quantity
         );
-        tx.setReferenceId(tx.getId());
-        walletTransactionRepository.save(tx);
         UserQuotaEntity quota = grantQuota(actor.getAccountId(), QUOTA_JOB_POST, quantity, "CREDIT_PURCHASE", tx.getId());
         auditLogService.record(ACTION_PURCHASE_CREDIT, "wallet_transactions", String.valueOf(tx.getId()), actor.getAccountId());
         return completed(quota, "CREDIT_PURCHASE_SUCCESS");
@@ -306,16 +306,14 @@ public class PaymentWalletService {
         if (available.compareTo(requiredAmount) < 0) {
             return insufficient(available, requiredAmount, "INSUFFICIENT_BALANCE");
         }
-        WalletTransactionEntity tx = walletLedgerService.debitAvailable(
-                actor.getAccountId(),
+        WalletTransactionEntity tx = postPlatformPurchaseRevenue(
+                actor,
                 requiredAmount,
                 "CREDIT_PURCHASE",
                 "CREDIT_PURCHASE",
                 actor.getAccountId().longValue(),
                 "Buy proposal credits: " + quantity
         );
-        tx.setReferenceId(tx.getId());
-        walletTransactionRepository.save(tx);
         UserQuotaEntity quota = grantQuota(actor.getAccountId(), QUOTA_PROPOSAL, quantity, "CREDIT_PURCHASE", tx.getId());
         auditLogService.record(ACTION_PURCHASE_CREDIT, "wallet_transactions", String.valueOf(tx.getId()), actor.getAccountId());
         return completed(quota, "CREDIT_PURCHASE_SUCCESS");
@@ -952,6 +950,7 @@ public class PaymentWalletService {
                 .referenceType(tx.getReferenceType())
                 .referenceId(tx.getReferenceId())
                 .operationKey(tx.getOperationKey())
+                .operationLeg(tx.getOperationLeg())
                 .rawDescription(tx.getDescription())
                 .createdAt(tx.getCreatedAt());
         AccountEntity walletOwner = currentActor != null && Objects.equals(currentActor.getAccountId(), tx.getAccountId())
@@ -964,7 +963,8 @@ public class PaymentWalletService {
             case "TOPUP" -> describeTopup(builder, tx, actorName);
             case "MEMBERSHIP_PURCHASE" -> describeMembership(builder, tx, actorName);
             case "CREDIT_PURCHASE" -> describeCreditPurchase(builder, tx, actorName);
-            case "CONTRACT_SECURITY_DEPOSIT_HOLD", "CONTRACT_SECURITY_DEPOSIT_REFUND", "CONTRACT_SECURITY_DEPOSIT_RESOLVED" ->
+            case "CONTRACT_SECURITY_DEPOSIT_HOLD", "CONTRACT_SECURITY_DEPOSIT_REFUND", "CONTRACT_SECURITY_DEPOSIT_RESOLVED",
+                    "EXPERT_CONTRACT_DEPOSIT_HOLD", "EXPERT_CONTRACT_DEPOSIT_REFUND" ->
                     describeContractDeposit(builder, tx, actorName);
             case "WITHDRAW_HOLD", "WITHDRAW_APPROVED", "WITHDRAW_REJECTED" ->
                     describeWithdrawal(builder, tx, actorName);
@@ -1192,7 +1192,8 @@ public class PaymentWalletService {
     }
 
     private Optional<ContractDepositEntity> contractDepositForTransaction(WalletTransactionEntity tx) {
-        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())) {
+        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())
+                || "EXPERT_CONTRACT_DEPOSIT_HOLD".equals(tx.getTransactionType())) {
             return contractDepositRepository.findByHoldTransactionId(tx.getId());
         }
         Optional<ContractDepositEntity> byTransaction = contractDepositRepository.findByRefundTransactionId(tx.getId());
@@ -1206,7 +1207,9 @@ public class PaymentWalletService {
     }
 
     private Optional<ContractEntity> contractForDepositTransaction(WalletTransactionEntity tx, Optional<ContractDepositEntity> deposit) {
-        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType()) && tx.getReferenceId() != null) {
+        if (("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())
+                || "EXPERT_CONTRACT_DEPOSIT_HOLD".equals(tx.getTransactionType()))
+                && tx.getReferenceId() != null) {
             return contractRepository.findById(toInt(tx.getReferenceId()));
         }
         return deposit.flatMap(item -> contractRepository.findById(item.getContractId()));
@@ -1430,6 +1433,9 @@ public class PaymentWalletService {
         String type = safe(tx.getTransactionType());
         String direction = safe(tx.getDirection());
         String balanceType = safe(tx.getBalanceType());
+        if (WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(tx.getOperationLeg())) {
+            return false;
+        }
         if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(type) || "WITHDRAW_HOLD".equals(type)) {
             return "HOLD".equals(direction);
         }
@@ -1437,6 +1443,46 @@ public class PaymentWalletService {
             return "CREDIT".equals(direction) && "AVAILABLE".equals(balanceType);
         }
         return true;
+    }
+
+    private WalletTransactionEntity postPlatformPurchaseRevenue(
+            AccountEntity purchaser,
+            BigDecimal amount,
+            String transactionType,
+            String referenceType,
+            Long referenceId,
+            String description
+    ) {
+        Integer platformAccountId = accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN")
+                .map(AccountEntity::getAccountId)
+                .orElseThrow(() -> new NotFoundException("CHUA CO TAI KHOAN ADMIN DE NHAN DOANH THU"));
+        String operationKey = transactionType + ":" + UUID.randomUUID();
+
+        WalletTransactionEntity purchaserDebit = walletLedgerService.debitAvailable(
+                purchaser.getAccountId(),
+                amount,
+                transactionType,
+                referenceType,
+                referenceId,
+                description,
+                WalletLedgerService.WalletOperationContext.builder()
+                        .operationKey(operationKey)
+                        .operationLeg(WalletLedgerService.LEG_PURCHASER_AVAILABLE_DEBIT)
+                        .build()
+        );
+        walletLedgerService.creditPlatformRevenue(
+                platformAccountId,
+                amount,
+                transactionType,
+                referenceType,
+                referenceId,
+                description,
+                WalletLedgerService.WalletOperationContext.builder()
+                        .operationKey(operationKey)
+                        .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                        .build()
+        );
+        return purchaserDebit;
     }
 
     private String creditQuantity(WalletTransactionEntity tx) {

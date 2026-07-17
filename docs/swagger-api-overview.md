@@ -2,9 +2,9 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **184**.
+- Tong so REST endpoint trong Swagger runtime: **185**.
 - Public endpoint: **21**.
-- Endpoint can Bearer JWT: **163**.
+- Endpoint can Bearer JWT: **164**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -143,7 +143,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 15 | POST | `/api/v1/milestones/{milestoneId}/reject` | Bearer JWT | Operation rejectMilestone. |
 | 16 | POST | `/api/v1/milestones/{milestoneId}/disputes` | Bearer JWT | Operation initiateMilestoneDispute. |
 | 17 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Operation listDeliverables. |
-| 18 | POST | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Operation submitMilestoneDeliverable. |
+| 18 | POST | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Assigned Expert submits a first or corrected deliverable before the contract milestone deadline. |
 | 19 | GET | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Operation listCriteria. |
 | 20 | POST | `/api/v1/milestones/{milestoneId}/criteria` | Bearer JWT | Operation createCriteria. |
 | 21 | POST | `/api/v1/milestones/{milestoneId}/complete` | Bearer JWT | Operation completeMilestone. |
@@ -185,6 +185,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 57 | GET | `/api/v1/contracts/{contractId}` | Bearer JWT | Operation getContract. |
 | 58 | GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Operation listMilestones. |
 | 59 | GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Operation listDisputes. |
+| 60 | POST | `/api/v1/milestones/{milestoneId}/source-code-file` | Bearer JWT | Approved assigned Expert uploads one ZIP source archive before the milestone deadline, maximum 50 MB. |
 
 ## Notification Flow
 
