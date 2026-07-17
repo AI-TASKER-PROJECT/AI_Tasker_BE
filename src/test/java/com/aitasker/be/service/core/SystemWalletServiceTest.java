@@ -6,6 +6,7 @@ import com.aitasker.be.entity.SystemWalletEntity;
 import com.aitasker.be.repository.AccountRepository;
 import com.aitasker.be.repository.BusinessProfileRepository;
 import com.aitasker.be.repository.ContractRepository;
+import com.aitasker.be.repository.ContractMilestoneRepository;
 import com.aitasker.be.repository.ExpertProfileRepository;
 import com.aitasker.be.repository.MilestoneRepository;
 import com.aitasker.be.repository.SystemWalletRepository;
@@ -38,6 +39,7 @@ class SystemWalletServiceTest {
     @Mock private ExpertProfileRepository expertProfileRepository;
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private ContractRepository contractRepository;
+    @Mock private ContractMilestoneRepository contractMilestoneRepository;
 
     @InjectMocks private SystemWalletService systemWalletService;
 
@@ -74,7 +76,8 @@ class SystemWalletServiceTest {
         when(transactionRepository.sumSuccessfulCommissionFee()).thenReturn(new BigDecimal("100"));
         when(walletTransactionRepository.sumPostedPlatformPurchaseRevenue()).thenReturn(new BigDecimal("600"));
         when(transactionRepository.calculateHoldingBalance()).thenReturn(new BigDecimal("20"));
-        when(transactionRepository.calculateDisputedBalance()).thenReturn(BigDecimal.ZERO);
+        when(walletTransactionRepository.calculatePostedEscrowBalance()).thenReturn(new BigDecimal("80"));
+        when(contractMilestoneRepository.calculateActiveDisputedEscrowBalance()).thenReturn(new BigDecimal("30"));
         when(transactionRepository.countDepositedBusinesses()).thenReturn(2L);
         when(transactionRepository.countByStatusAndTransactionType("Success", "Deposit")).thenReturn(3L);
 
@@ -82,8 +85,9 @@ class SystemWalletServiceTest {
 
         assertEquals(new BigDecimal("700"), result.getTotalRevenue());
         assertEquals(new BigDecimal("700"), result.getAvailableBalance());
-        assertEquals(new BigDecimal("20"), result.getEscrowBalance());
-        assertEquals(new BigDecimal("720"), result.getCurrentBalance());
+        assertEquals(new BigDecimal("100"), result.getEscrowBalance());
+        assertEquals(new BigDecimal("30"), result.getDisputedBalance());
+        assertEquals(new BigDecimal("800"), result.getCurrentBalance());
         assertEquals(2, result.getDepositedBusinessCount());
         assertEquals(3, result.getSuccessfulDepositCount());
         verify(walletTransactionRepository).sumPostedPlatformPurchaseRevenue();

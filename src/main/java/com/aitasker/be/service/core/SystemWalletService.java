@@ -30,6 +30,7 @@ public class SystemWalletService {
     private final ExpertProfileRepository expertProfileRepository;
     private final MilestoneRepository milestoneRepository;
     private final ContractRepository contractRepository;
+    private final ContractMilestoneRepository contractMilestoneRepository;
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
@@ -66,8 +67,10 @@ public class SystemWalletService {
         BigDecimal commissionRevenue = nonNegativeMoney(transactionRepository.sumSuccessfulCommissionFee());
         BigDecimal purchaseRevenue = nonNegativeMoney(walletTransactionRepository.sumPostedPlatformPurchaseRevenue());
         BigDecimal totalRevenue = commissionRevenue.add(purchaseRevenue);
-        BigDecimal holdingBalance = nonNegativeMoney(transactionRepository.calculateHoldingBalance());
-        BigDecimal disputedBalance = nonNegativeMoney(transactionRepository.calculateDisputedBalance());
+        BigDecimal legacyHoldingBalance = nonNegativeMoney(transactionRepository.calculateHoldingBalance());
+        BigDecimal walletEscrowBalance = nonNegativeMoney(walletTransactionRepository.calculatePostedEscrowBalance());
+        BigDecimal holdingBalance = legacyHoldingBalance.add(walletEscrowBalance);
+        BigDecimal disputedBalance = nonNegativeMoney(contractMilestoneRepository.calculateActiveDisputedEscrowBalance());
 
         for (AccountEntity account : accountRepository.findAll()) {
             SystemWalletEntity wallet = admin.getAccountId().equals(account.getAccountId())

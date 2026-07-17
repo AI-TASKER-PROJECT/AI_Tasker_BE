@@ -118,6 +118,7 @@ public class ProfileService {
             accountRepository.save(account);
         }
         ExpertProfileEntity saved = expertProfileRepository.save(entity);
+        syncPortfolioYearsExperience(saved);
         auditLogService.record(AuditLogService.ACTION_UPSERT_EXPERT_PROFILE, "expert_profiles", String.valueOf(saved.getExpertId()), account.getAccountId());
         if (submissionMode.reopensReview()) {
             notifyStaffProfileSubmitted("EXPERT", saved.getExpertId(), account.getAccountId(), account.getFullName());
@@ -411,6 +412,16 @@ public class ProfileService {
     private ProfileSubmissionMode resolveExpertSubmissionMode(ExpertProfileEntity entity) {
         if (entity.getExpertId() == null) return ProfileSubmissionMode.REOPEN_REVIEW;
         return resolveSubmissionMode(entity.getKycStatus());
+    }
+
+    private void syncPortfolioYearsExperience(ExpertProfileEntity expert) {
+        if (expert.getExpertId() == null || expert.getYearsOfExperience() == null) {
+            return;
+        }
+        portfolioRepository.findByExpertId(expert.getExpertId()).ifPresent(portfolio -> {
+            portfolio.setYearsExperience(expert.getYearsOfExperience());
+            portfolioRepository.save(portfolio);
+        });
     }
 
     private ProfileSubmissionMode resolveSubmissionMode(String currentStatus) {

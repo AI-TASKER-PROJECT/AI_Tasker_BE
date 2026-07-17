@@ -950,6 +950,7 @@ public class PaymentWalletService {
                 .referenceType(tx.getReferenceType())
                 .referenceId(tx.getReferenceId())
                 .operationKey(tx.getOperationKey())
+                .operationLeg(tx.getOperationLeg())
                 .rawDescription(tx.getDescription())
                 .createdAt(tx.getCreatedAt());
         AccountEntity walletOwner = currentActor != null && Objects.equals(currentActor.getAccountId(), tx.getAccountId())
@@ -962,7 +963,8 @@ public class PaymentWalletService {
             case "TOPUP" -> describeTopup(builder, tx, actorName);
             case "MEMBERSHIP_PURCHASE" -> describeMembership(builder, tx, actorName);
             case "CREDIT_PURCHASE" -> describeCreditPurchase(builder, tx, actorName);
-            case "CONTRACT_SECURITY_DEPOSIT_HOLD", "CONTRACT_SECURITY_DEPOSIT_REFUND", "CONTRACT_SECURITY_DEPOSIT_RESOLVED" ->
+            case "CONTRACT_SECURITY_DEPOSIT_HOLD", "CONTRACT_SECURITY_DEPOSIT_REFUND", "CONTRACT_SECURITY_DEPOSIT_RESOLVED",
+                    "EXPERT_CONTRACT_DEPOSIT_HOLD", "EXPERT_CONTRACT_DEPOSIT_REFUND" ->
                     describeContractDeposit(builder, tx, actorName);
             case "WITHDRAW_HOLD", "WITHDRAW_APPROVED", "WITHDRAW_REJECTED" ->
                     describeWithdrawal(builder, tx, actorName);
@@ -1190,7 +1192,8 @@ public class PaymentWalletService {
     }
 
     private Optional<ContractDepositEntity> contractDepositForTransaction(WalletTransactionEntity tx) {
-        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())) {
+        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())
+                || "EXPERT_CONTRACT_DEPOSIT_HOLD".equals(tx.getTransactionType())) {
             return contractDepositRepository.findByHoldTransactionId(tx.getId());
         }
         Optional<ContractDepositEntity> byTransaction = contractDepositRepository.findByRefundTransactionId(tx.getId());
@@ -1204,7 +1207,9 @@ public class PaymentWalletService {
     }
 
     private Optional<ContractEntity> contractForDepositTransaction(WalletTransactionEntity tx, Optional<ContractDepositEntity> deposit) {
-        if ("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType()) && tx.getReferenceId() != null) {
+        if (("CONTRACT_SECURITY_DEPOSIT_HOLD".equals(tx.getTransactionType())
+                || "EXPERT_CONTRACT_DEPOSIT_HOLD".equals(tx.getTransactionType()))
+                && tx.getReferenceId() != null) {
             return contractRepository.findById(toInt(tx.getReferenceId()));
         }
         return deposit.flatMap(item -> contractRepository.findById(item.getContractId()));

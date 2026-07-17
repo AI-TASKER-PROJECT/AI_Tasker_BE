@@ -41,6 +41,20 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     BigDecimal sumPostedPlatformPurchaseRevenue();
 
     @Query("""
+            select coalesce(sum(
+                case
+                    when wt.direction = 'HOLD' then wt.amount
+                    when wt.direction in ('RELEASE', 'DEBIT') then -wt.amount
+                    else 0
+                end
+            ), 0)
+            from WalletTransactionEntity wt
+            where wt.status = 'POSTED'
+              and wt.balanceType = 'ESCROW'
+            """)
+    BigDecimal calculatePostedEscrowBalance();
+
+    @Query("""
             select wt
             from WalletTransactionEntity wt
             where wt.accountId = :accountId
