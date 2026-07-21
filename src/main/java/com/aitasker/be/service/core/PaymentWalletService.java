@@ -46,6 +46,7 @@ import com.aitasker.be.repository.MilestoneRepository;
 import com.aitasker.be.repository.PaymentOrderRepository;
 import com.aitasker.be.repository.QuotaUsageLogRepository;
 import com.aitasker.be.repository.SystemSettingRepository;
+import com.aitasker.be.repository.SystemWalletRepository;
 import com.aitasker.be.repository.UserQuotaRepository;
 import com.aitasker.be.repository.WalletTransactionRepository;
 import com.aitasker.be.repository.WithdrawalRequestRepository;
@@ -111,6 +112,7 @@ public class PaymentWalletService {
     private final JobRepository jobRepository;
     private final MilestoneRepository milestoneRepository;
     private final PaymentOrderRepository paymentOrderRepository;
+    private final SystemWalletRepository systemWalletRepository;
     private final WithdrawalRequestRepository withdrawalRequestRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final AccountRepository accountRepository;
@@ -923,27 +925,53 @@ public class PaymentWalletService {
         result.addAll(buildConsolidatedWalletHistory(nonWithdrawalTx, actor));
 
         result.sort(Comparator.comparing(WalletTransactionHistoryResponse::getCreatedAt).reversed());
-        return result;
+        return result.stream()
+                .map(item -> withHistoryScope(item, "USER_WALLET"))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<WalletTransactionHistoryResponse> listPlatformWalletTransactions() {
+        return listPlatformUserActivityTransactions();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WalletTransactionHistoryResponse> listPlatformUserActivityTransactions() {
         accessService.requireRole("ADMIN");
         return walletTransactionRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .filter(this::isPlatformHistoryEventRow)
-                .map(tx -> toWalletHistory(tx, null))
+                .map(tx -> withHistoryScope(toWalletHistory(tx, null), "USER_ACTIVITY"))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WalletTransactionHistoryResponse> listPlatformWalletLedger() {
+        accessService.requireRole("ADMIN");
+        AccountEntity platformAccount = accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN")
+                .orElseThrow(() -> new NotFoundException("CHUA CO TAI KHOAN ADMIN DE QUAN LY SYSTEM WALLET"));
+        return walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(platformAccount.getAccountId())
+                .stream()
+                .map(tx -> withHistoryScope(toWalletHistory(tx, platformAccount), "PLATFORM_WALLET"))
                 .toList();
     }
 
     private WalletTransactionHistoryResponse toWalletHistory(WalletTransactionEntity tx, AccountEntity currentActor) {
+        Optional<SystemWalletEntity> wallet = walletForTransaction(tx);
         WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder = WalletTransactionHistoryResponse.builder()
                 .transactionId(tx.getId())
+                .systemWalletId(tx.getSystemWalletId())
                 .accountId(tx.getAccountId())
+                .actorAccountId(tx.getAccountId())
                 .transactionType(tx.getTransactionType())
+                .transactionCategory(transactionCategory(tx))
                 .direction(tx.getDirection())
                 .balanceType(tx.getBalanceType())
                 .amount(tx.getAmount())
+                .grossAmount(tx.getAmount())
+                .feeAmount(BigDecimal.ZERO)
+                .netAmount(tx.getAmount())
+                .currency(wallet.map(SystemWalletEntity::getCurrency).filter(value -> !value.isBlank()).orElse("VND"))
                 .balanceBefore(tx.getBalanceBefore())
                 .balanceAfter(tx.getBalanceAfter())
                 .status(tx.getStatus())
@@ -951,13 +979,24 @@ public class PaymentWalletService {
                 .referenceId(tx.getReferenceId())
                 .operationKey(tx.getOperationKey())
                 .operationLeg(tx.getOperationLeg())
+                .metadata(tx.getMetadata())
                 .rawDescription(tx.getDescription())
                 .createdAt(tx.getCreatedAt());
+        wallet.ifPresent(item -> builder
+                .walletType(item.getWalletType())
+                .walletOwnerRole(walletOwnerRole(item)));
         AccountEntity walletOwner = currentActor != null && Objects.equals(currentActor.getAccountId(), tx.getAccountId())
                 ? currentActor
                 : accountRepository.findById(tx.getAccountId()).orElse(null);
         String actorName = displayAccount(walletOwner, tx.getAccountId());
-        builder.actorName(actorName);
+        builder.actorName(actorName)
+                .actorRole(roleName(walletOwner))
+                .platformBalanceChanging(isPlatformBalanceChanging(tx));
+        if ("AVAILABLE".equals(tx.getBalanceType())) {
+            builder.availableBalanceBefore(tx.getBalanceBefore())
+                    .availableBalanceAfter(tx.getBalanceAfter());
+        }
+        attachMilestoneContext(builder, tx);
 
         return switch (safe(tx.getTransactionType())) {
             case "TOPUP" -> describeTopup(builder, tx, actorName);
@@ -983,7 +1022,10 @@ public class PaymentWalletService {
         Optional<PaymentOrderEntity> order = paymentOrder(tx);
         order.ifPresent(paymentOrder -> builder
                 .paymentOrderId(paymentOrder.getId())
+                .paymentProvider(paymentOrder.getProvider() == null ? null : paymentOrder.getProvider().name())
                 .providerOrderCode(paymentOrder.getProviderOrderCode())
+                .providerTransactionNo(paymentOrder.getProviderTransactionNo())
+                .providerPaymentLinkId(paymentOrder.getProviderPaymentLinkId())
                 .description(actorName + " đã nạp " + formatAmount(tx.getAmount()) + " VND vào ví. Mã thanh toán: "
                         + safeNumber(paymentOrder.getProviderOrderCode()) + "."));
         return builder
@@ -1000,6 +1042,18 @@ public class PaymentWalletService {
             WalletTransactionEntity tx,
             String actorName
     ) {
+        if (WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(tx.getOperationLeg())) {
+            AccountEntity purchaser = purchaserFromOperation(tx).orElse(null);
+            String purchaserName = displayAccount(purchaser, purchaser == null ? null : purchaser.getAccountId());
+            builder.counterpartyAccountId(purchaser == null ? null : purchaser.getAccountId())
+                    .counterpartyRole(roleName(purchaser))
+                    .counterpartyName(purchaserName);
+            return builder
+                    .title("Nền tảng ghi nhận doanh thu gói thành viên")
+                    .description("Nền tảng đã ghi nhận " + formatAmount(tx.getAmount())
+                            + " VND doanh thu từ giao dịch mua gói thành viên của " + purchaserName + ".")
+                    .build();
+        }
         Optional<MembershipPurchaseEntity> purchase = membershipPurchaseRepository.findByWalletTransactionId(tx.getId());
         Long packageId = purchase.map(MembershipPurchaseEntity::getPackageId).orElse(tx.getReferenceId());
         Optional<MembershipPackageEntity> membershipPackage = packageId == null ? Optional.empty() : membershipPackageRepository.findById(packageId);
@@ -1021,6 +1075,18 @@ public class PaymentWalletService {
             WalletTransactionEntity tx,
             String actorName
     ) {
+        if (WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(tx.getOperationLeg())) {
+            AccountEntity purchaser = purchaserFromOperation(tx).orElse(null);
+            String purchaserName = displayAccount(purchaser, purchaser == null ? null : purchaser.getAccountId());
+            builder.counterpartyAccountId(purchaser == null ? null : purchaser.getAccountId())
+                    .counterpartyRole(roleName(purchaser))
+                    .counterpartyName(purchaserName);
+            return builder
+                    .title("Nền tảng ghi nhận doanh thu lượt sử dụng")
+                    .description("Nền tảng đã ghi nhận " + formatAmount(tx.getAmount())
+                            + " VND doanh thu từ giao dịch mua lượt sử dụng của " + purchaserName + ".")
+                    .build();
+        }
         String description = cleanLedgerDescription(tx);
         String title = actorName + " đã mua lượt sử dụng";
         if (safe(tx.getDescription()).contains("job-post")) {
@@ -1038,7 +1104,7 @@ public class PaymentWalletService {
     ) {
         Optional<ContractDepositEntity> deposit = contractDepositForTransaction(tx);
         Optional<ContractEntity> contract = contractForDepositTransaction(tx, deposit);
-        contract.ifPresent(item -> attachContractContext(builder, item));
+        contract.ifPresent(item -> attachContractContext(builder, item, tx.getAccountId()));
         deposit.ifPresent(item -> builder.adminId(item.getAdminId())
                 .adminName(item.getAdminId() == null ? null : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
                 .adminNote(item.getAdminNote()));
@@ -1080,6 +1146,7 @@ public class PaymentWalletService {
         withdrawal.ifPresent(item -> builder
                 .withdrawalId(item.getWithdrawalId())
                 .bankName(item.getBankName())
+                .bankAccountNumberMasked(maskBankAccount(item.getBankAccountNumber()))
                 .bankAccountHolder(item.getBankAccountHolder())
                 .adminId(item.getAdminId())
                 .adminName(item.getAdminId() == null ? null : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
@@ -1126,14 +1193,32 @@ public class PaymentWalletService {
         WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder =
                 WalletTransactionHistoryResponse.builder()
                         .transactionId(tx.getId())
+                        .systemWalletId(tx.getSystemWalletId())
                         .accountId(tx.getAccountId())
+                        .actorAccountId(tx.getAccountId())
+                        .actorRole(roleName(currentActor))
+                        .walletOwnerRole(roleName(currentActor))
+                        .historyScope("USER_WALLET")
+                        .transactionCategory("WITHDRAWAL")
+                        .platformBalanceChanging(false)
                         .amount(withdrawal.getAmount())
+                        .grossAmount(withdrawal.getAmount())
+                        .feeAmount(BigDecimal.ZERO)
+                        .netAmount(withdrawal.getAmount())
+                        .currency("VND")
+                        .balanceBefore(tx.getBalanceBefore())
+                        .balanceAfter(tx.getBalanceAfter())
                         .status(withdrawal.getStatus())
                         .referenceType("WITHDRAW_REQUEST")
                         .referenceId(withdrawal.getWithdrawalId())
+                        .operationKey(tx.getOperationKey())
+                        .operationLeg(tx.getOperationLeg())
+                        .metadata(tx.getMetadata())
+                        .rawDescription(tx.getDescription())
                         .actorName(actorName)
                         .withdrawalId(withdrawal.getWithdrawalId())
                         .bankName(withdrawal.getBankName())
+                        .bankAccountNumberMasked(maskBankAccount(withdrawal.getBankAccountNumber()))
                         .bankAccountHolder(withdrawal.getBankAccountHolder())
                         .adminId(withdrawal.getAdminId())
                         .adminName(withdrawal.getAdminId() == null ? null : adminName)
@@ -1141,6 +1226,10 @@ public class PaymentWalletService {
                         .createdAt("PENDING".equals(withdrawal.getStatus())
                                 ? withdrawal.getRequestedAt()
                                 : withdrawal.getReviewedAt());
+        if ("AVAILABLE".equals(tx.getBalanceType())) {
+            builder.availableBalanceBefore(tx.getBalanceBefore())
+                    .availableBalanceAfter(tx.getBalanceAfter());
+        }
 
         return switch (safe(withdrawal.getStatus())) {
             case "APPROVED" -> builder
@@ -1179,6 +1268,123 @@ public class PaymentWalletService {
                             + " Đang chờ quản trị viên duyệt.")
                     .build();
         };
+    }
+
+    private WalletTransactionHistoryResponse withHistoryScope(WalletTransactionHistoryResponse item, String scope) {
+        item.setHistoryScope(scope);
+        if ("PLATFORM_WALLET".equals(scope)) {
+            item.setPlatformBalanceChanging(true);
+            item.setWalletOwnerRole("ADMIN");
+        } else if (item.getPlatformBalanceChanging() == null) {
+            item.setPlatformBalanceChanging(false);
+        }
+        if (item.getCurrency() == null || item.getCurrency().isBlank()) {
+            item.setCurrency("VND");
+        }
+        if (item.getGrossAmount() == null) {
+            item.setGrossAmount(item.getAmount());
+        }
+        if (item.getFeeAmount() == null) {
+            item.setFeeAmount(BigDecimal.ZERO);
+        }
+        if (item.getNetAmount() == null) {
+            item.setNetAmount(item.getAmount());
+        }
+        return item;
+    }
+
+    private Optional<SystemWalletEntity> walletForTransaction(WalletTransactionEntity tx) {
+        if (tx.getSystemWalletId() != null) {
+            return systemWalletRepository.findById(tx.getSystemWalletId());
+        }
+        if (tx.getAccountId() != null) {
+            return systemWalletRepository.findByAccountId(tx.getAccountId());
+        }
+        return Optional.empty();
+    }
+
+    private String walletOwnerRole(SystemWalletEntity wallet) {
+        if (wallet == null) {
+            return null;
+        }
+        String walletType = safe(wallet.getWalletType());
+        if ("ADMIN_SYSTEM".equals(walletType)) {
+            return "ADMIN";
+        }
+        return walletType.isBlank() ? null : walletType;
+    }
+
+    private String roleName(AccountEntity account) {
+        if (account == null || account.getRole() == null) {
+            return null;
+        }
+        return account.getRole().getRoleName();
+    }
+
+    private String transactionCategory(WalletTransactionEntity tx) {
+        String type = safe(tx.getTransactionType());
+        if ("TOPUP".equals(type)) {
+            return "TOPUP";
+        }
+        if ("MEMBERSHIP_PURCHASE".equals(type) || "CREDIT_PURCHASE".equals(type)) {
+            return WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(tx.getOperationLeg())
+                    ? "REVENUE" : "PURCHASE";
+        }
+        if (type.contains("WITHDRAW")) {
+            return "WITHDRAWAL";
+        }
+        if (type.contains("ESCROW") || type.contains("DEPOSIT")) {
+            return "ESCROW";
+        }
+        if (type.contains("REFUND")) {
+            return "REFUND";
+        }
+        return "WALLET";
+    }
+
+    private boolean isPlatformBalanceChanging(WalletTransactionEntity tx) {
+        return WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(tx.getOperationLeg());
+    }
+
+    private Optional<AccountEntity> purchaserFromOperation(WalletTransactionEntity tx) {
+        if (tx.getOperationKey() == null || tx.getOperationKey().isBlank()) {
+            return Optional.empty();
+        }
+        return walletTransactionRepository.findByOperationKeyOrderByCreatedAtAscIdAsc(tx.getOperationKey())
+                .stream()
+                .filter(row -> WalletLedgerService.LEG_PURCHASER_AVAILABLE_DEBIT.equals(row.getOperationLeg()))
+                .findFirst()
+                .flatMap(row -> accountRepository.findById(row.getAccountId()));
+    }
+
+    private void attachMilestoneContext(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx
+    ) {
+        Integer milestoneId = tx.getMilestoneId();
+        if (milestoneId == null && tx.getReferenceId() != null
+                && Set.of("MILESTONE", "CONTRACT_MILESTONE").contains(safe(tx.getReferenceType()))) {
+            milestoneId = toInt(tx.getReferenceId());
+        }
+        if (milestoneId == null) {
+            return;
+        }
+        Integer resolvedMilestoneId = milestoneId;
+        milestoneRepository.findById(resolvedMilestoneId)
+                .ifPresent(milestone -> builder
+                        .milestoneId(milestone.getMilestoneId())
+                        .milestoneName(milestone.getMilestoneName()));
+    }
+
+    private String maskBankAccount(String value) {
+        String account = safe(value);
+        if (account.isBlank()) {
+            return null;
+        }
+        if (account.length() <= 4) {
+            return "*".repeat(account.length());
+        }
+        return "*".repeat(Math.max(0, account.length() - 4)) + account.substring(account.length() - 4);
     }
 
     private Optional<PaymentOrderEntity> paymentOrder(WalletTransactionEntity tx) {
@@ -1249,6 +1455,7 @@ public class PaymentWalletService {
                     .forEach(consumed::add);
             WalletTransactionEntity representative = selectRepresentativeTransaction(group);
             WalletTransactionHistoryResponse item = toWalletHistory(representative, currentActor);
+            attachAvailableBalanceSnapshot(item, group);
             item.setCreatedAt(group.stream()
                     .map(WalletTransactionEntity::getCreatedAt)
                     .filter(Objects::nonNull)
@@ -1260,6 +1467,22 @@ public class PaymentWalletService {
             result.add(item);
         }
         return result;
+    }
+
+    private void attachAvailableBalanceSnapshot(
+            WalletTransactionHistoryResponse item,
+            List<WalletTransactionEntity> group
+    ) {
+        if (item.getAvailableBalanceBefore() != null || item.getAvailableBalanceAfter() != null) {
+            return;
+        }
+        group.stream()
+                .filter(tx -> "AVAILABLE".equals(tx.getBalanceType()))
+                .findFirst()
+                .ifPresent(tx -> {
+                    item.setAvailableBalanceBefore(tx.getBalanceBefore());
+                    item.setAvailableBalanceAfter(tx.getBalanceAfter());
+                });
     }
 
     private List<WalletTransactionEntity> resolveWalletOperationGroup(WalletTransactionEntity tx) {
@@ -1323,9 +1546,19 @@ public class PaymentWalletService {
                 || directions.equals(Set.of("RELEASE:HOLDING", "CREDIT:AVAILABLE"));
     }
 
-    private void attachContractContext(WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder, ContractEntity contract) {
+    private void attachContractContext(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            ContractEntity contract,
+            Integer actorAccountId
+    ) {
         String businessName = displayBusiness(contract.getBusinessId());
         String expertName = displayExpert(contract.getExpertId());
+        Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId())
+                .map(BusinessProfileEntity::getAccountId)
+                .orElse(null);
+        Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId())
+                .map(ExpertProfileEntity::getAccountId)
+                .orElse(null);
         builder.contractId(contract.getContractId())
                 .contractTitle(displayContract(contract))
                 .businessId(contract.getBusinessId())
@@ -1334,6 +1567,15 @@ public class PaymentWalletService {
                 .expertName(expertName)
                 .jobId(contract.getJobId())
                 .jobTitle(jobRepository.findById(contract.getJobId()).map(JobEntity::getTitle).orElse(null));
+        if (Objects.equals(actorAccountId, businessAccountId) && expertAccountId != null) {
+            builder.counterpartyAccountId(expertAccountId)
+                    .counterpartyRole("EXPERT")
+                    .counterpartyName(expertName);
+        } else if (Objects.equals(actorAccountId, expertAccountId) && businessAccountId != null) {
+            builder.counterpartyAccountId(businessAccountId)
+                    .counterpartyRole("BUSINESS")
+                    .counterpartyName(businessName);
+        }
     }
 
     private String displayBusiness(Integer businessId) {

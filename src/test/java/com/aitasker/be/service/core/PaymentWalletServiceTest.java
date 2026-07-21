@@ -16,7 +16,11 @@ import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.MembershipPackageEntity;
 import com.aitasker.be.entity.MembershipPurchaseEntity;
 import com.aitasker.be.entity.MilestoneEntity;
+import com.aitasker.be.entity.PaymentOrderEntity;
+import com.aitasker.be.entity.PaymentProvider;
+import com.aitasker.be.entity.PaymentStatus;
 import com.aitasker.be.entity.RoleEntity;
+import com.aitasker.be.entity.SystemWalletEntity;
 import com.aitasker.be.entity.UserQuotaEntity;
 import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.entity.WithdrawalRequestEntity;
@@ -32,6 +36,7 @@ import com.aitasker.be.repository.MilestoneRepository;
 import com.aitasker.be.repository.PaymentOrderRepository;
 import com.aitasker.be.repository.QuotaUsageLogRepository;
 import com.aitasker.be.repository.SystemSettingRepository;
+import com.aitasker.be.repository.SystemWalletRepository;
 import com.aitasker.be.repository.UserQuotaRepository;
 import com.aitasker.be.repository.WalletTransactionRepository;
 import com.aitasker.be.repository.WithdrawalRequestRepository;
@@ -76,6 +81,7 @@ class PaymentWalletServiceTest {
     @Mock private JobRepository jobRepository;
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private PaymentOrderRepository paymentOrderRepository;
+    @Mock private SystemWalletRepository systemWalletRepository;
     @Mock private WithdrawalRequestRepository withdrawalRequestRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private AccountRepository accountRepository;
@@ -944,6 +950,74 @@ class PaymentWalletServiceTest {
     }
 
     @Test
+    void listCurrentWalletTransactions_shouldExposeReconciliationFieldsForTopup() {
+        AccountEntity businessAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Nova Retail")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        WalletTransactionEntity tx = WalletTransactionEntity.builder()
+                .id(200L)
+                .systemWalletId(5L)
+                .accountId(10)
+                .paymentOrderId(77L)
+                .transactionType("TOPUP")
+                .direction("CREDIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("300000"))
+                .balanceBefore(new BigDecimal("100000"))
+                .balanceAfter(new BigDecimal("400000"))
+                .status("POSTED")
+                .referenceType("PAYMENT_ORDER")
+                .referenceId(77L)
+                .operationKey("TOPUP:77")
+                .operationLeg(WalletLedgerService.LEG_AVAILABLE_CREDIT)
+                .metadata("{\"source\":\"PAYOS_SYNC\"}")
+                .description("Top up wallet")
+                .createdAt(LocalDateTime.of(2026, 7, 21, 9, 0))
+                .build();
+        PaymentOrderEntity paymentOrder = PaymentOrderEntity.builder()
+                .id(77L)
+                .provider(PaymentProvider.PAYOS)
+                .providerOrderCode(90077L)
+                .providerTransactionNo("BANK-TXN-77")
+                .providerPaymentLinkId("plink_77")
+                .status(PaymentStatus.PAID)
+                .build();
+        SystemWalletEntity wallet = SystemWalletEntity.builder()
+                .systemWalletId(5L)
+                .accountId(10)
+                .walletType("BUSINESS")
+                .currency("VND")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(businessAccount);
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10)).thenReturn(List.of(tx));
+        when(systemWalletRepository.findById(5L)).thenReturn(Optional.of(wallet));
+        when(paymentOrderRepository.findById(77L)).thenReturn(Optional.of(paymentOrder));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals("USER_WALLET", item.getHistoryScope());
+        assertEquals("TOPUP", item.getTransactionCategory());
+        assertEquals(5L, item.getSystemWalletId());
+        assertEquals("BUSINESS", item.getWalletType());
+        assertEquals("BUSINESS", item.getActorRole());
+        assertEquals("VND", item.getCurrency());
+        assertEquals(new BigDecimal("300000"), item.getGrossAmount());
+        assertEquals(BigDecimal.ZERO, item.getFeeAmount());
+        assertEquals(new BigDecimal("300000"), item.getNetAmount());
+        assertEquals("PAYOS", item.getPaymentProvider());
+        assertEquals(90077L, item.getProviderOrderCode());
+        assertEquals("BANK-TXN-77", item.getProviderTransactionNo());
+        assertEquals("plink_77", item.getProviderPaymentLinkId());
+        assertEquals("{\"source\":\"PAYOS_SYNC\"}", item.getMetadata());
+        assertFalse(item.getPlatformBalanceChanging());
+    }
+
+    @Test
     void listPlatformWalletTransactions_shouldReturnVietnameseBusinessEventsForAdmin() {
         AccountEntity businessAccount = AccountEntity.builder()
                 .accountId(10)
@@ -1039,6 +1113,74 @@ class PaymentWalletServiceTest {
         assertEquals("Doanh nghiệp A đã mua gói Premium Business", history.get(2).getTitle());
         assertEquals("Doanh nghiệp A thanh toán 500000 VND để mua gói Premium Business. Thời hạn từ 2026-06-27T00:00 đến 2026-07-27T00:00.",
                 history.get(2).getDescription());
+    }
+
+    @Test
+    void listPlatformWalletLedger_shouldReturnOnlyPlatformWalletLedgerRows() {
+        AccountEntity admin = adminAccount();
+        admin.setFullName("Admin System");
+        AccountEntity purchaser = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Doanh nghiệp A")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        SystemWalletEntity platformWallet = SystemWalletEntity.builder()
+                .systemWalletId(1L)
+                .accountId(1)
+                .walletType("ADMIN_SYSTEM")
+                .currency("VND")
+                .build();
+        WalletTransactionEntity purchaserDebit = WalletTransactionEntity.builder()
+                .id(60L)
+                .accountId(10)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("DEBIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("500000"))
+                .operationKey("MEMBERSHIP_PURCHASE:abc")
+                .operationLeg(WalletLedgerService.LEG_PURCHASER_AVAILABLE_DEBIT)
+                .description("Premium Business")
+                .build();
+        WalletTransactionEntity platformRevenueCredit = WalletTransactionEntity.builder()
+                .id(61L)
+                .systemWalletId(1L)
+                .accountId(1)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("CREDIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("500000"))
+                .balanceBefore(new BigDecimal("1000000"))
+                .balanceAfter(new BigDecimal("1500000"))
+                .status("POSTED")
+                .operationKey("MEMBERSHIP_PURCHASE:abc")
+                .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                .description("Premium Business")
+                .createdAt(LocalDateTime.of(2026, 7, 21, 10, 0))
+                .build();
+
+        when(accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN"))
+                .thenReturn(Optional.of(admin));
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(1))
+                .thenReturn(List.of(platformRevenueCredit));
+        when(systemWalletRepository.findById(1L)).thenReturn(Optional.of(platformWallet));
+        when(walletTransactionRepository.findByOperationKeyOrderByCreatedAtAscIdAsc("MEMBERSHIP_PURCHASE:abc"))
+                .thenReturn(List.of(purchaserDebit, platformRevenueCredit));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(purchaser));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listPlatformWalletLedger();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals("PLATFORM_WALLET", item.getHistoryScope());
+        assertEquals("REVENUE", item.getTransactionCategory());
+        assertEquals(Boolean.TRUE, item.getPlatformBalanceChanging());
+        assertEquals(1, item.getAccountId());
+        assertEquals("ADMIN_SYSTEM", item.getWalletType());
+        assertEquals("ADMIN", item.getWalletOwnerRole());
+        assertEquals("Doanh nghiệp A", item.getCounterpartyName());
+        assertEquals(Integer.valueOf(10), item.getCounterpartyAccountId());
+        assertEquals("BUSINESS", item.getCounterpartyRole());
+        assertTrue(item.getTitle().contains("Nền tảng ghi nhận doanh thu"));
     }
 
     private AccountEntity businessAccount() {

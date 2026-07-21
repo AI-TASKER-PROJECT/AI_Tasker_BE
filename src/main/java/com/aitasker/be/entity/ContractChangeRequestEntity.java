@@ -8,7 +8,9 @@ package com.aitasker.be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,10 +36,14 @@ public class ContractChangeRequestEntity {
     @Column(name = "proposed_budget") private BigDecimal proposedBudget;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "proposed_timeline_days") private Integer proposedTimelineDays;
+    @Column(name = "proposed_scope") private String proposedScope;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "proposed_milestones", columnDefinition = "jsonb") private String proposedMilestones;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "status", nullable = false, length = 20) private String status;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "reviewed_by_account_id") private Integer reviewedByAccountId;
+    @Column(name = "review_note") private String reviewNote;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "reviewed_at") private LocalDateTime reviewedAt;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.

@@ -115,6 +115,7 @@ public class OpenApiConfig {
                 || path.equals("/api/v1/jobs/{jobId}/publish")
                 || path.equals("/api/v1/jobs/{jobId}/status")
                 || path.equals("/api/v1/jobs/{jobId}/milestones")
+                || path.equals("/api/v1/jobs/{jobId}/milestones/{milestoneId}")
                 || path.equals("/api/v1/jobs/{jobId}/domains")
                 || path.equals("/api/v1/jobs/{jobId}/skills")
                 || path.equals("/api/v1/jobs/{jobId}/technologies")) {
@@ -123,6 +124,7 @@ public class OpenApiConfig {
 
         if (path.equals("/api/v1/jobs/{jobId}/proposals")
                 || path.equals("/api/v1/proposals")
+                || path.equals("/api/v1/proposals/{proposalId}")
                 || path.equals("/api/v1/proposals/my")
                 || path.equals("/api/v1/proposals/{proposalId}/status")
                 || path.equals("/api/v1/proposals/file")

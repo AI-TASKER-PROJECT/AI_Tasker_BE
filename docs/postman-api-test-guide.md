@@ -1217,14 +1217,25 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### POST `/api/v1/milestones/{milestoneId}/reject`
 - OperationId: `rejectMilestone`
 - Auth: Bearer JWT
-- Giai thich: Operation rejectMilestone.
+- Giai thich: Business tu choi final deliverable, gui ly do tong va co the gui cac acceptance criteria khong dat kem ly do rieng.
 - Params:
   - `milestoneId` (path, required, integer)
-  - `reason` (query, optional, string)
-- Body raw: Khong co.
+  - `reason` (query, optional, string, compatibility fallback neu client cu chua gui body)
+- Body raw:
+```json
+{
+  "reason": "San pham chua du dieu kien nghiem thu.",
+  "failedCriteria": [
+    {
+      "criteriaId": 12,
+      "reason": "OTP het han nhung he thong van cho xac thuc."
+    }
+  ]
+}
+```
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
-  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `400`: Reason rong, criteria khong thuoc milestone, hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
@@ -2457,7 +2468,31 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### GET `/api/v1/admin/wallet/transactions`
 - OperationId: `platformWalletTransactions`
 - Auth: Bearer JWT
-- Giai thich: Operation platformWalletTransactions.
+- Giai thich: Compatibility alias for platform-wide user activity wallet history. Use this when Admin wants to review user-originated wallet actions across the platform, not the platform wallet's own ledger.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/wallet/platform-ledger`
+- OperationId: `platformWalletLedger`
+- Auth: Bearer JWT
+- Giai thich: Admin reads only the platform/Admin wallet ledger rows, including platform balance-changing rows such as platform revenue credits.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/wallet/user-activity-transactions`
+- OperationId: `platformUserActivityTransactions`
+- Auth: Bearer JWT
+- Giai thich: Admin reads platform-wide user activity wallet history, grouped/filtered so internal transfer legs do not appear as duplicate business events.
 - Params: Khong co.
 - Body raw: Khong co.
 - Ma phan hoi thuong gap:
@@ -2683,3 +2718,63 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+## US-068 Editable Marketplace And Contract Change APIs
+
+### PUT `/api/v1/proposals/{proposalId}`
+- Auth: Bearer JWT Expert.
+- Use when the owning Expert updates a `Pending` or `Accepted` proposal before any contract exists.
+- Body:
+```json
+{
+  "technicalSolution": "Updated architecture and delivery approach",
+  "proposalDescription": "Updated implementation plan",
+  "bidAmount": 15000000,
+  "proposalFileUrl": "proposal-files/experts/5/revised.pdf"
+}
+```
+
+### POST `/api/v1/jobs/{jobId}/milestones`
+- Auth: Bearer JWT Business.
+- Preferred job-scoped alias for milestone creation.
+
+### PATCH `/api/v1/jobs/{jobId}/milestones/{milestoneId}`
+- Auth: Bearer JWT Business.
+- Preferred job-scoped alias for milestone update.
+
+### POST `/api/v1/contracts/{contractId}/change-requests`
+- Auth: Bearer JWT Business or Expert participant.
+- Body:
+```json
+{
+  "changeType": "GENERAL",
+  "changeSummary": "Add deployment handover",
+  "proposedBudget": 18000000,
+  "proposedTimelineDays": 21,
+  "proposedScope": "Include deployment handover and documentation",
+  "proposedMilestones": []
+}
+```
+
+### GET `/api/v1/contracts/{contractId}/change-requests`
+- Auth: Bearer JWT participant/Admin/Staff.
+
+### POST `/api/v1/contracts/{contractId}/change-requests/{requestId}/accept`
+- Auth: Bearer JWT counterparty only.
+- Body:
+```json
+{ "reviewNote": "Accepted" }
+```
+
+### POST `/api/v1/contracts/{contractId}/change-requests/{requestId}/reject`
+- Auth: Bearer JWT counterparty only.
+- Body:
+```json
+{ "reviewNote": "Rejected because scope is not aligned" }
+```
+
+### Preferred Contract-Scoped Milestone Aliases
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deliverables`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/source-code-file`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/approve`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/reject`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/disputes`

@@ -78,6 +78,8 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 13 | PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Operation updateJobStatus. |
 | 14 | GET | `/api/v1/jobs/{jobId}/milestones` | Public | Operation listJobMilestones. |
 | 15 | GET | `/api/v1/jobs/my` | Bearer JWT | Operation listMyJobs. |
+| 16 | POST | `/api/v1/jobs/{jobId}/milestones` | Bearer JWT | Preferred job-scoped alias for creating a milestone. |
+| 17 | PATCH | `/api/v1/jobs/{jobId}/milestones/{milestoneId}` | Bearer JWT | Preferred job-scoped alias for updating a milestone. |
 
 ## Proposal Flow
 
@@ -95,6 +97,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 8 | GET | `/api/v1/jobs/{jobId}/proposals` | Bearer JWT | Operation listProposals. |
 | 9 | GET | `/api/v1/jobs/{jobId}/matching` | Bearer JWT | Operation matching. |
 | 10 | GET | `/api/jobs/{jobPostingId}/expert-candidates` | Bearer JWT | Operation findTopCandidates. |
+| 11 | PUT | `/api/v1/proposals/{proposalId}` | Bearer JWT | Expert updates own `Pending`/`Accepted` proposal before contract creation. |
 
 ## Wallet & Payment Flow
 
@@ -140,7 +143,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 12 | POST | `/api/v1/termination-requests/expire-awaiting-expert` | Bearer JWT | Operation expireTerminationResponses. |
 | 13 | POST | `/api/v1/milestones` | Bearer JWT | Operation createMilestone. |
 | 14 | POST | `/api/v1/milestones/{milestoneId}/start` | Bearer JWT | Compatibility start endpoint; deposit now auto-starts milestones and this route is idempotent for `IN_PROGRESS`. |
-| 15 | POST | `/api/v1/milestones/{milestoneId}/reject` | Bearer JWT | Operation rejectMilestone. |
+| 15 | POST | `/api/v1/milestones/{milestoneId}/reject` | Bearer JWT | Business rejects final deliverable with overall feedback and optional failed acceptance-criteria feedback. |
 | 16 | POST | `/api/v1/milestones/{milestoneId}/disputes` | Bearer JWT | Operation initiateMilestoneDispute. |
 | 17 | GET | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Operation listDeliverables. |
 | 18 | POST | `/api/v1/milestones/{milestoneId}/deliverables` | Bearer JWT | Assigned Expert submits a first or corrected deliverable before the contract milestone deadline. |
@@ -186,6 +189,15 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 58 | GET | `/api/v1/contracts/{contractId}/milestones` | Bearer JWT | Operation listMilestones. |
 | 59 | GET | `/api/v1/contracts/{contractId}/disputes` | Bearer JWT | Operation listDisputes. |
 | 60 | POST | `/api/v1/milestones/{milestoneId}/source-code-file` | Bearer JWT | Approved assigned Expert uploads one ZIP source archive before the milestone deadline, maximum 50 MB. |
+| 61 | POST | `/api/v1/contracts/{contractId}/change-requests` | Bearer JWT | Participant proposes contract budget, timeline, scope, or milestone changes. |
+| 62 | GET | `/api/v1/contracts/{contractId}/change-requests` | Bearer JWT | Participant/Admin/Staff lists contract change requests. |
+| 63 | POST | `/api/v1/contracts/{contractId}/change-requests/{requestId}/accept` | Bearer JWT | Counterparty accepts and applies a pending contract change request. |
+| 64 | POST | `/api/v1/contracts/{contractId}/change-requests/{requestId}/reject` | Bearer JWT | Counterparty rejects a pending contract change request without applying changes. |
+| 65 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/deliverables` | Bearer JWT | Preferred contract-scoped deliverable submission alias. |
+| 66 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/source-code-file` | Bearer JWT | Preferred contract-scoped source-code ZIP upload alias. |
+| 67 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/approve` | Bearer JWT | Preferred contract-scoped milestone approval alias. |
+| 68 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/reject` | Bearer JWT | Preferred contract-scoped milestone rejection alias. |
+| 69 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/disputes` | Bearer JWT | Preferred contract-scoped dispute creation alias. |
 
 ## Notification Flow
 
@@ -251,13 +263,15 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 18 | PATCH | `/api/v1/admin/accounts/{accountId}/status` | Bearer JWT | Operation setAccountStatus. |
 | 19 | PATCH | `/api/v1/admin/accounts/{accountId}/active` | Bearer JWT | Operation setAccountActive. |
 | 20 | GET | `/api/v1/admin/wallet` | Bearer JWT | Operation systemWallet. |
-| 21 | GET | `/api/v1/admin/wallet/transactions` | Bearer JWT | Operation platformWalletTransactions. |
-| 22 | GET | `/api/v1/admin/settings` | Bearer JWT | Operation listSettings. |
-| 23 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Operation listReviewsByContract. |
-| 24 | GET | `/api/v1/admin/disputes` | Bearer JWT | Operation listDisputes_1. |
-| 25 | GET | `/api/v1/admin/disputes/{disputeId}` | Bearer JWT | Operation getDisputeDetail. |
-| 26 | GET | `/api/v1/admin/audit-logs` | Bearer JWT | Operation listAuditLogs. |
-| 27 | GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Operation analyticsOverview. |
+| 21 | GET | `/api/v1/admin/wallet/transactions` | Bearer JWT | Compatibility alias for platform-wide user activity wallet history. |
+| 22 | GET | `/api/v1/admin/wallet/platform-ledger` | Bearer JWT | Admin reads only the platform/Admin wallet ledger rows. |
+| 23 | GET | `/api/v1/admin/wallet/user-activity-transactions` | Bearer JWT | Admin reads platform-wide user activity wallet history. |
+| 24 | GET | `/api/v1/admin/settings` | Bearer JWT | Operation listSettings. |
+| 25 | GET | `/api/v1/admin/reviews/contracts/{contractId}` | Bearer JWT | Operation listReviewsByContract. |
+| 26 | GET | `/api/v1/admin/disputes` | Bearer JWT | Operation listDisputes_1. |
+| 27 | GET | `/api/v1/admin/disputes/{disputeId}` | Bearer JWT | Operation getDisputeDetail. |
+| 28 | GET | `/api/v1/admin/audit-logs` | Bearer JWT | Operation listAuditLogs. |
+| 29 | GET | `/api/v1/admin/analytics/overview` | Bearer JWT | Operation analyticsOverview. |
 | 28 | GET | `/api/v1/admin/dashboard/summary` | Bearer JWT | Admin dashboard summary cards. |
 | 29 | GET | `/api/v1/admin/dashboard/revenue` | Bearer JWT | Chart-ready revenue series and transaction-type breakdown. |
 | 30 | GET | `/api/v1/admin/dashboard/contracts` | Bearer JWT | Contract status breakdown and created trend. |

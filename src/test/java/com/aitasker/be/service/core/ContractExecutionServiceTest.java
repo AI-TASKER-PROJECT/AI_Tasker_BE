@@ -8,14 +8,18 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
+import com.aitasker.be.dto.core.ContractChangeRequestRequest;
+import com.aitasker.be.dto.core.ContractChangeReviewRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
+import com.aitasker.be.dto.core.RejectMilestoneRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.AcceptanceCriteriaEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ContractEntity;
+import com.aitasker.be.entity.ContractChangeRequestEntity;
 import com.aitasker.be.entity.ContractMilestoneEntity;
 import com.aitasker.be.entity.DeliverableEntity;
 import com.aitasker.be.entity.DisputeEntity;
@@ -83,6 +87,7 @@ class ContractExecutionServiceTest {
     @Mock private JobRepository jobRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private ContractRepository contractRepository;
+    @Mock private ContractChangeRequestRepository contractChangeRequestRepository;
     @Mock private ContractMilestoneRepository contractMilestoneRepository;
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @Mock private MilestoneRepository milestoneRepository;
@@ -1274,7 +1279,80 @@ class ContractExecutionServiceTest {
         assertEquals("IN_PROGRESS", result.getStatus());
         assertEquals("REJECTED", deliverable.getStatus());
         assertEquals("Not good enough", deliverable.getRejectionFeedback());
+        assertNull(deliverable.getRejectedCriteriaFeedback());
         verify(disputeRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectMilestone_shouldStoreFailedCriteriaFeedbackJson() {
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).jobId(2).contractId(1).status("UNDER_REVIEW").build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2).businessId(10).expertId(5).status("ACTIVE").build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(200)
+                .finalBudget(BigDecimal.valueOf(1000)).resubmitCount(0).status("UNDER_REVIEW")
+                .build();
+        DeliverableEntity deliverable = DeliverableEntity.builder()
+                .deliverableId(300).milestoneId(200).submissionRound(1).status("SUBMITTED").build();
+        RejectMilestoneRequest request = new RejectMilestoneRequest(
+                "Sản phẩm chưa đủ điều kiện nghiệm thu.",
+                List.of(new RejectMilestoneRequest.FailedCriterionFeedback(
+                        501,
+                        "OTP hết hạn nhưng hệ thống vẫn cho xác thực."
+                )));
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("BUSINESS").build()).build()
+        );
+        when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(criteriaRepository.findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(200)).thenReturn(List.of(
+                AcceptanceCriteriaEntity.builder().criteriaId(501).milestoneId(200).description("OTP expiry").sortOrder(1).build()
+        ));
+        when(deliverableRepository.findByMilestoneIdOrderBySubmissionRoundDesc(200)).thenReturn(List.of(deliverable));
+        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(200), any())).thenReturn(List.of());
+        when(deliverableRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(milestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        contractExecutionService.rejectMilestone(200, request, null);
+
+        assertEquals("Sản phẩm chưa đủ điều kiện nghiệm thu.", deliverable.getRejectionFeedback());
+        assertNotNull(deliverable.getRejectedCriteriaFeedback());
+        assertTrue(deliverable.getRejectedCriteriaFeedback().contains("\"criteriaId\":501"));
+        assertTrue(deliverable.getRejectedCriteriaFeedback().contains("OTP hết hạn"));
+    }
+
+    @Test
+    void rejectMilestone_shouldRejectFailedCriteriaOutsideMilestone() {
+        MilestoneEntity milestone = MilestoneEntity.builder().milestoneId(200).jobId(2).contractId(1).status("UNDER_REVIEW").build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2).businessId(10).expertId(5).status("ACTIVE").build();
+        ContractMilestoneEntity cm = ContractMilestoneEntity.builder()
+                .contractMilestoneId(100).contractId(1).jobMilestoneId(200)
+                .finalBudget(BigDecimal.valueOf(1000)).resubmitCount(0).status("UNDER_REVIEW")
+                .build();
+        RejectMilestoneRequest request = new RejectMilestoneRequest(
+                "Sản phẩm chưa đủ điều kiện nghiệm thu.",
+                List.of(new RejectMilestoneRequest.FailedCriterionFeedback(999, "Không đạt"))
+        );
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(99).role(RoleEntity.builder().roleName("BUSINESS").build()).build()
+        );
+        when(businessProfileRepository.findByAccountId(99)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(milestoneRepository.findById(200)).thenReturn(Optional.of(milestone));
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(cm));
+        when(criteriaRepository.findByMilestoneIdOrderBySortOrderAscCriteriaIdAsc(200)).thenReturn(List.of(
+                AcceptanceCriteriaEntity.builder().criteriaId(501).milestoneId(200).description("OTP expiry").sortOrder(1).build()
+        ));
+        when(disputeRepository.findByMilestoneIdAndStatusIn(eq(200), any())).thenReturn(List.of());
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.rejectMilestone(200, request, null));
+
+        assertEquals("REJECTED_CRITERIA_NOT_IN_MILESTONE", ex.getMessage());
+        verify(deliverableRepository, never()).save(any());
     }
 
     @Test
@@ -2240,5 +2318,94 @@ class ContractExecutionServiceTest {
 
         verify(paymentWalletService).immediateTerminateContract(any(), any(), any());
         verify(auditLogService).record(eq("CONTRACT_IMMEDIATE_TERMINATED"), eq("contracts"), eq("1"), eq(50));
+    }
+
+    @Test
+    void requestContractChange_shouldPersistPendingAndNotifyCounterparty() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_ACTIVE).build();
+        AccountEntity businessActor = AccountEntity.builder()
+                .accountId(50).role(RoleEntity.builder().roleName("BUSINESS").build()).status("Approved").build();
+        ContractChangeRequestRequest request = new ContractChangeRequestRequest();
+        request.setChangeType("SCOPE");
+        request.setChangeSummary("Add deployment handover");
+        request.setProposedScope("Add cloud deployment and handover session");
+
+        when(accessService.currentAccount()).thenReturn(businessActor);
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractChangeRequestRepository.existsByContractIdAndStatusIgnoreCase(1, "Pending")).thenReturn(false);
+        when(contractChangeRequestRepository.save(any(ContractChangeRequestEntity.class))).thenAnswer(i -> {
+            ContractChangeRequestEntity saved = i.getArgument(0);
+            saved.setRequestId(77);
+            return saved;
+        });
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
+
+        ContractChangeRequestEntity result = contractExecutionService.requestContractChange(1, request);
+
+        assertEquals("Pending", result.getStatus());
+        assertEquals(Integer.valueOf(50), result.getRequestedByAccountId());
+        assertEquals("Add cloud deployment and handover session", result.getProposedScope());
+        verify(auditLogService).record(AuditLogService.ACTION_REQUEST_CONTRACT_CHANGE, "contract_change_requests", "77", 50);
+        verify(notificationService).notifyContractChangeRequested(60, 50, 1, 77, "Add deployment handover");
+    }
+
+    @Test
+    void acceptContractChange_shouldRejectRequesterSelfApproval() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_ACTIVE).build();
+        ContractChangeRequestEntity request = ContractChangeRequestEntity.builder()
+                .requestId(77).contractId(1).requestedByAccountId(50).status("Pending").build();
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(50).role(RoleEntity.builder().roleName("BUSINESS").build()).status("Approved").build());
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractChangeRequestRepository.findById(77)).thenReturn(Optional.of(request));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.acceptContractChange(1, 77, null));
+
+        assertEquals("BEN TAO YEU CAU KHONG DUOC TU DUYET", ex.getMessage());
+        verify(contractRepository, never()).save(any(ContractEntity.class));
+    }
+
+    @Test
+    void acceptContractChange_shouldApplyAcceptedBudgetScopeAndReviewNote() {
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).businessId(10).expertId(5).status(ContractEntity.STATUS_ACTIVE)
+                .totalBudget(BigDecimal.valueOf(1000)).timelineDays(10).build();
+        ContractChangeRequestEntity request = ContractChangeRequestEntity.builder()
+                .requestId(77)
+                .contractId(1)
+                .requestedByAccountId(50)
+                .changeSummary("Add handover")
+                .proposedBudget(BigDecimal.valueOf(1200))
+                .proposedTimelineDays(14)
+                .proposedScope("Updated scope")
+                .status("Pending")
+                .build();
+        ContractChangeReviewRequest review = new ContractChangeReviewRequest();
+        review.setReviewNote("Approved by expert");
+
+        when(accessService.currentAccount()).thenReturn(
+                AccountEntity.builder().accountId(60).role(RoleEntity.builder().roleName("EXPERT").build()).status("Approved").build());
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(expertProfileRepository.findByAccountId(60)).thenReturn(Optional.of(ExpertProfileEntity.builder().expertId(5).build()));
+        when(contractChangeRequestRepository.findById(77)).thenReturn(Optional.of(request));
+        when(contractRepository.save(any(ContractEntity.class))).thenAnswer(i -> i.getArgument(0));
+        when(contractChangeRequestRepository.save(any(ContractChangeRequestEntity.class))).thenAnswer(i -> i.getArgument(0));
+
+        ContractChangeRequestEntity result = contractExecutionService.acceptContractChange(1, 77, review);
+
+        assertEquals("Accepted", result.getStatus());
+        assertEquals(Integer.valueOf(60), result.getReviewedByAccountId());
+        assertEquals("Approved by expert", result.getReviewNote());
+        assertEquals(BigDecimal.valueOf(1200), contract.getTotalBudget());
+        assertEquals(Integer.valueOf(14), contract.getTimelineDays());
+        assertEquals("Updated scope", contract.getContractScope());
+        verify(auditLogService).record(AuditLogService.ACTION_ACCEPT_CONTRACT_CHANGE, "contract_change_requests", "77", 60);
+        verify(notificationService).notifyContractChangeReviewed(50, 60, 1, 77, true);
     }
 }

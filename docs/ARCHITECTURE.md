@@ -337,6 +337,10 @@ Contract execution enforces a multi-step agreement model:
 - Expert can submit deliverables only for their own active contract, after both
   NDA signatures exist.
 - Submitting a deliverable moves the milestone into review.
+- Business rejection of a reviewed final deliverable requires overall feedback
+  and may include failed milestone-owned acceptance criteria with one reason per
+  criterion. The backend validates criteria ownership before storing the JSONB
+  feedback on the deliverable.
 - Business completion of all reviewed milestones moves the contract to
   `COMPLETED` and the job to `CLOSED`.
 - Admin deposit refund/resolution keeps completed contracts `COMPLETED` and
@@ -375,12 +379,19 @@ Finance is partially MVP and partially integrated:
 - `GET /api/wallet/transactions` returns a read DTO for transparent wallet
   history. The response preserves raw ledger codes and adds Vietnamese
   presentation fields explaining top-up, membership, credit, contract-deposit,
-  and withdrawal events with related business/expert/job/contract/bank/admin
+  withdrawal, payment-provider, wallet, milestone, metadata, and bank/admin
   context where available.
-- `GET /api/v1/admin/wallet/transactions` returns the platform-wide admin view
-  of wallet history using the same transparent DTO. It filters duplicate
-  transfer ledger legs so each displayed row maps to a clear business event,
-  while keeping technical IDs for reconciliation.
+- `GET /api/v1/admin/wallet/platform-ledger` returns only the platform/Admin
+  wallet ledger rows using the same transparent DTO. This is the source for the
+  platform wallet's own balance-changing history, including platform revenue
+  credits.
+- `GET /api/v1/admin/wallet/user-activity-transactions` returns the
+  platform-wide user activity history. It filters duplicate transfer ledger
+  legs so each displayed row maps to a clear business event, while keeping
+  technical IDs for reconciliation.
+- `GET /api/v1/admin/wallet/transactions` remains a compatibility alias for
+  the user activity history and should not be treated as the platform wallet's
+  own ledger.
 - Legacy transaction endpoints still model deposit, payout, refund, webhook,
   and status updates for contract/milestone flows.
 - Legacy invoice storage no longer exists in the active schema.

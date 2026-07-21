@@ -120,6 +120,30 @@ public class NotificationService {
         );
     }
 
+    public void notifyJobUpdated(Integer receiverAccountId, Integer actorAccountId, Integer jobId, String jobTitle) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "JOB_UPDATED",
+                "Job đã được cập nhật",
+                "Dự án \"" + safeText(jobTitle, "không tên") + "\" đã được doanh nghiệp cập nhật thông tin.",
+                "/expert/jobs/" + jobId,
+                Map.of("jobId", jobId)
+        );
+    }
+
+    public void notifyProposalUpdated(Integer receiverAccountId, Integer actorAccountId, Integer jobId, Integer proposalId, String jobTitle) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "PROPOSAL_UPDATED",
+                "Proposal đã được cập nhật",
+                "Chuyên gia đã cập nhật proposal cho dự án \"" + safeText(jobTitle, "không tên") + "\".",
+                "/business/jobs/" + jobId + "/proposals",
+                Map.of("jobId", jobId, "proposalId", proposalId)
+        );
+    }
+
     // Note: Hàm `notifyProfileReviewed` tạo thông báo tiếng Việt khi staff duyệt hoặc từ chối hồ sơ KYB/KYC.
     public void notifyProfileReviewed(Integer receiverAccountId, Integer actorAccountId, String profileType, String status) {
         boolean approved = "Approved".equalsIgnoreCase(status);
@@ -214,6 +238,30 @@ public class NotificationService {
                 message,
                 "/contracts/" + contractId,
                 Map.of("contractId", contractId)
+        );
+    }
+
+    public void notifyContractChangeRequested(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer requestId, String summary) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "CONTRACT_CHANGE_REQUESTED",
+                "Có yêu cầu chỉnh sửa hợp đồng",
+                "Bên còn lại đã gửi yêu cầu chỉnh sửa hợp đồng. Nội dung: " + safeText(summary, "không có mô tả") + ".",
+                "/contracts/" + contractId + "/change-requests/" + requestId,
+                Map.of("contractId", contractId, "requestId", requestId)
+        );
+    }
+
+    public void notifyContractChangeReviewed(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer requestId, boolean accepted) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                accepted ? "CONTRACT_CHANGE_ACCEPTED" : "CONTRACT_CHANGE_REJECTED",
+                accepted ? "Yêu cầu chỉnh sửa hợp đồng đã được chấp nhận" : "Yêu cầu chỉnh sửa hợp đồng bị từ chối",
+                accepted ? "Bên còn lại đã chấp nhận yêu cầu và hợp đồng đã được cập nhật." : "Bên còn lại đã từ chối yêu cầu chỉnh sửa hợp đồng.",
+                "/contracts/" + contractId + "/change-requests/" + requestId,
+                Map.of("contractId", contractId, "requestId", requestId, "accepted", accepted)
         );
     }
 
