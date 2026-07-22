@@ -7,6 +7,8 @@ package com.aitasker.be.controller.core;
 
 import com.aitasker.be.dto.sow.GenerateSowRequest;
 import com.aitasker.be.dto.sow.GenerateSowResponse;
+import com.aitasker.be.dto.sow.ReallocateSowBudgetRequest;
+import com.aitasker.be.dto.sow.ReallocateSowBudgetResponse;
 import com.aitasker.be.service.core.AiSowGenerationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,11 +31,21 @@ public class SowGenerationController {
     private final AiSowGenerationService aiSowGenerationService;
 
     // Note: Annotation này mô tả API trên Swagger để người test hiểu chức năng generate SoW.
-    @Operation(summary = "Generate SoW", description = "Generate structured SoW, milestones and milestone budgets from raw job requirements.")
+    @Operation(summary = "Generate SoW", description = "Generate structured SoW, milestones, Business-budget allocations, and an advisory AI budget assessment. Business remains the final budget authority.")
     // Note: Annotation này khai báo endpoint POST dùng để tạo SoW từ dữ liệu yêu cầu dự án.
     @PostMapping("/generate-sow")
     // Note: Hàm nhận request đã validate, chuyển qua service AI xử lý và trả response cho client.
     public GenerateSowResponse generateSow(@Valid @RequestBody GenerateSowRequest request) {
         return aiSowGenerationService.generateSow(request);
+    }
+
+    @Operation(
+            summary = "Reallocate custom SoW budget",
+            description = "Proportionally allocate a Business-selected custom whole-VND budget across generated milestones without calling AI or persisting data."
+    )
+    @PostMapping("/reallocate-sow-budget")
+    public ReallocateSowBudgetResponse reallocateSowBudget(
+            @Valid @RequestBody ReallocateSowBudgetRequest request) {
+        return aiSowGenerationService.reallocateSowBudget(request);
     }
 }

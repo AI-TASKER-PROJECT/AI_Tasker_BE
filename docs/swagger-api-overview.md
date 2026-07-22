@@ -2,9 +2,9 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **185**.
+- Tong so REST endpoint trong Swagger runtime: **200**.
 - Public endpoint: **21**.
-- Endpoint can Bearer JWT: **164**.
+- Endpoint can Bearer JWT: **179**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -74,12 +74,13 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 9 | GET | `/api/v1/jobs` | Public | Operation listJobs. |
 | 10 | POST | `/api/v1/jobs` | Bearer JWT | Operation createJob. |
 | 11 | POST | `/api/v1/jobs/{jobId}/publish` | Bearer JWT | Operation publishJob. |
-| 12 | POST | `/api/jobs/generate-sow` | Bearer JWT | Operation generateSow. |
-| 13 | PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Operation updateJobStatus. |
-| 14 | GET | `/api/v1/jobs/{jobId}/milestones` | Public | Operation listJobMilestones. |
-| 15 | GET | `/api/v1/jobs/my` | Bearer JWT | Operation listMyJobs. |
-| 16 | POST | `/api/v1/jobs/{jobId}/milestones` | Bearer JWT | Preferred job-scoped alias for creating a milestone. |
-| 17 | PATCH | `/api/v1/jobs/{jobId}/milestones/{milestoneId}` | Bearer JWT | Preferred job-scoped alias for updating a milestone. |
+| 12 | POST | `/api/jobs/generate-sow` | Bearer JWT | Generate SoW plus advisory budget range and Business/recommended milestone allocations; Business keeps final price authority. |
+| 13 | POST | `/api/jobs/reallocate-sow-budget` | Bearer JWT | Reallocate a Business-selected custom whole-VND budget across generated milestones without AI or persistence. |
+| 14 | PATCH | `/api/v1/jobs/{jobId}/status` | Bearer JWT | Operation updateJobStatus. |
+| 15 | GET | `/api/v1/jobs/{jobId}/milestones` | Public | Operation listJobMilestones. |
+| 16 | GET | `/api/v1/jobs/my` | Bearer JWT | Operation listMyJobs. |
+| 17 | POST | `/api/v1/jobs/{jobId}/milestones` | Bearer JWT | Preferred job-scoped alias for creating a milestone. |
+| 18 | PATCH | `/api/v1/jobs/{jobId}/milestones/{milestoneId}` | Bearer JWT | Preferred job-scoped alias for updating a milestone. |
 
 ## Proposal Flow
 
