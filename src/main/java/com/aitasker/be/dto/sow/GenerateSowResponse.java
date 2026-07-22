@@ -5,6 +5,7 @@
  */
 package com.aitasker.be.dto.sow;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,6 +24,8 @@ import java.util.List;
 public class GenerateSowResponse {
     private Boolean needMoreInfo;
     private List<String> questions;
+    @Schema(description = "Advisory full-scope budget comparison; Business keeps final authority.")
+    private BudgetAssessmentDto budgetAssessment;
     private SowDto sow;
     private List<MilestoneDto> milestones;
 }

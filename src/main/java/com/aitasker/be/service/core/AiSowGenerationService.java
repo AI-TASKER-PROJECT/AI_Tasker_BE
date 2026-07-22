@@ -8,9 +8,14 @@ package com.aitasker.be.service.core;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.BadGatewayException;
 import com.aitasker.be.config.OpenAiProperties;
+import com.aitasker.be.dto.sow.BudgetAssessmentDto;
 import com.aitasker.be.dto.sow.GenerateSowRequest;
 import com.aitasker.be.dto.sow.GenerateSowResponse;
+import com.aitasker.be.dto.sow.MilestoneBudgetAllocationDto;
+import com.aitasker.be.dto.sow.MilestoneBudgetReferenceDto;
 import com.aitasker.be.dto.sow.MilestoneDto;
+import com.aitasker.be.dto.sow.ReallocateSowBudgetRequest;
+import com.aitasker.be.dto.sow.ReallocateSowBudgetResponse;
 import com.aitasker.be.dto.sow.SowDto;
 import com.aitasker.be.service.ai.RagRetrievalService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -35,9 +40,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 // Note: Annotation này cho Spring quản lý class như một service nghiệp vụ.
@@ -46,6 +54,9 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class AiSowGenerationService {
     private static final String SYSTEM_MESSAGE = "Ban la Senior AI Solution Architect. Bat buoc tra ve JSON hop le, khong markdown, khong giai thich ngoai JSON.";
+    private static final BigDecimal DEFAULT_MIN_ESTIMATE_RATIO = new BigDecimal("0.80");
+    private static final BigDecimal DEFAULT_MAX_ESTIMATE_RATIO = new BigDecimal("1.20");
+    private static final int MAX_BUDGET_FACTORS = 8;
 
     private final RestTemplate restTemplate;
     private final OpenAiProperties openAiProperties;
@@ -112,6 +123,8 @@ public class AiSowGenerationService {
         normalizeAssumptions(response.getSow());
         response.getMilestones().forEach(this::normalizeAcceptanceCriteria);
         normalizeMilestoneDuration(response, request.getDuration(), request.getDurationUnit());
+        normalizeBudgetAssessment(response, request.getBudget());
+        normalizeMilestoneRecommendedBudget(response, response.getBudgetAssessment().getRecommendedBudget());
         normalizeMilestoneBudget(response, request.getBudget());
     }
 
@@ -209,12 +222,21 @@ public class AiSowGenerationService {
                    rieng gom cac dieu kien nghiem thu cu the, do duoc va phu hop
                    voi san pham ban giao cua milestone do. Khong dung catalog hoac
                    danh sach tieu chi mac dinh giong nhau cho moi milestone.
-                9. Neu du thong tin:
-                   - Viet Statement of Work chuyen nghiep.
-                   - Chia milestone.
-                   - Uoc luong thoi luong.
-                   - Phan bo ngan sach theo milestone.
-                """ + (recovery ? """
+                 9. Neu du thong tin:
+                    - Viet Statement of Work chuyen nghiep.
+                    - Chia milestone.
+                    - Uoc luong thoi luong.
+                    - Phan bo ngan sach theo milestone.
+                10. Uoc luong mot khoang ngan sach VND DOC LAP cho TOAN BO scope da
+                    generate. Khong copy, neo, scale hoac xem Budget Business nhap
+                    la gia thi truong. Budget Business chi de backend so sanh sau.
+                11. budgetAssessment phai co estimatedMin <= recommendedBudget <=
+                    estimatedMax, confidence LOW|MEDIUM|HIGH va toi da 8 factors
+                    ngan gon giai thich cac driver chinh cua gia.
+                12. Tong milestones[].budget phai bang budgetAssessment.recommendedBudget.
+                    Day la phan bo de xuat cho full scope, khong phai quyet dinh
+                    cuoi cung cua Business.
+                 """ + (recovery ? """
 
                         BUOC PHUC HOI NOI BO: Phan hinh truoc chi co questions va thieu
                         sow/milestones. Lan nay bat buoc sinh ngay SoW day du va
@@ -230,6 +252,14 @@ public class AiSowGenerationService {
                 {
                   "needMoreInfo": boolean,
                   "questions": ["string"],
+                  "budgetAssessment": {
+                    "currency": "VND",
+                    "estimatedMin": 80000000,
+                    "recommendedBudget": 100000000,
+                    "estimatedMax": 130000000,
+                    "confidence": "MEDIUM",
+                    "factors": ["string"]
+                  },
                   "sow": {
                     "title": "string",
                     "overview": "string",
@@ -256,7 +286,7 @@ public class AiSowGenerationService {
                 Input:
                 Project title: %s
                 Raw requirement: %s
-                Budget: %s
+                Business proposed budget: %s
                 Duration: %s %s
                 Support fields: %s
                 Required skills: %s
@@ -300,6 +330,7 @@ public class AiSowGenerationService {
             JsonNode responseNode = objectMapper.readTree(jsonPayload);
             normalizeStringListFields(responseNode);
             stripMilestoneGuidanceFromSow(responseNode);
+            normalizeBudgetAssessmentFields(responseNode);
             normalizeBudgetFields(responseNode);
             normalizeDurationFields(responseNode);
             return objectMapper.treeToValue(responseNode, GenerateSowResponse.class);
@@ -315,6 +346,11 @@ public class AiSowGenerationService {
         }
 
         normalizeArrayField(response, "questions");
+
+        JsonNode budgetAssessmentNode = response.get("budgetAssessment");
+        if (budgetAssessmentNode instanceof ObjectNode budgetAssessment) {
+            normalizeArrayField(budgetAssessment, "factors");
+        }
 
         JsonNode sowNode = response.get("sow");
         if (sowNode instanceof ObjectNode sow) {
@@ -511,6 +547,29 @@ public class AiSowGenerationService {
         }
     }
 
+    private void normalizeBudgetAssessmentFields(JsonNode responseNode) {
+        JsonNode assessmentNode = responseNode.get("budgetAssessment");
+        if (!(assessmentNode instanceof ObjectNode assessment)) {
+            return;
+        }
+        normalizeMoneyField(assessment, "estimatedMin");
+        normalizeMoneyField(assessment, "recommendedBudget");
+        normalizeMoneyField(assessment, "estimatedMax");
+    }
+
+    private void normalizeMoneyField(ObjectNode node, String fieldName) {
+        JsonNode value = node.get(fieldName);
+        if (value == null || !value.isTextual()) {
+            return;
+        }
+        String normalized = normalizeMoneyText(value.asText());
+        if (normalized.isBlank()) {
+            node.putNull(fieldName);
+        } else {
+            node.put(fieldName, new BigDecimal(normalized));
+        }
+    }
+
     private void normalizeDurationFields(JsonNode responseNode) {
         JsonNode milestonesNode = responseNode.get("milestones");
         if (!(milestonesNode instanceof ArrayNode milestones)) {
@@ -574,47 +633,276 @@ public class AiSowGenerationService {
     // Note: Hàm điều chỉnh tổng ngân sách các milestone khớp với ngân sách doanh nghiệp nhập.
     public void normalizeMilestoneBudget(GenerateSowResponse response, BigDecimal totalBudget) {
         List<MilestoneDto> milestones = response.getMilestones();
-        if (milestones == null || milestones.isEmpty()) {
+        if (milestones == null || milestones.isEmpty() || !isPositive(totalBudget)) {
             return;
         }
+        List<BigDecimal> normalized = normalizedMilestoneBudgetValues(milestones, totalBudget);
+        for (int i = 0; i < milestones.size(); i++) {
+            milestones.get(i).setBudget(normalized.get(i));
+        }
+    }
 
+    public ReallocateSowBudgetResponse reallocateSowBudget(ReallocateSowBudgetRequest request) {
+        if (request == null) {
+            throw new AppException("request khong duoc rong");
+        }
+        BigDecimal selectedBudget = requirePositiveWholeVnd(request.getSelectedBudget(), "selectedBudget");
+        List<MilestoneBudgetReferenceDto> requestMilestones = request.getMilestones();
+        if (requestMilestones == null || requestMilestones.isEmpty()) {
+            throw new AppException("milestones khong duoc rong");
+        }
+        if (requestMilestones.size() > 50) {
+            throw new AppException("milestones khong duoc vuot qua 50 phan tu");
+        }
+
+        Set<Integer> seenIndexes = new HashSet<>();
+        List<MilestoneBudgetReferenceDto> milestones = new ArrayList<>();
+        for (MilestoneBudgetReferenceDto milestone : requestMilestones) {
+            if (milestone == null || milestone.getMilestoneIndex() == null
+                    || milestone.getMilestoneIndex() < 0) {
+                throw new AppException("milestoneIndex khong hop le");
+            }
+            if (!seenIndexes.add(milestone.getMilestoneIndex())) {
+                throw new AppException("milestoneIndex bi trung: " + milestone.getMilestoneIndex());
+            }
+            milestones.add(MilestoneBudgetReferenceDto.builder()
+                    .milestoneIndex(milestone.getMilestoneIndex())
+                    .referenceBudget(requirePositiveWholeVnd(
+                            milestone.getReferenceBudget(), "referenceBudget"))
+                    .build());
+        }
+        milestones.sort(Comparator.comparing(MilestoneBudgetReferenceDto::getMilestoneIndex));
+
+        BigDecimal referenceTotal = milestones.stream()
+                .map(MilestoneBudgetReferenceDto::getReferenceBudget)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal allocated = BigDecimal.ZERO;
+        List<MilestoneBudgetAllocationDto> allocations = new ArrayList<>();
+        for (int i = 0; i < milestones.size(); i++) {
+            MilestoneBudgetReferenceDto milestone = milestones.get(i);
+            BigDecimal fundsAllocated;
+            if (i == milestones.size() - 1) {
+                fundsAllocated = selectedBudget.subtract(allocated);
+            } else {
+                fundsAllocated = milestone.getReferenceBudget()
+                        .multiply(selectedBudget)
+                        .divide(referenceTotal, 0, RoundingMode.DOWN);
+                allocated = allocated.add(fundsAllocated);
+            }
+            allocations.add(MilestoneBudgetAllocationDto.builder()
+                    .milestoneIndex(milestone.getMilestoneIndex())
+                    .referenceBudget(milestone.getReferenceBudget())
+                    .fundsAllocated(fundsAllocated)
+                    .build());
+        }
+
+        BigDecimal allocationTotal = allocations.stream()
+                .map(MilestoneBudgetAllocationDto::getFundsAllocated)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (allocationTotal.compareTo(selectedBudget) != 0) {
+            throw new AppException("Tong milestone khong khop selectedBudget");
+        }
+        return ReallocateSowBudgetResponse.builder()
+                .currency("VND")
+                .selectedBudget(selectedBudget)
+                .allocationTotal(allocationTotal)
+                .allocations(allocations)
+                .build();
+    }
+
+    public void normalizeBudgetAssessment(GenerateSowResponse response, BigDecimal businessBudget) {
+        BudgetAssessmentDto providerAssessment = response.getBudgetAssessment();
+        boolean hasProviderRecommendation = providerAssessment != null
+                && isPositive(providerAssessment.getRecommendedBudget());
+        BigDecimal milestoneFallback = sumValidMilestoneBudgets(response.getMilestones());
+
+        BigDecimal recommended;
+        String source;
+        if (hasProviderRecommendation) {
+            recommended = roundVnd(providerAssessment.getRecommendedBudget());
+            source = "AI_ADVISORY";
+        } else if (isPositive(milestoneFallback)) {
+            recommended = roundVnd(milestoneFallback);
+            source = "AI_MILESTONE_FALLBACK";
+        } else {
+            recommended = roundVnd(businessBudget);
+            source = "BUSINESS_BUDGET_FALLBACK";
+        }
+
+        boolean repairedRange = false;
+        BigDecimal estimatedMin = providerAssessment == null ? null : providerAssessment.getEstimatedMin();
+        if (!isPositive(estimatedMin) || estimatedMin.compareTo(recommended) > 0) {
+            estimatedMin = recommended.multiply(DEFAULT_MIN_ESTIMATE_RATIO);
+            repairedRange = true;
+        }
+        estimatedMin = roundVnd(estimatedMin);
+
+        BigDecimal estimatedMax = providerAssessment == null ? null : providerAssessment.getEstimatedMax();
+        if (!isPositive(estimatedMax) || estimatedMax.compareTo(recommended) < 0) {
+            estimatedMax = recommended.multiply(DEFAULT_MAX_ESTIMATE_RATIO);
+            repairedRange = true;
+        }
+        estimatedMax = roundVnd(estimatedMax);
+
+        String confidence = normalizeConfidence(providerAssessment == null ? null : providerAssessment.getConfidence());
+        if (!hasProviderRecommendation || repairedRange) {
+            confidence = "LOW";
+        }
+
+        BigDecimal normalizedBusinessBudget = roundVnd(businessBudget);
+        String status = budgetStatus(normalizedBusinessBudget, estimatedMin, recommended, estimatedMax);
+        BigDecimal gapToMinimum = estimatedMin.subtract(normalizedBusinessBudget).max(BigDecimal.ZERO);
+
+        response.setBudgetAssessment(BudgetAssessmentDto.builder()
+                .currency("VND")
+                .businessBudget(normalizedBusinessBudget)
+                .estimatedMin(estimatedMin)
+                .recommendedBudget(recommended)
+                .estimatedMax(estimatedMax)
+                .status(status)
+                .gapToMinimum(gapToMinimum)
+                .confidence(confidence)
+                .source(source)
+                .requiresBusinessConfirmation(Boolean.TRUE)
+                .message(budgetMessage(status))
+                .factors(cleanBudgetFactors(providerAssessment == null ? null : providerAssessment.getFactors()))
+                .build());
+    }
+
+    private void normalizeMilestoneRecommendedBudget(GenerateSowResponse response, BigDecimal recommendedTotal) {
+        List<MilestoneDto> milestones = response.getMilestones();
+        if (milestones == null || milestones.isEmpty() || !isPositive(recommendedTotal)) {
+            return;
+        }
+        List<BigDecimal> normalized = normalizedMilestoneBudgetValues(milestones, recommendedTotal);
+        for (int i = 0; i < milestones.size(); i++) {
+            milestones.get(i).setRecommendedBudget(normalized.get(i));
+        }
+    }
+
+    private List<BigDecimal> normalizedMilestoneBudgetValues(List<MilestoneDto> milestones, BigDecimal totalBudget) {
         boolean hasInvalidBudget = milestones.stream()
                 .anyMatch(milestone -> milestone.getBudget() == null || milestone.getBudget().compareTo(BigDecimal.ZERO) < 0);
-
         if (hasInvalidBudget) {
-            distributeEqually(milestones, totalBudget);
-            return;
+            return equalBudgetValues(milestones.size(), totalBudget);
         }
 
         BigDecimal currentTotal = milestones.stream()
                 .map(MilestoneDto::getBudget)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
         if (currentTotal.compareTo(BigDecimal.ZERO) <= 0) {
-            distributeEqually(milestones, totalBudget);
-            return;
+            return equalBudgetValues(milestones.size(), totalBudget);
         }
-
         if (currentTotal.compareTo(totalBudget) == 0) {
-            return;
+            return milestones.stream().map(MilestoneDto::getBudget).toList();
         }
 
+        List<BigDecimal> normalized = new ArrayList<>();
         BigDecimal allocated = BigDecimal.ZERO;
         for (int i = 0; i < milestones.size(); i++) {
-            MilestoneDto milestone = milestones.get(i);
-            BigDecimal normalizedBudget;
-
+            BigDecimal value;
             if (i == milestones.size() - 1) {
-                normalizedBudget = totalBudget.subtract(allocated);
+                value = totalBudget.subtract(allocated);
             } else {
-                normalizedBudget = milestone.getBudget()
+                value = milestones.get(i).getBudget()
                         .multiply(totalBudget)
                         .divide(currentTotal, 0, RoundingMode.HALF_UP);
-                allocated = allocated.add(normalizedBudget);
+                allocated = allocated.add(value);
             }
-
-            milestone.setBudget(normalizedBudget);
+            normalized.add(value);
         }
+        return normalized;
+    }
+
+    private List<BigDecimal> equalBudgetValues(int size, BigDecimal totalBudget) {
+        BigDecimal baseBudget = totalBudget.divide(BigDecimal.valueOf(size), 0, RoundingMode.DOWN);
+        List<BigDecimal> values = new ArrayList<>();
+        BigDecimal allocated = BigDecimal.ZERO;
+        for (int i = 0; i < size; i++) {
+            BigDecimal value = i == size - 1 ? totalBudget.subtract(allocated) : baseBudget;
+            values.add(value);
+            allocated = allocated.add(value);
+        }
+        return values;
+    }
+
+    private BigDecimal sumValidMilestoneBudgets(List<MilestoneDto> milestones) {
+        if (milestones == null || milestones.isEmpty()
+                || milestones.stream().anyMatch(item -> item == null || !isPositive(item.getBudget()))) {
+            return null;
+        }
+        return milestones.stream().map(MilestoneDto::getBudget).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private boolean isPositive(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private BigDecimal requirePositiveWholeVnd(BigDecimal value, String fieldName) {
+        if (!isPositive(value) || value.stripTrailingZeros().scale() > 0) {
+            throw new AppException(fieldName + " phai la so VND nguyen lon hon 0");
+        }
+        return value.setScale(0, RoundingMode.UNNECESSARY);
+    }
+
+    private BigDecimal roundVnd(BigDecimal value) {
+        if (!isPositive(value)) {
+            return BigDecimal.ONE;
+        }
+        return value.setScale(0, RoundingMode.HALF_UP).max(BigDecimal.ONE);
+    }
+
+    private String normalizeConfidence(String value) {
+        if (value == null) {
+            return "LOW";
+        }
+        String normalized = value.trim().toUpperCase(java.util.Locale.ROOT);
+        return switch (normalized) {
+            case "LOW", "MEDIUM", "HIGH" -> normalized;
+            default -> "LOW";
+        };
+    }
+
+    private List<String> cleanBudgetFactors(List<String> factors) {
+        if (factors == null || factors.isEmpty()) {
+            return new ArrayList<>();
+        }
+        LinkedHashMap<String, String> unique = new LinkedHashMap<>();
+        for (String factor : factors) {
+            if (factor == null || factor.isBlank()) {
+                continue;
+            }
+            String trimmed = factor.trim();
+            unique.putIfAbsent(trimmed.toLowerCase(java.util.Locale.ROOT), trimmed);
+            if (unique.size() == MAX_BUDGET_FACTORS) {
+                break;
+            }
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private String budgetStatus(BigDecimal businessBudget, BigDecimal estimatedMin,
+                                BigDecimal recommended, BigDecimal estimatedMax) {
+        if (businessBudget.compareTo(estimatedMin) < 0) {
+            return "TOO_LOW";
+        }
+        if (businessBudget.compareTo(recommended) < 0) {
+            return "LOW";
+        }
+        if (businessBudget.compareTo(estimatedMax) <= 0) {
+            return "SUITABLE";
+        }
+        return "HIGH";
+    }
+
+    private String budgetMessage(String status) {
+        return switch (status) {
+            case "TOO_LOW" -> "Ngân sách Business nhập thấp hơn mức tối thiểu AI ước tính cho toàn bộ phạm vi.";
+            case "LOW" -> "Ngân sách Business nhập nằm trong khoảng ước tính nhưng thấp hơn mức AI đề xuất.";
+            case "SUITABLE" -> "Ngân sách Business nhập phù hợp với khoảng AI ước tính.";
+            case "HIGH" -> "Ngân sách Business nhập cao hơn khoảng AI ước tính; Business vẫn có quyền giữ nguyên.";
+            default -> "AI đã tạo ước tính tham khảo; Business cần xác nhận ngân sách cuối cùng.";
+        };
     }
 
     public void normalizeMilestoneDuration(GenerateSowResponse response, Integer totalDuration, String durationUnit) {
@@ -763,20 +1051,6 @@ public class AiSowGenerationService {
         }
 
         return text;
-    }
-
-    // Note: Hàm chia đều ngân sách khi AI không trả budget hợp lệ cho milestone.
-    private void distributeEqually(List<MilestoneDto> milestones, BigDecimal totalBudget) {
-        BigDecimal baseBudget = totalBudget.divide(BigDecimal.valueOf(milestones.size()), 0, RoundingMode.DOWN);
-        BigDecimal allocated = BigDecimal.ZERO;
-
-        for (int i = 0; i < milestones.size(); i++) {
-            BigDecimal milestoneBudget = i == milestones.size() - 1
-                    ? totalBudget.subtract(allocated)
-                    : baseBudget;
-            milestones.get(i).setBudget(milestoneBudget);
-            allocated = allocated.add(milestoneBudget);
-        }
     }
 
     private void distributeDurationEqually(List<MilestoneDto> milestones, Integer totalDuration, String durationUnit) {

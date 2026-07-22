@@ -600,17 +600,59 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### POST `/api/jobs/generate-sow`
 - OperationId: `generateSow`
 - Auth: Bearer JWT
-- Giai thich: Generate SoW
+- Giai thich: Generate SoW, danh gia khoang ngan sach AI tham khao va tra ca phan bo theo budget Business/de xuat. Business van la nguoi chot gia.
 - Params: Khong co.
 - Body raw:
 ```json
-{ "schema": "GenerateSowRequest" }
+{
+  "projectTitle": "RAG customer support bot",
+  "rawRequirement": "Chatbot tra loi san pham, tra cuu don hang va chuyen tiep nhan vien",
+  "budget": 50000000,
+  "duration": 10,
+  "durationUnit": "WEEK",
+  "supportFields": ["Generative AI Applications"],
+  "requiredSkills": ["RAG", "API Integration"]
+}
 ```
+- Response can kiem tra:
+  - `budgetAssessment.businessBudget` bang dung budget request.
+  - `budgetAssessment.estimatedMin <= recommendedBudget <= estimatedMax`.
+  - `budgetAssessment.status` thuoc `TOO_LOW|LOW|SUITABLE|HIGH`.
+  - Tong `milestones[].budget` bang `businessBudget`.
+  - Tong `milestones[].recommendedBudget` bang `recommendedBudget`.
+  - `requiresBusinessConfirmation=true`; backend khong tu ghi de gia Business.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/jobs/reallocate-sow-budget`
+- OperationId: `reallocateSowBudget`
+- Auth: Bearer JWT
+- Giai thich: Chia lai milestone theo gia tuy chinh do Business chot; khong goi AI, khong tao Job va khong ghi database.
+- Params: Khong co.
+- Body raw:
+```json
+{
+  "selectedBudget": 110000000,
+  "milestones": [
+    { "milestoneIndex": 0, "referenceBudget": 40000000 },
+    { "milestoneIndex": 1, "referenceBudget": 100000000 }
+  ]
+}
+```
+- Response can kiem tra:
+  - `currency=VND`.
+  - `allocationTotal` bang chinh xac `selectedBudget`.
+  - Ket qua sap xep theo `milestoneIndex`, khong phu thuoc thu tu request.
+  - Frontend map `allocations[].fundsAllocated` vao milestone cung index.
+  - `milestoneIndex` phai duy nhat; budget/reference phai la so VND nguyen duong.
+- Ma phan hoi thuong gap:
+  - `200`: Phan bo thanh cong.
+  - `400`: Budget/reference khong hop le, milestones rong/qua 50, hoac trung `milestoneIndex`.
+  - `401`/`403`: Sai token, het han token hoac sai quyen truy cap.
+  - `500`: Loi he thong; doi chieu log backend.
 
 ### PATCH `/api/v1/jobs/{jobId}/status`
 - OperationId: `updateJobStatus`

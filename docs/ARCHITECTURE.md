@@ -404,6 +404,15 @@ services/config:
 
 - OpenAI configuration is environment-driven.
 - SoW generation uses prompt/RAG knowledge under `src/main/resources/knowledge`.
+- SoW generation returns a response-only advisory VND budget assessment. The
+  backend normalizes range/status/fallback semantics, preserves the
+  Business-entered amount, and returns separate Business and recommended
+  milestone allocations. Business selection, Expert bid, and accepted contract
+  pricing remain separate authorities; AI estimates are not persisted.
+- Custom SoW budget allocation is a stateless backend calculation at
+  `POST /api/jobs/reallocate-sow-budget`. It uses AI-recommended milestone
+  amounts only as proportional weights, returns an exact whole-VND total, and
+  does not call OpenAI or cross the Job persistence boundary.
 - `knowledge_chunks` supports RAG-style storage.
 - File uploads/view URLs are Firebase-backed where enabled.
 - Request DTOs should parse and validate user input before service logic.

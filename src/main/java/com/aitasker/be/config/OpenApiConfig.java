@@ -109,6 +109,7 @@ public class OpenApiConfig {
         }
 
         if (path.equals("/api/jobs/generate-sow")
+                || path.equals("/api/jobs/reallocate-sow-budget")
                 || path.equals("/api/v1/jobs")
                 || path.equals("/api/v1/jobs/my")
                 || path.equals("/api/v1/jobs/{jobId}")
