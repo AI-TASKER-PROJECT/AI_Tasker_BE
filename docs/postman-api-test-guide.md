@@ -620,7 +620,10 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `budgetAssessment.status` thuoc `TOO_LOW|LOW|SUITABLE|HIGH`.
   - Tong `milestones[].budget` bang `businessBudget`.
   - Tong `milestones[].recommendedBudget` bang `recommendedBudget`.
-  - `requiresBusinessConfirmation=true`; backend khong tu ghi de gia Business.
+  - `requiresBusinessConfirmation=false` only for `HIGH`; otherwise `true`.
+    Backend never overwrites the Business amount.
+  - Bare AI values `80/100/130` are normalized to full VND
+    `80000000/100000000/130000000` before status comparison.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.

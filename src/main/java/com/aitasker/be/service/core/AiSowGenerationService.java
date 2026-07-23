@@ -56,6 +56,10 @@ public class AiSowGenerationService {
     private static final String SYSTEM_MESSAGE = "Ban la Senior AI Solution Architect. Bat buoc tra ve JSON hop le, khong markdown, khong giai thich ngoai JSON.";
     private static final BigDecimal DEFAULT_MIN_ESTIMATE_RATIO = new BigDecimal("0.80");
     private static final BigDecimal DEFAULT_MAX_ESTIMATE_RATIO = new BigDecimal("1.20");
+    private static final BigDecimal ONE_MILLION = new BigDecimal("1000000");
+    private static final BigDecimal ONE_BILLION = new BigDecimal("1000000000");
+    private static final BigDecimal MAX_ABBREVIATED_MILLION_VALUE = new BigDecimal("10000");
+    private static final Pattern MONEY_NUMBER_PATTERN = Pattern.compile("[-+]?\\d+(?:[.,]\\d+)*");
     private static final int MAX_BUDGET_FACTORS = 8;
 
     private final RestTemplate restTemplate;
@@ -228,14 +232,21 @@ public class AiSowGenerationService {
                     - Uoc luong thoi luong.
                     - Phan bo ngan sach theo milestone.
                 10. Uoc luong mot khoang ngan sach VND DOC LAP cho TOAN BO scope da
-                    generate. Khong copy, neo, scale hoac xem Budget Business nhap
-                    la gia thi truong. Budget Business chi de backend so sanh sau.
+                    generate. Tu tinh gia dua tren do phuc tap scope, thoi luong,
+                    vai tro va cong suc can thiet, tich hop, du lieu, kiem thu,
+                    bao mat, ha tang, trien khai va du phong rui ro. Cac du an khac
+                    nhau ve nhung yeu to nay phai co khoang gia khac nhau ro rang.
+                    Khong suy doan, copy, neo hoac scale theo ngan sach Business;
+                    ngan sach Business khong duoc cung cap cho model.
                 11. budgetAssessment phai co estimatedMin <= recommendedBudget <=
                     estimatedMax, confidence LOW|MEDIUM|HIGH va toi da 8 factors
                     ngan gon giai thich cac driver chinh cua gia.
                 12. Tong milestones[].budget phai bang budgetAssessment.recommendedBudget.
                     Day la phan bo de xuat cho full scope, khong phai quyet dinh
                     cuoi cung cua Business.
+                13. Tat ca field tien phai la JSON number, so nguyen VND day du
+                    va lon hon 0. Khong viet dang rut gon, khong kem don vi tien
+                    trong gia tri va khong sao chep gia tu schema.
                  """ + (recovery ? """
 
                         BUOC PHUC HOI NOI BO: Phan hinh truoc chi co questions va thieu
@@ -248,45 +259,61 @@ public class AiSowGenerationService {
 
                 Bat buoc tra ve JSON hop le, khong markdown, khong giai thich ngoai JSON.
 
-                JSON schema bat buoc:
+                JSON schema bat buoc (day la hop dong kieu du lieu, KHONG phai
+                du lieu mau va khong chua bat ky muc gia goi y nao):
                 {
-                  "needMoreInfo": boolean,
-                  "questions": ["string"],
-                  "budgetAssessment": {
-                    "currency": "VND",
-                    "estimatedMin": 80000000,
-                    "recommendedBudget": 100000000,
-                    "estimatedMax": 130000000,
-                    "confidence": "MEDIUM",
-                    "factors": ["string"]
-                  },
-                  "sow": {
-                    "title": "string",
-                    "overview": "string",
-                    "objectives": ["string"],
-                    "scopeOfWork": ["string"],
-                    "deliverables": ["string"],
-                    "assumptions": ["string"],
-                    "outOfScope": ["string"]
-                  },
-                  "milestones": [
-                    {
-                      "name": "string",
-                      "description": "string",
-                      "duration": 1,
-                      "durationUnit": "tuan",
-                      "budget": 30000000,
-                      "acceptanceCriteria": [
-                        "string"
-                      ]
+                  "type": "object",
+                  "required": ["needMoreInfo", "questions", "budgetAssessment", "sow", "milestones"],
+                  "properties": {
+                    "needMoreInfo": {"type": "boolean"},
+                    "questions": {"type": "array", "items": {"type": "string"}},
+                    "budgetAssessment": {
+                      "type": "object",
+                      "required": ["currency", "estimatedMin", "recommendedBudget", "estimatedMax", "confidence", "factors"],
+                      "properties": {
+                        "currency": {"type": "string", "const": "VND"},
+                        "estimatedMin": {"type": "integer", "minimum": 1},
+                        "recommendedBudget": {"type": "integer", "minimum": 1},
+                        "estimatedMax": {"type": "integer", "minimum": 1},
+                        "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+                        "factors": {"type": "array", "items": {"type": "string"}}
+                      }
+                    },
+                    "sow": {
+                      "type": "object",
+                      "required": ["title", "overview", "objectives", "scopeOfWork", "deliverables", "assumptions", "outOfScope"],
+                      "properties": {
+                        "title": {"type": "string"},
+                        "overview": {"type": "string"},
+                        "objectives": {"type": "array", "items": {"type": "string"}},
+                        "scopeOfWork": {"type": "array", "items": {"type": "string"}},
+                        "deliverables": {"type": "array", "items": {"type": "string"}},
+                        "assumptions": {"type": "array", "items": {"type": "string"}},
+                        "outOfScope": {"type": "array", "items": {"type": "string"}}
+                      }
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "required": ["name", "description", "duration", "durationUnit", "budget", "acceptanceCriteria"],
+                        "properties": {
+                          "name": {"type": "string"},
+                          "description": {"type": "string"},
+                          "duration": {"type": "integer", "minimum": 1},
+                          "durationUnit": {"type": "string"},
+                          "budget": {"type": "integer", "minimum": 1},
+                          "acceptanceCriteria": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+                        }
+                      }
                     }
-                  ]
+                  }
                 }
 
                 Input:
                 Project title: %s
                 Raw requirement: %s
-                Business proposed budget: %s
                 Duration: %s %s
                 Support fields: %s
                 Required skills: %s
@@ -296,7 +323,6 @@ public class AiSowGenerationService {
                 clarificationInstruction(request),
                 request.getProjectTitle(),
                 request.getRawRequirement(),
-                request.getBudget(),
                 request.getDuration(),
                 request.getDurationUnit(),
                 defaultList(request.getSupportFields()),
@@ -583,7 +609,7 @@ public class AiSowGenerationService {
 
             JsonNode durationNode = milestone.get("duration");
             if (durationNode != null && durationNode.isTextual()) {
-                String normalizedDuration = normalizeMoneyText(durationNode.asText());
+                String normalizedDuration = normalizeIntegerText(durationNode.asText());
                 if (normalizedDuration.isBlank()) {
                     milestone.putNull("duration");
                 } else {
@@ -598,11 +624,60 @@ public class AiSowGenerationService {
             return "";
         }
 
+        String normalizedUnitText = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase();
+        BigDecimal multiplier = null;
+        if (normalizedUnitText.matches(".*(?:trieu|million|\\d\\s*tr\\b).*")) {
+            multiplier = ONE_MILLION;
+        } else if (normalizedUnitText.matches(".*(?:\\bty\\b|billion).*")) {
+            multiplier = ONE_BILLION;
+        }
+
+        if (multiplier != null) {
+            var matcher = MONEY_NUMBER_PATTERN.matcher(normalizedUnitText);
+            if (!matcher.find()) {
+                return "";
+            }
+            BigDecimal abbreviatedAmount = parseAbbreviatedMoneyNumber(matcher.group());
+            return abbreviatedAmount.multiply(multiplier)
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .toPlainString();
+        }
+
+        return normalizeIntegerText(value);
+    }
+
+    private String normalizeIntegerText(String value) {
         String digits = value.replaceAll("[^0-9-]", "");
         if (digits.equals("-")) {
             return "";
         }
         return digits;
+    }
+
+    private BigDecimal parseAbbreviatedMoneyNumber(String value) {
+        int lastComma = value.lastIndexOf(',');
+        int lastDot = value.lastIndexOf('.');
+        if (lastComma >= 0 && lastDot >= 0) {
+            int decimalSeparator = Math.max(lastComma, lastDot);
+            String integerPart = value.substring(0, decimalSeparator).replaceAll("[.,]", "");
+            String decimalPart = value.substring(decimalSeparator + 1);
+            return new BigDecimal(integerPart + "." + decimalPart);
+        }
+
+        int separator = Math.max(lastComma, lastDot);
+        if (separator < 0) {
+            return new BigDecimal(value);
+        }
+
+        char separatorChar = value.charAt(separator);
+        long separatorCount = value.chars().filter(character -> character == separatorChar).count();
+        int trailingDigits = value.length() - separator - 1;
+        if (separatorCount == 1 && trailingDigits > 0 && trailingDigits <= 2) {
+            return new BigDecimal(value.replace(separatorChar, '.'));
+        }
+        return new BigDecimal(value.replace(String.valueOf(separatorChar), ""));
     }
 
     // Note: Hàm tách phần JSON thật từ response AI, kể cả khi AI bọc trong markdown code block.
@@ -712,9 +787,14 @@ public class AiSowGenerationService {
 
     public void normalizeBudgetAssessment(GenerateSowResponse response, BigDecimal businessBudget) {
         BudgetAssessmentDto providerAssessment = response.getBudgetAssessment();
+        boolean repairedMoneyScale = normalizeAbbreviatedProviderMoney(providerAssessment);
         boolean hasProviderRecommendation = providerAssessment != null
                 && isPositive(providerAssessment.getRecommendedBudget());
         BigDecimal milestoneFallback = sumValidMilestoneBudgets(response.getMilestones());
+        if (!hasProviderRecommendation && isAbbreviatedMillionValue(milestoneFallback)) {
+            milestoneFallback = milestoneFallback.multiply(ONE_MILLION);
+            repairedMoneyScale = true;
+        }
 
         BigDecimal recommended;
         String source;
@@ -725,8 +805,7 @@ public class AiSowGenerationService {
             recommended = roundVnd(milestoneFallback);
             source = "AI_MILESTONE_FALLBACK";
         } else {
-            recommended = roundVnd(businessBudget);
-            source = "BUSINESS_BUDGET_FALLBACK";
+            throw new AppException("AI response thieu uoc luong ngan sach hop le");
         }
 
         boolean repairedRange = false;
@@ -745,7 +824,7 @@ public class AiSowGenerationService {
         estimatedMax = roundVnd(estimatedMax);
 
         String confidence = normalizeConfidence(providerAssessment == null ? null : providerAssessment.getConfidence());
-        if (!hasProviderRecommendation || repairedRange) {
+        if (!hasProviderRecommendation || repairedRange || repairedMoneyScale) {
             confidence = "LOW";
         }
 
@@ -763,10 +842,31 @@ public class AiSowGenerationService {
                 .gapToMinimum(gapToMinimum)
                 .confidence(confidence)
                 .source(source)
-                .requiresBusinessConfirmation(Boolean.TRUE)
+                .requiresBusinessConfirmation(!"HIGH".equals(status))
                 .message(budgetMessage(status))
                 .factors(cleanBudgetFactors(providerAssessment == null ? null : providerAssessment.getFactors()))
                 .build());
+    }
+
+    private boolean normalizeAbbreviatedProviderMoney(BudgetAssessmentDto assessment) {
+        if (assessment == null || !isAbbreviatedMillionValue(assessment.getRecommendedBudget())) {
+            return false;
+        }
+
+        assessment.setRecommendedBudget(assessment.getRecommendedBudget().multiply(ONE_MILLION));
+        if (isAbbreviatedMillionValue(assessment.getEstimatedMin())) {
+            assessment.setEstimatedMin(assessment.getEstimatedMin().multiply(ONE_MILLION));
+        }
+        if (isAbbreviatedMillionValue(assessment.getEstimatedMax())) {
+            assessment.setEstimatedMax(assessment.getEstimatedMax().multiply(ONE_MILLION));
+        }
+        return true;
+    }
+
+    private boolean isAbbreviatedMillionValue(BigDecimal value) {
+        return isPositive(value)
+                && value.stripTrailingZeros().scale() <= 0
+                && value.compareTo(MAX_ABBREVIATED_MILLION_VALUE) <= 0;
     }
 
     private void normalizeMilestoneRecommendedBudget(GenerateSowResponse response, BigDecimal recommendedTotal) {
@@ -1011,7 +1111,7 @@ public class AiSowGenerationService {
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model", openAiProperties.getModel());
         requestBody.put("messages", List.of(systemMessage, userMessage));
-        requestBody.put("temperature", 0.2);
+        requestBody.put("temperature", 0.1);
         requestBody.put("response_format", responseFormat);
         return requestBody;
     }

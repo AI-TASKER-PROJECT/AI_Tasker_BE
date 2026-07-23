@@ -64,3 +64,9 @@ Tradeoffs:
 - Measure advisory estimate accuracy before adding historical calibration.
 - Consider a versioned `job_budget_estimates` table only when audit or analytics
   becomes a product requirement.
+
+## Amendment
+
+Decision 0042 keeps the same pricing-authority boundary but changes Create Job
+presentation: AI recommendation is read-only, and the advisory card is hidden
+for `HIGH` after provider money scale normalization.

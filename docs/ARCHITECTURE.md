@@ -420,6 +420,9 @@ services/config:
   Business-entered amount, and returns separate Business and recommended
   milestone allocations. Business selection, Expert bid, and accepted contract
   pricing remain separate authorities; AI estimates are not persisted.
+  Abbreviated bare provider amounts are expanded to full VND before status
+  comparison, and a `HIGH` assessment is not shown as a recommendation because
+  the higher Business amount remains authoritative.
 - Custom SoW budget allocation is a stateless backend calculation at
   `POST /api/jobs/reallocate-sow-budget`. It uses AI-recommended milestone
   amounts only as proportional weights, returns an exact whole-VND total, and

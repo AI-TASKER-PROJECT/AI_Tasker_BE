@@ -6,8 +6,13 @@ Checklist triển khai frontend: [frontend-ai-sow-budget-change-guide.md](fronte
 
 `POST /api/jobs/generate-sow` returns an advisory AI price range for the full
 generated scope. The estimate never overwrites the amount entered by Business.
-Business must explicitly keep the entered amount, use the recommendation, or
-enter a different custom amount before creating the draft job.
+The pricing prompt does not contain the Business-entered amount or any sample
+price. AI derives the range from project scope, duration, required roles,
+integrations, data, testing, security, infrastructure, deployment, and risk.
+The recommendation is read-only. Business may keep the entered amount or enter
+a different custom amount before creating the draft job. When the entered
+amount is above the full AI range (`status=HIGH`), frontend hides the advisory
+card and keeps the Business amount without requiring a second confirmation.
 
 The estimate is response-only in this release. No estimate or confirmation
 choice is stored in the database.
@@ -43,8 +48,8 @@ price.
 | `status` | enum | yes | Drives badge, warning color, and default CTA copy. |
 | `gapToMinimum` | number | yes | Amount missing to reach `estimatedMin`; otherwise `0`. |
 | `confidence` | enum | yes | `LOW`, `MEDIUM`, or `HIGH`; display as estimate confidence. |
-| `source` | enum | yes | Shows whether the provider estimate or a safe fallback produced the range. |
-| `requiresBusinessConfirmation` | boolean | yes | Always `true`; keep confirmation UI visible. |
+| `source` | enum | yes | Shows whether the top-level AI estimate or the AI milestone total produced the range. |
+| `requiresBusinessConfirmation` | boolean | yes | `false` for `HIGH`; otherwise `true`. |
 | `message` | string | yes | Backend-owned Vietnamese explanation for the current status. |
 | `factors` | string[] | yes | Short list of price drivers such as integrations, data work, or deployment. |
 
@@ -53,7 +58,24 @@ price.
 | Field | Meaning when creating the Job |
 | --- | --- |
 | `budget` | Allocation whose total equals `budgetAssessment.businessBudget`. Use when Business keeps the entered amount. |
-| `recommendedBudget` | Allocation whose total equals `budgetAssessment.recommendedBudget`. Use when Business accepts the AI recommendation. |
+| `recommendedBudget` | Advisory allocation whose total equals `budgetAssessment.recommendedBudget`; use only as the proportional reference for custom reallocation. |
+
+`recommendedBudget` is advisory and is used as a proportional reference for
+custom reallocation. It is not assigned directly as the authoritative Job
+budget by the Create Job UI.
+
+## VND Scale Normalization
+
+All returned money fields are full, whole VND amounts. The prompt uses only
+integer type constraints and deliberately contains no sample price. Text
+amounts returned by an untrusted provider are still parsed into full VND.
+
+OpenAI output is untrusted. If it returns a bare whole-number recommendation
+from `1` through `10000`, the backend treats it as abbreviated millions before
+range comparison. For example, `estimatedMin=80`,
+`recommendedBudget=100`, and `estimatedMax=130` become `80000000`,
+`100000000`, and `130000000`. Confidence is lowered to `LOW` because the
+backend repaired the provider's unit scale.
 
 ## Custom Budget Reallocation API
 
@@ -117,7 +139,7 @@ Frontend maps each returned `fundsAllocated` back to the generated milestone by
 | `TOO_LOW` | `businessBudget < estimatedMin` | Red warning; show `gapToMinimum`; emphasize "Use AI recommendation" but keep both choices enabled. |
 | `LOW` | `estimatedMin <= businessBudget < recommendedBudget` | Amber warning; explain the amount is inside the range but below recommendation. |
 | `SUITABLE` | `recommendedBudget <= businessBudget <= estimatedMax` | Green/neutral state; allow either choice without warning. |
-| `HIGH` | `businessBudget > estimatedMax` | Informational state; Business may still keep the higher amount. |
+| `HIGH` | `businessBudget > estimatedMax` | Hide the advisory card and keep the higher Business amount. |
 
 ## Source Table
 
@@ -125,16 +147,19 @@ Frontend maps each returned `fundsAllocated` back to the generated milestone by
 | --- | --- | --- |
 | `AI_ADVISORY` | OpenAI returned a positive recommendation; backend normalized the range. | Display returned confidence. |
 | `AI_MILESTONE_FALLBACK` | Top-level recommendation was missing, so backend used the valid raw AI milestone total. | Display low-confidence notice. |
-| `BUSINESS_BUDGET_FALLBACK` | AI returned no usable price amounts; backend used the Business amount to keep the response usable. | Display low-confidence notice and do not present it as a market estimate. |
+
+If neither the top-level AI recommendation nor the AI milestone total is
+usable, generation fails with an invalid-AI-budget error. The backend never
+turns the Business-entered amount into an AI estimate.
 
 ## Confirmation Flow
 
 ```text
 Generate SoW
-  -> show Business amount and AI range
+  -> if status=HIGH: hide AI range and keep Business amount
+  -> otherwise show Business amount and AI range
   -> Business selects one option
        KEEP_BUSINESS_BUDGET
-       USE_AI_RECOMMENDATION
        USE_CUSTOM_BUDGET
          -> enter custom amount
          -> call POST /api/jobs/reallocate-sow-budget
@@ -147,8 +172,8 @@ Frontend mapping:
 | Business action | `jobs.budget` | `milestones[].fundsAllocated` |
 | --- | --- | --- |
 | Keep entered amount | `budgetAssessment.businessBudget` | Copy each `milestones[].budget`. |
-| Use AI recommendation | `budgetAssessment.recommendedBudget` | Copy each `milestones[].recommendedBudget`. |
 | Use custom amount | `reallocation.selectedBudget` | Map each `reallocation.allocations[].fundsAllocated` by `milestoneIndex`. |
+| `HIGH` implicit keep | `budgetAssessment.businessBudget` | Copy each `milestones[].budget`; no advisory card or second confirmation. |
 
 Before calling `POST /api/v1/jobs`, frontend must verify that the selected
 milestone allocation total exactly equals the selected Job budget.

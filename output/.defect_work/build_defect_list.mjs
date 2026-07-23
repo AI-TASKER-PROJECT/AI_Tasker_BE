@@ -14,6 +14,65 @@ const clean = (s = "") => s
   .replace(/\s+/g, " ")
   .trim();
 
+const needsEnglishTranslation = (value) =>
+  typeof value === "string" && /[^\u0000-\u007f]/.test(value);
+
+async function translateStringsToEnglish(values) {
+  const unique = [...new Set(values.filter(needsEnglishTranslation))];
+  const translated = new Map();
+  const chunks = [];
+  let current = [];
+  let currentLength = 0;
+
+  for (const value of unique) {
+    const addition = value.length + 32;
+    if (current.length && currentLength + addition > 2800) {
+      chunks.push(current);
+      current = [];
+      currentLength = 0;
+    }
+    current.push(value);
+    currentLength += addition;
+  }
+  if (current.length) chunks.push(current);
+
+  for (const chunk of chunks) {
+    const marked = chunk
+      .map((value, index) => `ZXQ${String(index + 1).padStart(5, "0")}ZXQ\n${value}`)
+      .join("\n") + "\nZXQENDZXQ";
+    const url = new URL("https://translate.googleapis.com/translate_a/single");
+    url.searchParams.set("client", "gtx");
+    url.searchParams.set("sl", "vi");
+    url.searchParams.set("tl", "en");
+    url.searchParams.set("dt", "t");
+    url.searchParams.set("q", marked);
+
+    let response;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      response = await fetch(url);
+      if (response.ok) break;
+      if (attempt === 3) throw new Error(`Translation request failed: ${response.status}`);
+      await new Promise(resolve => setTimeout(resolve, 600 * attempt));
+    }
+    const payload = await response.json();
+    const output = (payload[0] || []).map(part => part[0] || "").join("");
+    for (let index = 0; index < chunk.length; index++) {
+      const marker = `ZXQ${String(index + 1).padStart(5, "0")}ZXQ`;
+      const nextMarker = index + 1 < chunk.length
+        ? `ZXQ${String(index + 2).padStart(5, "0")}ZXQ`
+        : "ZXQENDZXQ";
+      const start = output.indexOf(marker);
+      const end = output.indexOf(nextMarker, start + marker.length);
+      if (start < 0 || end < 0) throw new Error(`Translation marker lost: ${marker}`);
+      const english = output
+        .slice(start + marker.length, end)
+        .replace(/^\s+|\s+$/g, "");
+      translated.set(chunk[index], english);
+    }
+  }
+  return translated;
+}
+
 function section(text, names) {
   for (const name of names) {
     const re = new RegExp(`^##\\s+${name}\\s*$([\\s\\S]*?)(?=^##\\s+|\\Z)`, "im");
@@ -78,6 +137,20 @@ async function loadStories() {
     ["US-AUTH-005", "Login Resets Failed Counters On Success"],
   ];
   for (const [id, title] of auth) records.push({ id, title, module: "Authentication & Security", ac: "Theo gói high-risk auth: kiểm soát brute-force, reset password an toàn, token dùng một lần và phục hồi trạng thái khóa/counter đúng quy tắc.", source: "docs/stories/high-risk-auth-lockout-reset/execplan.md" });
+  if (process.env.DEFECT_STORY_CUTOFF_20260721 === "1") {
+    const addedAfterWorkbookCreation = [
+      "docs/stories/US-066-transparent-wallet-history-scope-split/",
+      "docs/stories/US-067-structured-final-deliverable-rejection-feedback/",
+      "docs/stories/US-068-editable-marketplace-and-contract-change-requests/",
+      "docs/stories/US-069-ai-sow-budget-assessment/",
+      "docs/stories/US-070-custom-sow-budget-reallocation/",
+    ];
+    for (let index = records.length - 1; index >= 0; index--) {
+      if (addedAfterWorkbookCreation.some(prefix => records[index].source.startsWith(prefix))) {
+        records.splice(index, 1);
+      }
+    }
+  }
   records.sort((a, b) => a.id.localeCompare(b.id) || a.title.localeCompare(b.title));
   const counts = new Map();
   for (const r of records) counts.set(r.id, (counts.get(r.id) || 0) + 1);
@@ -173,6 +246,57 @@ for (const d of defects) {
 }
 
 const stories = await loadStories();
+const defectTextFields = ["summary", "description", "steps", "expected", "actual", "tc", "evidence", "note"];
+const storyTextFields = ["title", "ac", "note"];
+const translationInputs = [
+  ...defects.flatMap(d => defectTextFields.map(field => d[field])),
+  ...stories.flatMap(s => storyTextFields.map(field => s[field])),
+  "Chưa có reproduction trực tiếp trong repo.",
+  "Bằng chứng khớp defect và fix/retest.",
+];
+const englishTranslations = await translateStringsToEnglish(translationInputs);
+for (const d of defects) {
+  for (const field of defectTextFields) {
+    if (englishTranslations.has(d[field])) d[field] = englishTranslations.get(d[field]);
+  }
+}
+for (const s of stories) {
+  for (const field of storyTextFields) {
+    if (englishTranslations.has(s[field])) s[field] = englishTranslations.get(s[field]);
+  }
+}
+const normalizeEnglishText = value => typeof value === "string"
+  ? value
+      .replace(/\u200b/g, "")
+      .replaceAll("→", " to ")
+      .replaceAll("✅", "Pass")
+      .replaceAll(
+        "commit 'ep schema AI recommend khong gen loi'",
+        "commit 'enforce AI recommendation schema without generation errors'",
+      )
+  : value;
+for (const d of defects) {
+  for (const field of defectTextFields) d[field] = normalizeEnglishText(d[field]);
+}
+for (const s of stories) {
+  for (const field of storyTextFields) s[field] = normalizeEnglishText(s[field]);
+}
+const kybCoverageStory = stories.find(s =>
+  s.id === "US-046" && /KYB Tax Code Verification/i.test(s.title),
+);
+if (kybCoverageStory) {
+  kybCoverageStory.ac = "AC1: A blank tax code is rejected as not provided. AC2: A tax code that is not 10 or 13 digits is rejected as invalid. AC3: A tax code already used by another account is rejected as a duplicate. AC4: A tax code not found in VietQR returns NotFoundException. AC5: An unavailable VietQR API returns BadGatewayException. AC6: A valid tax code stores the company name, address, and verified representative from VietQR. AC7: The same account may resubmit its existing tax code without a duplicate error. AC8: Staff notifications and audit logging remain functional.";
+}
+const sourceNoteStory = stories.find(s =>
+  s.id === "US-029" && /Backfill Legacy Source Notes/i.test(s.title),
+);
+if (sourceNoteStory) {
+  sourceNoteStory.ac = "Every Java file in src/main/java that lacks a NOTE FILE section receives a note consistent with the established style. New notes explain only the file, annotations, fields, and important methods; they do not change business logic. The source still compiles after the note backfill.";
+}
+const evidencePotentialNote = englishTranslations.get("Chưa có reproduction trực tiếp trong repo.")
+  || "No direct reproduction is available in the repository.";
+const evidenceConfirmedNote = englishTranslations.get("Bằng chứng khớp defect và fix/retest.")
+  || "The evidence matches the defect and its fix/retest.";
 const related = new Map();
 for (const s of stories) related.set(`${s.id}|${s.title}`, []);
 const duplicateStoryTitleHint = new Map([
@@ -208,7 +332,7 @@ for (const d of defects) {
   for (const item of [...new Set(items)]) {
     const low = item.toLowerCase();
     const type = low.includes("commit") ? "Commit" : low.includes("trace") ? "Harness Trace" : low.includes("test") || low.includes("test.java") ? "Test Case" : low.includes(".md") ? "Document" : low.includes(".java") || low.includes(".sql") || low.includes(".properties") ? "Source Code" : "Project Evidence";
-    evidenceRows.push([`EVD-${String(ev++).padStart(3,"0")}`,d.id,type,item,item,d.summary,d.level === "Confirmed" ? "High" : "Medium",d.level === "Potential" ? "Chưa có reproduction trực tiếp trong repo." : "Bằng chứng khớp defect và fix/retest."]);
+    evidenceRows.push([`EVD-${String(ev++).padStart(3,"0")}`,d.id,type,item,item,d.summary,d.level === "Confirmed" ? "High" : "Medium",d.level === "Potential" ? evidencePotentialNote : evidenceConfirmedNote]);
   }
 }
 

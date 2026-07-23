@@ -11,7 +11,13 @@ an underfunded full scope or offer a separate recommended allocation.
 `POST /api/jobs/generate-sow` returns a normalized advisory VND range, compares
 the Business amount with that range, and returns both Business-budget and
 recommended milestone allocations. The Business remains the final decision
-maker and no estimate is persisted.
+maker and no estimate is persisted. The pricing prompt excludes the Business
+amount and all sample prices so the provider derives a project-specific range
+from scope, duration, roles, integrations, data, testing, infrastructure, and
+risk. Abbreviated provider values such as
+`80/100/130` are expanded to full VND before comparison. When the Business
+amount exceeds the normalized maximum, the frontend hides the advisory card
+and keeps the Business amount.
 
 ## Affected Users
 

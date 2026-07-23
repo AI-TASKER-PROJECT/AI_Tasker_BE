@@ -35,9 +35,9 @@ public class BudgetAssessmentDto {
     private BigDecimal gapToMinimum;
     @Schema(allowableValues = {"LOW", "MEDIUM", "HIGH"})
     private String confidence;
-    @Schema(allowableValues = {"AI_ADVISORY", "AI_MILESTONE_FALLBACK", "BUSINESS_BUDGET_FALLBACK"})
+    @Schema(allowableValues = {"AI_ADVISORY", "AI_MILESTONE_FALLBACK"})
     private String source;
-    @Schema(description = "Always true because Business must choose the final job budget.")
+    @Schema(description = "True when UI must request explicit budget confirmation; false for HIGH because the higher Business amount remains authoritative without showing the advisory card.")
     private Boolean requiresBusinessConfirmation;
     private String message;
     private List<String> factors;

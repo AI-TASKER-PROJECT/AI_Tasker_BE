@@ -119,6 +119,49 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
+    void parseAiResponse_whenBudgetUsesMillionUnit_shouldConvertToFullVndAmount() {
+        GenerateSowResponse response = service.parseAiResponse("""
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "budgetAssessment": {
+                    "currency": "VND",
+                    "estimatedMin": "120 triệu VND",
+                    "recommendedBudget": "140 triệu",
+                    "estimatedMax": "160 tr",
+                    "confidence": "MEDIUM",
+                    "factors": []
+                  },
+                  "sow": {
+                    "title": "AI platform",
+                    "overview": "Build platform",
+                    "objectives": [],
+                    "scopeOfWork": [],
+                    "deliverables": [],
+                    "assumptions": [],
+                    "outOfScope": [],
+                    "acceptanceCriteria": []
+                  },
+                  "milestones": [
+                    {
+                      "name": "Build",
+                      "description": "Develop platform",
+                      "duration": 1,
+                      "durationUnit": "MONTH",
+                      "budget": "140 million VND",
+                      "tasks": []
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals(BigDecimal.valueOf(120000000), response.getBudgetAssessment().getEstimatedMin());
+        assertEquals(BigDecimal.valueOf(140000000), response.getBudgetAssessment().getRecommendedBudget());
+        assertEquals(BigDecimal.valueOf(160000000), response.getBudgetAssessment().getEstimatedMax());
+        assertEquals(BigDecimal.valueOf(140000000), response.getMilestones().get(0).getBudget());
+    }
+
+    @Test
     void parseAiResponse_whenStringListFieldsAreReturnedAsText_shouldWrapIntoLists() {
         GenerateSowResponse response = service.parseAiResponse("""
                 {
@@ -161,7 +204,13 @@ class AiSowGenerationServiceTest {
         assertTrue(prompt.contains("Project title: AI support bot"));
         assertTrue(prompt.contains("budgetAssessment"));
         assertTrue(prompt.contains("DOC LAP"));
-        assertTrue(prompt.contains("Business proposed budget"));
+        assertTrue(prompt.contains("do phuc tap scope"));
+        assertTrue(prompt.contains("\"estimatedMin\": {\"type\": \"integer\", \"minimum\": 1}"));
+        assertFalse(prompt.contains("Business proposed budget"));
+        assertFalse(prompt.contains("80000000"));
+        assertFalse(prompt.contains("100000000"));
+        assertFalse(prompt.contains("130000000"));
+        assertFalse(prompt.contains("180"));
     }
 
     @Test
@@ -466,39 +515,65 @@ class AiSowGenerationServiceTest {
     void normalizeBudgetAssessment_whenProviderEstimateIsMissing_shouldUseMilestoneFallback() {
         GenerateSowResponse response = GenerateSowResponse.builder()
                 .milestones(List.of(
-                        MilestoneDto.builder().budget(BigDecimal.valueOf(20)).build(),
-                        MilestoneDto.builder().budget(BigDecimal.valueOf(30)).build()
+                        MilestoneDto.builder().budget(million(20)).build(),
+                        MilestoneDto.builder().budget(million(30)).build()
                 ))
                 .build();
 
-        service.normalizeBudgetAssessment(response, BigDecimal.valueOf(100));
+        service.normalizeBudgetAssessment(response, million(100));
 
         BudgetAssessmentDto assessment = response.getBudgetAssessment();
-        assertEquals(BigDecimal.valueOf(100), assessment.getBusinessBudget());
-        assertEquals(BigDecimal.valueOf(40), assessment.getEstimatedMin());
-        assertEquals(BigDecimal.valueOf(50), assessment.getRecommendedBudget());
-        assertEquals(BigDecimal.valueOf(60), assessment.getEstimatedMax());
+        assertEquals(million(100), assessment.getBusinessBudget());
+        assertEquals(million(40), assessment.getEstimatedMin());
+        assertEquals(million(50), assessment.getRecommendedBudget());
+        assertEquals(million(60), assessment.getEstimatedMax());
         assertEquals("HIGH", assessment.getStatus());
         assertEquals("LOW", assessment.getConfidence());
         assertEquals("AI_MILESTONE_FALLBACK", assessment.getSource());
-        assertTrue(assessment.getRequiresBusinessConfirmation());
+        assertFalse(assessment.getRequiresBusinessConfirmation());
     }
 
     @Test
-    void normalizeBudgetAssessment_whenProviderAndMilestonesAreInvalid_shouldUseBusinessFallback() {
+    void normalizeBudgetAssessment_whenProviderAndMilestonesAreInvalid_shouldRejectInsteadOfUsingBusinessFallback() {
         GenerateSowResponse response = GenerateSowResponse.builder()
                 .milestones(List.of(MilestoneDto.builder().budget(BigDecimal.ZERO).build()))
                 .build();
 
-        service.normalizeBudgetAssessment(response, BigDecimal.valueOf(100));
+        AppException exception = assertThrows(
+                AppException.class,
+                () -> service.normalizeBudgetAssessment(response, million(100)));
 
-        BudgetAssessmentDto assessment = response.getBudgetAssessment();
-        assertEquals(BigDecimal.valueOf(80), assessment.getEstimatedMin());
-        assertEquals(BigDecimal.valueOf(100), assessment.getRecommendedBudget());
-        assertEquals(BigDecimal.valueOf(120), assessment.getEstimatedMax());
-        assertEquals("SUITABLE", assessment.getStatus());
-        assertEquals("LOW", assessment.getConfidence());
-        assertEquals("BUSINESS_BUDGET_FALLBACK", assessment.getSource());
+        assertEquals("AI response thieu uoc luong ngan sach hop le", exception.getMessage());
+    }
+
+    @Test
+    void normalizeBudgetAssessment_shouldPreserveDifferentAiRangesAcrossProjects() {
+        GenerateSowResponse smallProject = GenerateSowResponse.builder()
+                .budgetAssessment(BudgetAssessmentDto.builder()
+                        .estimatedMin(million(20))
+                        .recommendedBudget(million(30))
+                        .estimatedMax(million(40))
+                        .confidence("MEDIUM")
+                        .build())
+                .milestones(List.of(MilestoneDto.builder().budget(million(30)).build()))
+                .build();
+        GenerateSowResponse largeProject = GenerateSowResponse.builder()
+                .budgetAssessment(BudgetAssessmentDto.builder()
+                        .estimatedMin(million(300))
+                        .recommendedBudget(million(450))
+                        .estimatedMax(million(600))
+                        .confidence("MEDIUM")
+                        .build())
+                .milestones(List.of(MilestoneDto.builder().budget(million(450)).build()))
+                .build();
+
+        service.normalizeBudgetAssessment(smallProject, million(25));
+        service.normalizeBudgetAssessment(largeProject, million(25));
+
+        assertEquals(million(20), smallProject.getBudgetAssessment().getEstimatedMin());
+        assertEquals(million(40), smallProject.getBudgetAssessment().getEstimatedMax());
+        assertEquals(million(300), largeProject.getBudgetAssessment().getEstimatedMin());
+        assertEquals(million(600), largeProject.getBudgetAssessment().getEstimatedMax());
     }
 
     @Test
@@ -589,23 +664,23 @@ class AiSowGenerationServiceTest {
     void normalizeBudgetAssessment_whenProviderRangeIsContradictory_shouldRepairAndLowerConfidence() {
         GenerateSowResponse response = GenerateSowResponse.builder()
                 .budgetAssessment(BudgetAssessmentDto.builder()
-                        .estimatedMin(BigDecimal.valueOf(120))
-                        .recommendedBudget(BigDecimal.valueOf(100))
-                        .estimatedMax(BigDecimal.valueOf(80))
+                        .estimatedMin(million(120))
+                        .recommendedBudget(million(100))
+                        .estimatedMax(million(80))
                         .confidence("HIGH")
                         .factors(List.of(" API integration ", "api integration", "Production deployment"))
                         .build())
-                .milestones(List.of(MilestoneDto.builder().budget(BigDecimal.valueOf(100)).build()))
+                .milestones(List.of(MilestoneDto.builder().budget(million(100)).build()))
                 .build();
 
-        service.normalizeBudgetAssessment(response, BigDecimal.valueOf(50));
+        service.normalizeBudgetAssessment(response, million(50));
 
         BudgetAssessmentDto assessment = response.getBudgetAssessment();
-        assertEquals(BigDecimal.valueOf(80), assessment.getEstimatedMin());
-        assertEquals(BigDecimal.valueOf(100), assessment.getRecommendedBudget());
-        assertEquals(BigDecimal.valueOf(120), assessment.getEstimatedMax());
+        assertEquals(million(80), assessment.getEstimatedMin());
+        assertEquals(million(100), assessment.getRecommendedBudget());
+        assertEquals(million(120), assessment.getEstimatedMax());
         assertEquals("TOO_LOW", assessment.getStatus());
-        assertEquals(BigDecimal.valueOf(30), assessment.getGapToMinimum());
+        assertEquals(million(30), assessment.getGapToMinimum());
         assertEquals("LOW", assessment.getConfidence());
         assertEquals(List.of("API integration", "Production deployment"), assessment.getFactors());
     }
@@ -613,38 +688,39 @@ class AiSowGenerationServiceTest {
     @Test
     void normalizeBudgetAssessment_shouldClassifyAllBusinessBudgetBands() {
         List<BigDecimal> businessBudgets = List.of(
-                BigDecimal.valueOf(70),
-                BigDecimal.valueOf(90),
-                BigDecimal.valueOf(100),
-                BigDecimal.valueOf(130)
+                million(70),
+                million(90),
+                million(100),
+                million(130)
         );
         List<String> expectedStatuses = List.of("TOO_LOW", "LOW", "SUITABLE", "HIGH");
 
         for (int i = 0; i < businessBudgets.size(); i++) {
             GenerateSowResponse response = GenerateSowResponse.builder()
                     .budgetAssessment(BudgetAssessmentDto.builder()
-                            .estimatedMin(BigDecimal.valueOf(80))
-                            .recommendedBudget(BigDecimal.valueOf(100))
-                            .estimatedMax(BigDecimal.valueOf(120))
+                            .estimatedMin(million(80))
+                            .recommendedBudget(million(100))
+                            .estimatedMax(million(120))
                             .confidence("MEDIUM")
                             .build())
-                    .milestones(List.of(MilestoneDto.builder().budget(BigDecimal.valueOf(100)).build()))
+                    .milestones(List.of(MilestoneDto.builder().budget(million(100)).build()))
                     .build();
 
             service.normalizeBudgetAssessment(response, businessBudgets.get(i));
 
             assertEquals(expectedStatuses.get(i), response.getBudgetAssessment().getStatus());
+            assertEquals(i < 3, response.getBudgetAssessment().getRequiresBusinessConfirmation());
         }
     }
 
     @Test
-    void generateSow_whenBusinessBudgetIsTooLow_shouldReturnBusinessAndRecommendedMilestoneAllocations() {
+    void generateSow_whenProviderUsesBareMillionAmounts_shouldScaleToFullVndBeforeComparison() {
         RestTemplate restTemplate = mock(RestTemplate.class);
         OpenAiProperties openAiProperties = new OpenAiProperties();
         openAiProperties.setApiKey("test-key");
         AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
         GenerateSowRequest request = buildRequest();
-        request.setBudget(BigDecimal.valueOf(50));
+        request.setBudget(million(50));
 
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
                 .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
@@ -692,17 +768,20 @@ class AiSowGenerationServiceTest {
         GenerateSowResponse response = localService.generateSow(request);
 
         BudgetAssessmentDto assessment = response.getBudgetAssessment();
-        assertEquals(BigDecimal.valueOf(50), assessment.getBusinessBudget());
-        assertEquals(BigDecimal.valueOf(140), assessment.getRecommendedBudget());
+        assertEquals(million(50), assessment.getBusinessBudget());
+        assertEquals(million(120), assessment.getEstimatedMin());
+        assertEquals(million(140), assessment.getRecommendedBudget());
+        assertEquals(million(160), assessment.getEstimatedMax());
         assertEquals("TOO_LOW", assessment.getStatus());
-        assertEquals(BigDecimal.valueOf(70), assessment.getGapToMinimum());
+        assertEquals(million(70), assessment.getGapToMinimum());
+        assertEquals("LOW", assessment.getConfidence());
         assertEquals("AI_ADVISORY", assessment.getSource());
-        assertEquals(BigDecimal.valueOf(50), response.getMilestones().stream()
+        assertEquals(million(50), response.getMilestones().stream()
                 .map(MilestoneDto::getBudget).reduce(BigDecimal.ZERO, BigDecimal::add));
-        assertEquals(BigDecimal.valueOf(140), response.getMilestones().stream()
+        assertEquals(million(140), response.getMilestones().stream()
                 .map(MilestoneDto::getRecommendedBudget).reduce(BigDecimal.ZERO, BigDecimal::add));
-        assertEquals(BigDecimal.valueOf(40), response.getMilestones().get(0).getRecommendedBudget());
-        assertEquals(BigDecimal.valueOf(100), response.getMilestones().get(1).getRecommendedBudget());
+        assertEquals(million(40), response.getMilestones().get(0).getRecommendedBudget());
+        assertEquals(million(100), response.getMilestones().get(1).getRecommendedBudget());
     }
 
     @Test
@@ -1132,5 +1211,9 @@ class AiSowGenerationServiceTest {
                 .milestoneIndex(milestoneIndex)
                 .referenceBudget(BigDecimal.valueOf(referenceBudget))
                 .build();
+    }
+
+    private BigDecimal million(long value) {
+        return BigDecimal.valueOf(value).multiply(BigDecimal.valueOf(1_000_000));
     }
 }

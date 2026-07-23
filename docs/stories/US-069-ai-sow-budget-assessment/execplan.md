@@ -11,14 +11,15 @@ In scope:
 
 - Additive response DTO fields.
 - Prompt, parsing, normalization, fallback, and comparison behavior.
+- HIGH-status frontend visibility and implicit Business-budget retention.
 - Focused unit tests.
+- Frontend unit/build and rendered browser proof.
 - OpenAPI, Swagger/Postman, product, and frontend handoff documentation.
 
 Out of scope:
 
 - Database changes.
 - Historical estimate calibration.
-- Frontend source implementation.
 - Proposal and contract pricing changes.
 
 ## Risk Classification
