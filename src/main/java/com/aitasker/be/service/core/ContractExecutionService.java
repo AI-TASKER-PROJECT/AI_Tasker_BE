@@ -1719,7 +1719,7 @@ public class ContractExecutionService {
         }
         boolean automaticRouting = staffId == null;
         Integer routedStaffId = automaticRouting
-                ? selectStaffForDispute(dispute)
+                ? selectStaffForDispute(dispute)    
                 : validateManualStaffForDispute(dispute, staffId);
         return routeDisputeToStaff(dispute, routedStaffId, accessService.currentAccount().getAccountId(), automaticRouting);
     }

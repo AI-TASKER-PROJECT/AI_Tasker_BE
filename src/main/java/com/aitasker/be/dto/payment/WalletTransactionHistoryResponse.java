@@ -27,10 +27,18 @@ public class WalletTransactionHistoryResponse {
     private String walletOwnerRole;
     private String historyScope;
     private String transactionCategory;
+    private String transactionCategoryLabel;
+    private String transactionGroup;
+    private String transactionGroupLabel;
+    private String transactionSubGroup;
+    private String transactionSubGroupLabel;
     private Boolean platformBalanceChanging;
     private String transactionType;
+    private String transactionTypeLabel;
     private String direction;
+    private String directionLabel;
     private String balanceType;
+    private String balanceTypeLabel;
     private BigDecimal amount;
     private BigDecimal grossAmount;
     private BigDecimal feeAmount;
@@ -41,6 +49,7 @@ public class WalletTransactionHistoryResponse {
     private BigDecimal availableBalanceBefore;
     private BigDecimal availableBalanceAfter;
     private String status;
+    private String statusLabel;
     private String referenceType;
     private Long referenceId;
     private String operationKey;
@@ -54,6 +63,7 @@ public class WalletTransactionHistoryResponse {
     private String actorName;
     private Integer counterpartyAccountId;
     private String counterpartyRole;
+    private String counterpartyLabel;
     private String counterpartyName;
     private Integer businessId;
     private String businessName;

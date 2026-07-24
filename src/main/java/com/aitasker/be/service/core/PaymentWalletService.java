@@ -1007,6 +1007,13 @@ public class PaymentWalletService {
                     describeContractDeposit(builder, tx, actorName);
             case "WITHDRAW_HOLD", "WITHDRAW_APPROVED", "WITHDRAW_REJECTED" ->
                     describeWithdrawal(builder, tx, actorName);
+            case "MILESTONE_ESCROW_DEPOSIT" -> describeMilestoneEscrowDeposit(builder, tx, actorName);
+            case "MILESTONE_ESCROW_RELEASE" -> describeMilestoneEscrowRelease(builder, tx, actorName);
+            case "MILESTONE_ESCROW_REFUND" -> describeMilestoneEscrowRefund(builder, tx, actorName);
+            case "MILESTONE_ESCROW_SETTLEMENT_PAYOUT" -> describeMilestoneSettlementPayout(builder, tx, actorName);
+            case "MILESTONE_ESCROW_SETTLEMENT_REFUND" -> describeMilestoneSettlementRefund(builder, tx, actorName);
+            case "IMMEDIATE_TERMINATION_PENALTY" -> describeImmediateTerminationPenalty(builder, tx, actorName);
+            case "IMMEDIATE_TERMINATION_COMPENSATION" -> describeImmediateTerminationCompensation(builder, tx, actorName);
             default -> builder
                     .title(defaultTransactionTitle(tx))
                     .description(cleanLedgerDescription(tx))
@@ -1020,6 +1027,10 @@ public class PaymentWalletService {
             String actorName
     ) {
         Optional<PaymentOrderEntity> order = paymentOrder(tx);
+        builder.counterpartyAccountId(tx.getAccountId())
+                .counterpartyRole("WALLET")
+                .counterpartyLabel("Ví nhận")
+                .counterpartyName(actorName);
         order.ifPresent(paymentOrder -> builder
                 .paymentOrderId(paymentOrder.getId())
                 .paymentProvider(paymentOrder.getProvider() == null ? null : paymentOrder.getProvider().name())
@@ -1047,6 +1058,7 @@ public class PaymentWalletService {
             String purchaserName = displayAccount(purchaser, purchaser == null ? null : purchaser.getAccountId());
             builder.counterpartyAccountId(purchaser == null ? null : purchaser.getAccountId())
                     .counterpartyRole(roleName(purchaser))
+                    .counterpartyLabel(roleLabel(roleName(purchaser)))
                     .counterpartyName(purchaserName);
             return builder
                     .title("Nền tảng ghi nhận doanh thu gói thành viên")
@@ -1060,6 +1072,7 @@ public class PaymentWalletService {
         String packageName = membershipPackage.map(MembershipPackageEntity::getPackageName)
                 .orElseGet(() -> nonBlank(tx.getDescription(), "gói thành viên"));
         builder.packageId(packageId).packageName(packageName);
+        attachPlatformCounterparty(builder);
         String description = purchase
                 .map(item -> actorName + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua gói "
                         + packageName + ". Thời hạn từ " + item.getBadgeStartAt() + " đến " + item.getBadgeEndAt() + ".")
@@ -1080,6 +1093,7 @@ public class PaymentWalletService {
             String purchaserName = displayAccount(purchaser, purchaser == null ? null : purchaser.getAccountId());
             builder.counterpartyAccountId(purchaser == null ? null : purchaser.getAccountId())
                     .counterpartyRole(roleName(purchaser))
+                    .counterpartyLabel(roleLabel(roleName(purchaser)))
                     .counterpartyName(purchaserName);
             return builder
                     .title("Nền tảng ghi nhận doanh thu lượt sử dụng")
@@ -1087,6 +1101,7 @@ public class PaymentWalletService {
                             + " VND doanh thu từ giao dịch mua lượt sử dụng của " + purchaserName + ".")
                     .build();
         }
+        attachPlatformCounterparty(builder);
         String description = cleanLedgerDescription(tx);
         String title = actorName + " đã mua lượt sử dụng";
         if (safe(tx.getDescription()).contains("job-post")) {
@@ -1112,8 +1127,6 @@ public class PaymentWalletService {
         String contractTitle = contract.map(this::displayContract).orElse("hợp đồng");
         String businessName = contract.map(item -> displayBusiness(item.getBusinessId())).orElse(actorName);
         String expertName = contract.map(item -> displayExpert(item.getExpertId())).orElse(null);
-        String counterparty = expertName == null ? null : expertName;
-        builder.counterpartyName(counterparty);
 
         return switch (safe(tx.getTransactionType())) {
             case "CONTRACT_SECURITY_DEPOSIT_REFUND" -> builder
@@ -1148,6 +1161,9 @@ public class PaymentWalletService {
                 .bankName(item.getBankName())
                 .bankAccountNumberMasked(maskBankAccount(item.getBankAccountNumber()))
                 .bankAccountHolder(item.getBankAccountHolder())
+                .counterpartyRole("BANK_ACCOUNT")
+                .counterpartyLabel("Tài khoản nhận")
+                .counterpartyName(withdrawalDestination(item))
                 .adminId(item.getAdminId())
                 .adminName(item.getAdminId() == null ? null : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
                 .adminNote(item.getAdminNote()));
@@ -1177,6 +1193,111 @@ public class PaymentWalletService {
                             + requesterName + "." + bankText)
                     .build();
         };
+    }
+
+    // ── Milestone escrow describe methods ─────────────────────────────────────────
+
+    private WalletTransactionHistoryResponse describeMilestoneEscrowDeposit(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        attachContractContextFromMilestone(builder, tx);
+        String milestoneName = builder.build().getMilestoneName() != null ? builder.build().getMilestoneName() : "giai đoạn";
+        String contractTitle = builder.build().getContractTitle() != null ? builder.build().getContractTitle() : "hợp đồng";
+        return builder
+                .title("Ký quỹ giai đoạn " + milestoneName)
+                .description(actorName + " đã ký quỹ " + formatAmount(tx.getAmount())
+                        + " VND cho giai đoạn " + milestoneName + " của " + contractTitle + ".")
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeMilestoneEscrowRelease(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        attachContractContextFromMilestone(builder, tx);
+        WalletTransactionHistoryResponse built = builder.build();
+        String milestoneName = built.getMilestoneName() != null ? built.getMilestoneName() : "giai đoạn";
+        String expertName = built.getExpertName() != null ? built.getExpertName() : "chuyên gia";
+        return builder
+                .title("Giải ngân giai đoạn " + milestoneName)
+                .description(actorName + " đã duyệt nghiệm thu và giải ngân " + formatAmount(tx.getAmount())
+                        + " VND cho chuyên gia " + expertName + " từ giai đoạn " + milestoneName + ".")
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeMilestoneEscrowRefund(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        attachContractContextFromMilestone(builder, tx);
+        String milestoneName = builder.build().getMilestoneName() != null ? builder.build().getMilestoneName() : "giai đoạn";
+        return builder
+                .title("Hoàn tiền ký quỹ giai đoạn " + milestoneName)
+                .description("Hệ thống đã hoàn " + formatAmount(tx.getAmount())
+                        + " VND ký quỹ giai đoạn " + milestoneName + " về ví " + actorName + ".")
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeMilestoneSettlementPayout(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        attachContractContextFromMilestone(builder, tx);
+        WalletTransactionHistoryResponse built = builder.build();
+        String expertName = built.getExpertName() != null ? built.getExpertName() : "chuyên gia";
+        String contractTitle = built.getContractTitle() != null ? built.getContractTitle() : "hợp đồng";
+        return builder
+                .title("Quyết toán tiền cho chuyên gia")
+                .description("Chuyên gia " + expertName + " được nhận " + formatAmount(tx.getAmount())
+                        + " VND sau quyết toán tranh chấp/chấm dứt " + contractTitle + ".")
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeMilestoneSettlementRefund(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        attachContractContextFromMilestone(builder, tx);
+        String contractTitle = builder.build().getContractTitle() != null ? builder.build().getContractTitle() : "hợp đồng";
+        return builder
+                .title("Quyết toán hoàn tiền cho doanh nghiệp")
+                .description("Doanh nghiệp " + actorName + " được hoàn " + formatAmount(tx.getAmount())
+                        + " VND sau quyết toán tranh chấp/chấm dứt " + contractTitle + ".")
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeImmediateTerminationPenalty(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        attachContractContextFromMilestone(builder, tx);
+        String contractTitle = builder.build().getContractTitle() != null ? builder.build().getContractTitle() : "hợp đồng";
+        return builder
+                .title("Phạt chấm dứt hợp đồng")
+                .description(actorName + " bị trừ " + formatAmount(tx.getAmount())
+                        + " VND tiền phạt khi chấm dứt " + contractTitle + ".")
+                .build();
+    }
+
+    private WalletTransactionHistoryResponse describeImmediateTerminationCompensation(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx,
+            String actorName
+    ) {
+        attachContractContextFromMilestone(builder, tx);
+        String contractTitle = builder.build().getContractTitle() != null ? builder.build().getContractTitle() : "hợp đồng";
+        return builder
+                .title("Bồi thường chấm dứt hợp đồng")
+                .description(actorName + " được nhận " + formatAmount(tx.getAmount())
+                        + " VND tiền bồi thường từ phạt chấm dứt " + contractTitle + ".")
+                .build();
     }
 
     private WalletTransactionHistoryResponse buildWithdrawalHistoryResponse(
@@ -1220,6 +1341,9 @@ public class PaymentWalletService {
                         .bankName(withdrawal.getBankName())
                         .bankAccountNumberMasked(maskBankAccount(withdrawal.getBankAccountNumber()))
                         .bankAccountHolder(withdrawal.getBankAccountHolder())
+                        .counterpartyRole("BANK_ACCOUNT")
+                        .counterpartyLabel("Tài khoản nhận")
+                        .counterpartyName(withdrawalDestination(withdrawal))
                         .adminId(withdrawal.getAdminId())
                         .adminName(withdrawal.getAdminId() == null ? null : adminName)
                         .adminNote(withdrawal.getAdminNote())
@@ -1290,6 +1414,7 @@ public class PaymentWalletService {
         if (item.getNetAmount() == null) {
             item.setNetAmount(item.getAmount());
         }
+        fillWalletDisplayLabels(item);
         return item;
     }
 
@@ -1342,6 +1467,165 @@ public class PaymentWalletService {
         return "WALLET";
     }
 
+    private void fillWalletDisplayLabels(WalletTransactionHistoryResponse item) {
+        item.setTransactionTypeLabel(transactionTypeLabel(item.getTransactionType(), item.getOperationLeg()));
+        item.setTransactionCategoryLabel(transactionCategoryLabel(item.getTransactionCategory()));
+        WalletDisplayGroup group = displayGroup(item);
+        item.setTransactionGroup(group.group());
+        item.setTransactionGroupLabel(group.groupLabel());
+        item.setTransactionSubGroup(group.subGroup());
+        item.setTransactionSubGroupLabel(group.subGroupLabel());
+        item.setDirectionLabel(directionLabel(item.getDirection()));
+        item.setBalanceTypeLabel(balanceTypeLabel(item.getBalanceType()));
+        item.setStatusLabel(statusLabel(item.getStatus()));
+        if (item.getCounterpartyLabel() == null || item.getCounterpartyLabel().isBlank()) {
+            item.setCounterpartyLabel(counterpartyLabel(item));
+        }
+    }
+
+    private String transactionTypeLabel(String transactionType, String operationLeg) {
+        if (WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(operationLeg)) {
+            return "Doanh thu nền tảng";
+        }
+        return switch (safe(transactionType)) {
+            case "TOPUP" -> "Nạp tiền";
+            case "MEMBERSHIP_PURCHASE" -> "Mua gói thành viên";
+            case "CREDIT_PURCHASE" -> "Mua lượt sử dụng";
+            case "CONTRACT_SECURITY_DEPOSIT_HOLD" -> "Ký quỹ hợp đồng";
+            case "CONTRACT_SECURITY_DEPOSIT_REFUND" -> "Hoàn ký quỹ hợp đồng";
+            case "CONTRACT_SECURITY_DEPOSIT_RESOLVED" -> "Giữ lại ký quỹ";
+            case "DEPOSIT_REFUND" -> "Hoàn ký quỹ";
+            case "WITHDRAW_HOLD" -> "Tạm giữ rút tiền";
+            case "WITHDRAW_APPROVED" -> "Rút tiền";
+            case "WITHDRAW_REJECTED" -> "Từ chối rút tiền";
+            case "EXPERT_CONTRACT_DEPOSIT_HOLD" -> "Ký quỹ chuyên gia";
+            case "EXPERT_CONTRACT_DEPOSIT_REFUND" -> "Hoàn ký quỹ chuyên gia";
+            case "MILESTONE_ESCROW_DEPOSIT" -> "Ký quỹ giai đoạn";
+            case "MILESTONE_ESCROW_RELEASE" -> "Giải ngân giai đoạn";
+            case "MILESTONE_ESCROW_REFUND" -> "Hoàn ký quỹ giai đoạn";
+            case "MILESTONE_ESCROW_SETTLEMENT_PAYOUT" -> "Quyết toán cho chuyên gia";
+            case "MILESTONE_ESCROW_SETTLEMENT_REFUND" -> "Quyết toán hoàn tiền";
+            case "IMMEDIATE_TERMINATION_PENALTY" -> "Phạt chấm dứt";
+            case "IMMEDIATE_TERMINATION_COMPENSATION" -> "Bồi thường chấm dứt";
+            default -> safe(transactionType);
+        };
+    }
+
+    private String transactionCategoryLabel(String category) {
+        return switch (safe(category)) {
+            case "TOPUP" -> "Nạp tiền ví";
+            case "PURCHASE" -> "Mua dịch vụ";
+            case "REVENUE" -> "Doanh thu nền tảng";
+            case "WITHDRAWAL" -> "Rút tiền";
+            case "ESCROW" -> "Ký quỹ";
+            case "REFUND" -> "Hoàn tiền";
+            default -> "Giao dịch ví";
+        };
+    }
+
+    private WalletDisplayGroup displayGroup(WalletTransactionHistoryResponse item) {
+        String type = safe(item.getTransactionType());
+        String operationLeg = safe(item.getOperationLeg());
+        if ("TOPUP".equals(type)) {
+            return new WalletDisplayGroup("topup", "Nạp tiền ví", null, null);
+        }
+        if ("MEMBERSHIP_PURCHASE".equals(type) || "CREDIT_PURCHASE".equals(type)) {
+            if (WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(operationLeg)) {
+                return new WalletDisplayGroup("service-revenue", "Mua dịch vụ / Doanh thu nền tảng",
+                        "revenue", "Doanh thu nền tảng");
+            }
+            return new WalletDisplayGroup("service-revenue", "Mua dịch vụ / Doanh thu nền tảng",
+                    "purchase", "Mua dịch vụ");
+        }
+        if (Set.of("CONTRACT_SECURITY_DEPOSIT_HOLD", "CONTRACT_SECURITY_DEPOSIT_REFUND",
+                "CONTRACT_SECURITY_DEPOSIT_RESOLVED", "EXPERT_CONTRACT_DEPOSIT_HOLD",
+                "EXPERT_CONTRACT_DEPOSIT_REFUND", "DEPOSIT_REFUND").contains(type)) {
+            boolean refund = type.contains("REFUND");
+            return new WalletDisplayGroup("contract-deposit", "Ký quỹ hợp đồng",
+                    refund ? "refund" : "hold", refund ? "Hoàn / Giải tỏa ký quỹ" : "Ký quỹ giữ lại");
+        }
+        if (Set.of("MILESTONE_ESCROW_DEPOSIT", "MILESTONE_ESCROW_RELEASE", "MILESTONE_ESCROW_REFUND").contains(type)) {
+            boolean deposit = "MILESTONE_ESCROW_DEPOSIT".equals(type);
+            return new WalletDisplayGroup("milestone-escrow", "Ký quỹ giai đoạn",
+                    deposit ? "deposit" : "release-refund", deposit ? "Ký quỹ giai đoạn" : "Giải ngân / Hoàn tiền");
+        }
+        if (Set.of("MILESTONE_ESCROW_SETTLEMENT_PAYOUT", "MILESTONE_ESCROW_SETTLEMENT_REFUND",
+                "IMMEDIATE_TERMINATION_PENALTY", "IMMEDIATE_TERMINATION_COMPENSATION").contains(type)) {
+            boolean expertPayout = "MILESTONE_ESCROW_SETTLEMENT_PAYOUT".equals(type)
+                    || "IMMEDIATE_TERMINATION_COMPENSATION".equals(type);
+            return new WalletDisplayGroup("settlement", "Quyết toán tranh chấp / Chấm dứt",
+                    expertPayout ? "expert-payout" : "business-refund",
+                    expertPayout ? "Chuyển cho chuyên gia" : "Hoàn cho doanh nghiệp");
+        }
+        if (type.startsWith("WITHDRAW")) {
+            boolean request = "WITHDRAW_HOLD".equals(type);
+            return new WalletDisplayGroup("withdrawal", "Rút tiền",
+                    request ? "request" : "processed", request ? "Yêu cầu rút tiền" : "Đã xử lý");
+        }
+        return new WalletDisplayGroup("all", "Tất cả giao dịch", null, null);
+    }
+
+    private String directionLabel(String direction) {
+        return switch (safe(direction)) {
+            case "CREDIT" -> "Cộng tiền";
+            case "DEBIT" -> "Trừ tiền";
+            case "HOLD" -> "Tạm giữ";
+            case "RELEASE" -> "Giải tỏa";
+            default -> safe(direction);
+        };
+    }
+
+    private String balanceTypeLabel(String balanceType) {
+        return switch (safe(balanceType)) {
+            case "AVAILABLE" -> "Số dư khả dụng";
+            case "ESCROW" -> "Tiền ký quỹ";
+            case "HOLDING" -> "Tiền tạm giữ";
+            case "DISPUTE" -> "Tiền tranh chấp";
+            default -> safe(balanceType);
+        };
+    }
+
+    private String statusLabel(String status) {
+        return switch (safe(status)) {
+            case "POSTED", "SUCCESS" -> "Đã ghi sổ";
+            case "PENDING" -> "Chờ xử lý";
+            case "APPROVED" -> "Đã duyệt";
+            case "REJECTED" -> "Đã từ chối";
+            case "FAILED" -> "Thất bại";
+            case "CANCELLED" -> "Đã hủy";
+            case "VOID" -> "Đã hủy ghi sổ";
+            default -> safe(status);
+        };
+    }
+
+    private String counterpartyLabel(WalletTransactionHistoryResponse item) {
+        if (item.getCounterpartyName() == null || item.getCounterpartyName().isBlank()) {
+            return "Tài khoản";
+        }
+        return roleLabel(item.getCounterpartyRole());
+    }
+
+    private String roleLabel(String role) {
+        return switch (safe(role)) {
+            case "BUSINESS" -> "Doanh nghiệp";
+            case "EXPERT" -> "Chuyên gia";
+            case "ADMIN", "STAFF" -> "Nội bộ";
+            case "BANK_ACCOUNT" -> "Tài khoản nhận";
+            case "WALLET" -> "Ví nhận";
+            case "PLATFORM" -> "Nền tảng";
+            default -> "Tài khoản";
+        };
+    }
+
+    private void attachPlatformCounterparty(WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder) {
+        accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN")
+                .ifPresent(platform -> builder
+                        .counterpartyAccountId(platform.getAccountId())
+                        .counterpartyRole("PLATFORM")
+                        .counterpartyLabel("Nền tảng")
+                        .counterpartyName(displayAccount(platform, platform.getAccountId())));
+    }
+
     private boolean isPlatformBalanceChanging(WalletTransactionEntity tx) {
         return WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT.equals(tx.getOperationLeg());
     }
@@ -1376,6 +1660,20 @@ public class PaymentWalletService {
                         .milestoneName(milestone.getMilestoneName()));
     }
 
+    /**
+     * Gắn thông tin hợp đồng, doanh nghiệp, chuyên gia vào builder cho các giao dịch milestone escrow.
+     */
+    private void attachContractContextFromMilestone(
+            WalletTransactionHistoryResponse.WalletTransactionHistoryResponseBuilder builder,
+            WalletTransactionEntity tx
+    ) {
+        Integer contractId = tx.getContractId();
+        if (contractId == null) {
+            return;
+        }
+        contractRepository.findById(contractId).ifPresent(contract -> attachContractContext(builder, contract, tx.getAccountId()));
+    }
+
     private String maskBankAccount(String value) {
         String account = safe(value);
         if (account.isBlank()) {
@@ -1385,6 +1683,26 @@ public class PaymentWalletService {
             return "*".repeat(account.length());
         }
         return "*".repeat(Math.max(0, account.length() - 4)) + account.substring(account.length() - 4);
+    }
+
+    private String withdrawalDestination(WithdrawalRequestEntity withdrawal) {
+        if (withdrawal == null) {
+            return "Tài khoản nhận";
+        }
+        String holder = safe(withdrawal.getBankAccountHolder());
+        String bank = safe(withdrawal.getBankName());
+        String masked = maskBankAccount(withdrawal.getBankAccountNumber());
+        List<String> parts = new ArrayList<>();
+        if (!holder.isBlank()) {
+            parts.add(holder);
+        }
+        if (!bank.isBlank()) {
+            parts.add(bank);
+        }
+        if (masked != null && !masked.isBlank()) {
+            parts.add(masked);
+        }
+        return parts.isEmpty() ? "Tài khoản nhận" : String.join(" - ", parts);
     }
 
     private Optional<PaymentOrderEntity> paymentOrder(WalletTransactionEntity tx) {
@@ -1570,10 +1888,12 @@ public class PaymentWalletService {
         if (Objects.equals(actorAccountId, businessAccountId) && expertAccountId != null) {
             builder.counterpartyAccountId(expertAccountId)
                     .counterpartyRole("EXPERT")
+                    .counterpartyLabel("Chuyên gia")
                     .counterpartyName(expertName);
         } else if (Objects.equals(actorAccountId, expertAccountId) && businessAccountId != null) {
             builder.counterpartyAccountId(businessAccountId)
                     .counterpartyRole("BUSINESS")
+                    .counterpartyLabel("Doanh nghiệp")
                     .counterpartyName(businessName);
         }
     }
@@ -1740,6 +2060,14 @@ public class PaymentWalletService {
 
     private String formatAmount(BigDecimal amount) {
         return amount == null ? "0" : amount.stripTrailingZeros().toPlainString();
+    }
+
+    private record WalletDisplayGroup(
+            String group,
+            String groupLabel,
+            String subGroup,
+            String subGroupLabel
+    ) {
     }
 
     private String safeNumber(Long value) {
