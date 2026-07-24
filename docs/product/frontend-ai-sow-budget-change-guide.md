@@ -21,7 +21,7 @@ gọi `POST /api/v1/jobs`.
 | FE-SOW-11 | P0 | Custom allocation response | Map kết quả chia lại | `selectedBudget`, `allocationTotal`, `allocations[].milestoneIndex`, `allocations[].fundsAllocated` | Map bằng `milestoneIndex`; không tự tính/làm tròn lại trên frontend | Tổng tiền custom trên UI và payload bằng chính xác `allocationTotal` |
 | FE-SOW-12 | P0 | Create Job payload | Tạo payload cuối cùng | `POST /api/v1/jobs` | Giữ nguyên các field Job/SoW hiện có; chỉ chọn đúng `budget` và `milestones[].fundsAllocated` theo option đã xác nhận | Backend nhận đúng một bộ ngân sách tương ứng với lựa chọn Business |
 | FE-SOW-13 | P0 | Validation trước submit | Kiểm tra tổng tiền | Job `budget` và toàn bộ `fundsAllocated` | Chặn submit nếu thiếu milestone, index không map được hoặc tổng milestone khác Job budget; dùng phép tính số nguyên VND/decimal-safe | Không có payload sai tổng tiền được gửi tới API tạo Job |
-| FE-SOW-14 | P0 | Regenerate/edit flow | Reset xác nhận khi SoW thay đổi | Generate SoW response mới | Khi generate lại, thay đổi scope hoặc thay đổi milestone: xóa option cũ, custom allocation cũ và yêu cầu xác nhận lại | Không tái sử dụng allocation của bản SoW trước |
+| FE-SOW-14 | P0 | Regenerate/edit flow | Quản lý xác nhận khi SoW thay đổi | Generate SoW response mới | Khi generate lại hoặc thay đổi scope: xóa option cũ và custom allocation cũ. Khi chỉ sửa nội dung/thời lượng/thứ tự milestone, giữ allocation đã xác nhận. Khi xóa milestone trong chế độ custom, gọi lại API phân bổ với cùng `selectedBudget` và danh sách milestone còn lại. Khi Business sửa trực tiếp `fundsAllocated`, chuyển sang phân bổ thủ công và đồng bộ Job budget bằng tổng milestone | Không tái sử dụng allocation của bản SoW trước; sửa/xóa milestone không làm quay về `businessBudget` cũ |
 | FE-SOW-15 | P1 | Error handling | Xử lý lỗi API custom | HTTP `400`, `401`, `403`, `500` từ reallocation API | `400`: giữ dữ liệu nhập và hiển thị validation; `401/403`: xử lý auth; `500`: cho phép thử lại; không tiếp tục tạo Job khi reallocation lỗi | Người dùng nhận thông báo rõ ràng và không tạo Job với dữ liệu allocation cũ |
 | FE-SOW-16 | P0 | Frontend tests | Bổ sung unit/component/integration tests | Hai lựa chọn hiển thị, bốn status, ba source và custom API | Test `HIGH` ẩn card và tự giữ Business budget; custom 110m từ tỷ trọng 40m/100m trả 31,428,571 và 78,571,429; test regenerate reset; test chặn sai tổng | Toàn bộ test ngân sách chạy đạt và bao phủ nhánh ẩn/hiện |
 
@@ -33,6 +33,10 @@ POST /api/jobs/generate-sow
   -> nếu status khác HIGH: hiển thị budgetAssessment
      -> KEEP: dùng milestones[].budget
      -> CUSTOM: gọi /api/jobs/reallocate-sow-budget và dùng fundsAllocated trả về
+        -> sửa nội dung/thời lượng/thứ tự: giữ fundsAllocated mới
+        -> xóa milestone: phân bổ lại cùng selectedBudget trên các mốc còn lại
+  -> hoặc Business mở khóa milestone và sửa trực tiếp từng fundsAllocated
+     -> giữ phân bổ thủ công, Job budget = tổng fundsAllocated
   -> kiểm tra tổng milestone = Job budget
   -> POST /api/v1/jobs
 ```
@@ -41,5 +45,7 @@ POST /api/jobs/generate-sow
 
 - Frontend không sửa `estimatedMin`, `recommendedBudget`, `estimatedMax` của AI.
 - Frontend không tự chia hoặc làm tròn ngân sách custom.
+- Phân bổ thủ công chỉ dùng các số VND do Business nhập trực tiếp cho từng
+  milestone; không biến `recommendedBudget` thành giá thực thi.
 - API custom chỉ tính toán, không tạo Job và không ghi database.
 - Business vẫn là người xác nhận ngân sách cuối cùng.

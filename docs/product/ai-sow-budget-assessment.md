@@ -163,6 +163,13 @@ Generate SoW
        USE_CUSTOM_BUDGET
          -> enter custom amount
          -> call POST /api/jobs/reallocate-sow-budget
+         -> preserve the confirmed allocation for content, duration, and order edits
+         -> after deleting a milestone, reallocate the same selected amount
+            across the remaining generated milestones
+       MANUAL_MILESTONE_ALLOCATION
+         -> unlock generated milestones
+         -> edit each fundsAllocated directly
+         -> set Job budget to the exact milestone total
   -> build POST /api/v1/jobs payload
   -> Business can still edit the draft before publishing
 ```
@@ -173,6 +180,7 @@ Frontend mapping:
 | --- | --- | --- |
 | Keep entered amount | `budgetAssessment.businessBudget` | Copy each `milestones[].budget`. |
 | Use custom amount | `reallocation.selectedBudget` | Map each `reallocation.allocations[].fundsAllocated` by `milestoneIndex`. |
+| Edit milestone amounts manually | Sum of the edited `fundsAllocated` values | Keep each whole-VND amount entered directly by Business. |
 | `HIGH` implicit keep | `budgetAssessment.businessBudget` | Copy each `milestones[].budget`; no advisory card or second confirmation. |
 
 Before calling `POST /api/v1/jobs`, frontend must verify that the selected
