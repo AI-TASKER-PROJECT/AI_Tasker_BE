@@ -2356,7 +2356,16 @@ public class PaymentWalletService {
     }
 
     private BigDecimal percentageAmount(ContractEntity contract, BigDecimal percentage) {
-        return money(contract.getTotalBudget())
+        BigDecimal originalContractBudget = contractMilestoneRepository
+                .findByContractIdOrderByOrderIndexAsc(contract.getContractId())
+                .stream()
+                .map(ContractMilestoneEntity::getOriginalBudget)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal budgetForDeposit = originalContractBudget.signum() > 0
+                ? originalContractBudget
+                : money(contract.getTotalBudget());
+        return money(budgetForDeposit)
                 .multiply(percentage)
                 .divide(new BigDecimal("100"))
                 .setScale(2, RoundingMode.HALF_UP);

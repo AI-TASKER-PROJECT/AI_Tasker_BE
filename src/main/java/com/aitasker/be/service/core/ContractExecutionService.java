@@ -3117,25 +3117,11 @@ public class ContractExecutionService {
     }
 
     private void applyContractChange(ContractEntity contract, ContractChangeRequestEntity request) {
-        if (request.getProposedBudget() != null) {
-            contract.setTotalBudget(request.getProposedBudget());
-        }
-        if (request.getProposedTimelineDays() != null) {
-            contract.setTimelineDays(request.getProposedTimelineDays());
-        }
         if (!isBlank(request.getProposedScope())) {
             contract.setContractScope(request.getProposedScope().trim());
         }
         if (!isBlank(request.getProposedMilestones())) {
             applyProposedContractMilestones(contract, request.getProposedMilestones());
-            if (request.getProposedBudget() == null) {
-                BigDecimal recalculated = contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(contract.getContractId())
-                        .stream()
-                        .map(ContractMilestoneEntity::getFinalBudget)
-                        .filter(java.util.Objects::nonNull)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                if (recalculated.signum() > 0) contract.setTotalBudget(recalculated);
-            }
         }
         contract.setUpdatedAt(LocalDateTime.now());
         contractRepository.save(contract);
