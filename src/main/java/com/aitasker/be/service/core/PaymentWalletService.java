@@ -57,6 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -990,6 +991,7 @@ public class PaymentWalletService {
                 : accountRepository.findById(tx.getAccountId()).orElse(null);
         String actorName = displayAccount(walletOwner, tx.getAccountId());
         builder.actorName(actorName)
+                .actorAccount(accountIdentifier(walletOwner))
                 .actorRole(roleName(walletOwner))
                 .platformBalanceChanging(isPlatformBalanceChanging(tx));
         if ("AVAILABLE".equals(tx.getBalanceType())) {
@@ -1027,13 +1029,15 @@ public class PaymentWalletService {
             String actorName
     ) {
         Optional<PaymentOrderEntity> order = paymentOrder(tx);
-        builder.counterpartyAccountId(tx.getAccountId())
-                .counterpartyRole("WALLET")
-                .counterpartyLabel("Ví nhận")
-                .counterpartyName(actorName);
+        builder.counterpartyRole("PAYMENT_PROVIDER")
+                .counterpartyLabel("Cổng thanh toán")
+                .counterpartyName("Cổng thanh toán");
         order.ifPresent(paymentOrder -> builder
                 .paymentOrderId(paymentOrder.getId())
                 .paymentProvider(paymentOrder.getProvider() == null ? null : paymentOrder.getProvider().name())
+                .counterpartyName(paymentProviderName(paymentOrder.getProvider() == null
+                        ? null
+                        : paymentOrder.getProvider().name()))
                 .providerOrderCode(paymentOrder.getProviderOrderCode())
                 .providerTransactionNo(paymentOrder.getProviderTransactionNo())
                 .providerPaymentLinkId(paymentOrder.getProviderPaymentLinkId())
@@ -1075,7 +1079,8 @@ public class PaymentWalletService {
         attachPlatformCounterparty(builder);
         String description = purchase
                 .map(item -> actorName + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua gói "
-                        + packageName + ". Thời hạn từ " + item.getBadgeStartAt() + " đến " + item.getBadgeEndAt() + ".")
+                        + packageName + ". Thời hạn từ " + formatDisplayDate(item.getBadgeStartAt())
+                        + " đến " + formatDisplayDate(item.getBadgeEndAt()) + ".")
                 .orElse(actorName + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua gói " + packageName + ".");
         return builder
                 .title(actorName + " đã mua gói " + packageName)
@@ -1415,7 +1420,82 @@ public class PaymentWalletService {
             item.setNetAmount(item.getAmount());
         }
         fillWalletDisplayLabels(item);
+        fillWalletTransactionParties(item);
         return item;
+    }
+
+    private void fillWalletTransactionParties(WalletTransactionHistoryResponse item) {
+        String actorAccount = item.getActorAccount();
+        if ((actorAccount == null || actorAccount.isBlank()) && item.getActorAccountId() != null) {
+            actorAccount = accountRepository.findById(item.getActorAccountId())
+                    .map(this::accountIdentifier)
+                    .orElse(null);
+        }
+        item.setActorAccount(actorAccount);
+
+        String counterpartyAccount = counterpartyAccount(item);
+        item.setCounterpartyAccount(counterpartyAccount);
+        String counterpartyName = nonBlank(item.getCounterpartyName(), fallbackCounterpartyName(item));
+        String counterpartyRoleLabel = nonBlank(item.getCounterpartyLabel(), roleLabel(item.getCounterpartyRole()));
+        String actorRoleLabel = roleLabel(item.getActorRole());
+
+        boolean actorReceives = Set.of("CREDIT", "RELEASE").contains(safe(item.getDirection()));
+        if (actorReceives) {
+            item.setSenderName(counterpartyName);
+            item.setSenderAccount(counterpartyAccount);
+            item.setSenderRoleLabel(counterpartyRoleLabel);
+            item.setReceiverName(item.getActorName());
+            item.setReceiverAccount(actorAccount);
+            item.setReceiverRoleLabel(actorRoleLabel);
+        } else {
+            item.setSenderName(item.getActorName());
+            item.setSenderAccount(actorAccount);
+            item.setSenderRoleLabel(actorRoleLabel);
+            item.setReceiverName(counterpartyName);
+            item.setReceiverAccount(counterpartyAccount);
+            item.setReceiverRoleLabel(counterpartyRoleLabel);
+        }
+    }
+
+    private String counterpartyAccount(WalletTransactionHistoryResponse item) {
+        if ("BANK_ACCOUNT".equals(safe(item.getCounterpartyRole()))) {
+            return item.getBankAccountNumberMasked();
+        }
+        if ("PAYMENT_PROVIDER".equals(safe(item.getCounterpartyRole()))) {
+            if (item.getProviderTransactionNo() != null && !item.getProviderTransactionNo().isBlank()) {
+                return item.getProviderTransactionNo().trim();
+            }
+            return item.getProviderOrderCode() == null ? null : String.valueOf(item.getProviderOrderCode());
+        }
+        if (item.getCounterpartyAccountId() == null) {
+            return null;
+        }
+        return accountRepository.findById(item.getCounterpartyAccountId())
+                .map(this::accountIdentifier)
+                .orElse(null);
+    }
+
+    private String fallbackCounterpartyName(WalletTransactionHistoryResponse item) {
+        return switch (safe(item.getBalanceType())) {
+            case "ESCROW" -> "Ví ký quỹ";
+            case "HOLDING" -> "Số dư tạm giữ";
+            case "DISPUTE" -> "Số dư tranh chấp";
+            default -> "Ví giao dịch";
+        };
+    }
+
+    private String accountIdentifier(AccountEntity account) {
+        if (account == null || account.getEmail() == null || account.getEmail().isBlank()) {
+            return null;
+        }
+        return account.getEmail().trim();
+    }
+
+    private String paymentProviderName(String provider) {
+        if ("PAYOS".equals(safe(provider))) {
+            return "PayOS";
+        }
+        return nonBlank(provider, "Cổng thanh toán");
     }
 
     private Optional<SystemWalletEntity> walletForTransaction(WalletTransactionEntity tx) {
@@ -1613,6 +1693,7 @@ public class PaymentWalletService {
             case "BANK_ACCOUNT" -> "Tài khoản nhận";
             case "WALLET" -> "Ví nhận";
             case "PLATFORM" -> "Nền tảng";
+            case "PAYMENT_PROVIDER" -> "Cổng thanh toán";
             default -> "Tài khoản";
         };
     }
@@ -2060,6 +2141,10 @@ public class PaymentWalletService {
 
     private String formatAmount(BigDecimal amount) {
         return amount == null ? "0" : amount.stripTrailingZeros().toPlainString();
+    }
+
+    private String formatDisplayDate(LocalDateTime value) {
+        return value == null ? "chưa xác định" : value.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
     }
 
     private record WalletDisplayGroup(

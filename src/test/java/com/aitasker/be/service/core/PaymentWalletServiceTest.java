@@ -954,6 +954,7 @@ class PaymentWalletServiceTest {
         AccountEntity businessAccount = AccountEntity.builder()
                 .accountId(10)
                 .fullName("Nova Retail")
+                .email("finance@nova.test")
                 .role(RoleEntity.builder().roleName("BUSINESS").build())
                 .build();
         WalletTransactionEntity tx = WalletTransactionEntity.builder()
@@ -1013,6 +1014,12 @@ class PaymentWalletServiceTest {
         assertEquals(90077L, item.getProviderOrderCode());
         assertEquals("BANK-TXN-77", item.getProviderTransactionNo());
         assertEquals("plink_77", item.getProviderPaymentLinkId());
+        assertEquals("PayOS", item.getSenderName());
+        assertEquals("BANK-TXN-77", item.getSenderAccount());
+        assertEquals("Cổng thanh toán", item.getSenderRoleLabel());
+        assertEquals("Nova Retail", item.getReceiverName());
+        assertEquals("finance@nova.test", item.getReceiverAccount());
+        assertEquals("Doanh nghiệp", item.getReceiverRoleLabel());
         assertEquals("{\"source\":\"PAYOS_SYNC\"}", item.getMetadata());
         assertFalse(item.getPlatformBalanceChanging());
     }
@@ -1111,7 +1118,7 @@ class PaymentWalletServiceTest {
         assertEquals("Doanh nghiệp A đã mua 10 lượt đăng job", history.get(1).getTitle());
         assertEquals("Doanh nghiệp A thanh toán 100000 VND để mua 10 lượt đăng job.", history.get(1).getDescription());
         assertEquals("Doanh nghiệp A đã mua gói Premium Business", history.get(2).getTitle());
-        assertEquals("Doanh nghiệp A thanh toán 500000 VND để mua gói Premium Business. Thời hạn từ 2026-06-27T00:00 đến 2026-07-27T00:00.",
+        assertEquals("Doanh nghiệp A thanh toán 500000 VND để mua gói Premium Business. Thời hạn từ 27/06/2026 đến 27/07/2026.",
                 history.get(2).getDescription());
     }
 
@@ -1122,6 +1129,7 @@ class PaymentWalletServiceTest {
         AccountEntity purchaser = AccountEntity.builder()
                 .accountId(10)
                 .fullName("Doanh nghiệp A")
+                .email("billing@business-a.test")
                 .role(RoleEntity.builder().roleName("BUSINESS").build())
                 .build();
         SystemWalletEntity platformWallet = SystemWalletEntity.builder()
@@ -1180,6 +1188,12 @@ class PaymentWalletServiceTest {
         assertEquals("Doanh nghiệp A", item.getCounterpartyName());
         assertEquals(Integer.valueOf(10), item.getCounterpartyAccountId());
         assertEquals("BUSINESS", item.getCounterpartyRole());
+        assertEquals("Doanh nghiệp A", item.getSenderName());
+        assertEquals("billing@business-a.test", item.getSenderAccount());
+        assertEquals("Doanh nghiệp", item.getSenderRoleLabel());
+        assertEquals("Admin System", item.getReceiverName());
+        assertEquals("platform@aitasker.test", item.getReceiverAccount());
+        assertEquals("Nội bộ", item.getReceiverRoleLabel());
         assertTrue(item.getTitle().contains("Nền tảng ghi nhận doanh thu"));
     }
 
@@ -1222,6 +1236,7 @@ class PaymentWalletServiceTest {
     private AccountEntity adminAccount() {
         return AccountEntity.builder()
                 .accountId(1)
+                .email("platform@aitasker.test")
                 .role(RoleEntity.builder().roleName("ADMIN").build())
                 .status("Approved")
                 .build();

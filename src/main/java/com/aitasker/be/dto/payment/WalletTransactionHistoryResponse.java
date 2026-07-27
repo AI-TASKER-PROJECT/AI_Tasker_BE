@@ -61,10 +61,18 @@ public class WalletTransactionHistoryResponse {
     private String title;
     private String description;
     private String actorName;
+    private String actorAccount;
     private Integer counterpartyAccountId;
     private String counterpartyRole;
     private String counterpartyLabel;
     private String counterpartyName;
+    private String counterpartyAccount;
+    private String senderName;
+    private String senderAccount;
+    private String senderRoleLabel;
+    private String receiverName;
+    private String receiverAccount;
+    private String receiverRoleLabel;
     private Integer businessId;
     private String businessName;
     private Integer expertId;

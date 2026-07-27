@@ -38,6 +38,13 @@ history scope, transaction category, wallet id/type, actor role, platform
 balance flag, metadata, masked bank account number, provider details, milestone
 context, and gross/fee/net amounts. Existing fields remain present.
 
+Expose display-ready sender and receiver projections for every history item:
+name, account identifier, and Vietnamese role label. Account identifiers use
+the account email for platform users, the masked bank account for withdrawals,
+and the provider transaction/order code for payment-gateway top-ups. Frontend
+history views consume these fields directly instead of inferring parties from
+raw ledger codes or joining the admin account list.
+
 Do not add a new table or rewrite historical ledger rows.
 
 ## Consequences
