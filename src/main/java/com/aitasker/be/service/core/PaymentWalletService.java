@@ -9,6 +9,8 @@ import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.dto.admin.MembershipPackageRequest;
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
+import com.aitasker.be.dto.payment.CreditPriceResponse;
+import com.aitasker.be.dto.payment.ContractDepositRateResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.dto.payment.QuotaResponse;
@@ -95,6 +97,8 @@ public class PaymentWalletService {
     private static final String TIER_STANDARD = "STANDARD";
     private static final String TIER_BASIC = "BASIC";
     private static final int INITIAL_FREE_QUOTA = 3;
+    private static final BigDecimal DEFAULT_BUSINESS_DEPOSIT_PERCENTAGE = new BigDecimal("20.00");
+    private static final BigDecimal DEFAULT_EXPERT_DEPOSIT_PERCENTAGE = new BigDecimal("10.00");
 
     private final AccessService accessService;
     private final SystemWalletService systemWalletService;
@@ -396,7 +400,8 @@ public class PaymentWalletService {
         if (!"PENDING".equals(contract.getStatus())) {
             throw new AppException("CONTRACT_INVALID_STATUS");
         }
-        return fundContractDeposit(contract, actor, ROLE_BUSINESS, business.getBusinessId(), new BigDecimal("20.00"));
+        return fundContractDeposit(contract, actor, ROLE_BUSINESS, business.getBusinessId(),
+                depositPercentage("contract.deposit.business_percentage", DEFAULT_BUSINESS_DEPOSIT_PERCENTAGE));
     }
 
     @Transactional
@@ -409,7 +414,8 @@ public class PaymentWalletService {
         if (!expert.getExpertId().equals(contract.getExpertId())) {
             throw new AppException("BAN KHONG THUOC CONTRACT NAY");
         }
-        return fundContractDeposit(contract, actor, ROLE_EXPERT, contract.getBusinessId(), new BigDecimal("10.00"));
+        return fundContractDeposit(contract, actor, ROLE_EXPERT, contract.getBusinessId(),
+                depositPercentage("contract.deposit.expert_percentage", DEFAULT_EXPERT_DEPOSIT_PERCENTAGE));
     }
 
     private PaymentActionResponse<ContractDepositEntity> fundContractDeposit(
@@ -2435,20 +2441,38 @@ public class PaymentWalletService {
                 .orElse(fallback);
     }
 
-    // Note: Ham `depositAmount` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private BigDecimal depositAmount(ContractEntity contract) {
-        return percentageAmount(contract, new BigDecimal("20.00"));
+    public CreditPriceResponse getCreditPrices() {
+        accessService.requireRole(ROLE_BUSINESS, ROLE_EXPERT, "ADMIN");
+        return CreditPriceResponse.builder()
+                .jobPostPriceVnd(settingAmount("credit.job_post.price_vnd", BigDecimal.valueOf(200)))
+                .proposalPriceVnd(settingAmount("credit.proposal.price_vnd", BigDecimal.valueOf(100)))
+                .build();
+    }
+
+    public ContractDepositRateResponse getContractDepositRates() {
+        accessService.requireRole(ROLE_BUSINESS, ROLE_EXPERT, "ADMIN", "STAFF");
+        return ContractDepositRateResponse.builder()
+                .businessPercentage(depositPercentage("contract.deposit.business_percentage", DEFAULT_BUSINESS_DEPOSIT_PERCENTAGE))
+                .expertPercentage(depositPercentage("contract.deposit.expert_percentage", DEFAULT_EXPERT_DEPOSIT_PERCENTAGE))
+                .build();
+    }
+
+    private BigDecimal depositPercentage(String key, BigDecimal fallback) {
+        BigDecimal configured = settingAmount(key, fallback);
+        return configured.signum() > 0 && configured.compareTo(new BigDecimal("100")) <= 0
+                ? configured
+                : fallback;
     }
 
     private BigDecimal percentageAmount(ContractEntity contract, BigDecimal percentage) {
-        BigDecimal originalContractBudget = contractMilestoneRepository
+        BigDecimal finalContractBudget = contractMilestoneRepository
                 .findByContractIdOrderByOrderIndexAsc(contract.getContractId())
                 .stream()
-                .map(ContractMilestoneEntity::getOriginalBudget)
+                .map(ContractMilestoneEntity::getFinalBudget)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal budgetForDeposit = originalContractBudget.signum() > 0
-                ? originalContractBudget
+        BigDecimal budgetForDeposit = finalContractBudget.signum() > 0
+                ? finalContractBudget
                 : money(contract.getTotalBudget());
         return money(budgetForDeposit)
                 .multiply(percentage)

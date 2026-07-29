@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -3122,6 +3123,20 @@ public class ContractExecutionService {
         }
         if (!isBlank(request.getProposedMilestones())) {
             applyProposedContractMilestones(contract, request.getProposedMilestones());
+        }
+        if (request.getProposedBudget() != null && request.getProposedBudget().signum() > 0) {
+            contract.setTotalBudget(request.getProposedBudget());
+        } else if (!isBlank(request.getProposedMilestones())) {
+            BigDecimal milestoneTotal = contractMilestoneRepository
+                    .findByContractIdOrderByOrderIndexAsc(contract.getContractId())
+                    .stream()
+                    .map(ContractMilestoneEntity::getFinalBudget)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (milestoneTotal.signum() > 0) contract.setTotalBudget(milestoneTotal);
+        }
+        if (request.getProposedTimelineDays() != null && request.getProposedTimelineDays() > 0) {
+            contract.setTimelineDays(request.getProposedTimelineDays());
         }
         contract.setUpdatedAt(LocalDateTime.now());
         contractRepository.save(contract);

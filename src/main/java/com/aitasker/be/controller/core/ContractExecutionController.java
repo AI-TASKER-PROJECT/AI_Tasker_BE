@@ -18,6 +18,7 @@ import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
 import com.aitasker.be.dto.core.StaffDisputeFilter;
 import com.aitasker.be.dto.core.StaffDisputeListResponse;
 import com.aitasker.be.dto.payment.DepositRefundRequest;
+import com.aitasker.be.dto.payment.ContractDepositRateResponse;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.service.core.AdminService;
@@ -43,6 +44,13 @@ public class ContractExecutionController {
     private final PaymentWalletService paymentWalletService;
     private final AdminService adminService;
     private final StaffDisputeService staffDisputeService;
+
+    @GetMapping("/contracts/deposit-rates")
+    @Operation(summary = "Get current contract deposit percentages")
+    public ResponseEntity<ApiResponse<ContractDepositRateResponse>> getContractDepositRates() {
+        return ResponseEntity.ok(ApiResponse.success("GET CONTRACT DEPOSIT RATES SUCCESS",
+                paymentWalletService.getContractDepositRates()));
+    }
 
     // Note: Annotation nÃ y khai bÃ¡o API táº¡o má»›i hoáº·c gá»­i dá»¯ liá»‡u báº±ng HTTP POST.
     @PostMapping("/contracts/from-proposals/{proposalId}")

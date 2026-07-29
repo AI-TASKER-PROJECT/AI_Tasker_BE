@@ -35,7 +35,9 @@ public class AdminService {
             "default_sla_days",
             "dispute_staff_max_active_cases",
             "credit.job_post.price_vnd",
-            "credit.proposal.price_vnd"
+            "credit.proposal.price_vnd",
+            "contract.deposit.business_percentage",
+            "contract.deposit.expert_percentage"
     );
 
     private final AccessService accessService;
@@ -120,6 +122,7 @@ public class AdminService {
         validateSettingRequest(request, true);
         String key = normalizeSettingKey(request.getSettingKey());
         requireSupportedSettingKey(key);
+        validateSettingValue(key, request.getSettingValue());
         if (systemSettingRepository.existsById(key)) {
             throw new AppException("SYSTEM SETTING DA TON TAI");
         }
@@ -151,7 +154,10 @@ public class AdminService {
         requireSupportedSettingKey(normalizedKey);
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         // CHI CHO PHEP CAP NHAT GIA TRI/CO HIEU LUC, KHONG CHO DOI VALUE_TYPE TRANH VO HOP DONG DU LIEU.
-        if (value != null && !value.isBlank()) setting.setSettingValue(value);
+        if (value != null && !value.isBlank()) {
+            validateSettingValue(normalizedKey, value);
+            setting.setSettingValue(value.trim());
+        }
         if (isActive != null) setting.setIsActive(isActive);
         AccountEntity actor = accessService.currentAccount();
         setting.setUpdatedByRoleId(actor.getRole().getRoleId());
@@ -169,6 +175,7 @@ public class AdminService {
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         if (request.getSettingValue() != null && !request.getSettingValue().isBlank()) {
+            validateSettingValue(normalizedKey, request.getSettingValue());
             setting.setSettingValue(request.getSettingValue().trim());
         }
         if (request.getValueType() != null && !request.getValueType().isBlank()) {
@@ -483,6 +490,22 @@ public class AdminService {
     private void requireSupportedSettingKey(String key) {
         if (!SUPPORTED_SYSTEM_SETTINGS.contains(key)) {
             throw new AppException("SYSTEM SETTING KHONG DUOC HO TRO");
+        }
+    }
+
+    private void validateSettingValue(String key, String value) {
+        if (value == null || value.isBlank()) throw new AppException("SETTING VALUE KHONG DUOC DE TRONG");
+        try {
+            BigDecimal numeric = new BigDecimal(value.trim());
+            if (key.startsWith("contract.deposit.")) {
+                if (numeric.signum() <= 0 || numeric.compareTo(new BigDecimal("100")) > 0) {
+                    throw new AppException("TY LE KY QUY PHAI LON HON 0 VA KHONG VUOT QUA 100");
+                }
+            } else if (key.startsWith("credit.") && numeric.signum() <= 0) {
+                throw new AppException("GIA CREDIT PHAI LON HON 0");
+            }
+        } catch (NumberFormatException ex) {
+            throw new AppException("SETTING VALUE KHONG DUNG DINH DANG SO");
         }
     }
 

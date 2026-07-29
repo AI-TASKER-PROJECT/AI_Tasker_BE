@@ -577,7 +577,7 @@ class ContractExecutionServiceTest {
         JobEntity job = JobEntity.builder().jobId(2).businessId(10).title("Job A").build();
         ProposalEntity proposal = ProposalEntity.builder()
                 .proposalId(50).jobId(2).expertId(5).status("Accepted")
-                .proposalMilestone(null)
+                .proposalMilestone("[{\"milestoneId\":200,\"proposedBudget\":650}]")
                 .build();
         MilestoneEntity milestone = MilestoneEntity.builder()
                 .milestoneId(200).jobId(2)
@@ -626,6 +626,9 @@ class ContractExecutionServiceTest {
         ContractMilestoneEntity snapshot = captor.getValue();
         assertEquals("Criteria snapshot text", snapshot.getCriteriaSnapshot());
         assertEquals("Deliverable expectation text", snapshot.getDeliverableExpectation());
+        assertEquals(BigDecimal.valueOf(500), snapshot.getOriginalBudget());
+        assertEquals(BigDecimal.valueOf(650), snapshot.getFinalBudget());
+        assertEquals(BigDecimal.valueOf(650), saved.getTotalBudget());
         assertEquals("M1", saved.getContractMilestones().get(0).getMilestoneName());
     }
 

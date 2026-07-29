@@ -150,6 +150,18 @@ class AdminServiceTest {
         assertEquals("SYSTEM SETTING KHONG DUOC HO TRO", ex.getMessage());
     }
 
+    @Test
+    void createSetting_shouldRejectInvalidContractDepositPercentage() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingKey("contract.deposit.business_percentage");
+        request.setSettingValue("101");
+        request.setValueType("DECIMAL");
+
+        AppException ex = assertThrows(AppException.class, () -> adminService.createSetting(request));
+
+        assertEquals("TY LE KY QUY PHAI LON HON 0 VA KHONG VUOT QUA 100", ex.getMessage());
+    }
+
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
     // Note: Hàm `createReview_shouldThrowWhenRatingOutOfRange` dùng để kiểm thử hành vi mong đợi, giúp phát hiện lỗi khi code thay đổi.

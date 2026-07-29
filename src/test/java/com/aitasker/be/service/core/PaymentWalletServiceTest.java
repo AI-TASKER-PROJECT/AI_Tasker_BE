@@ -21,6 +21,7 @@ import com.aitasker.be.entity.PaymentProvider;
 import com.aitasker.be.entity.PaymentStatus;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.SystemWalletEntity;
+import com.aitasker.be.entity.SystemSettingEntity;
 import com.aitasker.be.entity.UserQuotaEntity;
 import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.entity.WithdrawalRequestEntity;
@@ -88,6 +89,36 @@ class PaymentWalletServiceTest {
     @Mock private NotificationService notificationService;
 
     @InjectMocks private PaymentWalletService paymentWalletService;
+
+    @Test
+    void getCreditPrices_shouldReturnActiveConfiguredValues() {
+        when(systemSettingRepository.findById("credit.job_post.price_vnd")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingKey("credit.job_post.price_vnd")
+                        .settingValue("500").isActive(true).build()));
+        when(systemSettingRepository.findById("credit.proposal.price_vnd")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingKey("credit.proposal.price_vnd")
+                        .settingValue("750").isActive(true).build()));
+
+        var prices = paymentWalletService.getCreditPrices();
+
+        assertEquals(new BigDecimal("500"), prices.getJobPostPriceVnd());
+        assertEquals(new BigDecimal("750"), prices.getProposalPriceVnd());
+        verify(accessService).requireRole("BUSINESS", "EXPERT", "ADMIN");
+    }
+
+    @Test
+    void getContractDepositRates_shouldReturnBothConfiguredPercentages() {
+        when(systemSettingRepository.findById("contract.deposit.business_percentage")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingValue("25").isActive(true).build()));
+        when(systemSettingRepository.findById("contract.deposit.expert_percentage")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingValue("15").isActive(true).build()));
+
+        var rates = paymentWalletService.getContractDepositRates();
+
+        assertEquals(new BigDecimal("25"), rates.getBusinessPercentage());
+        assertEquals(new BigDecimal("15"), rates.getExpertPercentage());
+        verify(accessService).requireRole("BUSINESS", "EXPERT", "ADMIN", "STAFF");
+    }
 
     @Test
     void listMembershipPackagesForAdmin_shouldUseActiveOnlyQuery() {
@@ -1022,6 +1053,37 @@ class PaymentWalletServiceTest {
         assertEquals("Doanh nghiệp", item.getReceiverRoleLabel());
         assertEquals("{\"source\":\"PAYOS_SYNC\"}", item.getMetadata());
         assertFalse(item.getPlatformBalanceChanging());
+    }
+
+    @Test
+    void payContractDeposit_shouldUseConfiguredRateAndFinalMilestoneBudget() {
+        AccountEntity account = AccountEntity.builder().accountId(10)
+                .role(RoleEntity.builder().roleName("BUSINESS").build()).status("Approved").build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).build();
+        ContractEntity contract = ContractEntity.builder().contractId(30).businessId(20)
+                .status("PENDING").totalBudget(new BigDecimal("1000000")).build();
+        ContractMilestoneEntity milestone = ContractMilestoneEntity.builder().contractId(30)
+                .originalBudget(new BigDecimal("1000000")).finalBudget(new BigDecimal("1200000")).build();
+        SystemSettingEntity rate = SystemSettingEntity.builder()
+                .settingKey("contract.deposit.business_percentage").settingValue("25").isActive(true).build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(contractRepository.findById(30)).thenReturn(Optional.of(contract));
+        when(systemSettingRepository.findById("contract.deposit.business_percentage")).thenReturn(Optional.of(rate));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(30)).thenReturn(List.of(milestone));
+        when(contractDepositRepository.findByContractIdAndOwnerRoleForUpdate(30, "BUSINESS")).thenReturn(Optional.empty());
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("500000"));
+        when(walletLedgerService.holdEscrowFromAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
+                .thenReturn(WalletTransactionEntity.builder().id(70L).build());
+        when(contractDepositRepository.save(any(ContractDepositEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentActionResponse<ContractDepositEntity> response = paymentWalletService.payContractDeposit(30);
+
+        assertTrue(response.isCompleted());
+        assertEquals(new BigDecimal("25"), response.getData().getRequiredPercentage());
+        assertEquals(new BigDecimal("300000.00"), response.getData().getRequiredAmount());
+        assertEquals(new BigDecimal("300000.00"), response.getData().getDepositAmount());
     }
 
     @Test
