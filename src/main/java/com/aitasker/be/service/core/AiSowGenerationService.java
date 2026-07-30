@@ -61,6 +61,7 @@ public class AiSowGenerationService {
     private static final BigDecimal MAX_ABBREVIATED_MILLION_VALUE = new BigDecimal("10000");
     private static final Pattern MONEY_NUMBER_PATTERN = Pattern.compile("[-+]?\\d+(?:[.,]\\d+)*");
     private static final int MAX_BUDGET_FACTORS = 8;
+    private static final int MAX_GENERATED_MILESTONES = 50;
 
     private final RestTemplate restTemplate;
     private final OpenAiProperties openAiProperties;
@@ -76,13 +77,18 @@ public class AiSowGenerationService {
         }
 
         String ragContext = ragRetrievalService.retrieveContext(request);
-        GenerateSowResponse response = callAndParse(buildPrompt(request, ragContext));
+        GenerateSowResponse response = callAndParse(buildPrompt(request, ragContext), request);
+        List<String> violations = generationViolations(response, request);
 
-        // Recovery retry nội bộ: nếu model chỉ trả questions mà thiếu SoW/milestone, retry đúng 1 lần.
-        if (!hasValidDraft(response)) {
-            GenerateSowResponse retry = callAndParse(buildRecoveryPrompt(request, ragContext));
-            if (!hasValidDraft(retry)) {
-                throw new AppException("AI response thieu thong tin sow hoac milestones sau recovery");
+        // Retry once for an incomplete draft or an infeasible milestone count.
+        if (!violations.isEmpty()) {
+            GenerateSowResponse retry = callAndParse(
+                    buildRecoveryPrompt(request, ragContext, violations),
+                    request);
+            List<String> retryViolations = generationViolations(retry, request);
+            if (!retryViolations.isEmpty()) {
+                throw new AppException("AI response khong dat rang buoc sau recovery: "
+                        + String.join("; ", retryViolations));
             }
             response = retry;
         }
@@ -92,8 +98,8 @@ public class AiSowGenerationService {
     }
 
     // Note: Hàm gọi AI và parse kết quả thành response DTO.
-    private GenerateSowResponse callAndParse(String prompt) {
-        return parseAiResponse(callAi(prompt));
+    private GenerateSowResponse callAndParse(String prompt, GenerateSowRequest request) {
+        return parseAiResponse(callAi(prompt, request));
     }
 
     // Note: Hàm kiểm tra response có SoW và milestones hợp lệ để sử dụng ngay.
@@ -103,9 +109,26 @@ public class AiSowGenerationService {
                 && response.getMilestones() != null
                 && !response.getMilestones().isEmpty()
                 && response.getMilestones().stream()
-                .allMatch(milestone -> milestone.getAcceptanceCriteria() != null
+                .allMatch(milestone -> milestone != null
+                        && milestone.getAcceptanceCriteria() != null
                         && milestone.getAcceptanceCriteria().stream()
                         .anyMatch(criterion -> criterion != null && !criterion.isBlank()));
+    }
+
+    private List<String> generationViolations(GenerateSowResponse response, GenerateSowRequest request) {
+        List<String> violations = new ArrayList<>();
+        if (!hasValidDraft(response)) {
+            violations.add("Bat buoc co sow, milestone va acceptanceCriteria khong rong");
+            return violations;
+        }
+
+        int milestoneLimit = milestoneLimit(request == null ? null : request.getDuration());
+        if (response.getMilestones().size() > milestoneLimit) {
+            violations.add("So milestone " + response.getMilestones().size()
+                    + " vuot gioi han " + milestoneLimit
+                    + " de moi milestone co duration nguyen duong");
+        }
+        return violations;
     }
 
     // Note: Hàm chuẩn hóa cuối cùng: questions tối đa 3, needMoreInfo theo questions, assumptions không null,
@@ -127,6 +150,7 @@ public class AiSowGenerationService {
         normalizeAssumptions(response.getSow());
         response.getMilestones().forEach(this::normalizeAcceptanceCriteria);
         normalizeMilestoneDuration(response, request.getDuration(), request.getDurationUnit());
+        validateDurationInvariant(response.getMilestones(), request.getDuration(), request.getDurationUnit());
         normalizeBudgetAssessment(response, request.getBudget());
         normalizeMilestoneRecommendedBudget(response, response.getBudgetAssessment().getRecommendedBudget());
         normalizeMilestoneBudget(response, request.getBudget());
@@ -189,16 +213,32 @@ public class AiSowGenerationService {
 
     // Note: Hàm dựng prompt cho lần recovery retry nội bộ khi model chỉ trả questions mà thiếu SoW/milestone.
     public String buildRecoveryPrompt(GenerateSowRequest request, String ragContext) {
-        return buildPromptInternal(request, ragContext, true);
+        return buildRecoveryPrompt(request, ragContext, List.of());
+    }
+
+    private String buildRecoveryPrompt(GenerateSowRequest request, String ragContext, List<String> violations) {
+        return buildPromptInternal(request, ragContext, true, violations);
     }
 
     private String buildPromptInternal(GenerateSowRequest request, String ragContext, boolean recovery) {
+        return buildPromptInternal(request, ragContext, recovery, List.of());
+    }
+
+    private String buildPromptInternal(GenerateSowRequest request, String ragContext,
+                                       boolean recovery, List<String> violations) {
+        int milestoneLimit = milestoneLimit(request == null ? null : request.getDuration());
+        String recoveryViolations = violations == null || violations.isEmpty()
+                ? ""
+                : "\nLoi can sua trong lan recovery nay:\n- " + String.join("\n- ", violations);
         String template = """
                 Ban la Senior AI Solution Architect.
 
                 Su dung RAG CONTEXT ben duoi de tao SoW dung nghiep vu he thong.
                 Neu RAG CONTEXT khong lien quan, hay bo qua phan khong lien quan.
                 Khong duoc copy may moc context, chi dung no lam quy tac tham khao.
+                Cac planning dimensions trong context chi la goi y phan tich,
+                KHONG phai danh sach phase hoac milestone bat buoc. Khong bien moi
+                context bullet thanh mot milestone.
                 Tuyet doi khong liet ke milestones hoac milestone guidance (ten milestone,
                 mo ta milestone, phan bo ngan sach %%) trong cac field sow.overview,
                 sow.scopeOfWork, sow.deliverables. Cac field sow chi mo ta tong quan
@@ -226,90 +266,55 @@ public class AiSowGenerationService {
                    rieng gom cac dieu kien nghiem thu cu the, do duoc va phu hop
                    voi san pham ban giao cua milestone do. Khong dung catalog hoac
                    danh sach tieu chi mac dinh giong nhau cho moi milestone.
-                 9. Neu du thong tin:
-                    - Viet Statement of Work chuyen nghiep.
-                    - Chia milestone.
-                    - Uoc luong thoi luong.
-                    - Phan bo ngan sach theo milestone.
-                10. Uoc luong mot khoang ngan sach VND DOC LAP cho TOAN BO scope da
+                   Moi criterion phai neu ket qua quan sat duoc va cach kiem tra,
+                   bang chung hoac nguong pass/fail. Khong dung rieng cac cau mo ho
+                   nhu "hoat dong dung", "hieu qua", "hoan thanh", "duoc phe duyet".
+                 9. Viet Statement of Work chuyen nghiep va TU QUYET DINH so luong
+                    milestone phu hop voi scope, do phuc tap, cac ket qua co the
+                    nghiem thu doc lap va tong thoi luong user cung cap.
+                    - Khong dung so luong, ten milestone hoac phase co dinh.
+                    - Khong sao chep planning dimensions thanh danh sach milestone.
+                    - Gop cac cong viec lien quan va bo qua nhom khong can thiet.
+                    - Moi milestone phai tao ra mot ket qua co the nghiem thu.
+                    - So milestone phai cho phep moi duration >= 1 va tong duration
+                      cua milestones bang dung Duration trong Input.
+                    - So milestone toi da la %s.
+                    - Phan bo ngan sach theo cong suc va rui ro thuc te; khong dung
+                      ty le phase co dinh tu RAG context.
+                10. Bao phu tat ca yeu cau ro rang trong Raw requirement, Support
+                    fields va Required skills. Moi scope item, deliverable va
+                    milestone phai truy vet duoc ve input hoac mot phu thuoc bat
+                    buoc duoc ghi trong sow.assumptions. Khong tu them CI/CD,
+                    monitoring, training, deployment hay tinh nang khac chi vi
+                    RAG context co nhac toi; neu chi la goi y thi dua vao outOfScope.
+                11. Uoc luong mot khoang ngan sach VND DOC LAP cho TOAN BO scope da
                     generate. Tu tinh gia dua tren do phuc tap scope, thoi luong,
                     vai tro va cong suc can thiet, tich hop, du lieu, kiem thu,
                     bao mat, ha tang, trien khai va du phong rui ro. Cac du an khac
                     nhau ve nhung yeu to nay phai co khoang gia khac nhau ro rang.
                     Khong suy doan, copy, neo hoac scale theo ngan sach Business;
                     ngan sach Business khong duoc cung cap cho model.
-                11. budgetAssessment phai co estimatedMin <= recommendedBudget <=
+                12. budgetAssessment phai co estimatedMin <= recommendedBudget <=
                     estimatedMax, confidence LOW|MEDIUM|HIGH va toi da 8 factors
                     ngan gon giai thich cac driver chinh cua gia.
-                12. Tong milestones[].budget phai bang budgetAssessment.recommendedBudget.
+                13. Tong milestones[].budget phai bang budgetAssessment.recommendedBudget.
                     Day la phan bo de xuat cho full scope, khong phai quyet dinh
                     cuoi cung cua Business.
-                13. Tat ca field tien phai la JSON number, so nguyen VND day du
+                14. Tat ca field tien phai la JSON number, so nguyen VND day du
                     va lon hon 0. Khong viet dang rut gon, khong kem don vi tien
                     trong gia tri va khong sao chep gia tu schema.
                  """ + (recovery ? """
 
-                        BUOC PHUC HOI NOI BO: Phan hinh truoc chi co questions va thieu
-                        sow/milestones. Lan nay bat buoc sinh ngay SoW day du va
-                        milestones khong rong, ghi cac gia dinh suy luan vao
-                        sow.assumptions, sinh acceptanceCriteria rieng cho tung
-                        milestone, va chi tra toi da 3 cau hoi optional. Khong duoc
-                        tra phan hinh question-only mot lan nua.
-                        """ : "") + """
+                        BUOC PHUC HOI NOI BO: Ket qua truoc vi pham hop dong sinh SoW.
+                        Lan nay bat buoc sinh ngay SoW day du, sua cac loi duoc neu,
+                        tao milestones khong rong, ghi gia dinh vao sow.assumptions,
+                        sinh acceptanceCriteria rieng cho tung milestone, va chi
+                        tra toi da 3 cau hoi optional.%s
+                        """ : "%s") + """
 
                 Bat buoc tra ve JSON hop le, khong markdown, khong giai thich ngoai JSON.
 
-                JSON schema bat buoc (day la hop dong kieu du lieu, KHONG phai
-                du lieu mau va khong chua bat ky muc gia goi y nao):
-                {
-                  "type": "object",
-                  "required": ["needMoreInfo", "questions", "budgetAssessment", "sow", "milestones"],
-                  "properties": {
-                    "needMoreInfo": {"type": "boolean"},
-                    "questions": {"type": "array", "items": {"type": "string"}},
-                    "budgetAssessment": {
-                      "type": "object",
-                      "required": ["currency", "estimatedMin", "recommendedBudget", "estimatedMax", "confidence", "factors"],
-                      "properties": {
-                        "currency": {"type": "string", "const": "VND"},
-                        "estimatedMin": {"type": "integer", "minimum": 1},
-                        "recommendedBudget": {"type": "integer", "minimum": 1},
-                        "estimatedMax": {"type": "integer", "minimum": 1},
-                        "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
-                        "factors": {"type": "array", "items": {"type": "string"}}
-                      }
-                    },
-                    "sow": {
-                      "type": "object",
-                      "required": ["title", "overview", "objectives", "scopeOfWork", "deliverables", "assumptions", "outOfScope"],
-                      "properties": {
-                        "title": {"type": "string"},
-                        "overview": {"type": "string"},
-                        "objectives": {"type": "array", "items": {"type": "string"}},
-                        "scopeOfWork": {"type": "array", "items": {"type": "string"}},
-                        "deliverables": {"type": "array", "items": {"type": "string"}},
-                        "assumptions": {"type": "array", "items": {"type": "string"}},
-                        "outOfScope": {"type": "array", "items": {"type": "string"}}
-                      }
-                    },
-                    "milestones": {
-                      "type": "array",
-                      "minItems": 1,
-                      "items": {
-                        "type": "object",
-                        "required": ["name", "description", "duration", "durationUnit", "budget", "acceptanceCriteria"],
-                        "properties": {
-                          "name": {"type": "string"},
-                          "description": {"type": "string"},
-                          "duration": {"type": "integer", "minimum": 1},
-                          "durationUnit": {"type": "string"},
-                          "budget": {"type": "integer", "minimum": 1},
-                          "acceptanceCriteria": {"type": "array", "minItems": 1, "items": {"type": "string"}}
-                        }
-                      }
-                    }
-                  }
-                }
+                Cau truc va kieu du lieu duoc he thong ep bang Structured Outputs.
 
                 Input:
                 Project title: %s
@@ -321,6 +326,8 @@ public class AiSowGenerationService {
         return template.formatted(
                 ragContext == null ? "" : ragContext,
                 clarificationInstruction(request),
+                milestoneLimit,
+                recoveryViolations,
                 request.getProjectTitle(),
                 request.getRawRequirement(),
                 request.getDuration(),
@@ -1010,6 +1017,9 @@ public class AiSowGenerationService {
         if (milestones == null || milestones.isEmpty() || totalDuration == null || totalDuration <= 0) {
             return;
         }
+        if (milestones.size() > milestoneLimit(totalDuration)) {
+            throw new AppException("So milestone vuot qua tong duration; khong the phan bo duration nguyen duong");
+        }
 
         boolean hasInvalidDuration = milestones.stream()
                 .anyMatch(milestone -> milestone.getDuration() == null || milestone.getDuration() <= 0);
@@ -1059,8 +1069,28 @@ public class AiSowGenerationService {
         rebalanceDurationTotal(milestones, totalDuration);
     }
 
-    private String callAi(String prompt) {
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(buildRequestBody(prompt), buildHeaders());
+    private void validateDurationInvariant(List<MilestoneDto> milestones, Integer totalDuration, String durationUnit) {
+        if (milestones == null || milestones.isEmpty() || totalDuration == null || totalDuration <= 0) {
+            return;
+        }
+        boolean invalid = milestones.stream().anyMatch(milestone -> milestone == null
+                || milestone.getDuration() == null
+                || milestone.getDuration() <= 0
+                || !isSameDurationUnit(milestone.getDurationUnit(), durationUnit));
+        int actualTotal = milestones.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(MilestoneDto::getDuration)
+                .filter(java.util.Objects::nonNull)
+                .reduce(0, Integer::sum);
+        if (invalid || actualTotal != totalDuration) {
+            throw new AppException("AI milestone duration khong khop tong duration cua du an");
+        }
+    }
+
+    private String callAi(String prompt, GenerateSowRequest sowRequest) {
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(
+                buildRequestBody(prompt, sowRequest),
+                buildHeaders());
 
         try {
             ResponseEntity<Map> response = callOpenAi(request);
@@ -1095,8 +1125,8 @@ public class AiSowGenerationService {
         return statusCode.is5xxServerError();
     }
 
-    // Note: Hàm dựng body request theo Chat Completions API và ép AI trả JSON object.
-    private Map<String, Object> buildRequestBody(String prompt) {
+    // Note: Build a strict Structured Outputs contract for Chat Completions.
+    private Map<String, Object> buildRequestBody(String prompt, GenerateSowRequest sowRequest) {
         Map<String, Object> systemMessage = new LinkedHashMap<>();
         systemMessage.put("role", "system");
         systemMessage.put("content", SYSTEM_MESSAGE);
@@ -1106,14 +1136,102 @@ public class AiSowGenerationService {
         userMessage.put("content", prompt);
 
         Map<String, Object> responseFormat = new LinkedHashMap<>();
-        responseFormat.put("type", "json_object");
+        responseFormat.put("type", "json_schema");
+        responseFormat.put("json_schema", Map.of(
+                "name", "ai_sow_response",
+                "strict", true,
+                "schema", buildSowResponseSchema(sowRequest)));
 
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model", openAiProperties.getModel());
         requestBody.put("messages", List.of(systemMessage, userMessage));
-        requestBody.put("temperature", 0.1);
+        if (openAiProperties.supportsCustomTemperature()) {
+            requestBody.put("temperature", 0.1);
+        }
         requestBody.put("response_format", responseFormat);
         return requestBody;
+    }
+
+    private Map<String, Object> buildSowResponseSchema(GenerateSowRequest request) {
+        Map<String, Object> nonBlankString = Map.of("type", "string", "minLength", 1);
+        Map<String, Object> stringArray = Map.of(
+                "type", "array",
+                "items", nonBlankString);
+        Map<String, Object> durationUnitSchema = request != null
+                && request.getDurationUnit() != null
+                && !request.getDurationUnit().isBlank()
+                ? Map.of("type", "string", "const", request.getDurationUnit())
+                : nonBlankString;
+
+        Map<String, Object> budgetAssessment = strictObject(
+                List.of("currency", "estimatedMin", "recommendedBudget", "estimatedMax", "confidence", "factors"),
+                Map.of(
+                        "currency", Map.of("type", "string", "const", "VND"),
+                        "estimatedMin", Map.of("type", "integer", "minimum", 1),
+                        "recommendedBudget", Map.of("type", "integer", "minimum", 1),
+                        "estimatedMax", Map.of("type", "integer", "minimum", 1),
+                        "confidence", Map.of("type", "string", "enum", List.of("LOW", "MEDIUM", "HIGH")),
+                        "factors", Map.of(
+                                "type", "array",
+                                "maxItems", MAX_BUDGET_FACTORS,
+                                "items", nonBlankString)));
+
+        Map<String, Object> sow = strictObject(
+                List.of("title", "overview", "objectives", "scopeOfWork",
+                        "deliverables", "assumptions", "outOfScope"),
+                Map.of(
+                        "title", nonBlankString,
+                        "overview", nonBlankString,
+                        "objectives", stringArray,
+                        "scopeOfWork", stringArray,
+                        "deliverables", stringArray,
+                        "assumptions", stringArray,
+                        "outOfScope", stringArray));
+
+        Map<String, Object> milestone = strictObject(
+                List.of("name", "description", "duration", "durationUnit", "budget", "acceptanceCriteria"),
+                Map.of(
+                        "name", nonBlankString,
+                        "description", nonBlankString,
+                        "duration", Map.of("type", "integer", "minimum", 1),
+                        "durationUnit", durationUnitSchema,
+                        "budget", Map.of("type", "integer", "minimum", 1),
+                        "acceptanceCriteria", Map.of(
+                                "type", "array",
+                                "minItems", 1,
+                                "items", nonBlankString)));
+
+        return strictObject(
+                List.of("needMoreInfo", "questions", "budgetAssessment", "sow", "milestones"),
+                Map.of(
+                        "needMoreInfo", Map.of("type", "boolean"),
+                        "questions", Map.of(
+                                "type", "array",
+                                "maxItems", 3,
+                                "items", nonBlankString),
+                        "budgetAssessment", budgetAssessment,
+                        "sow", sow,
+                        "milestones", Map.of(
+                                "type", "array",
+                                "minItems", 1,
+                                "maxItems", milestoneLimit(request == null ? null : request.getDuration()),
+                                "items", milestone)));
+    }
+
+    private Map<String, Object> strictObject(List<String> required, Map<String, Object> properties) {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        schema.put("required", required);
+        schema.put("properties", properties);
+        return schema;
+    }
+
+    private int milestoneLimit(Integer totalDuration) {
+        if (totalDuration == null || totalDuration <= 0) {
+            return 1;
+        }
+        return Math.min(totalDuration, MAX_GENERATED_MILESTONES);
     }
 
     // Note: Hàm dựng header gọi AI, bao gồm Content-Type JSON và Bearer API key.

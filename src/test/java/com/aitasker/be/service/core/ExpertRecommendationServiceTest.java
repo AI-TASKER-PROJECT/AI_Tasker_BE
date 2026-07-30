@@ -152,6 +152,8 @@ class ExpertRecommendationServiceTest {
                 eq(Map.class)
         );
         Map<String, Object> requestBody = requestCaptor.getValue().getBody();
+        assertEquals("gpt-5.6-terra", requestBody.get("model"));
+        assertFalse(requestBody.containsKey("temperature"));
         Map<String, Object> responseFormat = (Map<String, Object>) requestBody.get("response_format");
         assertEquals("json_schema", responseFormat.get("type"));
         Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");

@@ -18,7 +18,7 @@ Business amount. Compile, build, and public OpenAPI schemas must also pass.
 | Integration | Not required because the feature adds no persistence; full suite remains regression proof. |
 | E2E | HIGH hides the advisory card and implicitly retains Business budget; non-HIGH displays full VND values. |
 | Platform | Frontend production build, local browser page/console checks, and runtime OpenAPI refresh when the local application can boot. |
-| Performance | No additional provider call; no separate performance gate. |
+| Performance | Normal generation uses one provider call; an invalid draft permits exactly one recovery call and never loops. |
 | Logs/Audit | No new audit record because estimates are stateless and advisory. |
 
 ## Fixtures
@@ -32,6 +32,35 @@ Business amount. Compile, build, and public OpenAPI schemas must also pass.
 ## Commands
 
 ```text
+command: .\mvnw.cmd "-Dtest=AiSowGenerationServiceTest,ExpertRecommendationServiceTest" test
+result: PASS on 2026-07-30 - 50 tests, 0 failures, 0 errors, 0 skipped
+notes: default model is gpt-5.6-terra; SoW and expert recommendation request
+       bodies omit unsupported custom temperature for GPT-5.6 while retaining
+       strict json_schema output
+
+command: live AiSowTerraLiveSmokeTest with OPENAI_API_KEY
+result: PASS on 2026-07-30 - 1 test, 0 failures, 0 errors, 0 skipped
+notes: default gpt-5.6-terra generated a valid one-week SoW with one milestone,
+       exact duration total, and 14,000,000 VND advisory recommendation
+
+command: .\mvnw.cmd -Dtest=AiSowGenerationServiceTest test
+result: PASS on 2026-07-30 - 42 tests, 0 failures, 0 errors, 0 skipped
+notes: includes strict json_schema request validation, dynamic milestone
+       maxItems, one-week milestone recovery/rejection, exact duration totals,
+       scope provenance instructions, measurable acceptance criteria, and all
+       prior SoW budget regressions
+
+command: .\mvnw.cmd test
+result: PARTIAL on 2026-07-30 - 403 tests, 1 unrelated failure
+notes: all 43 SoW and 7 expert recommendation tests passed;
+       CoherentDemoDataMigrationTest expected exactly
+       31 accounts but the existing local database contained 32. No local data
+       was deleted to force the fixture count.
+
+command: git diff --check
+result: PASS on 2026-07-30
+notes: no whitespace errors; only expected LF-to-CRLF warnings
+
 command: .\mvnw.cmd "-Dtest=AiSowGenerationServiceTest" test
 result: PASS on 2026-07-24 - 38 tests, 0 failures, 0 errors, 0 skipped
 notes: includes prompt without Business budget/sample prices, preservation of
