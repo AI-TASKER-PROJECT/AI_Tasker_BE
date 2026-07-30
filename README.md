@@ -57,6 +57,10 @@ Swagger/OpenAPI:
 - Da bo sung migration `V48__milestone_owned_acceptance_criteria.sql` de bo
   catalog 26 tieu chi co dinh, chuyen du lieu cu thanh tieu chi thuoc tung
   milestone va cho AI/Business quan ly noi dung rieng theo moc.
+- Da bo sung migration `V67__rebuild_coherent_demo_data.sql` de thay toan bo
+  seed demo cu bang 31 tai khoan lien ket (1 Admin, 10 Business, 10 Expert, 10
+  Staff), 90 catalog item chia deu cho domain/skill/technology, va bo du lieu
+  job/proposal/contract/wallet/audit/notification co the doi soat.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.

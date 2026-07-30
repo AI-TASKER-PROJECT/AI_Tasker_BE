@@ -17,6 +17,26 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 | ADMIN | `admin@aitasker.local` | `12345678` |
 | STAFF | `staff@aitasker.local` | `12345678` |
 
+Bo du lieu V67 co dung 31 tai khoan: 1 Admin, 10 Business, 10 Expert va 10
+Staff. Bon tai khoan tren la tai khoan noi bo duoc giu nguyen thong tin dang
+nhap; 27 tai khoan con lai cung dung mat khau `12345678` va co email theo vai
+tro/ten ro rang. `staff@aitasker.local` chi co domain noi bo `PROFILE_REVIEW`
+(`Profile Review`).
+
+Du lieu nghiep vu mau de kiem tra nhanh:
+
+| Nhom | ID mau | Trang thai / muc dich |
+| --- | --- | --- |
+| Job | `1001`-`1010` | Co du `DRAFT`, `OPEN`, `IN_PROGRESS`, `CLOSED`; moi job co SoW va 3 milestone |
+| Proposal | `3001`-`3012` | Co `Pending`, `Accepted`, `Rejected`; proposal milestone khop dung job va bid |
+| Contract | `4001`-`4006` | Co `DRAFT`, `ACTIVE`, `COMPLETED`, `CLOSED` va snapshot 3 milestone |
+| Catalog | `1`-`30` moi bang | 30 domain, 30 skill, 30 technology; khong gan `PROFILE_REVIEW` cho job |
+| Wallet | 31 vi | Co top-up, membership revenue, contract deposit, milestone escrow/release/refund lien ket |
+
+Chi tiet mapping va quy tac doi soat nam tai
+`docs/product/demo-data-rebuild.md`. OpenAPI route/schema khong thay doi trong
+V67; thay doi nay chi lam sach va dong bo du lieu test.
+
 ## Milestone Dispute Smoke Flow
 
 1. Business/Expert sign contract and NDA, then Business pays contract deposit.
