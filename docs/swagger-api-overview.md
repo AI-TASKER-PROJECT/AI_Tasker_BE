@@ -2,9 +2,9 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **201**.
+- Tong so REST endpoint trong Swagger runtime: **204**.
 - Public endpoint: **21**.
-- Endpoint can Bearer JWT: **180**.
+- Endpoint can Bearer JWT: **183**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -56,6 +56,7 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 15 | GET | `/api/v1/profiles/business/{businessId}` | Public | Operation getBusinessById. |
 | 16 | GET | `/api/v1/profiles/business/me` | Bearer JWT | Operation myBusiness. |
 | 17 | GET | `/api/v1/profiles/business/by-job/{jobId}` | Public | Operation businessByJob. |
+| 18 | GET | `/api/v1/staff/me` | Bearer JWT | Trả hồ sơ và phạm vi chuyên môn của nhân viên hiện tại. |
 
 ## Job Draft & Publish Flow
 
@@ -198,6 +199,8 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 67 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/approve` | Bearer JWT | Preferred contract-scoped milestone approval alias. |
 | 68 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/reject` | Bearer JWT | Preferred contract-scoped milestone rejection alias. |
 | 69 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/disputes` | Bearer JWT | Preferred contract-scoped dispute creation alias. |
+| 70 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/user-guide-file` | Bearer JWT | Chuyên gia tải tệp hướng dẫn PDF/DOCX cho sản phẩm cuối của cột mốc cuối cùng. |
+| 71 | GET | `/api/v1/contracts/{contractId}/summary` | Bearer JWT | Trả trang tổng kết khi hợp đồng hoàn thành toàn bộ cột mốc theo luồng nghiệm thu thành công. |
 
 ## Notification Flow
 

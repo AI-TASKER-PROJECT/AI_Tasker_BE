@@ -32,6 +32,7 @@ public class DeliverableEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "source_code_url", length = 255) private String sourceCodeUrl;
     @Column(name = "source_code_file_url") private String sourceCodeFileUrl;
+    @Column(name = "user_guide_file_url") private String userGuideFileUrl;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "demo_link", length = 255) private String demoLink;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.

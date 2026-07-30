@@ -121,6 +121,7 @@ class ContractExecutionServiceTest {
     @Mock private StaffSkillRepository staffSkillRepository;
     @Mock private DomainRepository domainRepository;
     @Mock private SkillRepository skillRepository;
+    @Mock private SowRepository sowRepository;
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private ContractExecutionService contractExecutionService;
@@ -301,6 +302,135 @@ class ContractExecutionServiceTest {
         assertTrue(updated.isEmpty());
         assertEquals("UNDER_REVIEW", milestone.getStatus());
         verifyNoInteractions(walletLedgerService);
+    }
+
+    @Test
+    void getProjectSummary_shouldReturnCompletedProjectAndApprovedDeliverables() {
+        AccountEntity actor = AccountEntity.builder().accountId(50)
+                .role(RoleEntity.builder().roleName("BUSINESS").build()).build();
+        ContractEntity contract = ContractEntity.builder()
+                .contractId(1).jobId(2).businessId(10).expertId(5)
+                .contractTitle("Dự án tổng kết").contractScope("Phạm vi đã thống nhất")
+                .totalBudget(BigDecimal.valueOf(1000)).timelineDays(30)
+                .status(ContractEntity.STATUS_CLOSED).build();
+        ContractMilestoneEntity milestone = ContractMilestoneEntity.builder()
+                .contractMilestoneId(70).contractId(1).jobMilestoneId(7)
+                .milestoneName("Bàn giao").finalBudget(BigDecimal.valueOf(1000))
+                .orderIndex(1).criteriaSnapshot("Đạt tiêu chí nghiệm thu\nCó tài liệu vận hành")
+                .status(ContractMilestoneEntity.STATUS_COMPLETED).build();
+        DeliverableEntity deliverable = DeliverableEntity.builder()
+                .deliverableId(80).milestoneId(7).submissionRound(1)
+                .status(DeliverableEntity.STATUS_APPROVED)
+                .userGuideFileUrl("milestone-user-guides/milestones/7/accounts/60/guide.pdf")
+                .build();
+        JobDomainEntity jobDomain = JobDomainEntity.builder()
+                .id(new JobDomainId(2, 27)).build();
+
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(10).accountId(50).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(
+                JobEntity.builder().jobId(2).title("Dự án tổng kết").rawRequirements("Yêu cầu")
+                        .budget(BigDecimal.valueOf(1000)).status("CLOSED").build()));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(10).accountId(50).companyName("Doanh nghiệp A").build()));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(
+                ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
+        when(accountRepository.findById(60)).thenReturn(Optional.of(
+                AccountEntity.builder().accountId(60).fullName("Chuyên gia B").build()));
+        when(jobDomainRepository.findByIdJobId(2)).thenReturn(List.of(jobDomain));
+        when(domainRepository.findById(27)).thenReturn(Optional.of(
+                DomainEntity.builder().domainId(27).domainName("Trí tuệ nhân tạo cho chăm sóc khách hàng").build()));
+        when(deliverableRepository.findByMilestoneIdOrderBySubmissionRoundDesc(7)).thenReturn(List.of(deliverable));
+        var summary = contractExecutionService.getProjectSummary(1);
+
+        assertEquals("Dự án tổng kết", summary.getProjectTitle());
+        assertEquals("Doanh nghiệp A", summary.getBusinessName());
+        assertEquals("Chuyên gia B", summary.getExpertName());
+        assertEquals("Trí tuệ nhân tạo cho chăm sóc khách hàng", summary.getDomainName());
+        assertEquals(deliverable, summary.getMilestones().getFirst().getFinalDeliverable());
+        assertEquals(List.of("Đạt tiêu chí nghiệm thu", "Có tài liệu vận hành"),
+                summary.getMilestones().getFirst().getAcceptanceCriteria());
+    }
+
+    @Test
+    void getProjectSummary_shouldRejectWhenApprovedDeliverableIsMissing() {
+        AccountEntity actor = AccountEntity.builder().accountId(50)
+                .role(RoleEntity.builder().roleName("BUSINESS").build()).build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2)
+                .businessId(10).expertId(5).status(ContractEntity.STATUS_COMPLETED).build();
+        ContractMilestoneEntity milestone = ContractMilestoneEntity.builder()
+                .contractMilestoneId(70).contractId(1).jobMilestoneId(7)
+                .orderIndex(1).status(ContractMilestoneEntity.STATUS_COMPLETED).build();
+
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(JobEntity.builder().jobId(2).build()));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(10).accountId(50).build()));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(
+                ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
+        when(deliverableRepository.findByMilestoneIdOrderBySubmissionRoundDesc(7)).thenReturn(List.of());
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.getProjectSummary(1));
+
+        assertEquals("Trang tổng kết chỉ xuất hiện khi mỗi cột mốc có sản phẩm đã nghiệm thu", ex.getMessage());
+    }
+
+    @Test
+    void getProjectSummary_shouldRejectWhenFinalUsageGuideIsMissing() {
+        AccountEntity actor = AccountEntity.builder().accountId(50)
+                .role(RoleEntity.builder().roleName("BUSINESS").build()).build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2)
+                .businessId(10).expertId(5).status(ContractEntity.STATUS_COMPLETED).build();
+        ContractMilestoneEntity milestone = ContractMilestoneEntity.builder()
+                .contractMilestoneId(70).contractId(1).jobMilestoneId(7)
+                .orderIndex(1).status(ContractMilestoneEntity.STATUS_COMPLETED).build();
+        DeliverableEntity deliverable = DeliverableEntity.builder()
+                .deliverableId(80).milestoneId(7).status(DeliverableEntity.STATUS_APPROVED).build();
+
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(milestone));
+        when(jobRepository.findById(2)).thenReturn(Optional.of(JobEntity.builder().jobId(2).build()));
+        when(businessProfileRepository.findById(10)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(10).accountId(50).build()));
+        when(expertProfileRepository.findById(5)).thenReturn(Optional.of(
+                ExpertProfileEntity.builder().expertId(5).accountId(60).build()));
+        when(deliverableRepository.findByMilestoneIdOrderBySubmissionRoundDesc(7))
+                .thenReturn(List.of(deliverable));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.getProjectSummary(1));
+
+        assertEquals("Sản phẩm cuối của cột mốc cuối chưa có tệp hướng dẫn sử dụng", ex.getMessage());
+    }
+
+    @Test
+    void getProjectSummary_shouldRejectNonHappyCase() {
+        AccountEntity actor = AccountEntity.builder().accountId(50)
+                .role(RoleEntity.builder().roleName("BUSINESS").build()).build();
+        ContractEntity contract = ContractEntity.builder().contractId(1).businessId(10)
+                .status(ContractEntity.STATUS_ACTIVE).build();
+        when(accessService.currentAccount()).thenReturn(actor);
+        when(contractRepository.findById(1)).thenReturn(Optional.of(contract));
+        when(businessProfileRepository.findByAccountId(50)).thenReturn(Optional.of(
+                BusinessProfileEntity.builder().businessId(10).build()));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(1)).thenReturn(List.of(
+                ContractMilestoneEntity.builder().status(ContractMilestoneEntity.STATUS_IN_PROGRESS).build()));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> contractExecutionService.getProjectSummary(1));
+
+        assertEquals("Trang tổng kết chỉ xuất hiện khi tất cả cột mốc đã hoàn thành", ex.getMessage());
     }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.

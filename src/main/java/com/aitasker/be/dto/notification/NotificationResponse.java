@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class NotificationResponse {
     private Integer notificationId;
     private String type;
+    private String typeLabel;
     private String title;
     private String message;
     private String targetUrl;
