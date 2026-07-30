@@ -770,10 +770,13 @@ public class ContractExecutionService {
         input.setSubmissionRound(nextRound);
         input.setStatus(DeliverableEntity.STATUS_SUBMITTED);
         DeliverableEntity saved = deliverableRepository.save(input);
+        LocalDateTime reviewStartedAt = LocalDateTime.now();
         milestone.setStatus(ContractMilestoneEntity.STATUS_UNDER_REVIEW);
-        milestone.setUpdatedAt(LocalDateTime.now());
+        milestone.setUpdatedAt(reviewStartedAt);
         milestoneRepository.save(milestone);
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_UNDER_REVIEW);
+        contractMilestone.setReviewStartedAt(reviewStartedAt);
+        contractMilestone.setReviewDueAt(currentReviewSlaDuration().addTo(reviewStartedAt));
         contractMilestoneRepository.save(contractMilestone);
         auditLogService.record("DELIVERABLE_SUBMITTED", "milestones", String.valueOf(milestone.getMilestoneId()), accessService.currentAccount().getAccountId());
         businessProfileRepository.findById(contract.getBusinessId())
@@ -1207,6 +1210,9 @@ public class ContractExecutionService {
         if (!ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())) throw new AppException("CHI DUOC DUYET MILESTONE KHI CONTRACT ACTIVE");
         if (!ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(milestone.getStatus())) throw new AppException("MILESTONE CHUA O TRANG THAI CHO DUYET");
         ContractMilestoneEntity contractMilestone = findContractMilestoneForUpdate(contract.getContractId(), milestoneId);
+        if (!ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(contractMilestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA O TRANG THAI CHO DUYET");
+        }
         ensureEscrowNotReleased(contractMilestone);
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId()).map(BusinessProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
         Integer expertAccountId = expertProfileRepository.findById(contract.getExpertId()).map(ExpertProfileEntity::getAccountId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
@@ -1272,7 +1278,11 @@ public class ContractExecutionService {
         String reason = request == null || isBlank(request.getReason()) ? legacyReason : request.getReason();
         if (reason == null || reason.isBlank()) throw new AppException("REJECTION_FEEDBACK_REQUIRED");
         if (!activeDisputesForMilestone(milestoneId).isEmpty()) throw new AppException("DISPUTE_ALREADY_ACTIVE");
-        ContractMilestoneEntity contractMilestone = findContractMilestone(contract.getContractId(), milestoneId);
+        ContractMilestoneEntity contractMilestone = findContractMilestoneForUpdate(contract.getContractId(), milestoneId);
+        if (!ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(contractMilestone.getStatus())
+                || !ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(milestone.getStatus())) {
+            throw new AppException("MILESTONE CHUA O TRANG THAI CHO TU CHOI");
+        }
         String rejectedCriteriaFeedback = buildRejectedCriteriaFeedback(milestoneId, request);
         DeliverableEntity current = deliverableRepository.findByMilestoneIdOrderBySubmissionRoundDesc(milestoneId)
                 .stream().findFirst().orElseThrow(() -> new NotFoundException("KHONG TIM THAY DELIVERABLE"));
@@ -1286,6 +1296,8 @@ public class ContractExecutionService {
         contractMilestone.setResubmitCount(rejectCount);
         contractMilestone.setLastRejectionFeedback(reason.trim());
         contractMilestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
+        contractMilestone.setReviewStartedAt(null);
+        contractMilestone.setReviewDueAt(null);
         milestone.setRejectCount(rejectCount);
         milestone.setLastRejectionFeedback(reason.trim());
         milestone.setStatus(ContractMilestoneEntity.STATUS_IN_PROGRESS);
@@ -1580,6 +1592,8 @@ public class ContractExecutionService {
                     .overdue(dueAt != null && now.isAfter(dueAt)
                             && !List.of(ContractMilestoneEntity.STATUS_COMPLETED, ContractMilestoneEntity.STATUS_CANCELLED)
                             .contains(liveStatus))
+                    .reviewStartedAt(cm.getReviewStartedAt())
+                    .reviewDueAt(cm.getReviewDueAt())
                     .progressReportRequestCount(latestRequest.map(MilestoneProgressReportRequestEntity::getRequestNumber).orElse(0))
                     .progressReportRequestedAt(latestRequest.map(MilestoneProgressReportRequestEntity::getRequestedAt).orElse(null))
                     .progressReportDueAt(latestRequest.map(MilestoneProgressReportRequestEntity::getDueAt).orElse(null))
@@ -1772,40 +1786,40 @@ public class ContractExecutionService {
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
-    // Note: Hàm `runSlaAutoApprove` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
-    public List<MilestoneEntity> runSlaAutoApprove() {
-        accessService.requireRole("ADMIN");
-        // MO PHONG JOB SLA: TU DONG RELEASE MILESTONE NEU QUA SO NGAY CAU HINH SAU KHI CO DELIVERABLE.
-        int slaDays = systemSettingRepository.findById("default_sla_days")
-                .filter(setting -> Boolean.TRUE.equals(setting.getIsActive()))
-                .map(SystemSettingEntity::getSettingValue)
-                .map(v -> {
-                    try { return Integer.parseInt(v); } catch (Exception e) { return 7; }
-                }).orElse(7);
+    // Backend scheduler processes due review deadlines without an Admin request.
+    public List<MilestoneEntity> processDueReviewSla() {
         LocalDateTime now = LocalDateTime.now();
         List<MilestoneEntity> updated = new java.util.ArrayList<>();
-        Integer actorAccountId = accessService.currentAccount().getAccountId();
-        for (MilestoneEntity milestone : milestoneRepository.findAll()) {
-            if (!ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(milestone.getStatus())) continue;
-            List<DeliverableEntity> deliverables = deliverableRepository.findByMilestoneId(milestone.getMilestoneId());
-            if (deliverables.isEmpty()) continue;
-            LocalDateTime lastSubmission = deliverables.stream()
-                    .map(DeliverableEntity::getCreatedAt)
-                    .filter(java.util.Objects::nonNull)
-                    .max(LocalDateTime::compareTo)
-                    .orElse(null);
-            if (lastSubmission == null) continue;
-            if (!lastSubmission.plusDays(slaDays).isAfter(now)) {
-                findContractForMilestone(milestone).ifPresent(contract -> {
-                    if (!hasActiveDispute(contract.getContractId())
-                            && activeTerminationRequests(contract.getContractId()).isEmpty()) {
-                        updated.add(finalizeSlaApproval(milestone, contract, actorAccountId));
-                    }
-                });
+        for (ContractMilestoneEntity contractMilestone
+                : contractMilestoneRepository.findDueReviewSlaForUpdate(now)) {
+            MilestoneEntity milestone = milestoneRepository.findById(contractMilestone.getJobMilestoneId()).orElse(null);
+            ContractEntity contract = contractRepository.findById(contractMilestone.getContractId()).orElse(null);
+            if (milestone == null || contract == null
+                    || !ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(milestone.getStatus())
+                    || !ContractMilestoneEntity.STATUS_UNDER_REVIEW.equals(contractMilestone.getStatus())
+                    || !ContractEntity.STATUS_ACTIVE.equals(contract.getStatus())
+                    || contractMilestone.getEscrowReleasedAt() != null
+                    || hasActiveDispute(contract.getContractId())
+                    || !activeTerminationRequests(contract.getContractId()).isEmpty()) {
+                continue;
             }
+            updated.add(finalizeSlaApproval(milestone, contract, contractMilestone));
         }
-        auditLogService.record(AuditLogService.ACTION_RUN_SLA_AUTO_APPROVE, "system_settings", "default_sla_days", actorAccountId);
         return updated;
+    }
+
+    private MilestoneReviewSlaDuration currentReviewSlaDuration() {
+        return systemSettingRepository.findById(MilestoneReviewSlaDuration.SETTING_KEY)
+                .filter(setting -> Boolean.TRUE.equals(setting.getIsActive()))
+                .map(SystemSettingEntity::getSettingValue)
+                .map(value -> {
+                    try {
+                        return MilestoneReviewSlaDuration.parse(value);
+                    } catch (AppException ignored) {
+                        return MilestoneReviewSlaDuration.DEFAULT;
+                    }
+                })
+                .orElse(MilestoneReviewSlaDuration.DEFAULT);
     }
 
     @Transactional
@@ -1834,9 +1848,9 @@ public class ContractExecutionService {
     }
 
     private MilestoneEntity finalizeSlaApproval(
-            MilestoneEntity milestone, ContractEntity contract, Integer actorAccountId) {
-        ContractMilestoneEntity contractMilestone =
-                findContractMilestoneForUpdate(contract.getContractId(), milestone.getMilestoneId());
+            MilestoneEntity milestone, ContractEntity contract,
+            ContractMilestoneEntity contractMilestone) {
+        Integer actorAccountId = null;
         ensureEscrowNotReleased(contractMilestone);
         Integer businessAccountId = businessProfileRepository.findById(contract.getBusinessId())
                 .map(BusinessProfileEntity::getAccountId)
@@ -1870,8 +1884,11 @@ public class ContractExecutionService {
         milestone.setSettlementSourceId(contractMilestone.getSettlementSourceId());
         milestone.setUpdatedAt(LocalDateTime.now());
         MilestoneEntity saved = milestoneRepository.save(milestone);
-        auditLogService.record("MILESTONE_REVIEW_SLA_AUTO_APPROVED", "milestones",
-                String.valueOf(milestone.getMilestoneId()), actorAccountId);
+        auditLogService.recordSystem("MILESTONE_REVIEW_SLA_AUTO_APPROVED", "milestones",
+                String.valueOf(milestone.getMilestoneId()));
+        notificationService.notifyMilestoneAutoApproved(
+                expertAccountId, actorAccountId, contract.getContractId(),
+                milestone.getMilestoneId(), milestone.getMilestoneName());
         tryCompleteContract(contract, actorAccountId);
         return saved;
     }

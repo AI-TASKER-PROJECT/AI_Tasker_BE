@@ -2,9 +2,9 @@
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag flow trong `OpenApiConfig`.
 
-- Tong so REST endpoint trong Swagger runtime: **200**.
+- Tong so REST endpoint trong Swagger runtime: **201**.
 - Public endpoint: **21**.
-- Endpoint can Bearer JWT: **179**.
+- Endpoint can Bearer JWT: **180**.
 - Swagger UI mac dinh: `http://localhost:8080/swagger-ui.html`.
 - OpenAPI JSON runtime: `http://localhost:8080/v3/api-docs`.
 
@@ -171,7 +171,6 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI `/v3/api-docs` va sap xep theo tag 
 | 39 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/acknowledge` | Bearer JWT | Business acknowledges the latest progress report to unlock the next submission. |
 | 40 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request` | Bearer JWT | Business requests report with 24h/12h SLA. |
 | 41 | POST | `/api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit` | Bearer JWT | Operation depositMilestone. |
-| 42 | POST | `/api/v1/contracts/{contractId}/milestones/sla-auto-approve` | Bearer JWT | Operation autoApproveReviewSla. |
 | 43 | POST | `/api/v1/contracts/{contractId}/milestones/check-overdue` | Bearer JWT | Operation checkOverdue. |
 | 44 | POST | `/api/v1/contracts/{contractId}/immediate-termination` | Bearer JWT | Operation immediateTermination. |
 | 45 | POST | `/api/v1/contracts/{contractId}/expert-deposit/pay` | Bearer JWT | Operation payExpertContractDeposit. |

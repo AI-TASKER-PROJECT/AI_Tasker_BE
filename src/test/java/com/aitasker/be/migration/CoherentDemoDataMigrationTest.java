@@ -27,8 +27,28 @@ class CoherentDemoDataMigrationTest {
                 .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
-            assertEquals(67, intValue(connection,
+            assertEquals(69, intValue(connection,
                     "SELECT MAX(version::integer) FROM flyway_schema_history WHERE success"));
+            assertEquals(1, intValue(connection, """
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='audit_logs'
+                      AND column_name='actor_account_id' AND is_nullable='YES'
+                    """));
+            assertEquals(1, intValue(connection, """
+                    SELECT COUNT(*) FROM system_settings
+                    WHERE setting_key='milestone_review_sla_duration'
+                      AND setting_value ~ '^[1-9][0-9]*:(MINUTE|HOUR|DAY)$'
+                      AND is_active=TRUE
+                    """));
+            assertEquals(0, intValue(connection, """
+                    SELECT COUNT(*) FROM system_settings
+                    WHERE setting_key='default_sla_days' AND is_active=TRUE
+                    """));
+            assertEquals(2, intValue(connection, """
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='contract_milestones'
+                      AND column_name IN ('review_started_at','review_due_at')
+                    """));
             assertEquals(31, intValue(connection, "SELECT COUNT(*) FROM account"));
             assertEquals(1, roleCount(connection, "ADMIN"));
             assertEquals(10, roleCount(connection, "BUSINESS"));

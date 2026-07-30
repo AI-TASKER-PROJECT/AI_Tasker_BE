@@ -71,71 +71,83 @@ class AdminServiceTest {
     @Test
     void createSetting_shouldPersistNewSystemSetting() {
         SystemSettingRequest request = new SystemSettingRequest();
-        request.setSettingKey("default_sla_days");
-        request.setSettingValue("3");
-        request.setValueType("INT");
-        request.setDescription("So ngay SLA xet duyet");
+        request.setSettingKey(MilestoneReviewSlaDuration.SETTING_KEY);
+        request.setSettingValue("3:DAY");
+        request.setValueType("STRING");
+        request.setDescription("Thoi gian SLA xet duyet");
 
         AccountEntity admin = adminAccount();
-        when(systemSettingRepository.existsById("default_sla_days")).thenReturn(false);
+        when(systemSettingRepository.existsById(MilestoneReviewSlaDuration.SETTING_KEY)).thenReturn(false);
         when(accessService.currentAccount()).thenReturn(admin);
         when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SystemSettingEntity saved = adminService.createSetting(request);
 
-        assertEquals("default_sla_days", saved.getSettingKey());
-        assertEquals("3", saved.getSettingValue());
-        assertEquals("INT", saved.getValueType());
+        assertEquals(MilestoneReviewSlaDuration.SETTING_KEY, saved.getSettingKey());
+        assertEquals("3:DAY", saved.getSettingValue());
+        assertEquals("STRING", saved.getValueType());
         assertEquals(Boolean.TRUE, saved.getIsActive());
         assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
-        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "default_sla_days", 1);
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", MilestoneReviewSlaDuration.SETTING_KEY, 1);
     }
 
     @Test
     void updateSettingBody_shouldUpdateMutableFields() {
         SystemSettingEntity setting = SystemSettingEntity.builder()
-                .settingKey("default_sla_days")
-                .settingValue("7")
-                .valueType("INT")
+                .settingKey(MilestoneReviewSlaDuration.SETTING_KEY)
+                .settingValue("7:DAY")
+                .valueType("STRING")
                 .isActive(true)
                 .build();
         SystemSettingRequest request = new SystemSettingRequest();
-        request.setSettingValue("3");
-        request.setValueType("int");
+        request.setSettingValue("45:MINUTE");
+        request.setValueType("string");
         request.setDescription("SLA xet duyet moi");
-        request.setIsActive(false);
+        request.setIsActive(true);
 
-        when(systemSettingRepository.findById("default_sla_days")).thenReturn(Optional.of(setting));
+        when(systemSettingRepository.findById(MilestoneReviewSlaDuration.SETTING_KEY)).thenReturn(Optional.of(setting));
         when(accessService.currentAccount()).thenReturn(adminAccount());
         when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        SystemSettingEntity saved = adminService.updateSetting("default_sla_days", request);
+        SystemSettingEntity saved = adminService.updateSetting(MilestoneReviewSlaDuration.SETTING_KEY, request);
 
-        assertEquals("3", saved.getSettingValue());
-        assertEquals("INT", saved.getValueType());
+        assertEquals("45:MINUTE", saved.getSettingValue());
+        assertEquals("STRING", saved.getValueType());
         assertEquals("SLA xet duyet moi", saved.getDescription());
-        assertEquals(Boolean.FALSE, saved.getIsActive());
-        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "default_sla_days", 1);
+        assertEquals(Boolean.TRUE, saved.getIsActive());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", MilestoneReviewSlaDuration.SETTING_KEY, 1);
     }
 
     @Test
     void deleteSetting_shouldDeactivateSetting() {
         SystemSettingEntity setting = SystemSettingEntity.builder()
-                .settingKey("default_sla_days")
-                .settingValue("3")
+                .settingKey("dispute_staff_max_active_cases")
+                .settingValue("5")
                 .valueType("INT")
                 .isActive(true)
                 .build();
 
-        when(systemSettingRepository.findById("default_sla_days")).thenReturn(Optional.of(setting));
+        when(systemSettingRepository.findById("dispute_staff_max_active_cases")).thenReturn(Optional.of(setting));
         when(accessService.currentAccount()).thenReturn(adminAccount());
         when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        SystemSettingEntity saved = adminService.deleteSetting("default_sla_days");
+        SystemSettingEntity saved = adminService.deleteSetting("dispute_staff_max_active_cases");
 
         assertEquals(Boolean.FALSE, saved.getIsActive());
         assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
-        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "default_sla_days", 1);
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "dispute_staff_max_active_cases", 1);
+    }
+
+    @Test
+    void updateSetting_shouldRejectDisablingAutomaticReviewSla() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingValue("3:DAY");
+        request.setIsActive(false);
+
+        AppException ex = assertThrows(AppException.class, () ->
+                adminService.updateSetting(MilestoneReviewSlaDuration.SETTING_KEY, request));
+
+        assertEquals("SLA TU DONG KHONG THE TAT", ex.getMessage());
     }
 
     @Test

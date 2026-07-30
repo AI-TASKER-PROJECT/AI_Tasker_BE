@@ -1883,19 +1883,6 @@ V67; thay doi nay chi lam sach va dong bo du lieu test.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
-### POST `/api/v1/contracts/{contractId}/milestones/sla-auto-approve`
-- OperationId: `autoApproveReviewSla`
-- Auth: Bearer JWT
-- Giai thich: Operation autoApproveReviewSla.
-- Params:
-  - `contractId` (path, required, integer)
-- Body raw: Khong co.
-- Ma phan hoi thuong gap:
-  - `200`: Thanh cong theo message/schema tren Swagger.
-  - `400`: Validation loi hoac vi pham business rule/state transition.
-  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
-  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
-
 ### POST `/api/v1/contracts/{contractId}/milestones/check-overdue`
 - OperationId: `checkOverdue`
 - Auth: Bearer JWT

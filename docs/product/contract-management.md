@@ -117,11 +117,13 @@ Alternate exits:
   before Staff review; Admin can cancel invalid active disputes.
 - When every contract milestone is `COMPLETED`, the system moves the contract
   to `COMPLETED` and the job to `CLOSED`.
-- SLA auto-approval of an overdue reviewed milestone runs after the configured
-  `default_sla_days` window, currently 3 days after the latest deliverable
-  submission. It uses the same finalization rule: if the auto-approved
-  milestone completes the last remaining contract milestone, the contract
-  becomes `COMPLETED` and the job becomes `CLOSED`.
+- Final deliverable submission snapshots `reviewStartedAt` and `reviewDueAt`
+  from the active `milestone_review_sla_duration` value. The backend scheduler
+  automatically approves a due `UNDER_REVIEW` milestone only when the contract
+  remains active and no dispute or termination blocks settlement. It releases
+  escrow exactly once and applies the same finalization rule: if this is the
+  last milestone, the contract becomes `COMPLETED` and the job becomes `CLOSED`.
+  Admin config changes apply to later review rounds and cannot disable the rule.
 - Termination requests move eligible active contracts to
   `TERMINATION_PENDING`. Admin assigns Staff review; assigned Staff approves or
   rejects. Approved requests either await milestone escrow settlement or move
@@ -194,7 +196,6 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback`
 - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/check-overdue`
-- `POST /api/v1/contracts/{contractId}/milestones/sla-auto-approve`
 - `POST /api/v1/milestones/{milestoneId}/start`
 - `POST /api/v1/milestones/{milestoneId}/approve`
 - `POST /api/v1/milestones/{milestoneId}/reject`
@@ -241,3 +242,7 @@ only when a payment order first reaches a terminal outcome (`PAID`, `FAILED`,
 `CANCELLED`, or `EXPIRED`), so repeated sync polling does not spam audit logs.
 Dispute decision and settlement audit rows display the two contract participants
 as the business object context.
+Automatic milestone review settlement records the actor as `Hệ thống tự động`,
+uses the fully Vietnamese action “Hệ thống tự động duyệt và giải ngân cột mốc
+khi hết hạn nghiệm thu”, and sends the Expert a clear confirmation that both
+approval and escrow release have completed.

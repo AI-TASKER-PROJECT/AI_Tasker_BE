@@ -103,7 +103,8 @@ public class AuditLogService {
     public static final String ACTION_ACKNOWLEDGE_PROGRESS_REPORT = "Xác nhận báo cáo tiến độ";
     public static final String ACTION_EXPIRE_PROGRESS_REPORT_REQUEST = "Yêu cầu báo cáo tiến độ hết hạn";
     public static final String ACTION_MARK_MILESTONE_OVERDUE = "Đánh dấu milestone quá hạn";
-    public static final String ACTION_AUTO_APPROVE_MILESTONE_REVIEW_SLA = "Tự động duyệt milestone quá SLA";
+    public static final String ACTION_AUTO_APPROVE_MILESTONE_REVIEW_SLA =
+            "Hệ thống tự động duyệt và giải ngân cột mốc khi hết hạn nghiệm thu";
     public static final String ACTION_AUTO_ASSIGN_DISPUTE = "Tự động phân công tranh chấp";
     public static final String ACTION_ESCALATE_DISPUTE_SLA = "Escalate SLA xử lý tranh chấp";
     public static final String ACTION_ACCEPT_TERMINATION_BY_EXPERT = "Chuyên gia chấp nhận chấm dứt";
@@ -179,6 +180,11 @@ public class AuditLogService {
         }
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSystem(String action, String entityName, String entityId) {
+        record(action, entityName, entityId, null);
+    }
+
     @Transactional(readOnly = true)
     public List<AuditLogResponse> listForAdmin(String actorGroup) {
         accessService.requireRole("ADMIN");
@@ -190,9 +196,13 @@ public class AuditLogService {
     }
 
     private AuditLogResponse toResponse(AuditLogEntity log) {
-        AccountEntity actor = accountRepository.findById(log.getActorAccountId()).orElse(null);
-        String actorGroup = resolveActorGroup(actor);
-        return attachEntityInfo(AuditLogResponse.from(log, actor, actorGroup, translateLegacyAction(log.getAction())), log, actor)
+        AccountEntity actor = accountById(log.getActorAccountId());
+        boolean systemActor = log.getActorAccountId() == null;
+        String actorGroup = systemActor ? GROUP_INTERNAL : resolveActorGroup(actor);
+        AuditLogResponse response = AuditLogResponse.from(
+                log, actor, actorGroup, translateLegacyAction(log.getAction()));
+        if (systemActor) response.markAsSystemActor();
+        return attachEntityInfo(response, log, actor)
                 .fallbackEntityOwner(actor);
     }
 

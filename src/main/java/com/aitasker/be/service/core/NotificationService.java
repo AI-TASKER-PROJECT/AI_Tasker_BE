@@ -405,6 +405,16 @@ public class NotificationService {
                 Map.of("contractId", contractId, "milestoneId", milestoneId));
     }
 
+    public void notifyMilestoneAutoApproved(Integer receiverAccountId, Integer actorAccountId,
+                                             Integer contractId, Integer milestoneId, String milestoneName) {
+        createAndPush(receiverAccountId, actorAccountId, "MILESTONE_SLA_AUTO_APPROVED",
+                "Cột mốc đã được tự động duyệt và giải ngân",
+                "Milestone \"" + safeText(milestoneName, "không tên")
+                        + "\" đã hết thời hạn nghiệm thu. Hệ thống đã tự động duyệt sản phẩm và giải ngân toàn bộ tiền ký quỹ của cột mốc cho bạn.",
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId));
+    }
+
     // Note: Báo cho chuyên gia khi doanh nghiệp từ chối sản phẩm bàn giao của milestone.
     public void notifyMilestoneRejected(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, String milestoneName, String reason) {
         String message = "Doanh nghiệp đã từ chối sản phẩm bàn giao của milestone \"" + safeText(milestoneName, "không tên") + "\".";

@@ -4,13 +4,15 @@ Admin configuration APIs manage platform settings, catalogs, and membership pack
 
 ## System Settings
 
-Admin can list, create, update, and deactivate system settings.
+Admin can list, create, update, and deactivate supported system settings. The
+automatic milestone review SLA is always active and only its duration is mutable.
 
 Delete semantics are soft-delete: deleting a setting sets `isActive=false`.
 
 Backend-supported operational settings are intentionally allowlisted:
 
-- `default_sla_days`: active SLA window for milestone auto-approval.
+- `milestone_review_sla_duration`: positive `<value>:<MINUTE|HOUR|DAY>` window
+  used for new final-deliverable review rounds. It cannot be deactivated or deleted.
 - `dispute_staff_max_active_cases`: maximum concurrent `STAFF_REVIEWING` disputes for one Staff account.
 - `credit.job_post.price_vnd`: Business job-post credit unit price.
 - `credit.proposal.price_vnd`: Expert proposal credit unit price.

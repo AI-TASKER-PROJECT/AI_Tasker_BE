@@ -136,6 +136,25 @@ class NotificationServiceTest {
     }
 
     @Test
+    void notifyMilestoneAutoApproved_shouldConfirmApprovalAndDisbursementBySystem() {
+        when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyMilestoneAutoApproved(20, null, 1, 3, "Bàn giao cuối");
+
+        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository).save(captor.capture());
+        NotificationEntity saved = captor.getValue();
+        assertNull(saved.getActorAccountId());
+        assertEquals("Cột mốc đã được tự động duyệt và giải ngân", saved.getTitle());
+        assertTrue(saved.getMessage().contains("Hệ thống đã tự động duyệt sản phẩm"));
+        assertTrue(saved.getMessage().contains("giải ngân toàn bộ tiền ký quỹ"));
+    }
+
+    @Test
     void notifyWithdrawalRejected_shouldIncludeAdminReason() {
         when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
             NotificationEntity saved = invocation.getArgument(0);

@@ -452,11 +452,6 @@ public class ContractExecutionController {
                 service.expireAwaitingExpertTerminationResponses()));
     }
 
-    @PostMapping("/contracts/{contractId}/milestones/sla-auto-approve")
-    public ResponseEntity<ApiResponse<List<MilestoneEntity>>> autoApproveReviewSla(@PathVariable Integer contractId) {
-        return ResponseEntity.ok(ApiResponse.success("SLA AUTO APPROVE SUCCESS", service.runSlaAutoApprove()));
-    }
-
     @PostMapping("/termination-requests/{terminationRequestId}/assign-staff")
     public ResponseEntity<ApiResponse<TerminationRequestEntity>> assignTerminationStaff(@PathVariable Long terminationRequestId, @RequestParam Integer staffId) {
         return ResponseEntity.ok(ApiResponse.success("ASSIGN TERMINATION STAFF SUCCESS", service.assignTerminationStaff(terminationRequestId, staffId)));

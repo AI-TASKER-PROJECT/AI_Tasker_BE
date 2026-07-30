@@ -32,7 +32,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AdminService {
     private static final List<String> SUPPORTED_SYSTEM_SETTINGS = List.of(
-            "default_sla_days",
+            MilestoneReviewSlaDuration.SETTING_KEY,
             "dispute_staff_max_active_cases",
             "credit.job_post.price_vnd",
             "credit.proposal.price_vnd",
@@ -130,9 +130,11 @@ public class AdminService {
         SystemSettingEntity setting = SystemSettingEntity.builder()
                 .settingKey(key)
                 .settingValue(request.getSettingValue().trim())
-                .valueType(normalizeValueType(request.getValueType()))
+                .valueType(MilestoneReviewSlaDuration.SETTING_KEY.equals(key)
+                        ? "STRING" : normalizeValueType(request.getValueType()))
                 .description(request.getDescription())
-                .isActive(request.getIsActive() == null || request.getIsActive())
+                .isActive(MilestoneReviewSlaDuration.SETTING_KEY.equals(key)
+                        || request.getIsActive() == null || request.getIsActive())
                 .updatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId())
                 .build();
         SystemSettingEntity saved = systemSettingRepository.save(setting);
@@ -152,6 +154,10 @@ public class AdminService {
         accessService.requireRole("ADMIN");
         String normalizedKey = normalizeSettingKey(key);
         requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                && Boolean.FALSE.equals(isActive)) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         // CHI CHO PHEP CAP NHAT GIA TRI/CO HIEU LUC, KHONG CHO DOI VALUE_TYPE TRANH VO HOP DONG DU LIEU.
         if (value != null && !value.isBlank()) {
@@ -172,6 +178,10 @@ public class AdminService {
         if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         String normalizedKey = normalizeSettingKey(key);
         requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                && Boolean.FALSE.equals(request.getIsActive())) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         if (request.getSettingValue() != null && !request.getSettingValue().isBlank()) {
@@ -179,7 +189,8 @@ public class AdminService {
             setting.setSettingValue(request.getSettingValue().trim());
         }
         if (request.getValueType() != null && !request.getValueType().isBlank()) {
-            setting.setValueType(normalizeValueType(request.getValueType()));
+            setting.setValueType(MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                    ? "STRING" : normalizeValueType(request.getValueType()));
         }
         if (request.getDescription() != null) setting.setDescription(request.getDescription());
         if (request.getIsActive() != null) setting.setIsActive(request.getIsActive());
@@ -195,6 +206,9 @@ public class AdminService {
         accessService.requireRole("ADMIN");
         String normalizedKey = normalizeSettingKey(key);
         requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         setting.setIsActive(false);
@@ -495,6 +509,10 @@ public class AdminService {
 
     private void validateSettingValue(String key, String value) {
         if (value == null || value.isBlank()) throw new AppException("SETTING VALUE KHONG DUOC DE TRONG");
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(key)) {
+            MilestoneReviewSlaDuration.parse(value);
+            return;
+        }
         try {
             BigDecimal numeric = new BigDecimal(value.trim());
             if (key.startsWith("contract.deposit.")) {

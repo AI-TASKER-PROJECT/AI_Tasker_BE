@@ -304,6 +304,27 @@ class AuditLogServiceTest {
         assertEquals("STAFF", response.getActorRole());
     }
 
+    @Test
+    void listForAdmin_shouldRenderAutomaticSlaSettlementAsInternalSystemActor() {
+        when(milestoneRepository.findById(7)).thenReturn(Optional.of(
+                MilestoneEntity.builder().milestoneId(7).milestoneName("Bàn giao cuối").build()));
+        when(auditLogRepository.findTop200ByOrderByCreatedAtDesc()).thenReturn(List.of(log(
+                "MILESTONE_REVIEW_SLA_AUTO_APPROVED",
+                "milestones",
+                "7",
+                null
+        )));
+
+        AuditLogResponse response = auditLogService.listForAdmin("INTERNAL").get(0);
+
+        assertEquals("Hệ thống tự động duyệt và giải ngân cột mốc khi hết hạn nghiệm thu", response.getAction());
+        assertEquals("Hệ thống tự động", response.getActor());
+        assertEquals("INTERNAL", response.getActorGroup());
+        assertNull(response.getActorAccountId());
+        assertNull(response.getActorEmail());
+        assertNull(response.getActorRole());
+    }
+
     private AuditLogEntity log(String action, String entityName, String entityId, Integer actorId) {
         return AuditLogEntity.builder()
                 .logId(1)
