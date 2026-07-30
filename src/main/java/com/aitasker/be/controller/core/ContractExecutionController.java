@@ -6,6 +6,7 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.admin.StaffResponse;
 import com.aitasker.be.dto.core.AcceptanceCriteriaRequest;
 import com.aitasker.be.dto.core.ContractChangeRequestRequest;
 import com.aitasker.be.dto.core.ContractChangeReviewRequest;
@@ -44,6 +45,11 @@ public class ContractExecutionController {
     private final PaymentWalletService paymentWalletService;
     private final AdminService adminService;
     private final StaffDisputeService staffDisputeService;
+
+    @GetMapping("/staff/me")
+    public ResponseEntity<ApiResponse<StaffResponse>> currentStaff() {
+        return ResponseEntity.ok(ApiResponse.success("GET CURRENT STAFF SUCCESS", adminService.currentStaff()));
+    }
 
     @GetMapping("/contracts/deposit-rates")
     @Operation(summary = "Get current contract deposit percentages")

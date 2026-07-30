@@ -230,6 +230,15 @@ public class AdminService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `createStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    public StaffResponse currentStaff() {
+        accessService.requireRole("STAFF");
+        AccountEntity actor = accessService.currentAccount();
+        StaffEntity staff = staffRepository.findByAccountId(actor.getAccountId())
+                .orElseThrow(() -> new NotFoundException("CHUA CO STAFF PROFILE"));
+        return toStaffResponse(staff);
+    }
+
+    @Transactional
     public StaffResponse createStaff(StaffRequest request) {
         accessService.requireRole("ADMIN");
         if (request.getAccountId() == null) throw new AppException("ACCOUNT ID KHONG DUOC DE TRONG");
