@@ -13,6 +13,7 @@ import com.aitasker.be.service.ai.FileBasedSowRagRetrievalService;
 import com.aitasker.be.service.ai.RagRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -205,7 +206,8 @@ class AiSowGenerationServiceTest {
         assertTrue(prompt.contains("budgetAssessment"));
         assertTrue(prompt.contains("DOC LAP"));
         assertTrue(prompt.contains("do phuc tap scope"));
-        assertTrue(prompt.contains("\"estimatedMin\": {\"type\": \"integer\", \"minimum\": 1}"));
+        assertTrue(prompt.contains("Structured Outputs"));
+        assertTrue(prompt.contains("So milestone toi da la 10"));
         assertFalse(prompt.contains("Business proposed budget"));
         assertFalse(prompt.contains("80000000"));
         assertFalse(prompt.contains("100000000"));
@@ -243,6 +245,13 @@ class AiSowGenerationServiceTest {
         assertTrue(prompt.contains("Khong bao gio bo sot sow hay milestones vi co questions"));
         assertTrue(prompt.contains("acceptanceCriteria"));
         assertTrue(prompt.contains("Khong dung catalog"));
+        assertTrue(prompt.contains("TU QUYET DINH so luong"));
+        assertTrue(prompt.contains("Khong dung so luong, ten milestone hoac phase co dinh"));
+        assertTrue(prompt.contains("tong duration"));
+        assertTrue(prompt.contains("ty le phase co dinh tu RAG context"));
+        assertTrue(prompt.contains("Khong tu them CI/CD"));
+        assertTrue(prompt.contains("nguong pass/fail"));
+        assertTrue(prompt.contains("hoat dong dung"));
     }
 
     @Test
@@ -426,6 +435,7 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void generateSow_shouldContinueWhenRagContextEmpty() {
         RestTemplate restTemplate = mock(RestTemplate.class);
         OpenAiProperties openAiProperties = new OpenAiProperties();
@@ -477,6 +487,33 @@ class AiSowGenerationServiceTest {
         assertFalse(response.getNeedMoreInfo());
         assertEquals(BigDecimal.valueOf(90), response.getMilestones().get(0).getBudget());
         assertEquals(BigDecimal.valueOf(90), response.getMilestones().get(1).getBudget());
+
+        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).exchange(anyString(), eq(HttpMethod.POST), requestCaptor.capture(), eq(Map.class));
+        Map<String, Object> requestBody = (Map<String, Object>) requestCaptor.getValue().getBody();
+        Map<String, Object> responseFormat = (Map<String, Object>) requestBody.get("response_format");
+        Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
+        Map<String, Object> schema = (Map<String, Object>) jsonSchema.get("schema");
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        Map<String, Object> milestonesSchema = (Map<String, Object>) properties.get("milestones");
+
+        assertEquals("json_schema", responseFormat.get("type"));
+        assertEquals(true, jsonSchema.get("strict"));
+        assertEquals(false, schema.get("additionalProperties"));
+        assertEquals(10, milestonesSchema.get("maxItems"));
+        assertEquals("gpt-5.6-terra", requestBody.get("model"));
+        assertFalse(requestBody.containsKey("temperature"));
+    }
+
+    @Test
+    void openAiProperties_shouldOnlyUseCustomTemperatureForCompatibleModels() {
+        OpenAiProperties properties = new OpenAiProperties();
+
+        assertEquals("gpt-5.6-terra", properties.getModel());
+        assertFalse(properties.supportsCustomTemperature());
+
+        properties.setModel("gpt-4o-mini");
+        assertTrue(properties.supportsCustomTemperature());
     }
 
     @Test
@@ -817,6 +854,22 @@ class AiSowGenerationServiceTest {
         assertEquals(3, response.getMilestones().get(1).getDuration());
         assertEquals(4, response.getMilestones().get(2).getDuration());
         assertEquals("tuần", response.getMilestones().get(2).getDurationUnit());
+    }
+
+    @Test
+    void normalizeMilestoneDuration_whenMilestoneCountExceedsDuration_shouldReject() {
+        GenerateSowResponse response = GenerateSowResponse.builder()
+                .milestones(List.of(
+                        MilestoneDto.builder().duration(1).durationUnit("week").build(),
+                        MilestoneDto.builder().duration(1).durationUnit("week").build()
+                ))
+                .build();
+
+        AppException exception = assertThrows(
+                AppException.class,
+                () -> service.normalizeMilestoneDuration(response, 1, "week"));
+
+        assertTrue(exception.getMessage().contains("So milestone vuot qua tong duration"));
     }
 
     @Test
@@ -1170,7 +1223,62 @@ class AiSowGenerationServiceTest {
 
         // Dung 2 lan goi AI roi dung, khong retry vo tan
         verify(restTemplate, times(2)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class));
-        assertTrue(ex.getMessage().contains("AI response thieu thong tin sow hoac milestones sau recovery"));
+        assertTrue(ex.getMessage().contains("AI response khong dat rang buoc sau recovery"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void generateSow_whenMilestoneCountExceedsDuration_shouldRecoverWithExactLimit() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(
+                restTemplate,
+                openAiProperties,
+                ragRetrievalService);
+        GenerateSowRequest request = buildRequest();
+        request.setDuration(1);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(generatedDraftWithMilestones(2))))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(generatedDraftWithMilestones(1))));
+
+        GenerateSowResponse response = localService.generateSow(request);
+
+        assertEquals(1, response.getMilestones().size());
+        assertEquals(1, response.getMilestones().get(0).getDuration());
+        assertEquals(1, response.getMilestones().stream()
+                .map(MilestoneDto::getDuration)
+                .reduce(0, Integer::sum));
+
+        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate, times(2))
+                .exchange(anyString(), eq(HttpMethod.POST), requestCaptor.capture(), eq(Map.class));
+        Map<String, Object> retryBody = (Map<String, Object>) requestCaptor.getAllValues().get(1).getBody();
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) retryBody.get("messages");
+        assertTrue(messages.get(1).get("content").toString().contains("So milestone 2 vuot gioi han 1"));
+    }
+
+    @Test
+    void generateSow_whenRecoveryStillExceedsDuration_shouldRejectInvalidDraft() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(
+                restTemplate,
+                openAiProperties,
+                ragRetrievalService);
+        GenerateSowRequest request = buildRequest();
+        request.setDuration(1);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(generatedDraftWithMilestones(2))));
+
+        AppException exception = assertThrows(AppException.class, () -> localService.generateSow(request));
+
+        verify(restTemplate, times(2))
+                .exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class));
+        assertTrue(exception.getMessage().contains("So milestone 2 vuot gioi han 1"));
     }
 
     @Test
@@ -1182,6 +1290,63 @@ class AiSowGenerationServiceTest {
         assertTrue(context.contains("For RAG customer support chatbot projects"));
     }
 
+    @Test
+    void ragKnowledge_shouldProvidePlanningDimensionsWithoutFixedMilestoneTemplates() {
+        FileBasedSowRagRetrievalService ragService = new FileBasedSowRagRetrievalService();
+        List<GenerateSowRequest> requests = List.of(
+                buildRagRequest("Customer support chatbot", "Tra cuu don hang va chuyen tiep nhan vien"),
+                buildRagRequest("Visual quality inspection", "Camera defect detection tren day chuyen"),
+                buildRagRequest("Executive dashboard", "KPI analytics cho ban dieu hanh"),
+                buildRagRequest("Warehouse ingestion", "ETL data pipeline tu nhieu nguon"),
+                buildRagRequest("Contract test suite", "API testing Swagger Postman automation test"),
+                buildRagRequest("Document classification", "Phan loai tai lieu bang machine learning")
+        );
+
+        List<String> contexts = requests.stream()
+                .map(ragService::retrieveContext)
+                .toList();
+
+        assertEquals(6, contexts.stream().distinct().count());
+        for (String context : contexts) {
+            assertTrue(context.contains("Candidate planning dimensions, not predefined milestones"));
+            assertTrue(context.contains("Do not use a fixed phase count or fixed phase percentages"));
+            assertFalse(context.contains("Recommended milestones"));
+            assertFalse(context.contains("% budget"));
+        }
+    }
+
+    private String generatedDraftWithMilestones(int milestoneCount) {
+        List<String> milestones = new java.util.ArrayList<>();
+        for (int i = 1; i <= milestoneCount; i++) {
+            milestones.add("""
+                    {
+                      "name": "Milestone %s",
+                      "description": "Deliver outcome %s",
+                      "duration": 1,
+                      "durationUnit": "tuan",
+                      "budget": 100,
+                      "acceptanceCriteria": ["API response is verified by an automated passing test"]
+                    }
+                    """.formatted(i, i));
+        }
+        return """
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "sow": {
+                    "title": "AI support bot",
+                    "overview": "Build bot",
+                    "objectives": ["Answer customer questions"],
+                    "scopeOfWork": ["Develop requested bot"],
+                    "deliverables": ["Bot API"],
+                    "assumptions": [],
+                    "outOfScope": []
+                  },
+                  "milestones": [%s]
+                }
+                """.formatted(String.join(",", milestones));
+    }
+
     private GenerateSowRequest buildRequest() {
         return GenerateSowRequest.builder()
                 .projectTitle("AI support bot")
@@ -1191,6 +1356,13 @@ class AiSowGenerationServiceTest {
                 .durationUnit("tuan")
                 .supportFields(List.of("Generative AI Applications"))
                 .requiredSkills(List.of("API Testing & Swagger"))
+                .build();
+    }
+
+    private GenerateSowRequest buildRagRequest(String title, String requirement) {
+        return GenerateSowRequest.builder()
+                .projectTitle(title)
+                .rawRequirement(requirement)
                 .build();
     }
 

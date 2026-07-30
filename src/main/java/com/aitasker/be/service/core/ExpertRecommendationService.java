@@ -309,7 +309,9 @@ public class ExpertRecommendationService {
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model", openAiProperties.getModel());
         requestBody.put("messages", List.of(systemMessage, userMessage));
-        requestBody.put("temperature", 0.1);
+        if (openAiProperties.supportsCustomTemperature()) {
+            requestBody.put("temperature", 0.1);
+        }
         requestBody.put("response_format", responseFormat);
         return requestBody;
     }

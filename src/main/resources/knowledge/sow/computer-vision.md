@@ -1,12 +1,8 @@
 For computer vision projects:
+- Use this document as domain guidance, not as a fixed workflow or milestone template.
 - When details are missing, infer reasonable domain-appropriate defaults and list each inferred detail under sow.assumptions. Do not block generation.
 - Ask at most the highest-impact missing questions (one batch, at most three concise questions) only when they would materially improve the draft. Do not turn this checklist into a fixed questionnaire.
-- Consider dataset availability, annotation format, target classes, camera/source type, accuracy target, inference speed, deployment environment.
-- Recommended milestones:
-  1. Requirement & Data Assessment: 10-15% budget
-  2. Dataset Preparation & Annotation: 20-30% budget
-  3. Model Training & Evaluation: 30-40% budget
-  4. API/Integration Development: 10-20% budget
-  5. Deployment & Monitoring: 10-15% budget
-- Common deliverables:
-  labeled dataset, training pipeline, model artifact, evaluation report, inference API, deployment document.
+- Candidate planning dimensions, not predefined milestones: dataset availability, annotation quality, target classes, capture conditions, camera or source type, accuracy targets, inference speed, integration boundaries, deployment environment, monitoring, and model update strategy.
+- Select only the dimensions relevant to the supplied scope. Merge related work and omit dimensions that do not create a meaningful project outcome.
+- Derive milestone count, names, order, duration, and budget allocation from independently verifiable outcomes and the supplied total duration. Do not use a fixed phase count or fixed phase percentages.
+- Common deliverables may include prepared data, annotation guidance, training or evaluation pipelines, model artifacts, evaluation reports, inference services, integration components, and deployment documentation.
