@@ -13,6 +13,7 @@ import com.aitasker.be.dto.core.ContractChangeReviewRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
+import com.aitasker.be.dto.core.RejectedMilestoneTerminationRequest;
 import com.aitasker.be.dto.core.RejectMilestoneRequest;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
 import com.aitasker.be.dto.core.StaffAssignmentCandidateResponse;
@@ -429,6 +430,15 @@ public class ContractExecutionController {
     @PostMapping("/contracts/{contractId}/termination-requests")
     public ResponseEntity<ApiResponse<TerminationRequestEntity>> requestTermination(@PathVariable Integer contractId, @RequestBody TerminationRequestEntity request) {
         return ResponseEntity.ok(ApiResponse.success("REQUEST TERMINATION SUCCESS", service.requestTerminationRequest(contractId, request)));
+    }
+
+    @PostMapping("/contracts/{contractId}/termination-requests/rejected-milestone-change")
+    public ResponseEntity<ApiResponse<TerminationRequestEntity>> requestRejectedMilestoneChangeTermination(
+            @PathVariable Integer contractId,
+            @RequestBody RejectedMilestoneTerminationRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("REQUEST REJECTED MILESTONE CHANGE TERMINATION SUCCESS",
+                service.requestRejectedMilestoneChangeTermination(contractId, request)));
     }
 
     @PostMapping("/contracts/{contractId}/immediate-termination")
