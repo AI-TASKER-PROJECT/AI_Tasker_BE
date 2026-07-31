@@ -7,9 +7,11 @@ package com.aitasker.be;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 // Note: Annotation này đánh dấu class khởi động Spring Boot và bật tự cấu hình/component scan.
 @SpringBootApplication
+@EnableScheduling
 public class AitaskerApplication {
 
     // Note: Hàm main dùng để khởi động ứng dụng Spring Boot và chạy server back-end.

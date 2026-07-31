@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 // Note: Annotation nay cho Spring quan ly class nhu mot service chua nghiep vu.
 @Service
@@ -29,30 +30,40 @@ public class TaxCheckService {
     private static final String VIETQR_BUSINESS_API_URL = "https://api.vietqr.io/v2/business/";
     private static final String FOUND_CODE = "00";
     private static final String FOUND_STATUS = "FOUND";
+    private static final long CACHE_TTL_MILLIS = 10 * 60 * 1000L;
 
     private final RestTemplate restTemplate;
+    private final Map<String, CachedTaxCheck> successfulChecks = new ConcurrentHashMap<>();
 
     // Note: Ham `checkTaxCode` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     public TaxCheckResponse checkTaxCode(String mst) {
         validateTaxCode(mst);
+        String normalizedTaxCode = mst.trim();
 
-        Map<String, Object> responseBody = fetchBusiness(mst);
+        TaxCheckResponse cached = findCached(normalizedTaxCode);
+        if (cached != null) {
+            return cached;
+        }
+
+        Map<String, Object> responseBody = fetchBusiness(normalizedTaxCode);
         if (responseBody == null || !FOUND_CODE.equals(String.valueOf(responseBody.get("code")))) {
-            throw new NotFoundException("Khong tim thay doanh nghiep voi ma so thue: " + mst);
+            throw new NotFoundException("Khong tim thay doanh nghiep voi ma so thue: " + normalizedTaxCode);
         }
 
         Object dataValue = responseBody.get("data");
         if (!(dataValue instanceof Map<?, ?> data)) {
-            throw new NotFoundException("Khong tim thay doanh nghiep voi ma so thue: " + mst);
+            throw new NotFoundException("Khong tim thay doanh nghiep voi ma so thue: " + normalizedTaxCode);
         }
 
-        return TaxCheckResponse.builder()
-                .taxCode(defaultIfBlank(getString(data, "id"), mst))
+        TaxCheckResponse result = TaxCheckResponse.builder()
+                .taxCode(defaultIfBlank(getString(data, "id"), normalizedTaxCode))
                 .companyName(getString(data, "name"))
                 .address(getString(data, "address"))
                 .representative(getString(data, "legalName"))
                 .status(FOUND_STATUS)
                 .build();
+        successfulChecks.put(normalizedTaxCode, new CachedTaxCheck(result, System.currentTimeMillis() + CACHE_TTL_MILLIS));
+        return result;
     }
 
     // Note: Ham `validateTaxCode` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
@@ -97,5 +108,20 @@ public class TaxCheckService {
     // Note: Ham `defaultIfBlank` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private TaxCheckResponse findCached(String mst) {
+        CachedTaxCheck cached = successfulChecks.get(mst);
+        if (cached == null) {
+            return null;
+        }
+        if (cached.expiresAtMillis() <= System.currentTimeMillis()) {
+            successfulChecks.remove(mst, cached);
+            return null;
+        }
+        return cached.response();
+    }
+
+    private record CachedTaxCheck(TaxCheckResponse response, long expiresAtMillis) {
     }
 }

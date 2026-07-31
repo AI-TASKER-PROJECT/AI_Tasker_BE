@@ -21,7 +21,18 @@ docker compose up -d
 ## 3) Seed can thiet
 - Bang `roles` duoc seed tu migration V1.
 - `system_settings` duoc seed tu migration V6.
-- Neu can account mau, tao qua API register.
+- Migration V67 tao bo du lieu demo dong bo gom 31 tai khoan (1 Admin, 10
+  Business, 10 Expert, 10 Staff), 30 domain, 30 skill va 30 technology.
+- Bon tai khoan noi bo de test nhanh la `business@aitasker.local`,
+  `expert@aitasker.local`, `admin@aitasker.local`, `staff@aitasker.local`; mat
+  khau la `12345678`.
+- `staff@aitasker.local` chi duoc gan domain noi bo `PROFILE_REVIEW` de duyet
+  profile. Staff khac khong co quyen nay.
+- Job mau `1001`-`1010`, proposal `3001`-`3012` va contract `4001`-`4006` co
+  du trang thai de test list/detail/dashboard. Moi job co SoW, 3 milestone,
+  acceptance criteria va catalog mapping day du.
+- Neu can kiem tra luong dang ky moi, van co the tao account rieng qua API;
+  khong nen sua truc tiep account seed.
 
 ## 4) Kich ban test theo luong
 

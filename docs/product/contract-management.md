@@ -56,8 +56,11 @@ Alternate exits:
 - Contract and NDA signatures are limited to the business and expert attached
   to the contract.
 - Signing is allowed only while the contract is `DRAFT`.
-- The negotiation/change-request lifecycle is disabled and must not move
-  contracts out of `DRAFT`. The endpoint has been removed.
+- Contract change requests are enabled for `DRAFT`, `PENDING`, and `ACTIVE`
+  contracts. Either participant can propose budget, timeline, scope, or
+  milestone snapshot changes; only the counterparty can accept or reject. The
+  system applies proposed changes only after acceptance and records audit log
+  plus notification for request/review.
 
 - The contract moves to `PENDING` after business signature, expert signature,
   business NDA, and expert NDA are all present.
@@ -79,6 +82,10 @@ Alternate exits:
   both are allowed. `demoLink` remains a separate runnable-product URL. Source
   archives are uploaded first through the milestone-scoped authenticated route,
   accept ZIP only, and are capped at 50 MB.
+- The final contract milestone also requires a usage guide uploaded through the
+  contract-scoped route. The guide accepts PDF or DOCX only, is stored on the
+  final approved deliverable, and requires both NDA signatures plus matching
+  `IN_PROGRESS` live/snapshot milestone state.
 - The owning business can deposit milestone escrow only from `PENDING`; a
   successful deposit automatically moves both milestone records to
   `IN_PROGRESS` and starts the execution timeline. The Expert start endpoint is
@@ -98,9 +105,11 @@ Alternate exits:
   and unlocks the next Expert report, but it does not create a dispute,
   deliverable rejection, report revision state, or money movement.
 - A Business rejection from `UNDER_REVIEW` marks the current deliverable
-  `REJECTED`, stores feedback, increments rejection history, and returns the
-  milestone to `IN_PROGRESS`. It never creates a dispute. Either participant
-  must explicitly invoke the dispute API for a genuine disagreement.
+  `REJECTED`, stores overall feedback, optionally stores failed
+  acceptance-criteria feedback with a reason per criterion, increments rejection
+  history, and returns the milestone to `IN_PROGRESS`. It never creates a
+  dispute. Either participant must explicitly invoke the dispute API for a
+  genuine disagreement.
 - Business on-demand progress-report requests use a durable request history:
   the first response SLA is 24 hours and later requests use 12 hours. Reports
   remain accepted in `OVERDUE`; final deliverables and source-code ZIP uploads
@@ -112,11 +121,19 @@ Alternate exits:
   before Staff review; Admin can cancel invalid active disputes.
 - When every contract milestone is `COMPLETED`, the system moves the contract
   to `COMPLETED` and the job to `CLOSED`.
-- SLA auto-approval of an overdue reviewed milestone runs after the configured
-  `default_sla_days` window, currently 3 days after the latest deliverable
-  submission. It uses the same finalization rule: if the auto-approved
-  milestone completes the last remaining contract milestone, the contract
-  becomes `COMPLETED` and the job becomes `CLOSED`.
+- A project summary is available only for this successful all-milestone path.
+  It returns contract/project/participant/domain data, immutable acceptance
+  criteria snapshots, and the latest approved deliverable for every milestone.
+  Every completed milestone must have an approved deliverable and the last one
+  must have its usage guide. Both participants receive a
+  `PROJECT_SUMMARY_READY` notification linking to the summary.
+- Final deliverable submission snapshots `reviewStartedAt` and `reviewDueAt`
+  from the active `milestone_review_sla_duration` value. The backend scheduler
+  automatically approves a due `UNDER_REVIEW` milestone only when the contract
+  remains active and no dispute or termination blocks settlement. It releases
+  escrow exactly once and applies the same finalization rule: if this is the
+  last milestone, the contract becomes `COMPLETED` and the job becomes `CLOSED`.
+  Admin config changes apply to later review rounds and cannot disable the rule.
 - Termination requests move eligible active contracts to
   `TERMINATION_PENDING`. Admin assigns Staff review; assigned Staff approves or
   rejects. Approved requests either await milestone escrow settlement or move
@@ -159,6 +176,11 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/reject`
 - `POST /api/v1/contracts/{contractId}/cancel-draft`
 - `GET /api/v1/contracts/{contractId}/milestones`
+- `GET /api/v1/contracts/{contractId}/summary`
+- `POST /api/v1/contracts/{contractId}/change-requests`
+- `GET /api/v1/contracts/{contractId}/change-requests`
+- `POST /api/v1/contracts/{contractId}/change-requests/{requestId}/accept`
+- `POST /api/v1/contracts/{contractId}/change-requests/{requestId}/reject`
 - `POST /api/v1/contracts/{contractId}/termination-requests`
 - `POST /api/v1/contracts/{contractId}/immediate-termination`
 - `POST /api/v1/termination-requests/{terminationRequestId}/accept`
@@ -176,6 +198,9 @@ Alternate exits:
 - `POST /api/v1/milestones/{milestoneId}/deliverables`
 - `GET /api/v1/milestones/{milestoneId}/deliverables`
 - `POST /api/v1/milestones/{milestoneId}/source-code-file`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deliverables`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/source-code-file`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/user-guide-file`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`
@@ -183,13 +208,15 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports/{progressReportId}/feedback`
 - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/check-overdue`
-- `POST /api/v1/contracts/{contractId}/milestones/sla-auto-approve`
 - `POST /api/v1/milestones/{milestoneId}/start`
 - `POST /api/v1/milestones/{milestoneId}/approve`
-- `POST /api/v1/milestones/{milestoneId}/reject?reason=...`
+- `POST /api/v1/milestones/{milestoneId}/reject`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/approve`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/reject`
 - `POST /api/v1/milestones/{milestoneId}/complete` (compatibility alias for
   approval/release)
 - `POST /api/v1/milestones/{milestoneId}/disputes?contractId=...`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/disputes`
 
 Staff dispute routing keeps the mandatory job-domain gate. Automatic routing
 locks the Staff pool, keeps only approved Staff below
@@ -227,3 +254,7 @@ only when a payment order first reaches a terminal outcome (`PAID`, `FAILED`,
 `CANCELLED`, or `EXPIRED`), so repeated sync polling does not spam audit logs.
 Dispute decision and settlement audit rows display the two contract participants
 as the business object context.
+Automatic milestone review settlement records the actor as `Hệ thống tự động`,
+uses the fully Vietnamese action “Hệ thống tự động duyệt và giải ngân cột mốc
+khi hết hạn nghiệm thu”, and sends the Expert a clear confirmation that both
+approval and escrow release have completed.

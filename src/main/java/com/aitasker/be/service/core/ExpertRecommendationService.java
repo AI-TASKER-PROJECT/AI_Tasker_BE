@@ -55,7 +55,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ExpertRecommendationService {
     private static final int MAX_RECOMMENDATIONS = 5;
-    private static final String FALLBACK_REASON = "Được đề xuất dựa trên điểm match từ kỹ năng, lĩnh vực, kinh nghiệm và mô tả portfolio.";
+    private static final String FALLBACK_REASON = "Được đề xuất dựa trên mức độ phù hợp về kỹ năng, lĩnh vực, kinh nghiệm và hồ sơ năng lực.";
     private static final String AI_SYSTEM_MESSAGE = """
         Bạn là AI matching assistant cho nền tảng thuê chuyên gia.
         Backend đã quyết định danh sách và thứ tự Expert được đề xuất.
@@ -105,8 +105,8 @@ public class ExpertRecommendationService {
                     .recommendations(selectedRecommendations)
                     .generatedByAi(false)
                     .message(selectedRecommendations.isEmpty()
-                            ? "No eligible expert candidates found."
-                            : "No new eligible candidates found; existing Business selection was preserved.")
+                            ? "Không tìm thấy chuyên gia đủ điều kiện và phù hợp với dự án."
+                            : "Không tìm thấy chuyên gia phù hợp mới; lựa chọn hiện tại của doanh nghiệp vẫn được giữ nguyên.")
                     .build();
         }
 
@@ -114,7 +114,7 @@ public class ExpertRecommendationService {
                 .orElseGet(() -> RecommendationGenerationResult.builder()
                         .recommendations(fallbackRecommendations(candidates))
                         .generatedByAi(false)
-                        .message("AI recommendation failed, fallback to rule-based ranking.")
+                        .message("Không thể tạo giải thích bằng trí tuệ nhân tạo; hệ thống đã dùng kết quả xếp hạng theo quy tắc.")
                         .build());
 
         List<ExpertRecommendationResponse> normalizedRecommendations = normalizeRecommendations(
@@ -127,7 +127,7 @@ public class ExpertRecommendationService {
             generationResult = RecommendationGenerationResult.builder()
                     .recommendations(generationResult.recommendations())
                     .generatedByAi(false)
-                    .message("AI recommendation failed, fallback to rule-based ranking.")
+                    .message("Không thể tạo giải thích bằng trí tuệ nhân tạo; hệ thống đã dùng kết quả xếp hạng theo quy tắc.")
                     .build();
         }
 
@@ -309,7 +309,9 @@ public class ExpertRecommendationService {
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model", openAiProperties.getModel());
         requestBody.put("messages", List.of(systemMessage, userMessage));
-        requestBody.put("temperature", 0.1);
+        if (openAiProperties.supportsCustomTemperature()) {
+            requestBody.put("temperature", 0.1);
+        }
         requestBody.put("response_format", responseFormat);
         return requestBody;
     }

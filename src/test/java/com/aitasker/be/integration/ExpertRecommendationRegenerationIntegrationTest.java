@@ -117,6 +117,12 @@ class ExpertRecommendationRegenerationIntegrationTest {
     }
 
     private void createJobRequirements() {
+        Integer businessId = jdbcTemplate.queryForObject("""
+                SELECT bp.business_id
+                FROM business_profiles bp
+                JOIN account a ON a.account_id=bp.account_id
+                WHERE a.email='business@aitasker.local'
+                """, Integer.class);
         jdbcTemplate.update("""
                 INSERT INTO skills (
                     skill_id, skill_code, skill_name, description, is_active, created_at, updated_at
@@ -140,8 +146,8 @@ class ExpertRecommendationRegenerationIntegrationTest {
         jdbcTemplate.update("""
                 INSERT INTO jobs (
                     job_id, business_id, title, raw_requirements, budget, status, created_at, updated_at
-                ) VALUES (?, 8501, ?, ?, 1000000, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, JOB_ID, "Expert recommendation regeneration test", "Test deterministic recommendation regeneration");
+                ) VALUES (?, ?, ?, ?, 1000000, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, JOB_ID, businessId, "Expert recommendation regeneration test", "Test deterministic recommendation regeneration");
         jdbcTemplate.update(
                 "INSERT INTO job_skills (job_id, skill_id, is_mandatory, created_at) VALUES (?, ?, TRUE, CURRENT_TIMESTAMP)",
                 JOB_ID,

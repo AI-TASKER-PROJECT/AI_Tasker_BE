@@ -32,10 +32,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AdminService {
     private static final List<String> SUPPORTED_SYSTEM_SETTINGS = List.of(
-            "default_sla_days",
+            MilestoneReviewSlaDuration.SETTING_KEY,
             "dispute_staff_max_active_cases",
             "credit.job_post.price_vnd",
-            "credit.proposal.price_vnd"
+            "credit.proposal.price_vnd",
+            "contract.deposit.business_percentage",
+            "contract.deposit.expert_percentage"
     );
 
     private final AccessService accessService;
@@ -120,6 +122,7 @@ public class AdminService {
         validateSettingRequest(request, true);
         String key = normalizeSettingKey(request.getSettingKey());
         requireSupportedSettingKey(key);
+        validateSettingValue(key, request.getSettingValue());
         if (systemSettingRepository.existsById(key)) {
             throw new AppException("SYSTEM SETTING DA TON TAI");
         }
@@ -127,9 +130,11 @@ public class AdminService {
         SystemSettingEntity setting = SystemSettingEntity.builder()
                 .settingKey(key)
                 .settingValue(request.getSettingValue().trim())
-                .valueType(normalizeValueType(request.getValueType()))
+                .valueType(MilestoneReviewSlaDuration.SETTING_KEY.equals(key)
+                        ? "STRING" : normalizeValueType(request.getValueType()))
                 .description(request.getDescription())
-                .isActive(request.getIsActive() == null || request.getIsActive())
+                .isActive(MilestoneReviewSlaDuration.SETTING_KEY.equals(key)
+                        || request.getIsActive() == null || request.getIsActive())
                 .updatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId())
                 .build();
         SystemSettingEntity saved = systemSettingRepository.save(setting);
@@ -149,9 +154,16 @@ public class AdminService {
         accessService.requireRole("ADMIN");
         String normalizedKey = normalizeSettingKey(key);
         requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                && Boolean.FALSE.equals(isActive)) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         // CHI CHO PHEP CAP NHAT GIA TRI/CO HIEU LUC, KHONG CHO DOI VALUE_TYPE TRANH VO HOP DONG DU LIEU.
-        if (value != null && !value.isBlank()) setting.setSettingValue(value);
+        if (value != null && !value.isBlank()) {
+            validateSettingValue(normalizedKey, value);
+            setting.setSettingValue(value.trim());
+        }
         if (isActive != null) setting.setIsActive(isActive);
         AccountEntity actor = accessService.currentAccount();
         setting.setUpdatedByRoleId(actor.getRole().getRoleId());
@@ -166,13 +178,19 @@ public class AdminService {
         if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
         String normalizedKey = normalizeSettingKey(key);
         requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                && Boolean.FALSE.equals(request.getIsActive())) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         if (request.getSettingValue() != null && !request.getSettingValue().isBlank()) {
+            validateSettingValue(normalizedKey, request.getSettingValue());
             setting.setSettingValue(request.getSettingValue().trim());
         }
         if (request.getValueType() != null && !request.getValueType().isBlank()) {
-            setting.setValueType(normalizeValueType(request.getValueType()));
+            setting.setValueType(MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                    ? "STRING" : normalizeValueType(request.getValueType()));
         }
         if (request.getDescription() != null) setting.setDescription(request.getDescription());
         if (request.getIsActive() != null) setting.setIsActive(request.getIsActive());
@@ -188,6 +206,9 @@ public class AdminService {
         accessService.requireRole("ADMIN");
         String normalizedKey = normalizeSettingKey(key);
         requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
         SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         setting.setIsActive(false);
@@ -209,6 +230,15 @@ public class AdminService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `createStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    public StaffResponse currentStaff() {
+        accessService.requireRole("STAFF");
+        AccountEntity actor = accessService.currentAccount();
+        StaffEntity staff = staffRepository.findByAccountId(actor.getAccountId())
+                .orElseThrow(() -> new NotFoundException("CHUA CO STAFF PROFILE"));
+        return toStaffResponse(staff);
+    }
+
+    @Transactional
     public StaffResponse createStaff(StaffRequest request) {
         accessService.requireRole("ADMIN");
         if (request.getAccountId() == null) throw new AppException("ACCOUNT ID KHONG DUOC DE TRONG");
@@ -483,6 +513,26 @@ public class AdminService {
     private void requireSupportedSettingKey(String key) {
         if (!SUPPORTED_SYSTEM_SETTINGS.contains(key)) {
             throw new AppException("SYSTEM SETTING KHONG DUOC HO TRO");
+        }
+    }
+
+    private void validateSettingValue(String key, String value) {
+        if (value == null || value.isBlank()) throw new AppException("SETTING VALUE KHONG DUOC DE TRONG");
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(key)) {
+            MilestoneReviewSlaDuration.parse(value);
+            return;
+        }
+        try {
+            BigDecimal numeric = new BigDecimal(value.trim());
+            if (key.startsWith("contract.deposit.")) {
+                if (numeric.signum() <= 0 || numeric.compareTo(new BigDecimal("100")) > 0) {
+                    throw new AppException("TY LE KY QUY PHAI LON HON 0 VA KHONG VUOT QUA 100");
+                }
+            } else if (key.startsWith("credit.") && numeric.signum() <= 0) {
+                throw new AppException("GIA CREDIT PHAI LON HON 0");
+            }
+        } catch (NumberFormatException ex) {
+            throw new AppException("SETTING VALUE KHONG DUNG DINH DANG SO");
         }
     }
 

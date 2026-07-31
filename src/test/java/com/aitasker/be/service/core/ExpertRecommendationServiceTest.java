@@ -89,7 +89,7 @@ class ExpertRecommendationServiceTest {
         ExpertRecommendationListResponse response = service.generateRecommendations(1L);
 
         assertFalse(response.getGeneratedByAi());
-        assertEquals("AI recommendation failed, fallback to rule-based ranking.", response.getMessage());
+        assertEquals("Không thể tạo giải thích bằng trí tuệ nhân tạo; hệ thống đã dùng kết quả xếp hạng theo quy tắc.", response.getMessage());
         assertEquals(5, response.getRecommendations().size());
         assertEquals(1L, response.getRecommendations().get(0).getExpertId());
         assertEquals(5, response.getRecommendations().get(4).getRankPosition());
@@ -152,6 +152,8 @@ class ExpertRecommendationServiceTest {
                 eq(Map.class)
         );
         Map<String, Object> requestBody = requestCaptor.getValue().getBody();
+        assertEquals("gpt-5.6-terra", requestBody.get("model"));
+        assertFalse(requestBody.containsKey("temperature"));
         Map<String, Object> responseFormat = (Map<String, Object>) requestBody.get("response_format");
         assertEquals("json_schema", responseFormat.get("type"));
         Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
@@ -203,7 +205,7 @@ class ExpertRecommendationServiceTest {
         ExpertRecommendationListResponse response = service.generateRecommendations(1L);
 
         assertFalse(response.getGeneratedByAi());
-        assertEquals("AI recommendation failed, fallback to rule-based ranking.", response.getMessage());
+        assertEquals("Không thể tạo giải thích bằng trí tuệ nhân tạo; hệ thống đã dùng kết quả xếp hạng theo quy tắc.", response.getMessage());
         assertEquals(1L, response.getRecommendations().get(0).getExpertId());
         assertEquals(95.0, response.getRecommendations().get(0).getMatchScore());
     }
@@ -228,7 +230,7 @@ class ExpertRecommendationServiceTest {
         ExpertRecommendationListResponse response = service.generateRecommendations(1L);
 
         assertFalse(response.getGeneratedByAi());
-        assertEquals("AI recommendation failed, fallback to rule-based ranking.", response.getMessage());
+        assertEquals("Không thể tạo giải thích bằng trí tuệ nhân tạo; hệ thống đã dùng kết quả xếp hạng theo quy tắc.", response.getMessage());
         assertEquals(1L, response.getRecommendations().get(0).getExpertId());
         assertEquals(95.0, response.getRecommendations().get(0).getMatchScore());
     }

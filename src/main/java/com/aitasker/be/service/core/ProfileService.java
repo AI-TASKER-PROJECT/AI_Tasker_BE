@@ -68,7 +68,7 @@ public class ProfileService {
         entity.setAccountId(account.getAccountId());
         entity.setTaxCode(input.getTaxCode());
         entity.setCompanyName(vietQrData.getCompanyName());
-        entity.setAddress(vietQrData.getAddress());
+        entity.setAddress(resolveBusinessAddress(input, vietQrData, submissionMode));
         entity.setVerifiedRepresentative(vietQrData.getRepresentative());
         entity.setBusinessLicenseUrl(input.getBusinessLicenseUrl());
         // Moi lan nop/cap nhat KYB deu dua account ve Pending de staff duyet lai.
@@ -407,6 +407,19 @@ public class ProfileService {
     private ProfileSubmissionMode resolveBusinessSubmissionMode(BusinessProfileEntity entity) {
         if (entity.getBusinessId() == null) return ProfileSubmissionMode.REOPEN_REVIEW;
         return resolveSubmissionMode(entity.getKybStatus());
+    }
+
+    private String resolveBusinessAddress(
+            BusinessProfileEntity input,
+            TaxCheckResponse vietQrData,
+            ProfileSubmissionMode submissionMode
+    ) {
+        if (submissionMode == ProfileSubmissionMode.UPDATE_APPROVED_ONLY
+                && input.getAddress() != null
+                && !input.getAddress().isBlank()) {
+            return input.getAddress().trim();
+        }
+        return vietQrData.getAddress();
     }
 
     private ProfileSubmissionMode resolveExpertSubmissionMode(ExpertProfileEntity entity) {

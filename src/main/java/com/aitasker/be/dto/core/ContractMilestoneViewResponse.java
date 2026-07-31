@@ -37,6 +37,8 @@ public class ContractMilestoneViewResponse {
     private String deliverableExpectation;
     private LocalDateTime dueAt;
     private Boolean overdue;
+    private LocalDateTime reviewStartedAt;
+    private LocalDateTime reviewDueAt;
     private Integer progressReportRequestCount;
     private LocalDateTime progressReportRequestedAt;
     private LocalDateTime progressReportDueAt;

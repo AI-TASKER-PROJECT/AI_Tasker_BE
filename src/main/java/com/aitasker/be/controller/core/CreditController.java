@@ -6,12 +6,14 @@
 package com.aitasker.be.controller.core;
 
 import com.aitasker.be.common.response.ApiResponse;
+import com.aitasker.be.dto.payment.CreditPriceResponse;
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.entity.UserQuotaEntity;
 import com.aitasker.be.service.core.PaymentWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,5 +48,11 @@ public class CreditController {
     ) {
         return ResponseEntity.ok(ApiResponse.success("PURCHASE PROPOSAL CREDITS SUCCESS",
                 paymentWalletService.purchaseProposalCredits(request)));
+    }
+
+    @GetMapping("/prices")
+    public ResponseEntity<ApiResponse<CreditPriceResponse>> getCreditPrices() {
+        return ResponseEntity.ok(ApiResponse.success("GET CREDIT PRICES SUCCESS",
+                paymentWalletService.getCreditPrices()));
     }
 }

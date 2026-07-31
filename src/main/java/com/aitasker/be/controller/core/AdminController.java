@@ -161,8 +161,20 @@ public class AdminController {
 
     @GetMapping("/wallet/transactions")
     public ResponseEntity<ApiResponse<List<WalletTransactionHistoryResponse>>> platformWalletTransactions() {
-        return ResponseEntity.ok(ApiResponse.success("PLATFORM WALLET TRANSACTIONS SUCCESS",
-                paymentWalletService.listPlatformWalletTransactions()));
+        return ResponseEntity.ok(ApiResponse.success("PLATFORM USER ACTIVITY TRANSACTIONS SUCCESS",
+                paymentWalletService.listPlatformUserActivityTransactions()));
+    }
+
+    @GetMapping("/wallet/platform-ledger")
+    public ResponseEntity<ApiResponse<List<WalletTransactionHistoryResponse>>> platformWalletLedger() {
+        return ResponseEntity.ok(ApiResponse.success("PLATFORM WALLET LEDGER SUCCESS",
+                paymentWalletService.listPlatformWalletLedger()));
+    }
+
+    @GetMapping("/wallet/user-activity-transactions")
+    public ResponseEntity<ApiResponse<List<WalletTransactionHistoryResponse>>> platformUserActivityTransactions() {
+        return ResponseEntity.ok(ApiResponse.success("PLATFORM USER ACTIVITY TRANSACTIONS SUCCESS",
+                paymentWalletService.listPlatformUserActivityTransactions()));
     }
 
     // Note: Annotation này khai báo API tạo mới hoặc gửi dữ liệu bằng HTTP POST.

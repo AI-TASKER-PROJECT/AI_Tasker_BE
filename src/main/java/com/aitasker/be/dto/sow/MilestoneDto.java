@@ -5,6 +5,7 @@
  */
 package com.aitasker.be.dto.sow;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +27,11 @@ public class MilestoneDto {
     private String description;
     private Integer duration;
     private String durationUnit;
+    // Allocation that matches the Business-entered budget and remains backward compatible.
+    @Schema(description = "Milestone allocation scaled to the Business-entered budget.")
     private BigDecimal budget;
+    // Advisory allocation that matches budgetAssessment.recommendedBudget.
+    @Schema(description = "Milestone allocation scaled to the advisory recommended budget.")
+    private BigDecimal recommendedBudget;
     private List<String> acceptanceCriteria;
 }

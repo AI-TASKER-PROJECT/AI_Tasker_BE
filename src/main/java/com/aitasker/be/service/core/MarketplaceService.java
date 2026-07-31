@@ -88,28 +88,45 @@ public class MarketplaceService {
     }
 
     @Transactional
-    // Chức năng 2: Cập nhật nội dung Job nháp trước khi doanh nghiệp đăng bài.
+    // Chức năng 2: Cập nhật nội dung Job nháp hoặc Job đã public trước khi có hợp đồng.
     public JobEntity updateDraftJob(Integer jobId, JobEntity input) {
         accessService.requireRole("BUSINESS");
         if (input == null) throw new AppException("JOB UPDATE BODY KHONG DUOC DE TRONG");
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        String previousStatus = job.getStatus();
         BusinessProfileEntity business = currentApprovedBusiness();
         if (!business.getBusinessId().equals(job.getBusinessId())) {
             throw new AppException("BAN KHONG CO QUYEN THAO TAC JOB NAY");
         }
-        if (!"DRAFT".equalsIgnoreCase(job.getStatus())) {
-            throw new AppException("JOB KHONG O TRANG THAI DRAFT");
+        if (!List.of("DRAFT", "OPEN").contains(previousStatus)) {
+            throw new AppException("JOB KHONG O TRANG THAI CHO PHEP CAP NHAT");
         }
         if (contractRepository.findByJobId(jobId).isPresent()) {
-            throw new AppException("JOB DA CO CONTRACT, KHONG DUOC CHINH MILESTONE");
+            throw new AppException("JOB DA CO CONTRACT, KHONG DUOC CAP NHAT TRUC TIEP");
         }
         if (input.getTitle() != null && !input.getTitle().isBlank()) job.setTitle(input.getTitle());
         if (input.getRawRequirements() != null && !input.getRawRequirements().isBlank()) job.setRawRequirements(input.getRawRequirements());
         if (input.getBudget() != null && input.getBudget().signum() > 0) job.setBudget(input.getBudget());
+        if (input.getPlannedDurationValue() != null || (input.getPlannedDurationUnit() != null && !input.getPlannedDurationUnit().isBlank())) {
+            job.setPlannedDurationValue(input.getPlannedDurationValue());
+            job.setPlannedDurationUnit(input.getPlannedDurationUnit());
+            validateAndNormalizeJobDuration(job);
+        }
+        validateMilestoneDurationsWithinJob(job, input.getMilestones());
         JobEntity saved = jobRepository.save(job);
         upsertSow(saved.getJobId(), input.getSow());
         replaceDraftMilestones(saved, input.getMilestones());
-        auditLogService.record(AuditLogService.ACTION_UPDATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
+        replaceJobDomains(saved.getJobId(), input.getDomainIds());
+        replaceJobSkills(saved.getJobId(), input.getSkills());
+        replaceJobTechnologies(saved.getJobId(), input.getTechnologyIds());
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        auditLogService.record("OPEN".equalsIgnoreCase(previousStatus)
+                        ? AuditLogService.ACTION_UPDATE_JOB_OPEN
+                        : AuditLogService.ACTION_UPDATE_JOB_DRAFT,
+                "jobs", String.valueOf(saved.getJobId()), actorAccountId);
+        if ("OPEN".equalsIgnoreCase(previousStatus)) {
+            notifyJobUpdatedExperts(saved, actorAccountId);
+        }
         return attachJobDetails(saved);
     }
 
@@ -211,6 +228,58 @@ public class MarketplaceService {
         accessService.requireRole("EXPERT");
         Integer expertId = currentApprovedExpert().getExpertId();
         return proposalRepository.findByExpertIdOrderByCreatedAtDesc(expertId);
+    }
+
+    @Transactional
+    public ProposalEntity updateProposal(Integer proposalId, ProposalRequest request) {
+        accessService.requireRole("EXPERT");
+        if (request == null) throw new AppException("PROPOSAL UPDATE BODY KHONG DUOC DE TRONG");
+        AccountEntity actor = accessService.currentAccount();
+        ExpertProfileEntity expert = currentApprovedExpert();
+        ProposalEntity proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY PROPOSAL"));
+        if (!expert.getExpertId().equals(proposal.getExpertId())) {
+            throw new AppException("BAN KHONG CO QUYEN CAP NHAT PROPOSAL NAY");
+        }
+        if (!List.of("Pending", "Accepted").contains(proposal.getStatus())) {
+            throw new AppException("PROPOSAL KHONG O TRANG THAI CHO PHEP CAP NHAT");
+        }
+        if (contractRepository.existsByProposalId(proposalId)) {
+            throw new AppException("PROPOSAL DA DUOC TAO CONTRACT, KHONG DUOC CAP NHAT");
+        }
+        JobEntity job = jobRepository.findById(proposal.getJobId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA PROPOSAL"));
+        if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
+            throw new AppException("JOB KHONG O TRANG THAI CHO PHEP CAP NHAT PROPOSAL");
+        }
+        if (request.getTechnicalSolution() != null && !request.getTechnicalSolution().isBlank()) {
+            proposal.setTechnicalSolution(request.getTechnicalSolution());
+        }
+        if (request.getProposalDescription() != null && !request.getProposalDescription().isBlank()) {
+            proposal.setProposalDescription(request.getProposalDescription());
+        }
+        if (request.getProposalFileUrl() != null) {
+            proposal.setProposalFileUrl(request.getProposalFileUrl().isBlank() ? null : request.getProposalFileUrl());
+        }
+        if (request.getBidAmount() != null) {
+            if (request.getBidAmount().signum() <= 0) throw new AppException("BID AMOUNT PHAI LON HON 0");
+            proposal.setBidAmount(request.getBidAmount());
+        }
+        if (request.proposalMilestoneText() != null) {
+            proposal.assignProposalMilestone(normalizeProposalMilestone(
+                    request.proposalMilestoneText(), job, proposal.getBidAmount()));
+        }
+        ProposalEntity saved = proposalRepository.save(proposal);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_PROPOSAL, "proposals", String.valueOf(proposalId), actor.getAccountId());
+        businessProfileRepository.findById(job.getBusinessId())
+                .ifPresent(business -> notificationService.notifyProposalUpdated(
+                        business.getAccountId(),
+                        actor.getAccountId(),
+                        job.getJobId(),
+                        saved.getProposalId(),
+                        job.getTitle()
+                ));
+        return saved;
     }
 
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
@@ -374,6 +443,24 @@ public class MarketplaceService {
             replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getAcceptanceCriteria());
             defaultOrderIndex++;
         }
+    }
+
+    private void replaceJobDomains(Integer jobId, List<Integer> domainIds) {
+        if (domainIds == null) return;
+        jobDomainRepository.deleteByIdJobId(jobId);
+        saveJobDomains(jobId, domainIds);
+    }
+
+    private void replaceJobSkills(Integer jobId, List<JobSkillAssignmentRequest> assignments) {
+        if (assignments == null) return;
+        jobSkillRepository.deleteByIdJobId(jobId);
+        saveJobSkills(jobId, assignments);
+    }
+
+    private void replaceJobTechnologies(Integer jobId, List<Integer> technologyIds) {
+        if (technologyIds == null) return;
+        jobTechnologyRepository.deleteByIdJobId(jobId);
+        saveJobTechnologies(jobId, technologyIds);
     }
 
     // Note: Hàm `saveJobDomains` lưu các lĩnh vực business chọn ngay lúc tạo job.
@@ -628,6 +715,20 @@ public class MarketplaceService {
             throw new AppException(fieldName.toUpperCase() + " PHAI LON HON 0");
         }
         return budget;
+    }
+
+    private void notifyJobUpdatedExperts(JobEntity job, Integer actorAccountId) {
+        proposalRepository.findByJobId(job.getJobId()).stream()
+                .map(ProposalEntity::getExpertId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(expertId -> expertProfileRepository.findById(expertId)
+                        .ifPresent(expert -> notificationService.notifyJobUpdated(
+                                expert.getAccountId(),
+                                actorAccountId,
+                                job.getJobId(),
+                                job.getTitle()
+                        )));
     }
 
     private BusinessProfileEntity currentApprovedBusiness() {

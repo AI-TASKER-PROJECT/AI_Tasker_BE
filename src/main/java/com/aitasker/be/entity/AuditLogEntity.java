@@ -23,7 +23,7 @@ public class AuditLogEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "log_id") private Integer logId;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
-    @Column(name = "actor_account_id", nullable = false) private Integer actorAccountId;
+    @Column(name = "actor_account_id") private Integer actorAccountId;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "action", nullable = false, length = 100) private String action;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.

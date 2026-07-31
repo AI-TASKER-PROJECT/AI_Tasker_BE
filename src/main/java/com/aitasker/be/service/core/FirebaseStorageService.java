@@ -50,6 +50,13 @@ public class FirebaseStorageService {
         return store(file, folder);
     }
 
+    public String uploadUserGuide(MultipartFile file, String folder) {
+        validateFirebaseReady();
+        validateUserGuide(file);
+
+        return store(file, folder);
+    }
+
     private String store(MultipartFile file, String folder) {
         String objectName = folder + "/" + UUID.randomUUID() + "-" + sanitizeFileName(file.getOriginalFilename());
         try {
@@ -95,6 +102,46 @@ public class FirebaseStorageService {
             }
         } catch (IOException ex) {
             throw new AppException("KHONG DOC DUOC FILE SOURCE CODE");
+        }
+    }
+
+    void validateUserGuide(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException("Tệp hướng dẫn sử dụng không hợp lệ");
+        }
+        if (file.getSize() > MAX_FILE_SIZE_BYTES) {
+            throw new AppException("Tệp hướng dẫn sử dụng không được vượt quá 10 MB");
+        }
+        String originalName = file.getOriginalFilename();
+        String normalizedName = originalName == null ? "" : originalName.toLowerCase(java.util.Locale.ROOT);
+        boolean pdf = normalizedName.endsWith(".pdf");
+        boolean docx = normalizedName.endsWith(".docx");
+        if (!pdf && !docx) {
+            throw new AppException("Tệp hướng dẫn sử dụng phải có định dạng PDF hoặc DOCX");
+        }
+        String contentType = file.getContentType();
+        if (pdf && !"application/pdf".equals(contentType)) {
+            throw new AppException("Nội dung tệp hướng dẫn không đúng định dạng PDF");
+        }
+        if (docx && !List.of(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/octet-stream"
+        ).contains(contentType)) {
+            throw new AppException("Nội dung tệp hướng dẫn không đúng định dạng DOCX");
+        }
+        try (InputStream input = file.getInputStream()) {
+            byte[] signature = input.readNBytes(4);
+            boolean validPdf = pdf && signature.length == 4
+                    && signature[0] == 0x25 && signature[1] == 0x50
+                    && signature[2] == 0x44 && signature[3] == 0x46;
+            boolean validDocx = docx && signature.length == 4
+                    && signature[0] == 0x50 && signature[1] == 0x4B
+                    && signature[2] == 0x03 && signature[3] == 0x04;
+            if (!validPdf && !validDocx) {
+                throw new AppException("Nội dung tệp hướng dẫn không khớp với phần mở rộng");
+            }
+        } catch (IOException ex) {
+            throw new AppException("Không đọc được tệp hướng dẫn sử dụng");
         }
     }
 

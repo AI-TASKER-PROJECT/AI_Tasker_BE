@@ -68,6 +68,11 @@ public class MarketplaceController {
         return ResponseEntity.ok(ApiResponse.success("SUBMIT PROPOSAL SUCCESS", marketplaceService.submitProposal(request)));
     }
 
+    @PutMapping("/proposals/{proposalId}")
+    public ResponseEntity<ApiResponse<ProposalEntity>> updateProposal(@PathVariable Integer proposalId, @RequestBody ProposalRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("UPDATE PROPOSAL SUCCESS", marketplaceService.updateProposal(proposalId, request)));
+    }
+
     // Note: Annotation này khai báo API upload file bằng multipart/form-data.
     @PostMapping(value = "/proposals/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     // Note: Hàm `uploadProposalFile` nhận file proposal của chuyên gia, upload Firebase và trả path để gửi kèm proposal.
