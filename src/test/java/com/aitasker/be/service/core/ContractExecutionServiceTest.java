@@ -305,7 +305,7 @@ class ContractExecutionServiceTest {
     }
 
     @Test
-    void getProjectSummary_shouldReturnCompletedProjectAndApprovedDeliverables() {
+    void getProjectSummary_shouldReturnCompletedProjectAndFinalDeliverables() {
         AccountEntity actor = AccountEntity.builder().accountId(50)
                 .role(RoleEntity.builder().roleName("BUSINESS").build()).build();
         ContractEntity contract = ContractEntity.builder()
@@ -320,7 +320,7 @@ class ContractExecutionServiceTest {
                 .status(ContractMilestoneEntity.STATUS_COMPLETED).build();
         DeliverableEntity deliverable = DeliverableEntity.builder()
                 .deliverableId(80).milestoneId(7).submissionRound(1)
-                .status(DeliverableEntity.STATUS_APPROVED)
+                .status(DeliverableEntity.STATUS_REJECTED)
                 .userGuideFileUrl("milestone-user-guides/milestones/7/accounts/60/guide.pdf")
                 .build();
         JobDomainEntity jobDomain = JobDomainEntity.builder()
@@ -356,7 +356,7 @@ class ContractExecutionServiceTest {
     }
 
     @Test
-    void getProjectSummary_shouldRejectWhenApprovedDeliverableIsMissing() {
+    void getProjectSummary_shouldRejectWhenFinalDeliverableIsMissing() {
         AccountEntity actor = AccountEntity.builder().accountId(50)
                 .role(RoleEntity.builder().roleName("BUSINESS").build()).build();
         ContractEntity contract = ContractEntity.builder().contractId(1).jobId(2)
@@ -380,7 +380,7 @@ class ContractExecutionServiceTest {
         AppException ex = assertThrows(AppException.class,
                 () -> contractExecutionService.getProjectSummary(1));
 
-        assertEquals("Trang tổng kết chỉ xuất hiện khi mỗi cột mốc có sản phẩm đã nghiệm thu", ex.getMessage());
+        assertEquals("Trang tổng kết chỉ xuất hiện khi mỗi cột mốc có sản phẩm cuối", ex.getMessage());
     }
 
     @Test

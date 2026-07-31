@@ -1909,10 +1909,9 @@ public class ContractExecutionService {
                     DeliverableEntity finalDeliverable = deliverableRepository
                             .findByMilestoneIdOrderBySubmissionRoundDesc(item.getJobMilestoneId())
                             .stream()
-                            .filter(deliverable -> DeliverableEntity.STATUS_APPROVED.equals(deliverable.getStatus()))
                             .findFirst()
                             .orElseThrow(() -> new AppException(
-                                    "Trang tổng kết chỉ xuất hiện khi mỗi cột mốc có sản phẩm đã nghiệm thu"));
+                                    "Trang tổng kết chỉ xuất hiện khi mỗi cột mốc có sản phẩm cuối"));
                     List<String> criteria = splitCriteriaSnapshot(item.getCriteriaSnapshot());
                     return ProjectSummaryMilestoneResponse.builder()
                             .contractMilestoneId(item.getContractMilestoneId())
@@ -1978,15 +1977,14 @@ public class ContractExecutionService {
                         java.util.Comparator.nullsFirst(Integer::compareTo)))
                 .orElse(null);
         for (ContractMilestoneEntity item : items) {
-            DeliverableEntity approved = deliverableRepository
+            DeliverableEntity finalDeliverable = deliverableRepository
                     .findByMilestoneIdOrderBySubmissionRoundDesc(item.getJobMilestoneId())
                     .stream()
-                    .filter(deliverable -> DeliverableEntity.STATUS_APPROVED.equals(deliverable.getStatus()))
                     .findFirst()
                     .orElse(null);
-            if (approved == null) return false;
-            if (item == lastMilestone && (approved.getUserGuideFileUrl() == null
-                    || approved.getUserGuideFileUrl().isBlank())) {
+            if (finalDeliverable == null) return false;
+            if (item == lastMilestone && (finalDeliverable.getUserGuideFileUrl() == null
+                    || finalDeliverable.getUserGuideFileUrl().isBlank())) {
                 return false;
             }
         }
