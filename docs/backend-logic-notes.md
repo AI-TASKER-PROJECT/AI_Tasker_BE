@@ -117,7 +117,8 @@ Nhung phan sau chua phai production:
 - VNPay/IPN/refund/payout chua that; webhook hien mo phong cap nhat status va invoice.
 - Firebase/file upload chua that; deliverable/license/receipt van la URL text.
 - NDA PDF chua generate/upload.
-- SLA auto approve co API manual, chua co scheduler chay dinh ky.
+- SLA nghiem thu tu dong chay bang backend scheduler; deadline duoc snapshot khi
+  Expert nop final deliverable va settlement dung wallet ledger idempotent.
 - Dispute va termination da dung wallet escrow ledger cho cac settlement chinh;
   cac penalty/rule phat phuc tap van chua phai production.
 - Notification/WebSocket chua co.
@@ -132,4 +133,4 @@ Uu tien de ket noi FE voi DB that hon:
 3. Them API list `audit_logs` va ghi audit cho setting/staff/contract/dispute/wallet.
 4. Tach bang hoac cot rieng cho dispute evidence, demo testing result, technical report.
 5. Them payment service rieng cho VNPay va escrow ledger.
-6. Them scheduler cho SLA auto approve.
+6. Theo doi do tre scheduler va ty le milestone bi chan boi dispute/termination.

@@ -1367,6 +1367,31 @@ V67; thay doi nay chi lam sach va dong bo du lieu test.
   - `401`/`403`: Sai token, sai role, Expert khong thuoc contract.
   - `500`: Firebase chua cau hinh hoac upload that bai.
 
+### POST `/api/v1/contracts/{contractId}/milestones/{milestoneId}/user-guide-file`
+- OperationId: `uploadContractMilestoneUserGuide`
+- Auth: Bearer JWT (chuyên gia đã được duyệt và được gán vào hợp đồng)
+- Giải thích: Tải tệp hướng dẫn sử dụng cho sản phẩm cuối của cột mốc cuối cùng. Hai bên phải ký NDA; cột mốc trực tiếp và cột mốc snapshot đều phải ở trạng thái `IN_PROGRESS`.
+- Params:
+  - `contractId` (path, required, integer)
+  - `milestoneId` (path, required, integer)
+- Body: `multipart/form-data`, key `file`, chỉ nhận `.pdf` hoặc `.docx`.
+- Mã phản hồi thường gặp:
+  - `200`: Tải thành công, `data` là đường dẫn lưu trữ.
+  - `400`: Tệp rỗng, sai định dạng, không phải cột mốc cuối, sai trạng thái hoặc chưa đủ chữ ký NDA.
+  - `401`/`403`: Sai token, sai vai trò hoặc chuyên gia không thuộc hợp đồng.
+
+### GET `/api/v1/contracts/{contractId}/summary`
+- OperationId: `getProjectSummary`
+- Auth: Bearer JWT (hai bên hợp đồng hoặc nhân sự vận hành được phép)
+- Giải thích: Trả dữ liệu tổng kết chỉ khi hợp đồng hoàn thành theo luồng thành công, mọi cột mốc có sản phẩm được duyệt và sản phẩm cuối có tệp hướng dẫn.
+- Params:
+  - `contractId` (path, required, integer)
+- Body raw: Không có.
+- Mã phản hồi thường gặp:
+  - `200`: Trả `ProjectSummaryResponse` gồm dự án, hợp đồng, các bên, lĩnh vực và kết quả bàn giao từng cột mốc.
+  - `400`: Hợp đồng chưa đủ điều kiện tổng kết hoặc thiếu sản phẩm/tệp hướng dẫn.
+  - `401`/`403`: Không phải người tham gia hoặc nhân sự vận hành hợp lệ.
+
 ### GET `/api/v1/milestones/{milestoneId}/criteria`
 - OperationId: `listCriteria`
 - Auth: Bearer JWT
@@ -1876,19 +1901,6 @@ V67; thay doi nay chi lam sach va dong bo du lieu test.
 - Params:
   - `contractId` (path, required, integer)
   - `milestoneId` (path, required, integer)
-- Body raw: Khong co.
-- Ma phan hoi thuong gap:
-  - `200`: Thanh cong theo message/schema tren Swagger.
-  - `400`: Validation loi hoac vi pham business rule/state transition.
-  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
-  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
-
-### POST `/api/v1/contracts/{contractId}/milestones/sla-auto-approve`
-- OperationId: `autoApproveReviewSla`
-- Auth: Bearer JWT
-- Giai thich: Operation autoApproveReviewSla.
-- Params:
-  - `contractId` (path, required, integer)
 - Body raw: Khong co.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.

@@ -67,4 +67,42 @@ class FirebaseStorageServiceTest {
 
         assertEquals("FILE SOURCE CODE KHONG DUOC VUOT QUA 50MB", ex.getMessage());
     }
+
+    @Test
+    void validateUserGuide_shouldAcceptPdfSignature() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "huong-dan.pdf", "application/pdf", new byte[] {0x25, 0x50, 0x44, 0x46});
+
+        assertDoesNotThrow(() -> service.validateUserGuide(file));
+    }
+
+    @Test
+    void validateUserGuide_shouldAcceptDocxSignature() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "huong-dan.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                new byte[] {0x50, 0x4B, 0x03, 0x04});
+
+        assertDoesNotThrow(() -> service.validateUserGuide(file));
+    }
+
+    @Test
+    void validateUserGuide_shouldRejectUnsupportedExtension() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "huong-dan.doc", "application/msword", new byte[] {1, 2, 3, 4});
+
+        AppException ex = assertThrows(AppException.class, () -> service.validateUserGuide(file));
+
+        assertEquals("Tệp hướng dẫn sử dụng phải có định dạng PDF hoặc DOCX", ex.getMessage());
+    }
+
+    @Test
+    void validateUserGuide_shouldRejectSpoofedPdf() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "huong-dan.pdf", "application/pdf", new byte[] {1, 2, 3, 4});
+
+        AppException ex = assertThrows(AppException.class, () -> service.validateUserGuide(file));
+
+        assertEquals("Nội dung tệp hướng dẫn không khớp với phần mở rộng", ex.getMessage());
+    }
 }

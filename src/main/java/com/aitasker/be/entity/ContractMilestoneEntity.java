@@ -42,6 +42,8 @@ public class ContractMilestoneEntity {
     @Column(name = "duration") private Integer duration;
     @Column(name = "duration_unit", length = 20) private String durationUnit;
     @Column(name = "in_progress_started_at") private LocalDateTime inProgressStartedAt;
+    @Column(name = "review_started_at") private LocalDateTime reviewStartedAt;
+    @Column(name = "review_due_at") private LocalDateTime reviewDueAt;
     @Column(name = "criteria_snapshot") private String criteriaSnapshot;
     @Column(name = "deliverable_expectation") private String deliverableExpectation;
     @Column(name = "resubmit_count") private Integer resubmitCount;

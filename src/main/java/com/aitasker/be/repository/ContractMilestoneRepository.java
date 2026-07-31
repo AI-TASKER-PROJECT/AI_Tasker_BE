@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +27,16 @@ public interface ContractMilestoneRepository extends JpaRepository<ContractMiles
             @Param("contractId") Integer contractId,
             @Param("milestoneId") Integer milestoneId
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select cm from ContractMilestoneEntity cm
+            where cm.status = 'UNDER_REVIEW'
+              and cm.reviewDueAt is not null
+              and cm.reviewDueAt <= :now
+            order by cm.reviewDueAt asc, cm.contractMilestoneId asc
+            """)
+    List<ContractMilestoneEntity> findDueReviewSlaForUpdate(@Param("now") LocalDateTime now);
 
     @Query("""
             select coalesce(sum(cm.finalBudget), 0)

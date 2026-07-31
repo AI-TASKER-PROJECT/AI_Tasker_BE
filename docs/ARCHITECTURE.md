@@ -345,7 +345,9 @@ Contract execution enforces a multi-step agreement model:
   `COMPLETED` and the job to `CLOSED`.
 - Admin deposit refund/resolution keeps completed contracts `COMPLETED` and
   cancelled contracts `CANCELLED` after final deposit handling.
-- SLA auto-approve is currently a manual API simulation, not a scheduler.
+- Final-deliverable submission snapshots a milestone review deadline. A backend
+  scheduler automatically approves eligible overdue reviews and releases escrow
+  exactly once; the frontend only displays the server deadline and countdown.
 
 ## Finance And Payment Rules
 
@@ -545,7 +547,6 @@ The following areas are intentionally not yet production-complete:
 - Provider-backed payment, refund, payout, and escrow ledger.
 - Full Firebase/file coverage for all evidence and deliverable flows.
 - NDA PDF generation and storage.
-- Scheduled SLA auto-approval.
 - Dispute fund lock, evidence snapshot, refund, and penalty handling.
 - Complete audit coverage for every sensitive operation.
 - WebSocket/STOMP test coverage.

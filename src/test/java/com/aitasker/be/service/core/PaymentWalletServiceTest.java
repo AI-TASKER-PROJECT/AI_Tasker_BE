@@ -1177,8 +1177,8 @@ class PaymentWalletServiceTest {
         assertEquals("Chuyên gia E đã tạo yêu cầu rút tiền", history.get(0).getTitle());
         assertEquals("Hệ thống đã tạm giữ 5000000 VND cho yêu cầu rút tiền của Chuyên gia E. Ngân hàng: Vietcombank, chủ tài khoản: Nguyen Van E.",
                 history.get(0).getDescription());
-        assertEquals("Doanh nghiệp A đã mua 10 lượt đăng job", history.get(1).getTitle());
-        assertEquals("Doanh nghiệp A thanh toán 100000 VND để mua 10 lượt đăng job.", history.get(1).getDescription());
+        assertEquals("Doanh nghiệp A đã mua 10 lượt đăng dự án", history.get(1).getTitle());
+        assertEquals("Doanh nghiệp A thanh toán 100000 VNĐ để mua 10 lượt đăng dự án.", history.get(1).getDescription());
         assertEquals("Doanh nghiệp A đã mua gói Premium Business", history.get(2).getTitle());
         assertEquals("Doanh nghiệp A thanh toán 500000 VND để mua gói Premium Business. Thời hạn từ 27/06/2026 đến 27/07/2026.",
                 history.get(2).getDescription());
