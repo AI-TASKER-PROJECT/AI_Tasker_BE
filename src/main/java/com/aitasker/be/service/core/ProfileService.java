@@ -5,6 +5,7 @@
  */
 package com.aitasker.be.service.core;
 
+import com.aitasker.be.common.exception.ForbiddenException;
 import com.aitasker.be.common.exception.NotFoundException;
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.auth.TaxCheckResponse;
@@ -35,11 +36,14 @@ public class ProfileService {
     private final NotificationService notificationService;
     private final ReviewRepository reviewRepository;
     private final TaxCheckService taxCheckService;
+    private final DomainRepository domainRepository;
+    private final StaffDomainRepository staffDomainRepository;
 
     // TAO HOAC CAP NHAT HO SO DOANH NGHIEP DE PHUC VU LUONG KYB.
     // Note: Annotation nay dam bao cac thao tac database trong ham chay cung mot transaction.
     @Transactional
     // Note: Ham `upsertBusiness` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
+    // Chức năng 1: Tạo hoặc cập nhật hồ sơ định danh doanh nghiệp của tài khoản hiện tại.
     public BusinessProfileEntity upsertBusiness(BusinessProfileEntity input) {
         accessService.requireRole("BUSINESS");
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
@@ -51,6 +55,9 @@ public class ProfileService {
         AccountEntity account = accessService.currentAccount();
 
         // KIEM TRA TRUNG MST — MOT MST CHI THUOC VE MOT ACCOUNT.
+        BusinessProfileEntity entity = businessProfileRepository.findByAccountId(account.getAccountId()).orElseGet(BusinessProfileEntity::new);
+        ProfileSubmissionMode submissionMode = resolveBusinessSubmissionMode(entity);
+
         if (businessProfileRepository.existsByTaxCodeExcludingAccount(input.getTaxCode(), account.getAccountId())) {
             throw new AppException("MA SO THUE DA DUOC SU DUNG BOI TAI KHOAN KHAC");
         }
@@ -58,22 +65,25 @@ public class ProfileService {
         // XAC THUC MST VOI VIETQR — HE THONG TU DONG DIEN THONG TIN DOANH NGHIEP TU NGUON CHINH THUC.
         TaxCheckResponse vietQrData = taxCheckService.checkTaxCode(input.getTaxCode());
 
-        BusinessProfileEntity entity = businessProfileRepository.findByAccountId(account.getAccountId()).orElseGet(BusinessProfileEntity::new);
         entity.setAccountId(account.getAccountId());
         entity.setTaxCode(input.getTaxCode());
         entity.setCompanyName(vietQrData.getCompanyName());
-        entity.setAddress(vietQrData.getAddress());
+        entity.setAddress(resolveBusinessAddress(input, vietQrData, submissionMode));
         entity.setVerifiedRepresentative(vietQrData.getRepresentative());
         entity.setBusinessLicenseUrl(input.getBusinessLicenseUrl());
         // Moi lan nop/cap nhat KYB deu dua account ve Pending de staff duyet lai.
-        entity.setKybStatus("Pending");
-        entity.setApprovedBy(null);
-        entity.setRejectionReason(null);
-        account.setStatus("Pending");
-        accountRepository.save(account);
+        if (submissionMode.reopensReview()) {
+            entity.setKybStatus("Pending");
+            entity.setApprovedBy(null);
+            entity.setRejectionReason(null);
+            account.setStatus("Pending");
+            accountRepository.save(account);
+        }
         BusinessProfileEntity saved = businessProfileRepository.save(entity);
         auditLogService.record(AuditLogService.ACTION_UPSERT_BUSINESS_PROFILE, "business_profiles", String.valueOf(saved.getBusinessId()), account.getAccountId());
-        notifyStaffProfileSubmitted("BUSINESS", saved.getBusinessId(), account.getAccountId(), saved.getCompanyName());
+        if (submissionMode.reopensReview()) {
+            notifyStaffProfileSubmitted("BUSINESS", saved.getBusinessId(), account.getAccountId(), saved.getCompanyName());
+        }
         return saved;
     }
 
@@ -81,6 +91,7 @@ public class ProfileService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `upsertExpert` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 2: Tạo hoặc cập nhật hồ sơ định danh chuyên gia của tài khoản hiện tại.
     public ExpertProfileEntity upsertExpert(ExpertProfileEntity input) {
         accessService.requireRole("EXPERT");
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
@@ -89,23 +100,29 @@ public class ProfileService {
         if (input.getPortfolioUrl() == null || input.getPortfolioUrl().isBlank()) throw new AppException("PORTFOLIO URL KHONG DUOC DE TRONG");
         if (input.getYearsOfExperience() == null || input.getYearsOfExperience() < 0) throw new AppException("YEARS OF EXPERIENCE KHONG HOP LE");
         AccountEntity account = accessService.currentAccount();
+        ExpertProfileEntity entity = expertProfileRepository.findByAccountId(account.getAccountId()).orElseGet(ExpertProfileEntity::new);
+        ProfileSubmissionMode submissionMode = resolveExpertSubmissionMode(entity);
         expertProfileRepository.findByNationalId(input.getNationalId().trim())
                 .filter(existing -> !existing.getAccountId().equals(account.getAccountId()))
                 .ifPresent(existing -> { throw new AppException("NATIONAL ID DA DUOC SU DUNG"); });
-        ExpertProfileEntity entity = expertProfileRepository.findByAccountId(account.getAccountId()).orElseGet(ExpertProfileEntity::new);
         entity.setAccountId(account.getAccountId());
         entity.setNationalId(input.getNationalId().trim());
         entity.setPortfolioUrl(input.getPortfolioUrl().trim());
         entity.setYearsOfExperience(input.getYearsOfExperience());
         // Moi lan nop/cap nhat KYC deu dua account ve Pending de staff duyet lai.
-        entity.setKycStatus("Pending");
-        entity.setApprovedBy(null);
-        entity.setRejectionReason(null);
-        account.setStatus("Pending");
-        accountRepository.save(account);
+        if (submissionMode.reopensReview()) {
+            entity.setKycStatus("Pending");
+            entity.setApprovedBy(null);
+            entity.setRejectionReason(null);
+            account.setStatus("Pending");
+            accountRepository.save(account);
+        }
         ExpertProfileEntity saved = expertProfileRepository.save(entity);
+        syncPortfolioYearsExperience(saved);
         auditLogService.record(AuditLogService.ACTION_UPSERT_EXPERT_PROFILE, "expert_profiles", String.valueOf(saved.getExpertId()), account.getAccountId());
-        notifyStaffProfileSubmitted("EXPERT", saved.getExpertId(), account.getAccountId(), account.getFullName());
+        if (submissionMode.reopensReview()) {
+            notifyStaffProfileSubmitted("EXPERT", saved.getExpertId(), account.getAccountId(), account.getFullName());
+        }
         return saved;
     }
 
@@ -113,6 +130,7 @@ public class ProfileService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `approveProfile` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 3: Staff/Admin duyệt hoặc từ chối hồ sơ định danh doanh nghiệp/chuyên gia.
     public Object approveProfile(String type, Integer id, String status, String reason) {
         accessService.requireRole("STAFF");
         // CHI CHO PHEP 2 GIA TRI PHE DUYET DUNG THEO BUSINESS RULE.
@@ -122,8 +140,10 @@ public class ProfileService {
         String normalizedReason = normalizeRejectionReason(status, reason);
         AccountEntity actor = accessService.currentAccount();
         Integer staffId = resolveStaffId(actor.getAccountId());
+        requireProfileReviewDomain(staffId);
         if ("BUSINESS".equalsIgnoreCase(type)) {
             BusinessProfileEntity b = businessProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY BUSINESS PROFILE"));
+            requirePendingProfileStatus(b.getKybStatus());
             b.setKybStatus(status);
             b.setApprovedBy(staffId);
             b.setRejectionReason(normalizedReason);
@@ -137,6 +157,7 @@ public class ProfileService {
             throw new AppException("TYPE PROFILE KHONG HOP LE");
         }
         ExpertProfileEntity e = expertProfileRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY EXPERT PROFILE"));
+        requirePendingProfileStatus(e.getKycStatus());
         e.setKycStatus(status);
         e.setApprovedBy(staffId);
         e.setRejectionReason(normalizedReason);
@@ -148,6 +169,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `currentBusinessProfile` lấy hồ sơ KYB của chính doanh nghiệp đang đăng nhập để reload trang vẫn thấy status/file mới nhất.
+    // Chức năng 4: Lấy hồ sơ doanh nghiệp của tài khoản đang đăng nhập.
     public BusinessProfileEntity currentBusinessProfile() {
         accessService.requireRole("BUSINESS");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -157,6 +179,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `businessProfileById` lấy hồ sơ doanh nghiệp theo businessId để hiển thị trang cá nhân public cho expert xem.
+    // Chức năng 5: Lấy hồ sơ doanh nghiệp theo ID để xem công khai hoặc duyệt hồ sơ.
     public BusinessProfileEntity businessProfileById(Integer businessId) {
         return businessProfileRepository.findById(businessId)
                 .map(this::attachBusinessAccountInfo)
@@ -164,6 +187,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `businessProfileByJob` lấy hồ sơ doanh nghiệp đăng một job để chuyên gia xem chi tiết khi job đã public.
+    // Chức năng 6: Lấy hồ sơ doanh nghiệp theo Job để chuyên gia xem trước khi nộp proposal.
     public BusinessProfileEntity businessProfileByJob(Integer jobId) {
         JobEntity job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
@@ -177,6 +201,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `currentExpertProfile` lấy hồ sơ KYC của chính chuyên gia đang đăng nhập để reload trang vẫn thấy status mới nhất.
+    // Chức năng 7: Lấy hồ sơ chuyên gia của tài khoản đang đăng nhập.
     public ExpertProfileEntity currentExpertProfile() {
         accessService.requireRole("EXPERT");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -186,6 +211,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `expertProfileById` lấy hồ sơ chuyên gia theo expertId để hiển thị trang cá nhân public cho business xem.
+    // Chức năng 8: Lấy hồ sơ chuyên gia theo ID để xem công khai hoặc duyệt hồ sơ.
     public ExpertProfileEntity expertProfileById(Integer expertId) {
         accessService.requireRole("EXPERT", "BUSINESS", "STAFF", "ADMIN");
         return expertProfileRepository.findById(expertId)
@@ -194,6 +220,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `currentPortfolio` lấy portfolio của chính chuyên gia đang đăng nhập để form không mất dữ liệu sau khi reload.
+    // Chức năng 9: Lấy portfolio năng lực của chuyên gia đang đăng nhập.
     public PortfolioEntity currentPortfolio() {
         accessService.requireRole("EXPERT");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -205,6 +232,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `createFileViewUrl` tạo link xem file Firebase cho người dùng có quyền trong hệ thống thay vì trả raw storage path lên UI.
+    // Chức năng 10: Tạo URL xem file hồ sơ hoặc tài liệu đã upload.
     public String createFileViewUrl(String path) {
         accessService.requireRole("STAFF", "ADMIN", "BUSINESS", "EXPERT");
         if (path != null && (path.startsWith("http://") || path.startsWith("https://"))) {
@@ -213,23 +241,38 @@ public class ProfileService {
         return firebaseStorageService.createReadUrl(path);
     }
 
+    // Chức năng 11: Lấy toàn bộ hồ sơ doanh nghiệp cho màn duyệt định danh.
     public List<BusinessProfileEntity> allBusinessProfiles() {
         accessService.requireRole("STAFF");
+        requireCurrentStaffProfileReviewDomain();
         return businessProfileRepository.findAll().stream()
                 .map(this::attachBusinessAccountInfo)
                 .toList();
     }
     // Note: Hàm `allExpertProfiles` cho STAFF quản trị hồ sơ và BUSINESS đọc thông tin expert khi xem proposal.
+    // Chức năng 12: Lấy toàn bộ hồ sơ chuyên gia cho màn duyệt định danh.
     public List<ExpertProfileEntity> allExpertProfiles() {
         accessService.requireRole("STAFF", "BUSINESS");
+        AccountEntity actor = accessService.currentAccount();
+        if (actor.getRole() != null && "STAFF".equals(actor.getRole().getRoleName())) {
+            requireProfileReviewDomain(resolveStaffId(actor.getAccountId()));
+        }
         return expertProfileRepository.findAll().stream()
                 .map(this::attachExpertAccountInfo)
                 .toList();
     }
     // Note: Hàm `allPortfolios` cho STAFF quản trị portfolio và BUSINESS xem năng lực expert trong màn proposal.
-    public List<PortfolioEntity> allPortfolios() { accessService.requireRole("STAFF", "BUSINESS"); return portfolioRepository.findAll(); }
+    public List<PortfolioEntity> allPortfolios() {
+        accessService.requireRole("STAFF", "BUSINESS");
+        AccountEntity actor = accessService.currentAccount();
+        if (actor.getRole() != null && "STAFF".equals(actor.getRole().getRoleName())) {
+            requireProfileReviewDomain(resolveStaffId(actor.getAccountId()));
+        }
+        return portfolioRepository.findAll();
+    }
 
     // Note: Hàm `uploadBusinessLicense` upload file giấy phép kinh doanh lên Firebase Storage và trả về storage path để lưu vào hồ sơ KYB.
+    // Chức năng 13: Upload giấy phép kinh doanh phục vụ định danh doanh nghiệp.
     public String uploadBusinessLicense(MultipartFile file) {
         accessService.requireRole("BUSINESS");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -240,6 +283,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `uploadExpertCertificate` upload file chứng chỉ chuyên gia lên Firebase Storage và trả về storage path để lưu vào portfolio.
+    // Chức năng 14: Upload chứng chỉ chuyên gia phục vụ hồ sơ năng lực.
     public String uploadExpertCertificate(MultipartFile file) {
         accessService.requireRole("EXPERT");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -250,6 +294,7 @@ public class ProfileService {
     }
 
     // Note: Hàm `uploadExpertPortfolio` upload file portfolio chuyên gia lên Firebase Storage và trả về storage path để frontend lưu vào hồ sơ KYC/portfolio.
+    // Chức năng 15: Upload file portfolio hoặc hồ sơ năng lực của chuyên gia.
     public String uploadExpertPortfolio(MultipartFile file) {
         accessService.requireRole("EXPERT");
         Integer accountId = accessService.currentAccount().getAccountId();
@@ -263,6 +308,7 @@ public class ProfileService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `upsertPortfolio` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 16: Tạo hoặc cập nhật portfolio năng lực của chuyên gia.
     public PortfolioEntity upsertPortfolio(PortfolioEntity input) {
         accessService.requireRole("EXPERT");
         if (input == null) throw new AppException("BODY REQUEST KHONG HOP LE");
@@ -358,14 +404,77 @@ public class ProfileService {
         return normalized;
     }
 
+    private ProfileSubmissionMode resolveBusinessSubmissionMode(BusinessProfileEntity entity) {
+        if (entity.getBusinessId() == null) return ProfileSubmissionMode.REOPEN_REVIEW;
+        return resolveSubmissionMode(entity.getKybStatus());
+    }
+
+    private String resolveBusinessAddress(
+            BusinessProfileEntity input,
+            TaxCheckResponse vietQrData,
+            ProfileSubmissionMode submissionMode
+    ) {
+        if (submissionMode == ProfileSubmissionMode.UPDATE_APPROVED_ONLY
+                && input.getAddress() != null
+                && !input.getAddress().isBlank()) {
+            return input.getAddress().trim();
+        }
+        return vietQrData.getAddress();
+    }
+
+    private ProfileSubmissionMode resolveExpertSubmissionMode(ExpertProfileEntity entity) {
+        if (entity.getExpertId() == null) return ProfileSubmissionMode.REOPEN_REVIEW;
+        return resolveSubmissionMode(entity.getKycStatus());
+    }
+
+    private void syncPortfolioYearsExperience(ExpertProfileEntity expert) {
+        if (expert.getExpertId() == null || expert.getYearsOfExperience() == null) {
+            return;
+        }
+        portfolioRepository.findByExpertId(expert.getExpertId()).ifPresent(portfolio -> {
+            portfolio.setYearsExperience(expert.getYearsOfExperience());
+            portfolioRepository.save(portfolio);
+        });
+    }
+
+    private ProfileSubmissionMode resolveSubmissionMode(String currentStatus) {
+        if ("Pending".equalsIgnoreCase(currentStatus)) {
+            throw new AppException("HO SO DANG CHO DUYET, VUI LONG DOI KET QUA XET DUYET");
+        }
+        if ("Approved".equalsIgnoreCase(currentStatus)) {
+            return ProfileSubmissionMode.UPDATE_APPROVED_ONLY;
+        }
+        return ProfileSubmissionMode.REOPEN_REVIEW;
+    }
+
+    private void requirePendingProfileStatus(String currentStatus) {
+        if (!"Pending".equalsIgnoreCase(currentStatus)) {
+            throw new AppException("CHI DUOC XET DUYET HO SO DANG CHO DUYET");
+        }
+    }
+
+    private enum ProfileSubmissionMode {
+        REOPEN_REVIEW,
+        UPDATE_APPROVED_ONLY;
+
+        boolean reopensReview() {
+            return this == REOPEN_REVIEW;
+        }
+    }
+
     private void notifyStaffProfileSubmitted(String profileType, Integer profileId, Integer submitterAccountId, String displayName) {
-        staffRepository.findAll().forEach(staff -> notificationService.notifyProfileSubmitted(
-                staff.getAccountId(),
-                submitterAccountId,
-                profileType,
-                profileId,
-                displayName
-        ));
+        domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)
+                .ifPresent(domain -> staffDomainRepository.findByIdDomainId(domain.getDomainId()).forEach(mapping ->
+                        staffRepository.findById(mapping.getId().getStaffId()).ifPresent(staff ->
+                                notificationService.notifyProfileSubmitted(
+                                        staff.getAccountId(),
+                                        submitterAccountId,
+                                        profileType,
+                                        profileId,
+                                        displayName
+                                )
+                        )
+                ));
     }
 
     // BAT BUOC TAI KHOAN STAFF PHAI CO BAN GHI TRONG BANG staffs DE LUU approvedBy.
@@ -374,5 +483,18 @@ public class ProfileService {
         return staffRepository.findByAccountId(accountId)
                 .map(StaffEntity::getStaffId)
                 .orElseThrow(() -> new AppException("TAI KHOAN STAFF CHUA DUOC KHOI TAO HO SO NHAN SU (staffs)"));
+    }
+
+    private void requireCurrentStaffProfileReviewDomain() {
+        AccountEntity actor = accessService.currentAccount();
+        requireProfileReviewDomain(resolveStaffId(actor.getAccountId()));
+    }
+
+    private void requireProfileReviewDomain(Integer staffId) {
+        DomainEntity profileReviewDomain = domainRepository.findByDomainCode(CatalogService.PROFILE_REVIEW_DOMAIN_CODE)
+                .orElseThrow(() -> new AppException("CHUA CAU HINH DOMAIN XET DUYET HO SO"));
+        if (!staffDomainRepository.existsByIdStaffIdAndIdDomainId(staffId, profileReviewDomain.getDomainId())) {
+            throw new ForbiddenException("STAFF KHONG CO QUYEN XET DUYET HO SO");
+        }
     }
 }

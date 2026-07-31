@@ -125,7 +125,7 @@ public class AuthServiceImpl implements AuthService {
         paymentWalletService.ensureQuotaForAccount(saved);
         notifyAdminsNewAccountCreated(saved);
         emailOtpService.clearVerifiedEmail(email);
-        return buildAuthResponse(saved);
+        return issueNewSession(saved);
     }
 
     @Override
@@ -138,8 +138,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String email = normalizeEmail(payload.getEmail());
-        return accountRepository.findByEmailWithRole(email)
-                .map(this::buildAuthResponse)
+        return accountRepository.findByEmailWithRoleForUpdate(email)
+                .map(this::issueNewSession)
                 .orElseGet(() -> createGoogleAccount(req, email, payload));
     }
 
@@ -167,8 +167,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         resetFailedLoginCounters(account);
-        accountRepository.save(account);
-        return buildAuthResponse(account);
+        return issueNewSession(account);
     }
 
     private boolean isTemporarilyLocked(AccountEntity account) {
@@ -435,9 +434,13 @@ public class AuthServiceImpl implements AuthService {
         AccountEntity account = accountRepository.findByEmailWithRole(email)
                 .orElseThrow(() -> new UnauthorizedException("Tai khoan khong hop le"));
         assertAccountCanReceiveToken(account);
+        assertCurrentTokenVersion(refreshToken, account);
 
         return AuthResponse.builder()
-                .accessToken(jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName()))
+                .accessToken(jwtService.generateAccessToken(
+                        account.getEmail(),
+                        account.getRole().getRoleName(),
+                        account.getActiveTokenVersion()))
                 .refreshToken(refreshToken)
                 .role(account.getRole().getRoleName())
                 .accountStatus(account.getStatus())
@@ -472,7 +475,7 @@ public class AuthServiceImpl implements AuthService {
         AccountEntity saved = accountRepository.save(account);
         paymentWalletService.ensureQuotaForAccount(saved);
         notifyAdminsNewAccountCreated(saved);
-        return buildAuthResponse(saved);
+        return issueNewSession(saved);
     }
 
     private void notifyAdminsNewAccountCreated(AccountEntity account) {
@@ -487,20 +490,36 @@ public class AuthServiceImpl implements AuthService {
     }
 
     // Note: Ham `buildAuthResponse` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
-    private AuthResponse buildAuthResponse(AccountEntity account) {
+    private AuthResponse issueNewSession(AccountEntity account) {
         assertAccountCanReceiveToken(account);
 
-        String accessToken = jwtService.generateAccessToken(account.getEmail(), account.getRole().getRoleName());
-        String refreshToken = jwtService.generateRefreshToken(account.getEmail());
+        account.setActiveTokenVersion(account.getActiveTokenVersion() + 1);
+        AccountEntity saved = accountRepository.save(account);
+        AccountEntity tokenAccount = saved == null ? account : saved;
+
+        String accessToken = jwtService.generateAccessToken(
+                tokenAccount.getEmail(),
+                tokenAccount.getRole().getRoleName(),
+                tokenAccount.getActiveTokenVersion());
+        String refreshToken = jwtService.generateRefreshToken(
+                tokenAccount.getEmail(),
+                tokenAccount.getActiveTokenVersion());
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .role(account.getRole().getRoleName())
-                .accountStatus(account.getStatus())
-                .email(account.getEmail())
-                .fullName(account.getFullName())
+                .role(tokenAccount.getRole().getRoleName())
+                .accountStatus(tokenAccount.getStatus())
+                .email(tokenAccount.getEmail())
+                .fullName(tokenAccount.getFullName())
                 .build();
+    }
+
+    private void assertCurrentTokenVersion(String token, AccountEntity account) {
+        Integer tokenVersion = jwtService.extractTokenVersion(token);
+        if (tokenVersion == null || tokenVersion != account.getActiveTokenVersion()) {
+            throw new UnauthorizedException("Phien dang nhap da het hieu luc");
+        }
     }
 
     private void assertAccountCanReceiveToken(AccountEntity account) {

@@ -102,7 +102,7 @@ public class AiCompletionService {
     // Note: Ham `buildRequestBody` xu ly nghiep vu chinh, kiem tra dieu kien va phoi hop repository/service lien quan.
     private Map<String, Object> buildRequestBody(String question, Map<String, String> contexts) {
         Map<String, Object> requestBody = new LinkedHashMap<>();
-        requestBody.put("model", openAiProperties.getModel());
+        requestBody.put("model", openAiProperties.getChatbotModel());
         requestBody.put("instructions", SYSTEM_INSTRUCTIONS);
         requestBody.put("input", buildPrompt(question, contexts));
         requestBody.put("max_output_tokens", openAiProperties.getMaxOutputTokens());

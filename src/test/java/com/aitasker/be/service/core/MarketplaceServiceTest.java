@@ -6,11 +6,14 @@
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
+import com.aitasker.be.dto.core.ProposalRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.BusinessProfileEntity;
 import com.aitasker.be.entity.ContractEntity;
+import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.JobEntity;
 import com.aitasker.be.entity.MilestoneEntity;
+import com.aitasker.be.entity.ProposalEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.SowEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -191,9 +194,9 @@ class MarketplaceServiceTest {
     }
 
     @Test
-    void updateDraftJob_shouldRejectNonDraftJob() {
+    void updateDraftJob_shouldRejectDisallowedJobStatus() {
         Integer jobId = 4;
-        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("OPEN").build();
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("IN_PROGRESS").build();
         RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
         AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
         BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
@@ -203,7 +206,7 @@ class MarketplaceServiceTest {
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
         AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateDraftJob(jobId, JobEntity.builder().build()));
-        assertEquals("JOB KHONG O TRANG THAI DRAFT", ex.getMessage());
+        assertEquals("JOB KHONG O TRANG THAI CHO PHEP CAP NHAT", ex.getMessage());
     }
 
     @Test
@@ -220,7 +223,77 @@ class MarketplaceServiceTest {
         when(contractRepository.findByJobId(jobId)).thenReturn(Optional.of(ContractEntity.builder().build()));
 
         AppException ex = assertThrows(AppException.class, () -> marketplaceService.updateDraftJob(jobId, JobEntity.builder().build()));
-        assertEquals("JOB DA CO CONTRACT, KHONG DUOC CHINH MILESTONE", ex.getMessage());
+        assertEquals("JOB DA CO CONTRACT, KHONG DUOC CAP NHAT TRUC TIEP", ex.getMessage());
+    }
+
+    @Test
+    void updateDraftJob_shouldUpdateOpenJobAndNotifyProposedExperts() {
+        Integer jobId = 15;
+        JobEntity job = JobEntity.builder().jobId(jobId).businessId(20).status("OPEN")
+                .title("Old").rawRequirements("Old req").budget(BigDecimal.TEN).build();
+        JobEntity input = JobEntity.builder().title("New public title").build();
+        RoleEntity role = RoleEntity.builder().roleName("BUSINESS").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).kybStatus("Approved").build();
+        ProposalEntity proposal = ProposalEntity.builder().proposalId(30).jobId(jobId).expertId(40).status("Pending").build();
+        ExpertProfileEntity expert = ExpertProfileEntity.builder().expertId(40).accountId(50).build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(contractRepository.findByJobId(jobId)).thenReturn(Optional.empty());
+        when(jobRepository.save(any(JobEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(milestoneRepository.findByJobIdOrderByOrderIndexAsc(jobId)).thenReturn(List.of());
+        when(proposalRepository.findByJobId(jobId)).thenReturn(List.of(proposal));
+        when(expertProfileRepository.findById(40)).thenReturn(Optional.of(expert));
+
+        JobEntity result = marketplaceService.updateDraftJob(jobId, input);
+
+        assertEquals("New public title", result.getTitle());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_JOB_OPEN, "jobs", String.valueOf(jobId), 10);
+        verify(notificationService).notifyJobUpdated(50, 10, jobId, "New public title");
+    }
+
+    @Test
+    void updateProposal_shouldUpdatePendingProposalAndNotifyBusiness() {
+        Integer proposalId = 60;
+        RoleEntity role = RoleEntity.builder().roleName("EXPERT").build();
+        AccountEntity account = AccountEntity.builder().accountId(10).status("Approved").role(role).build();
+        ExpertProfileEntity expert = ExpertProfileEntity.builder().expertId(20).accountId(10).kycStatus("Approved").build();
+        ProposalEntity proposal = ProposalEntity.builder()
+                .proposalId(proposalId)
+                .jobId(30)
+                .expertId(20)
+                .technicalSolution("Old tech")
+                .proposalDescription("Old description")
+                .bidAmount(BigDecimal.valueOf(100))
+                .status("Pending")
+                .build();
+        JobEntity job = JobEntity.builder().jobId(30).businessId(40).status("OPEN").title("AI Job").budget(BigDecimal.valueOf(500)).build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(40).accountId(50).kybStatus("Approved").build();
+        ProposalRequest request = new ProposalRequest();
+        request.setJobId(30);
+        request.setTechnicalSolution("New tech");
+        request.setBidAmount(BigDecimal.valueOf(150));
+        request.setProposalDescription("New description");
+        request.setProposalFileUrl("proposal.pdf");
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(expertProfileRepository.findByAccountId(10)).thenReturn(Optional.of(expert));
+        when(proposalRepository.findById(proposalId)).thenReturn(Optional.of(proposal));
+        when(contractRepository.existsByProposalId(proposalId)).thenReturn(false);
+        when(jobRepository.findById(30)).thenReturn(Optional.of(job));
+        when(proposalRepository.save(any(ProposalEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(businessProfileRepository.findById(40)).thenReturn(Optional.of(business));
+
+        ProposalEntity result = marketplaceService.updateProposal(proposalId, request);
+
+        assertEquals("New tech", result.getTechnicalSolution());
+        assertEquals(BigDecimal.valueOf(150), result.getBidAmount());
+        assertEquals("New description", result.getProposalDescription());
+        assertEquals("proposal.pdf", result.getProposalFileUrl());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_PROPOSAL, "proposals", String.valueOf(proposalId), 10);
+        verify(notificationService).notifyProposalUpdated(50, 10, 30, proposalId, "AI Job");
     }
 
     @Test

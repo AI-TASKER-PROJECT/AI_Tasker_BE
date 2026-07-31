@@ -8,10 +8,12 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.dto.admin.AccountRequest;
+import com.aitasker.be.dto.admin.SystemSettingRequest;
 import com.aitasker.be.entity.AccountEntity;
 import com.aitasker.be.entity.ReviewEntity;
 import com.aitasker.be.entity.RoleEntity;
 import com.aitasker.be.entity.StaffEntity;
+import com.aitasker.be.entity.SystemSettingEntity;
 import com.aitasker.be.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +67,112 @@ class AdminServiceTest {
 
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @InjectMocks private AdminService adminService;
+
+    @Test
+    void createSetting_shouldPersistNewSystemSetting() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingKey(MilestoneReviewSlaDuration.SETTING_KEY);
+        request.setSettingValue("3:DAY");
+        request.setValueType("STRING");
+        request.setDescription("Thoi gian SLA xet duyet");
+
+        AccountEntity admin = adminAccount();
+        when(systemSettingRepository.existsById(MilestoneReviewSlaDuration.SETTING_KEY)).thenReturn(false);
+        when(accessService.currentAccount()).thenReturn(admin);
+        when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SystemSettingEntity saved = adminService.createSetting(request);
+
+        assertEquals(MilestoneReviewSlaDuration.SETTING_KEY, saved.getSettingKey());
+        assertEquals("3:DAY", saved.getSettingValue());
+        assertEquals("STRING", saved.getValueType());
+        assertEquals(Boolean.TRUE, saved.getIsActive());
+        assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", MilestoneReviewSlaDuration.SETTING_KEY, 1);
+    }
+
+    @Test
+    void updateSettingBody_shouldUpdateMutableFields() {
+        SystemSettingEntity setting = SystemSettingEntity.builder()
+                .settingKey(MilestoneReviewSlaDuration.SETTING_KEY)
+                .settingValue("7:DAY")
+                .valueType("STRING")
+                .isActive(true)
+                .build();
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingValue("45:MINUTE");
+        request.setValueType("string");
+        request.setDescription("SLA xet duyet moi");
+        request.setIsActive(true);
+
+        when(systemSettingRepository.findById(MilestoneReviewSlaDuration.SETTING_KEY)).thenReturn(Optional.of(setting));
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SystemSettingEntity saved = adminService.updateSetting(MilestoneReviewSlaDuration.SETTING_KEY, request);
+
+        assertEquals("45:MINUTE", saved.getSettingValue());
+        assertEquals("STRING", saved.getValueType());
+        assertEquals("SLA xet duyet moi", saved.getDescription());
+        assertEquals(Boolean.TRUE, saved.getIsActive());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", MilestoneReviewSlaDuration.SETTING_KEY, 1);
+    }
+
+    @Test
+    void deleteSetting_shouldDeactivateSetting() {
+        SystemSettingEntity setting = SystemSettingEntity.builder()
+                .settingKey("dispute_staff_max_active_cases")
+                .settingValue("5")
+                .valueType("INT")
+                .isActive(true)
+                .build();
+
+        when(systemSettingRepository.findById("dispute_staff_max_active_cases")).thenReturn(Optional.of(setting));
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(systemSettingRepository.save(any(SystemSettingEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SystemSettingEntity saved = adminService.deleteSetting("dispute_staff_max_active_cases");
+
+        assertEquals(Boolean.FALSE, saved.getIsActive());
+        assertEquals(Integer.valueOf(1), saved.getUpdatedByRoleId());
+        verify(auditLogService).record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", "dispute_staff_max_active_cases", 1);
+    }
+
+    @Test
+    void updateSetting_shouldRejectDisablingAutomaticReviewSla() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingValue("3:DAY");
+        request.setIsActive(false);
+
+        AppException ex = assertThrows(AppException.class, () ->
+                adminService.updateSetting(MilestoneReviewSlaDuration.SETTING_KEY, request));
+
+        assertEquals("SLA TU DONG KHONG THE TAT", ex.getMessage());
+    }
+
+    @Test
+    void createSetting_shouldRejectUnsupportedSettingKey() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingKey("platform_fee_percent");
+        request.setSettingValue("10");
+        request.setValueType("DECIMAL");
+
+        AppException ex = assertThrows(AppException.class, () -> adminService.createSetting(request));
+
+        assertEquals("SYSTEM SETTING KHONG DUOC HO TRO", ex.getMessage());
+    }
+
+    @Test
+    void createSetting_shouldRejectInvalidContractDepositPercentage() {
+        SystemSettingRequest request = new SystemSettingRequest();
+        request.setSettingKey("contract.deposit.business_percentage");
+        request.setSettingValue("101");
+        request.setValueType("DECIMAL");
+
+        AppException ex = assertThrows(AppException.class, () -> adminService.createSetting(request));
+
+        assertEquals("TY LE KY QUY PHAI LON HON 0 VA KHONG VUOT QUA 100", ex.getMessage());
+    }
 
     // Note: Annotation này đánh dấu hàm test để JUnit thực thi.
     @Test
@@ -167,5 +275,12 @@ class AdminServiceTest {
         adminService.createAccount(request);
 
         verify(notificationService).notifyNewAccountCreated(1, 101, "New Expert", "new.expert@mail.com", "EXPERT");
+    }
+
+    private AccountEntity adminAccount() {
+        return AccountEntity.builder()
+                .accountId(1)
+                .role(RoleEntity.builder().roleId(1).roleName("ADMIN").build())
+                .build();
     }
 }

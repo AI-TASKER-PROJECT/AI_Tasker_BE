@@ -89,8 +89,8 @@ public class NotificationService {
                 receiverAccountId,
                 actorAccountId,
                 "PROPOSAL_CREATED",
-                "Có proposal mới",
-                "Một chuyên gia vừa gửi proposal cho dự án \"" + safeText(jobTitle, "không tên") + "\".",
+                "Có bản đề xuất mới",
+                "Một chuyên gia vừa gửi bản đề xuất cho dự án \"" + safeText(jobTitle, "không tên") + "\".",
                 "/business/jobs/" + jobId + "/proposals"
         );
     }
@@ -102,8 +102,8 @@ public class NotificationService {
                 receiverAccountId,
                 actorAccountId,
                 "PROPOSAL_REVIEWED",
-                "Kết quả proposal",
-                "Proposal của bạn cho dự án \"" + safeText(jobTitle, "không tên") + "\" " + result + ".",
+                "Kết quả xét duyệt bản đề xuất",
+                "Bản đề xuất của bạn cho dự án \"" + safeText(jobTitle, "không tên") + "\" " + result + ".",
                 "/expert/proposals"
         );
     }
@@ -115,8 +115,32 @@ public class NotificationService {
                 actorAccountId,
                 "EXPERT_RECOMMENDATION_SELECTED",
                 "Bạn được doanh nghiệp chọn",
-                "Doanh nghiệp đã chọn bạn cho dự án \"" + safeText(jobTitle, "không tên") + "\". Hãy xem job và nộp proposal nếu phù hợp.",
+                "Doanh nghiệp đã chọn bạn cho dự án \"" + safeText(jobTitle, "không tên") + "\". Hãy xem dự án và nộp bản đề xuất nếu phù hợp.",
                 "/expert/jobs/" + jobId
+        );
+    }
+
+    public void notifyJobUpdated(Integer receiverAccountId, Integer actorAccountId, Integer jobId, String jobTitle) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "JOB_UPDATED",
+                "Dự án đã được cập nhật",
+                "Dự án \"" + safeText(jobTitle, "không tên") + "\" đã được doanh nghiệp cập nhật thông tin.",
+                "/expert/jobs/" + jobId,
+                Map.of("jobId", jobId)
+        );
+    }
+
+    public void notifyProposalUpdated(Integer receiverAccountId, Integer actorAccountId, Integer jobId, Integer proposalId, String jobTitle) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "PROPOSAL_UPDATED",
+                "Bản đề xuất đã được cập nhật",
+                "Chuyên gia đã cập nhật bản đề xuất cho dự án \"" + safeText(jobTitle, "không tên") + "\".",
+                "/business/jobs/" + jobId + "/proposals",
+                Map.of("jobId", jobId, "proposalId", proposalId)
         );
     }
 
@@ -129,7 +153,7 @@ public class NotificationService {
                 actorAccountId,
                 "PROFILE_REVIEWED",
                 approved ? "Hồ sơ đã được duyệt" : "Hồ sơ bị từ chối",
-                "Hồ sơ " + profileName + " của bạn " + (approved ? "đã được staff duyệt." : "đã bị staff từ chối."),
+                "Hồ sơ " + profileName + " của bạn " + (approved ? "đã được nhân viên duyệt." : "đã bị nhân viên từ chối."),
                 "BUSINESS".equalsIgnoreCase(profileType) ? "/business/kyb" : "/expert/profile"
         );
     }
@@ -149,7 +173,7 @@ public class NotificationService {
                 actorAccountId,
                 "PROFILE_VERIFICATION_SUBMITTED",
                 "Có hồ sơ cần xác minh",
-                "Hồ sơ " + profileName + " \"" + safeText(displayName, "không tên") + "\" vừa được gửi và cần staff kiểm tra.",
+                "Hồ sơ " + profileName + " \"" + safeText(displayName, "không tên") + "\" vừa được gửi và cần nhân viên kiểm tra.",
                 targetUrl,
                 metadata
         );
@@ -168,7 +192,7 @@ public class NotificationService {
                 actorAccountId,
                 "DELIVERABLE_SUBMITTED",
                 "Có sản phẩm bàn giao mới",
-                "Chuyên gia vừa nộp sản phẩm bàn giao cho milestone \"" + safeText(milestoneName, "không tên") + "\".",
+                "Chuyên gia vừa nộp sản phẩm bàn giao cho cột mốc \"" + safeText(milestoneName, "không tên") + "\".",
                 "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
                 metadata
         );
@@ -186,7 +210,7 @@ public class NotificationService {
                 actorAccountId,
                 "PROGRESS_REPORT_SUBMITTED",
                 "Có báo cáo tiến độ mới",
-                "Chuyên gia vừa nộp báo cáo tiến độ cho milestone \"" + safeText(milestoneName, "không tên") + "\"" + (isLate ? " (nộp trễ)." : "."),
+                "Chuyên gia vừa nộp báo cáo tiến độ cho cột mốc \"" + safeText(milestoneName, "không tên") + "\"" + (isLate ? " (nộp trễ)." : "."),
                 "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
                 metadata
         );
@@ -199,7 +223,7 @@ public class NotificationService {
                 actorAccountId,
                 "PROGRESS_REPORT_FEEDBACK_RECORDED",
                 "Doanh nghiệp đã phản hồi báo cáo tiến độ",
-                "Doanh nghiệp đã ghi nhận phản hồi cho báo cáo tiến độ của milestone.",
+                "Doanh nghiệp đã ghi nhận phản hồi cho báo cáo tiến độ của cột mốc.",
                 "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
                 Map.of("contractId", contractId, "milestoneId", milestoneId, "progressReportId", progressReportId)
         );
@@ -214,6 +238,30 @@ public class NotificationService {
                 message,
                 "/contracts/" + contractId,
                 Map.of("contractId", contractId)
+        );
+    }
+
+    public void notifyContractChangeRequested(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer requestId, String summary) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                "CONTRACT_CHANGE_REQUESTED",
+                "Có yêu cầu chỉnh sửa hợp đồng",
+                "Bên còn lại đã gửi yêu cầu chỉnh sửa hợp đồng. Nội dung: " + safeText(summary, "không có mô tả") + ".",
+                "/contracts/" + contractId + "/change-requests/" + requestId,
+                Map.of("contractId", contractId, "requestId", requestId)
+        );
+    }
+
+    public void notifyContractChangeReviewed(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer requestId, boolean accepted) {
+        createAndPush(
+                receiverAccountId,
+                actorAccountId,
+                accepted ? "CONTRACT_CHANGE_ACCEPTED" : "CONTRACT_CHANGE_REJECTED",
+                accepted ? "Yêu cầu chỉnh sửa hợp đồng đã được chấp nhận" : "Yêu cầu chỉnh sửa hợp đồng bị từ chối",
+                accepted ? "Bên còn lại đã chấp nhận yêu cầu và hợp đồng đã được cập nhật." : "Bên còn lại đã từ chối yêu cầu chỉnh sửa hợp đồng.",
+                "/contracts/" + contractId + "/change-requests/" + requestId,
+                Map.of("contractId", contractId, "requestId", requestId, "accepted", accepted)
         );
     }
 
@@ -238,8 +286,8 @@ public class NotificationService {
                 receiverAccountId,
                 actorAccountId,
                 "JOB_POST_QUOTA_CONSUMED",
-                "Đã trừ quota đăng bài",
-                "Dự án \"" + safeText(jobTitle, "không tên") + "\" đã được public và hệ thống đã trừ 1 quota đăng bài.",
+                "Đã trừ một lượt đăng dự án",
+                "Dự án \"" + safeText(jobTitle, "không tên") + "\" đã được đăng và hệ thống đã trừ 1 lượt đăng dự án.",
                 "/business/jobs/" + jobId,
                 Map.of("jobId", jobId, "remainingBalance", remainingBalance == null ? 0 : remainingBalance)
         );
@@ -263,7 +311,7 @@ public class NotificationService {
                 actorAccountId,
                 "WITHDRAWAL_REVIEW_REQUESTED",
                 "Có yêu cầu rút tiền cần duyệt",
-                "Một user vừa tạo yêu cầu rút " + formatAmount(amount) + " VND và cần admin duyệt.",
+                "Một người dùng vừa tạo yêu cầu rút " + formatAmount(amount) + " VND và cần quản trị viên duyệt.",
                 "/admin/withdrawal-requests",
                 Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount)
         );
@@ -275,14 +323,14 @@ public class NotificationService {
                 actorAccountId,
                 "WITHDRAWAL_APPROVED",
                 "Rút tiền thành công",
-                "Yêu cầu rút " + formatAmount(amount) + " VND của bạn đã được admin duyệt.",
+                "Yêu cầu rút " + formatAmount(amount) + " VND của bạn đã được quản trị viên duyệt.",
                 "/wallet/withdrawals",
                 Map.of("withdrawalId", withdrawalId, "amount", amount == null ? BigDecimal.ZERO : amount)
         );
     }
 
     public void notifyWithdrawalRejected(Integer receiverAccountId, Integer actorAccountId, Long withdrawalId, BigDecimal amount, String reason) {
-        String message = "Yêu cầu rút " + formatAmount(amount) + " VND của bạn đã bị admin từ chối.";
+        String message = "Yêu cầu rút " + formatAmount(amount) + " VND của bạn đã bị quản trị viên từ chối.";
         if (reason != null && !reason.isBlank()) {
             message += " Lý do: " + reason.trim();
         }
@@ -320,7 +368,7 @@ public class NotificationService {
                 actorAccountId,
                 "DISPUTE_CREATED",
                 "Có tranh chấp mới",
-                "Một tranh chấp mới đã được tạo và cần staff xử lý.",
+                "Một tranh chấp mới đã được tạo và cần nhân viên xử lý.",
                 "/staff/disputes/" + disputeId
         );
     }
@@ -342,8 +390,8 @@ public class NotificationService {
     // Note: Báo cho chuyên gia khi doanh nghiệp ký quỹ milestone để có thể bắt đầu thực hiện.
     public void notifyMilestoneEscrowDeposited(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, String milestoneName) {
         createAndPush(receiverAccountId, actorAccountId, "MILESTONE_ESCROW_DEPOSITED",
-                "Doanh nghiệp đã ký quỹ milestone",
-                "Doanh nghiệp vừa ký quỹ cho milestone \"" + safeText(milestoneName, "không tên") + "\". Bạn có thể bắt đầu thực hiện.",
+                "Doanh nghiệp đã ký quỹ cột mốc",
+                "Doanh nghiệp vừa ký quỹ cho cột mốc \"" + safeText(milestoneName, "không tên") + "\". Bạn có thể bắt đầu thực hiện.",
                 "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
                 Map.of("contractId", contractId, "milestoneId", milestoneId));
     }
@@ -351,20 +399,50 @@ public class NotificationService {
     // Note: Báo cho chuyên gia khi doanh nghiệp duyệt milestone và tiền ký quỹ được giải ngân.
     public void notifyMilestoneApproved(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, String milestoneName) {
         createAndPush(receiverAccountId, actorAccountId, "MILESTONE_APPROVED",
-                "Milestone đã được duyệt",
-                "Doanh nghiệp đã duyệt milestone \"" + safeText(milestoneName, "không tên") + "\" và tiền ký quỹ đã được giải ngân cho bạn.",
+                "Cột mốc đã được duyệt",
+                "Doanh nghiệp đã duyệt cột mốc \"" + safeText(milestoneName, "không tên") + "\" và tiền ký quỹ đã được giải ngân cho bạn.",
                 "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
                 Map.of("contractId", contractId, "milestoneId", milestoneId));
     }
 
+    public void notifyMilestoneAutoApproved(Integer receiverAccountId, Integer actorAccountId,
+                                             Integer contractId, Integer milestoneId, String milestoneName) {
+        createAndPush(receiverAccountId, actorAccountId, "MILESTONE_SLA_AUTO_APPROVED",
+                "Cột mốc đã được tự động duyệt và giải ngân",
+                "Cột mốc \"" + safeText(milestoneName, "không tên")
+                        + "\" đã hết thời hạn nghiệm thu. Hệ thống đã tự động duyệt sản phẩm và giải ngân toàn bộ tiền ký quỹ của cột mốc cho bạn.",
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId));
+    }
+
+    public void notifyMilestoneAutoApprovedForBusiness(Integer receiverAccountId, Integer actorAccountId,
+                                                        Integer contractId, Integer milestoneId, String milestoneName) {
+        createAndPush(receiverAccountId, actorAccountId, "MILESTONE_SLA_AUTO_APPROVED",
+                "Cột mốc đã được hệ thống tự động duyệt",
+                "Cột mốc \"" + safeText(milestoneName, "không tên")
+                        + "\" đã hết thời hạn nghiệm thu. Hệ thống đã tự động duyệt sản phẩm và giải ngân tiền ký quỹ cho chuyên gia.",
+                "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
+                Map.of("contractId", contractId, "milestoneId", milestoneId));
+    }
+
+    public void notifyProjectSummaryReady(Integer receiverAccountId, Integer actorAccountId,
+                                          Integer contractId, String contractTitle) {
+        createAndPush(receiverAccountId, actorAccountId, "PROJECT_SUMMARY_READY",
+                "Dự án đã hoàn thành",
+                "Tất cả cột mốc của \"" + safeText(contractTitle, "dự án")
+                        + "\" đã hoàn thành. Trang tổng kết kết quả dự án hiện đã sẵn sàng.",
+                "/contracts/" + contractId + "/summary",
+                Map.of("contractId", contractId));
+    }
+
     // Note: Báo cho chuyên gia khi doanh nghiệp từ chối sản phẩm bàn giao của milestone.
     public void notifyMilestoneRejected(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, String milestoneName, String reason) {
-        String message = "Doanh nghiệp đã từ chối sản phẩm bàn giao của milestone \"" + safeText(milestoneName, "không tên") + "\".";
+        String message = "Doanh nghiệp đã từ chối sản phẩm bàn giao của cột mốc \"" + safeText(milestoneName, "không tên") + "\".";
         if (reason != null && !reason.isBlank()) {
             message += " Lý do: " + reason.trim();
         }
         createAndPush(receiverAccountId, actorAccountId, "MILESTONE_REJECTED",
-                "Sản phẩm milestone bị từ chối",
+                "Sản phẩm cột mốc bị từ chối",
                 message,
                 "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
                 Map.of("contractId", contractId, "milestoneId", milestoneId, "reason", safeText(reason, "")));
@@ -376,7 +454,7 @@ public class NotificationService {
     public void notifyDisputeInitiated(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer milestoneId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_INITIATED",
                 "Có tranh chấp mới",
-                "Đối tác vừa khởi tạo một tranh chấp cho milestone của hợp đồng. Vui lòng vào xem và cùng tự giải quyết.",
+                "Đối tác vừa khởi tạo một tranh chấp cho cột mốc của hợp đồng. Vui lòng vào xem và cùng tự giải quyết.",
                 "/contracts/" + contractId + "/disputes/" + disputeId,
                 Map.of("contractId", contractId, "milestoneId", milestoneId, "disputeId", disputeId));
     }
@@ -385,7 +463,7 @@ public class NotificationService {
     public void notifyDisputeEscalationRequested(Integer receiverAccountId, Integer actorAccountId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_ESCALATION_REQUESTED",
                 "Có yêu cầu can thiệp tranh chấp",
-                "Một bên vừa yêu cầu Staff can thiệp vào tranh chấp.",
+                "Một bên vừa yêu cầu nhân viên can thiệp vào tranh chấp.",
                 "/staff/disputes/" + disputeId,
                 Map.of("disputeId", disputeId));
     }
@@ -393,8 +471,8 @@ public class NotificationService {
     // Note: Báo cho hai bên khi tranh chấp đã được route tới Staff.
     public void notifyDisputeUnderStaffReview(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_UNDER_REVIEW",
-                "Tranh chấp đang được staff xem xét",
-                "Tranh chấp đã được chuyển tới Staff xem xét. Vui lòng theo dõi kết quả.",
+                "Tranh chấp đang được nhân viên xem xét",
+                "Tranh chấp đã được chuyển tới nhân viên xem xét. Vui lòng theo dõi kết quả.",
                 "/contracts/" + contractId + "/disputes/" + disputeId,
                 Map.of("contractId", contractId, "disputeId", disputeId));
     }
@@ -402,8 +480,8 @@ public class NotificationService {
     // Note: Báo cho hai bên khi staff ra quyết định bắt buộc cho tranh chấp.
     public void notifyDisputeStaffDecided(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_STAFF_DECIDED",
-                "Staff đã ra quyết định tranh chấp",
-                "Staff đã ra quyết định bắt buộc cho tranh chấp. Hệ thống sẽ thực thi quyết toán ký quỹ tương ứng.",
+                "Nhân viên đã ra quyết định tranh chấp",
+                "Nhân viên đã ra quyết định bắt buộc cho tranh chấp. Hệ thống sẽ thực thi quyết toán ký quỹ tương ứng.",
                 "/contracts/" + contractId + "/disputes/" + disputeId,
                 Map.of("contractId", contractId, "disputeId", disputeId));
     }
@@ -423,7 +501,7 @@ public class NotificationService {
     public void notifyTerminationRequested(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId) {
         createAndPush(receiverAccountId, actorAccountId, "TERMINATION_REQUESTED",
                 "Có yêu cầu chấm dứt hợp đồng",
-                "Một bên vừa gửi yêu cầu chấm dứt hợp đồng. Admin cần phân công staff xem xét.",
+                "Một bên vừa gửi yêu cầu chấm dứt hợp đồng. Quản trị viên cần phân công nhân viên xem xét.",
                 "/admin/termination-requests/" + terminationRequestId,
                 Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
     }
@@ -432,7 +510,7 @@ public class NotificationService {
     public void notifyTerminationStaffAssigned(Integer receiverAccountId, Integer actorAccountId, Long terminationRequestId) {
         createAndPush(receiverAccountId, actorAccountId, "TERMINATION_STAFF_ASSIGNED",
                 "Bạn được gán xử lý yêu cầu chấm dứt",
-                "Admin vừa gán một yêu cầu chấm dứt hợp đồng cho bạn xem xét.",
+                "Quản trị viên vừa giao một yêu cầu chấm dứt hợp đồng cho bạn xem xét.",
                 "/staff/termination-requests/" + terminationRequestId,
                 Map.of("terminationRequestId", terminationRequestId));
     }
@@ -442,8 +520,8 @@ public class NotificationService {
         createAndPush(receiverAccountId, actorAccountId, approved ? "TERMINATION_APPROVED" : "TERMINATION_REJECTED",
                 approved ? "Yêu cầu chấm dứt được chấp thuận" : "Yêu cầu chấm dứt bị từ chối",
                 approved
-                        ? "Staff đã chấp thuận yêu cầu chấm dứt hợp đồng. Hệ thống sẽ tiến hành quyết toán và hoàn ký quỹ."
-                        : "Staff đã từ chối yêu cầu chấm dứt hợp đồng. Hợp đồng tiếp tục được thực hiện bình thường.",
+                        ? "Nhân viên đã chấp thuận yêu cầu chấm dứt hợp đồng. Hệ thống sẽ tiến hành quyết toán và hoàn ký quỹ."
+                        : "Nhân viên đã từ chối yêu cầu chấm dứt hợp đồng. Hợp đồng tiếp tục được thực hiện bình thường.",
                 "/contracts/" + contractId + "/termination-requests/" + terminationRequestId,
                 Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
     }
@@ -452,7 +530,7 @@ public class NotificationService {
     public void notifyTerminationSettlementExecuted(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId) {
         createAndPush(receiverAccountId, actorAccountId, "TERMINATION_SETTLEMENT_EXECUTED",
                 "Đã quyết toán chấm dứt hợp đồng",
-                "Hệ thống đã quyết toán ký quỹ milestone theo quyết định chấm dứt. Hợp đồng chờ admin hoàn tiền ký quỹ.",
+                "Hệ thống đã quyết toán ký quỹ cột mốc theo quyết định chấm dứt. Hợp đồng chờ quản trị viên hoàn tiền ký quỹ.",
                 "/contracts/" + contractId + "/termination-requests/" + terminationRequestId,
                 Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
     }
@@ -470,7 +548,7 @@ public class NotificationService {
     public void notifyTerminationDepositRefunded(Integer receiverAccountId, Integer actorAccountId, Integer contractId, Long terminationRequestId) {
         createAndPush(receiverAccountId, actorAccountId, "TERMINATION_DEPOSIT_REFUNDED",
                 "Đã hoàn tiền ký quỹ hợp đồng",
-                "Admin đã hoàn tiền ký quỹ hợp đồng sau khi chấm dứt. Hợp đồng đã đóng và bạn có thể đánh giá đối tác.",
+                "Quản trị viên đã hoàn tiền ký quỹ hợp đồng sau khi chấm dứt. Hợp đồng đã đóng và bạn có thể đánh giá đối tác.",
                 "/contracts/" + contractId,
                 Map.of("contractId", contractId, "terminationRequestId", terminationRequestId));
     }
@@ -478,8 +556,8 @@ public class NotificationService {
     public void notifyMilestoneMarkedOverdue(Integer receiverAccountId, Integer actorAccountId,
             Integer contractId, Integer milestoneId) {
         createAndPush(receiverAccountId, actorAccountId, "MILESTONE_MARKED_OVERDUE",
-                "Milestone đã quá hạn",
-                "Một milestone trong hợp đồng đã được đánh dấu quá hạn.",
+                "Cột mốc đã quá hạn",
+                "Một cột mốc trong hợp đồng đã được đánh dấu quá hạn.",
                 "/contracts/" + contractId + "/workspace?milestoneId=" + milestoneId,
                 Map.of("contractId", contractId, "milestoneId", milestoneId));
     }
@@ -487,8 +565,8 @@ public class NotificationService {
     public void notifyDisputeStaffSlaEscalated(Integer receiverAccountId, Integer actorAccountId,
             Integer contractId, Integer disputeId) {
         createAndPush(receiverAccountId, actorAccountId, "DISPUTE_STAFF_SLA_ESCALATED",
-                "Tranh chấp quá hạn SLA Staff",
-                "Một tranh chấp đã quá hạn xử lý Staff SLA và cần được kiểm tra.",
+                "Tranh chấp quá hạn xử lý",
+                "Một tranh chấp đã quá hạn xử lý và cần được kiểm tra.",
                 "/admin/disputes/" + disputeId,
                 Map.of("contractId", contractId, "disputeId", disputeId));
     }
@@ -606,6 +684,7 @@ public class NotificationService {
         return NotificationResponse.builder()
                 .notificationId(notification.getNotificationId())
                 .type(notification.getType())
+                .typeLabel(notificationTypeLabel(notification.getType()))
                 .title(notification.getTitle())
                 .message(notification.getMessage())
                 .targetUrl(notification.getTargetUrl())
@@ -614,6 +693,61 @@ public class NotificationService {
                 .createdAt(notification.getCreatedAt())
                 .readAt(notification.getReadAt())
                 .build();
+    }
+
+    private String notificationTypeLabel(String type) {
+        if (type == null || type.isBlank()) return "Thông báo hệ thống";
+        return switch (type) {
+            case "PROPOSAL_CREATED" -> "Có bản đề xuất mới";
+            case "PROPOSAL_REVIEWED" -> "Kết quả xét duyệt bản đề xuất";
+            case "PROPOSAL_UPDATED" -> "Bản đề xuất được cập nhật";
+            case "EXPERT_RECOMMENDATION_SELECTED" -> "Chuyên gia được lựa chọn";
+            case "JOB_UPDATED" -> "Dự án được cập nhật";
+            case "PROFILE_REVIEWED" -> "Kết quả xét duyệt hồ sơ";
+            case "PROFILE_VERIFICATION_SUBMITTED" -> "Hồ sơ chờ xác minh";
+            case "DELIVERABLE_SUBMITTED" -> "Sản phẩm bàn giao mới";
+            case "PROGRESS_REPORT_SUBMITTED" -> "Báo cáo tiến độ mới";
+            case "PROGRESS_REPORT_FEEDBACK_RECORDED" -> "Phản hồi báo cáo tiến độ";
+            case "CONTRACT_CHANGE_REQUESTED" -> "Yêu cầu chỉnh sửa hợp đồng";
+            case "CONTRACT_CHANGE_ACCEPTED" -> "Chấp nhận chỉnh sửa hợp đồng";
+            case "CONTRACT_CHANGE_REJECTED" -> "Từ chối chỉnh sửa hợp đồng";
+            case "CONTRACT_REJECTED", "CONTRACT_REJECTED_BY_BUSINESS" -> "Hợp đồng bị từ chối";
+            case "CONTRACT_DRAFT_CANCELLED" -> "Hợp đồng nháp bị hủy";
+            case "CONTRACT_PENDING_DEPOSIT" -> "Hợp đồng chờ ký quỹ";
+            case "CONTRACT_ACTIVATED_AFTER_DUAL_DEPOSIT" -> "Hợp đồng được kích hoạt";
+            case "CONTRACT_COMPLETED", "PROJECT_SUMMARY_READY" -> "Dự án hoàn thành";
+            case "CONTRACT_CLOSED" -> "Hợp đồng đã đóng";
+            case "PARTICIPANT_DEPOSITS_REFUNDED" -> "Hoàn ký quỹ hai bên";
+            case "MILESTONE_ESCROW_DEPOSITED" -> "Ký quỹ cột mốc";
+            case "MILESTONE_APPROVED" -> "Cột mốc được nghiệm thu";
+            case "MILESTONE_REJECTED" -> "Sản phẩm cột mốc bị từ chối";
+            case "MILESTONE_MARKED_OVERDUE" -> "Cột mốc quá hạn";
+            case "MILESTONE_SLA_AUTO_APPROVED" -> "Tự động nghiệm thu cột mốc";
+            case "DISPUTE_CREATED", "DISPUTE_INITIATED" -> "Tranh chấp mới";
+            case "DISPUTE_ASSIGNED" -> "Phân công tranh chấp";
+            case "DISPUTE_ESCALATION_REQUESTED" -> "Yêu cầu can thiệp tranh chấp";
+            case "DISPUTE_UNDER_REVIEW" -> "Tranh chấp đang được xem xét";
+            case "DISPUTE_STAFF_DECIDED" -> "Quyết định xử lý tranh chấp";
+            case "DISPUTE_RESOLVED" -> "Tranh chấp đã giải quyết";
+            case "DISPUTE_CANCELLED" -> "Tranh chấp đã hủy";
+            case "DISPUTE_SETTLEMENT_REPORTED" -> "Báo cáo quyết toán tranh chấp";
+            case "DISPUTE_STAFF_SLA_ESCALATED" -> "Tranh chấp quá hạn xử lý";
+            case "TERMINATION_REQUESTED" -> "Yêu cầu chấm dứt hợp đồng";
+            case "TERMINATION_STAFF_ASSIGNED" -> "Phân công xử lý chấm dứt";
+            case "TERMINATION_APPROVED" -> "Chấp thuận chấm dứt hợp đồng";
+            case "TERMINATION_REJECTED" -> "Từ chối chấm dứt hợp đồng";
+            case "TERMINATION_CANCELLED" -> "Hủy yêu cầu chấm dứt";
+            case "TERMINATION_SETTLEMENT_EXECUTED" -> "Quyết toán chấm dứt hợp đồng";
+            case "TERMINATION_DEPOSIT_REFUNDED" -> "Hoàn ký quỹ sau chấm dứt";
+            case "JOB_POST_QUOTA_CONSUMED" -> "Sử dụng lượt đăng dự án";
+            case "WALLET_TOPUP_SUCCEEDED" -> "Nạp tiền thành công";
+            case "WITHDRAWAL_REVIEW_REQUESTED" -> "Yêu cầu rút tiền chờ duyệt";
+            case "WITHDRAWAL_APPROVED" -> "Yêu cầu rút tiền được duyệt";
+            case "WITHDRAWAL_REJECTED" -> "Yêu cầu rút tiền bị từ chối";
+            case "NEW_ACCOUNT_CREATED" -> "Tài khoản mới";
+            case "REVIEW_CREATED" -> "Đánh giá mới";
+            default -> "Thông báo hệ thống";
+        };
     }
 
     // Note: Hàm `safeText` tránh trả message bị trống khi dữ liệu gốc chưa có tên rõ ràng.

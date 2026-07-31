@@ -100,6 +100,10 @@ public class AccountEntity {
     @Column(name = "status_before_lock", length = 20)
     private String statusBeforeLock;
 
+    @Column(name = "active_token_version", nullable = false)
+    @Builder.Default
+    private int activeTokenVersion = 0;
+
     // Note: Annotation này cung cấp metadata để Spring, JPA, Lombok, validation hoặc test xử lý tự động.
     @UpdateTimestamp // ANNOTATION CỦA HIBERNATE DÙNG ĐỂ GÁN TỰ ĐỘNG THỜI GIAN LÚC UPDATE CHO FIELD
     // Note: Annotation này cấu hình cột database tương ứng với field entity.

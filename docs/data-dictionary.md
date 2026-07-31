@@ -54,7 +54,9 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Milestones
 - Mục đích: Các cột mốc thực thi trong hợp đồng.
-- Cột nổi bật: `duration`, `duration_unit`.
+- Cột nổi bật: `duration`, `duration_unit`; snapshot thực thi trong
+  `contract_milestones` còn có `review_started_at`, `review_due_at` cho SLA
+  nghiệm thu tự động.
 - Quan hệ chính: `job_id -> Jobs.job_id`; `contract_id -> Contracts.contract_id` khi milestone đã gắn hợp đồng.
 
 ### AcceptanceCriteria
@@ -64,6 +66,9 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Deliverables
 - Mục đích: Sản phẩm bàn giao cho milestone.
+- Cột nổi bật: `user_guide_file_url` lưu đường dẫn tệp PDF/DOCX hướng dẫn sử
+  dụng; chỉ sản phẩm đã duyệt của cột mốc cuối cùng có giá trị, các cột mốc khác
+  để `NULL`.
 - Quan hệ chính: `milestone_id -> Milestones.milestone_id`.
 
 ### Transactions
@@ -101,11 +106,13 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 ### AuditLogs
 - Mục đích: Ghi vết thao tác nhạy cảm (audit trail).
 - Cột nổi bật: `action`, `entity_name`, `entity_id`, `old_value_json`, `new_value_json`.
-- Quan hệ chính: `actor_account_id -> Account`.
+- Quan hệ chính: `actor_account_id -> Account`; trường này để trống đối với tác
+  vụ nền do hệ thống tự động thực hiện.
 
 ### SystemSettings
 - Mục đích: Cấu hình tham số lõi hệ thống.
-- Ví dụ: `platform_fee_percent`, `default_sla_days`, `auto_assign_staff_enabled`.
+- Ví dụ đang được runtime dùng: `milestone_review_sla_duration`,
+  `dispute_staff_max_active_cases`, giá credit và tỷ lệ ký quỹ hợp đồng.
 - Quan hệ chính: `updated_by -> Account` (nếu có).
 
 ## 3) Quy ước trạng thái (gợi ý)

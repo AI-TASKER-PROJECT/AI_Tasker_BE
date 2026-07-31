@@ -1,6 +1,7 @@
 package com.aitasker.be.service.core;
 
 import com.aitasker.be.entity.NotificationEntity;
+import com.aitasker.be.dto.notification.NotificationResponse;
 import com.aitasker.be.repository.NotificationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -136,6 +137,62 @@ class NotificationServiceTest {
     }
 
     @Test
+    void notifyMilestoneAutoApproved_shouldConfirmApprovalAndDisbursementBySystem() {
+        when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyMilestoneAutoApproved(20, null, 1, 3, "Bàn giao cuối");
+
+        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository).save(captor.capture());
+        NotificationEntity saved = captor.getValue();
+        assertNull(saved.getActorAccountId());
+        assertEquals("Cột mốc đã được tự động duyệt và giải ngân", saved.getTitle());
+        assertTrue(saved.getMessage().contains("Hệ thống đã tự động duyệt sản phẩm"));
+        assertTrue(saved.getMessage().contains("giải ngân toàn bộ tiền ký quỹ"));
+    }
+
+    @Test
+    void notifyMilestoneAutoApprovedForBusiness_shouldExplainAutomaticDisbursement() {
+        when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyMilestoneAutoApprovedForBusiness(20, null, 1, 3, "Bàn giao cuối");
+
+        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository).save(captor.capture());
+        assertEquals(20, captor.getValue().getReceiverAccountId());
+        assertTrue(captor.getValue().getMessage().contains("giải ngân tiền ký quỹ cho chuyên gia"));
+    }
+
+    @Test
+    void notifyProjectSummaryReady_shouldTargetSummaryAndExposeVietnameseTypeLabel() {
+        when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
+            NotificationEntity saved = invocation.getArgument(0);
+            saved.setNotificationId(1);
+            return saved;
+        });
+
+        notificationService.notifyProjectSummaryReady(20, 99, 1, "Dự án A");
+
+        ArgumentCaptor<NotificationEntity> entityCaptor = ArgumentCaptor.forClass(NotificationEntity.class);
+        verify(notificationRepository).save(entityCaptor.capture());
+        assertEquals("/contracts/1/summary", entityCaptor.getValue().getTargetUrl());
+        ArgumentCaptor<NotificationResponse> responseCaptor = ArgumentCaptor.forClass(NotificationResponse.class);
+        verify(messagingTemplate).convertAndSendToUser(
+                org.mockito.ArgumentMatchers.eq("20"),
+                org.mockito.ArgumentMatchers.eq("/queue/notifications"),
+                responseCaptor.capture());
+        assertEquals("Dự án hoàn thành", responseCaptor.getValue().getTypeLabel());
+    }
+
+    @Test
     void notifyWithdrawalRejected_shouldIncludeAdminReason() {
         when(notificationRepository.save(any(NotificationEntity.class))).thenAnswer(invocation -> {
             NotificationEntity saved = invocation.getArgument(0);
@@ -150,7 +207,7 @@ class NotificationServiceTest {
         NotificationEntity saved = captor.getValue();
         assertEquals("WITHDRAWAL_REJECTED", saved.getType());
         assertEquals("Rút tiền thất bại", saved.getTitle());
-        assertTrue(saved.getMessage().contains("Yêu cầu rút 120000 VND của bạn đã bị admin từ chối."));
+        assertTrue(saved.getMessage().contains("Yêu cầu rút 120000 VND của bạn đã bị quản trị viên từ chối."));
         assertTrue(saved.getMessage().contains("Lý do: Invalid bank info"));
         assertTrue(saved.getMessage().contains("Invalid bank info"));
         assertEquals("/wallet/withdrawals", saved.getTargetUrl());
@@ -177,7 +234,7 @@ class NotificationServiceTest {
         assertTrue(captor.getAllValues().get(0).getMessage().contains("Ví của bạn đã được nạp"));
         assertEquals("Rút tiền thành công", captor.getAllValues().get(1).getTitle());
         assertEquals("Có yêu cầu rút tiền cần duyệt", captor.getAllValues().get(2).getTitle());
-        assertEquals("Đã trừ quota đăng bài", captor.getAllValues().get(3).getTitle());
+        assertEquals("Đã trừ một lượt đăng dự án", captor.getAllValues().get(3).getTitle());
         assertEquals("Có tài khoản mới", captor.getAllValues().get(4).getTitle());
     }
 

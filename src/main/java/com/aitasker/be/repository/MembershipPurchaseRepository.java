@@ -7,7 +7,9 @@ package com.aitasker.be.repository;
 
 import com.aitasker.be.entity.MembershipPurchaseEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +18,11 @@ public interface MembershipPurchaseRepository extends JpaRepository<MembershipPu
     List<MembershipPurchaseEntity> findByAccountIdOrderByCreatedAtDesc(Integer accountId);
 
     Optional<MembershipPurchaseEntity> findByWalletTransactionId(Long walletTransactionId);
+
+    @Query("""
+            select coalesce(sum(p.amount), 0)
+            from MembershipPurchaseEntity p
+            where p.status = 'SUCCESS'
+            """)
+    BigDecimal sumSuccessfulMembershipRevenue();
 }

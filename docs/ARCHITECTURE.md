@@ -44,7 +44,8 @@ Current product domains:
   credit, quota, contract deposit, withdrawal, system wallet, and legacy
   transaction flows.
 - Dispute assignment, demo testing, technical report, and resolution.
-- Reviews, admin settings, account/staff management, analytics, and audit logs.
+- Reviews, admin settings, account/staff management, analytics, admin
+  dashboard aggregates, and audit logs.
 - Notifications over REST and WebSocket/STOMP.
 - Chatbot/RAG support over local knowledge and optional OpenAI APIs.
 
@@ -56,7 +57,8 @@ Key runtime choices:
 
 - Spring Boot 4.0.6.
 - Spring Web MVC REST controllers.
-- Spring Security with JWT authentication.
+- Spring Security with JWT authentication plus account token-version validation
+  for one active session per account.
 - Spring Data JPA with PostgreSQL.
 - Flyway for database migrations.
 - Spring Validation for request DTO validation.
@@ -112,7 +114,8 @@ focused on persistence. Entities map the Flyway-managed database shape.
 The following service boundaries are established and should be preserved:
 
 - `service/auth/AuthServiceImpl`: registration, login, BCrypt password hashing,
-  JWT issuance.
+  JWT issuance, and active token-version rotation for one active account
+  session.
 - `service/auth/EmailOtpService`: email OTP flow.
 - `service/auth/TaxCheckService`: business tax-code lookup/check.
 - `service/core/AccessService`: current account lookup from JWT and role checks.
@@ -126,12 +129,15 @@ The following service boundaries are established and should be preserved:
 - `service/core/MarketplaceService`: job lifecycle, proposal submission, and
   proposal review.
 - `service/core/CatalogService`: domain, skill, technology, and job metadata
-  mappings.
+  mappings, including admin soft-delete/deactivation for catalog values.
 - `service/core/ContractExecutionService`: contract draft/signature,
   NDA, milestones, criteria, deliverables, finance-adjacent legacy
   transactions, disputes, and SLA simulation.
-- `service/core/AdminService`: reviews, settings, staff, account management,
-  audit logs, and analytics overview.
+- `service/core/AdminService`: reviews, system settings CRUD, staff, account
+  management, audit logs, and analytics overview.
+- `service/core/AdminDashboardService`: admin-only dashboard aggregates for
+  summary cards, revenue, contracts, users, jobs/proposals, disputes,
+  membership, and finance breakdown charts.
 - `service/core/ExpertRecommendationService` and
   `ExpertCandidateRankingService`: candidate search and ranking.
 - `service/core/AiSowGenerationService`, `SowKeywordExtractionService`,
@@ -140,7 +146,8 @@ The following service boundaries are established and should be preserved:
 - `service/core/FirebaseStorageService`: Firebase-backed upload/view-url flows.
 - `service/core/PayOSPaymentService`, `PaymentWalletService`,
   `WalletLedgerService`, and `SystemWalletService`: payment order, wallet,
-  membership, credit, quota, deposit, withdrawal, and system-wallet behavior.
+  membership, membership package CRUD for admins, credit, quota, deposit,
+  withdrawal, and system-wallet behavior.
 - `service/core/NotificationService`: notification records and unread state.
 
 ## API Surface
@@ -182,7 +189,8 @@ Important runtime notes:
   `/api/auth/google/register`.
 - Refresh-token renewal exists at `POST /api/auth/refresh`: it accepts only a
   valid refresh JWT, reloads the account/role, rejects locked accounts, and
-  returns a new access token.
+  returns a new access token. Refresh tokens are bound to the account's current
+  active token version, so a newer login invalidates older refresh tokens.
 - Expert candidate and recommendation endpoints exist under `/api/jobs/...`.
 - PayOS endpoints exist under `/api/payments/payos/...`.
 - Contract activation is now signature-driven through
@@ -235,6 +243,11 @@ JWT includes the real business role used by RBAC:
 - `ADMIN`
 - `STAFF`
 
+JWTs also include `tokenVersion`. The request filter and WebSocket CONNECT
+compare that claim with `account.active_token_version`; a newer successful
+login increments the account value and invalidates older access and refresh
+tokens.
+
 Controllers may declare route-level security, but business authorization must
 also be enforced in services because most workflows depend on ownership and
 state, not only role.
@@ -269,9 +282,14 @@ Current rules to preserve:
   Business can add, update, delete, or reorder them before a contract exists.
   Criteria are not selected from a global catalog.
 - Payout/refund/system finance operations are admin/staff responsibilities.
-- Catalog creation/update is admin-only.
+- Catalog creation/update/delete is admin-only; delete is implemented as
+  `is_active=false` so existing job/profile history keeps referential integrity.
 - Job catalog assignments can be changed by admin or the owning business.
 - Profile approval is staff/admin work and should write audit evidence.
+- Staff profile review is restricted by the internal `PROFILE_REVIEW` domain
+  assignment in `staff_domains`; non-admin catalog and job-domain flows must
+  hide or reject this internal domain so it cannot be used as a marketplace job
+  category.
 - Profile rejection stores a staff-provided `rejection_reason` on the business
   or expert profile; the reason is required when `status=Rejected` and cleared
   when the profile is approved or resubmitted.
@@ -319,11 +337,17 @@ Contract execution enforces a multi-step agreement model:
 - Expert can submit deliverables only for their own active contract, after both
   NDA signatures exist.
 - Submitting a deliverable moves the milestone into review.
+- Business rejection of a reviewed final deliverable requires overall feedback
+  and may include failed milestone-owned acceptance criteria with one reason per
+  criterion. The backend validates criteria ownership before storing the JSONB
+  feedback on the deliverable.
 - Business completion of all reviewed milestones moves the contract to
   `COMPLETED` and the job to `CLOSED`.
 - Admin deposit refund/resolution keeps completed contracts `COMPLETED` and
   cancelled contracts `CANCELLED` after final deposit handling.
-- SLA auto-approve is currently a manual API simulation, not a scheduler.
+- Final-deliverable submission snapshots a milestone review deadline. A backend
+  scheduler automatically approves eligible overdue reviews and releases escrow
+  exactly once; the frontend only displays the server deadline and countdown.
 
 ## Finance And Payment Rules
 
@@ -357,12 +381,19 @@ Finance is partially MVP and partially integrated:
 - `GET /api/wallet/transactions` returns a read DTO for transparent wallet
   history. The response preserves raw ledger codes and adds Vietnamese
   presentation fields explaining top-up, membership, credit, contract-deposit,
-  and withdrawal events with related business/expert/job/contract/bank/admin
+  withdrawal, payment-provider, wallet, milestone, metadata, and bank/admin
   context where available.
-- `GET /api/v1/admin/wallet/transactions` returns the platform-wide admin view
-  of wallet history using the same transparent DTO. It filters duplicate
-  transfer ledger legs so each displayed row maps to a clear business event,
-  while keeping technical IDs for reconciliation.
+- `GET /api/v1/admin/wallet/platform-ledger` returns only the platform/Admin
+  wallet ledger rows using the same transparent DTO. This is the source for the
+  platform wallet's own balance-changing history, including platform revenue
+  credits.
+- `GET /api/v1/admin/wallet/user-activity-transactions` returns the
+  platform-wide user activity history. It filters duplicate transfer ledger
+  legs so each displayed row maps to a clear business event, while keeping
+  technical IDs for reconciliation.
+- `GET /api/v1/admin/wallet/transactions` remains a compatibility alias for
+  the user activity history and should not be treated as the platform wallet's
+  own ledger.
 - Legacy transaction endpoints still model deposit, payout, refund, webhook,
   and status updates for contract/milestone flows.
 - Legacy invoice storage no longer exists in the active schema.
@@ -386,6 +417,18 @@ services/config:
 
 - OpenAI configuration is environment-driven.
 - SoW generation uses prompt/RAG knowledge under `src/main/resources/knowledge`.
+- SoW generation returns a response-only advisory VND budget assessment. The
+  backend normalizes range/status/fallback semantics, preserves the
+  Business-entered amount, and returns separate Business and recommended
+  milestone allocations. Business selection, Expert bid, and accepted contract
+  pricing remain separate authorities; AI estimates are not persisted.
+  Abbreviated bare provider amounts are expanded to full VND before status
+  comparison, and a `HIGH` assessment is not shown as a recommendation because
+  the higher Business amount remains authoritative.
+- Custom SoW budget allocation is a stateless backend calculation at
+  `POST /api/jobs/reallocate-sow-budget`. It uses AI-recommended milestone
+  amounts only as proportional weights, returns an exact whole-VND total, and
+  does not call OpenAI or cross the Job persistence boundary.
 - `knowledge_chunks` supports RAG-style storage.
 - File uploads/view URLs are Firebase-backed where enabled.
 - Request DTOs should parse and validate user input before service logic.
@@ -394,7 +437,10 @@ services/config:
 
 Current MVP limitations:
 
-- AI Job Assistant and matching are still simplified.
+- Expert recommendation uses structured-first taxonomy resolution, exact numeric
+  portfolio catalog IDs, eligibility filters, deterministic backend scoring,
+  and optional explanation-only AI. Portfolio taxonomy normalization remains a
+  future Release B concern.
 - Matching relies on tags, keywords, proposal text, and ranking heuristics; it
   is not yet a full portfolio/skill/domain scoring engine.
 - Firebase/file upload coverage is not complete for all deliverable/license
@@ -450,9 +496,10 @@ Application logs and audit logs have different jobs:
 - Audit logs are product records for sensitive business actions.
 
 Audit should cover profile approval, account/admin changes, settings changes,
-contract and dispute decisions, transaction/payment state changes, and other
-sensitive operator actions. Audit coverage is not complete yet and should be
-expanded as sensitive flows are hardened.
+membership package changes, contract and dispute decisions,
+transaction/payment state changes, and other sensitive operator actions. Audit
+coverage is not complete yet and should be expanded as sensitive flows are
+hardened.
 
 Admin audit-log responses normalize stored action and entity values into
 Vietnamese business labels for the table-facing fields. Raw technical entity
@@ -500,7 +547,6 @@ The following areas are intentionally not yet production-complete:
 - Provider-backed payment, refund, payout, and escrow ledger.
 - Full Firebase/file coverage for all evidence and deliverable flows.
 - NDA PDF generation and storage.
-- Scheduled SLA auto-approval.
 - Dispute fund lock, evidence snapshot, refund, and penalty handling.
 - Complete audit coverage for every sensitive operation.
 - WebSocket/STOMP test coverage.

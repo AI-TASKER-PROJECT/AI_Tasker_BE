@@ -2,13 +2,18 @@ package com.aitasker.be.service.core;
 
 import com.aitasker.be.common.exception.AppException;
 import com.aitasker.be.config.OpenAiProperties;
+import com.aitasker.be.dto.sow.BudgetAssessmentDto;
 import com.aitasker.be.dto.sow.GenerateSowRequest;
 import com.aitasker.be.dto.sow.GenerateSowResponse;
+import com.aitasker.be.dto.sow.MilestoneBudgetReferenceDto;
 import com.aitasker.be.dto.sow.MilestoneDto;
+import com.aitasker.be.dto.sow.ReallocateSowBudgetRequest;
+import com.aitasker.be.dto.sow.ReallocateSowBudgetResponse;
 import com.aitasker.be.service.ai.FileBasedSowRagRetrievalService;
 import com.aitasker.be.service.ai.RagRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +35,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AiSowGenerationServiceTest {
@@ -73,6 +79,14 @@ class AiSowGenerationServiceTest {
                   "needMoreInfo": false,
                   "questions": [],
                   "unexpectedField": "ignored",
+                  "budgetAssessment": {
+                    "currency": "VND",
+                    "estimatedMin": "70,000,000 VND",
+                    "recommendedBudget": "90,000,000 VND",
+                    "estimatedMax": "120,000,000 VND",
+                    "confidence": "MEDIUM",
+                    "factors": "Can tich hop API"
+                  },
                   "sow": {
                     "title": "AI support bot",
                     "overview": "Build bot",
@@ -100,6 +114,52 @@ class AiSowGenerationServiceTest {
 
         assertFalse(response.getNeedMoreInfo());
         assertEquals(BigDecimal.valueOf(90000000), response.getMilestones().get(0).getBudget());
+        assertEquals(BigDecimal.valueOf(70000000), response.getBudgetAssessment().getEstimatedMin());
+        assertEquals(BigDecimal.valueOf(90000000), response.getBudgetAssessment().getRecommendedBudget());
+        assertEquals(List.of("Can tich hop API"), response.getBudgetAssessment().getFactors());
+    }
+
+    @Test
+    void parseAiResponse_whenBudgetUsesMillionUnit_shouldConvertToFullVndAmount() {
+        GenerateSowResponse response = service.parseAiResponse("""
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "budgetAssessment": {
+                    "currency": "VND",
+                    "estimatedMin": "120 triệu VND",
+                    "recommendedBudget": "140 triệu",
+                    "estimatedMax": "160 tr",
+                    "confidence": "MEDIUM",
+                    "factors": []
+                  },
+                  "sow": {
+                    "title": "AI platform",
+                    "overview": "Build platform",
+                    "objectives": [],
+                    "scopeOfWork": [],
+                    "deliverables": [],
+                    "assumptions": [],
+                    "outOfScope": [],
+                    "acceptanceCriteria": []
+                  },
+                  "milestones": [
+                    {
+                      "name": "Build",
+                      "description": "Develop platform",
+                      "duration": 1,
+                      "durationUnit": "MONTH",
+                      "budget": "140 million VND",
+                      "tasks": []
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals(BigDecimal.valueOf(120000000), response.getBudgetAssessment().getEstimatedMin());
+        assertEquals(BigDecimal.valueOf(140000000), response.getBudgetAssessment().getRecommendedBudget());
+        assertEquals(BigDecimal.valueOf(160000000), response.getBudgetAssessment().getEstimatedMax());
+        assertEquals(BigDecimal.valueOf(140000000), response.getMilestones().get(0).getBudget());
     }
 
     @Test
@@ -143,6 +203,16 @@ class AiSowGenerationServiceTest {
         assertTrue(prompt.contains("RAG CONTEXT:"));
         assertTrue(prompt.contains("RAG policy context"));
         assertTrue(prompt.contains("Project title: AI support bot"));
+        assertTrue(prompt.contains("budgetAssessment"));
+        assertTrue(prompt.contains("DOC LAP"));
+        assertTrue(prompt.contains("do phuc tap scope"));
+        assertTrue(prompt.contains("Structured Outputs"));
+        assertTrue(prompt.contains("So milestone toi da la 10"));
+        assertFalse(prompt.contains("Business proposed budget"));
+        assertFalse(prompt.contains("80000000"));
+        assertFalse(prompt.contains("100000000"));
+        assertFalse(prompt.contains("130000000"));
+        assertFalse(prompt.contains("180"));
     }
 
     @Test
@@ -175,6 +245,13 @@ class AiSowGenerationServiceTest {
         assertTrue(prompt.contains("Khong bao gio bo sot sow hay milestones vi co questions"));
         assertTrue(prompt.contains("acceptanceCriteria"));
         assertTrue(prompt.contains("Khong dung catalog"));
+        assertTrue(prompt.contains("TU QUYET DINH so luong"));
+        assertTrue(prompt.contains("Khong dung so luong, ten milestone hoac phase co dinh"));
+        assertTrue(prompt.contains("tong duration"));
+        assertTrue(prompt.contains("ty le phase co dinh tu RAG context"));
+        assertTrue(prompt.contains("Khong tu them CI/CD"));
+        assertTrue(prompt.contains("nguong pass/fail"));
+        assertTrue(prompt.contains("hoat dong dung"));
     }
 
     @Test
@@ -358,6 +435,7 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void generateSow_shouldContinueWhenRagContextEmpty() {
         RestTemplate restTemplate = mock(RestTemplate.class);
         OpenAiProperties openAiProperties = new OpenAiProperties();
@@ -409,6 +487,33 @@ class AiSowGenerationServiceTest {
         assertFalse(response.getNeedMoreInfo());
         assertEquals(BigDecimal.valueOf(90), response.getMilestones().get(0).getBudget());
         assertEquals(BigDecimal.valueOf(90), response.getMilestones().get(1).getBudget());
+
+        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).exchange(anyString(), eq(HttpMethod.POST), requestCaptor.capture(), eq(Map.class));
+        Map<String, Object> requestBody = (Map<String, Object>) requestCaptor.getValue().getBody();
+        Map<String, Object> responseFormat = (Map<String, Object>) requestBody.get("response_format");
+        Map<String, Object> jsonSchema = (Map<String, Object>) responseFormat.get("json_schema");
+        Map<String, Object> schema = (Map<String, Object>) jsonSchema.get("schema");
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        Map<String, Object> milestonesSchema = (Map<String, Object>) properties.get("milestones");
+
+        assertEquals("json_schema", responseFormat.get("type"));
+        assertEquals(true, jsonSchema.get("strict"));
+        assertEquals(false, schema.get("additionalProperties"));
+        assertEquals(10, milestonesSchema.get("maxItems"));
+        assertEquals("gpt-5.6-terra", requestBody.get("model"));
+        assertFalse(requestBody.containsKey("temperature"));
+    }
+
+    @Test
+    void openAiProperties_shouldOnlyUseCustomTemperatureForCompatibleModels() {
+        OpenAiProperties properties = new OpenAiProperties();
+
+        assertEquals("gpt-5.6-terra", properties.getModel());
+        assertFalse(properties.supportsCustomTemperature());
+
+        properties.setModel("gpt-4o-mini");
+        assertTrue(properties.supportsCustomTemperature());
     }
 
     @Test
@@ -444,6 +549,279 @@ class AiSowGenerationServiceTest {
     }
 
     @Test
+    void normalizeBudgetAssessment_whenProviderEstimateIsMissing_shouldUseMilestoneFallback() {
+        GenerateSowResponse response = GenerateSowResponse.builder()
+                .milestones(List.of(
+                        MilestoneDto.builder().budget(million(20)).build(),
+                        MilestoneDto.builder().budget(million(30)).build()
+                ))
+                .build();
+
+        service.normalizeBudgetAssessment(response, million(100));
+
+        BudgetAssessmentDto assessment = response.getBudgetAssessment();
+        assertEquals(million(100), assessment.getBusinessBudget());
+        assertEquals(million(40), assessment.getEstimatedMin());
+        assertEquals(million(50), assessment.getRecommendedBudget());
+        assertEquals(million(60), assessment.getEstimatedMax());
+        assertEquals("HIGH", assessment.getStatus());
+        assertEquals("LOW", assessment.getConfidence());
+        assertEquals("AI_MILESTONE_FALLBACK", assessment.getSource());
+        assertFalse(assessment.getRequiresBusinessConfirmation());
+    }
+
+    @Test
+    void normalizeBudgetAssessment_whenProviderAndMilestonesAreInvalid_shouldRejectInsteadOfUsingBusinessFallback() {
+        GenerateSowResponse response = GenerateSowResponse.builder()
+                .milestones(List.of(MilestoneDto.builder().budget(BigDecimal.ZERO).build()))
+                .build();
+
+        AppException exception = assertThrows(
+                AppException.class,
+                () -> service.normalizeBudgetAssessment(response, million(100)));
+
+        assertEquals("AI response thieu uoc luong ngan sach hop le", exception.getMessage());
+    }
+
+    @Test
+    void normalizeBudgetAssessment_shouldPreserveDifferentAiRangesAcrossProjects() {
+        GenerateSowResponse smallProject = GenerateSowResponse.builder()
+                .budgetAssessment(BudgetAssessmentDto.builder()
+                        .estimatedMin(million(20))
+                        .recommendedBudget(million(30))
+                        .estimatedMax(million(40))
+                        .confidence("MEDIUM")
+                        .build())
+                .milestones(List.of(MilestoneDto.builder().budget(million(30)).build()))
+                .build();
+        GenerateSowResponse largeProject = GenerateSowResponse.builder()
+                .budgetAssessment(BudgetAssessmentDto.builder()
+                        .estimatedMin(million(300))
+                        .recommendedBudget(million(450))
+                        .estimatedMax(million(600))
+                        .confidence("MEDIUM")
+                        .build())
+                .milestones(List.of(MilestoneDto.builder().budget(million(450)).build()))
+                .build();
+
+        service.normalizeBudgetAssessment(smallProject, million(25));
+        service.normalizeBudgetAssessment(largeProject, million(25));
+
+        assertEquals(million(20), smallProject.getBudgetAssessment().getEstimatedMin());
+        assertEquals(million(40), smallProject.getBudgetAssessment().getEstimatedMax());
+        assertEquals(million(300), largeProject.getBudgetAssessment().getEstimatedMin());
+        assertEquals(million(600), largeProject.getBudgetAssessment().getEstimatedMax());
+    }
+
+    @Test
+    void reallocateSowBudget_shouldSortAndReturnExactProportionalWholeVndAllocations() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        AiSowGenerationService localService = new AiSowGenerationService(
+                restTemplate, new OpenAiProperties(), ragRetrievalService);
+        ReallocateSowBudgetRequest request = ReallocateSowBudgetRequest.builder()
+                .selectedBudget(BigDecimal.valueOf(110_000_000))
+                .milestones(List.of(
+                        MilestoneBudgetReferenceDto.builder()
+                                .milestoneIndex(1)
+                                .referenceBudget(BigDecimal.valueOf(100_000_000))
+                                .build(),
+                        MilestoneBudgetReferenceDto.builder()
+                                .milestoneIndex(0)
+                                .referenceBudget(BigDecimal.valueOf(40_000_000))
+                                .build()
+                ))
+                .build();
+
+        ReallocateSowBudgetResponse response = localService.reallocateSowBudget(request);
+
+        assertEquals("VND", response.getCurrency());
+        assertEquals(BigDecimal.valueOf(110_000_000), response.getSelectedBudget());
+        assertEquals(response.getSelectedBudget(), response.getAllocationTotal());
+        assertEquals(0, response.getAllocations().get(0).getMilestoneIndex());
+        assertEquals(BigDecimal.valueOf(31_428_571), response.getAllocations().get(0).getFundsAllocated());
+        assertEquals(1, response.getAllocations().get(1).getMilestoneIndex());
+        assertEquals(BigDecimal.valueOf(78_571_429), response.getAllocations().get(1).getFundsAllocated());
+        verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void reallocateSowBudget_whenSelectedBudgetIsSmallerThanMilestoneCount_shouldStayNonNegativeAndExact() {
+        ReallocateSowBudgetRequest request = ReallocateSowBudgetRequest.builder()
+                .selectedBudget(BigDecimal.valueOf(2))
+                .milestones(List.of(
+                        reference(0, 1),
+                        reference(1, 1),
+                        reference(2, 1),
+                        reference(3, 1)
+                ))
+                .build();
+
+        ReallocateSowBudgetResponse response = service.reallocateSowBudget(request);
+
+        assertEquals(BigDecimal.valueOf(2), response.getAllocationTotal());
+        assertTrue(response.getAllocations().stream()
+                .allMatch(item -> item.getFundsAllocated().compareTo(BigDecimal.ZERO) >= 0));
+        assertEquals(List.of(
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.valueOf(2)),
+                response.getAllocations().stream()
+                        .map(item -> item.getFundsAllocated())
+                        .toList());
+    }
+
+    @Test
+    void reallocateSowBudget_whenMilestoneIndexIsDuplicated_shouldRejectRequest() {
+        ReallocateSowBudgetRequest request = ReallocateSowBudgetRequest.builder()
+                .selectedBudget(BigDecimal.valueOf(100))
+                .milestones(List.of(reference(0, 40), reference(0, 60)))
+                .build();
+
+        AppException exception = assertThrows(
+                AppException.class, () -> service.reallocateSowBudget(request));
+
+        assertEquals("milestoneIndex bi trung: 0", exception.getMessage());
+    }
+
+    @Test
+    void reallocateSowBudget_whenAmountHasFractionalVnd_shouldRejectRequest() {
+        ReallocateSowBudgetRequest request = ReallocateSowBudgetRequest.builder()
+                .selectedBudget(new BigDecimal("100.5"))
+                .milestones(List.of(reference(0, 100)))
+                .build();
+
+        AppException exception = assertThrows(
+                AppException.class, () -> service.reallocateSowBudget(request));
+
+        assertEquals("selectedBudget phai la so VND nguyen lon hon 0", exception.getMessage());
+    }
+
+    @Test
+    void normalizeBudgetAssessment_whenProviderRangeIsContradictory_shouldRepairAndLowerConfidence() {
+        GenerateSowResponse response = GenerateSowResponse.builder()
+                .budgetAssessment(BudgetAssessmentDto.builder()
+                        .estimatedMin(million(120))
+                        .recommendedBudget(million(100))
+                        .estimatedMax(million(80))
+                        .confidence("HIGH")
+                        .factors(List.of(" API integration ", "api integration", "Production deployment"))
+                        .build())
+                .milestones(List.of(MilestoneDto.builder().budget(million(100)).build()))
+                .build();
+
+        service.normalizeBudgetAssessment(response, million(50));
+
+        BudgetAssessmentDto assessment = response.getBudgetAssessment();
+        assertEquals(million(80), assessment.getEstimatedMin());
+        assertEquals(million(100), assessment.getRecommendedBudget());
+        assertEquals(million(120), assessment.getEstimatedMax());
+        assertEquals("TOO_LOW", assessment.getStatus());
+        assertEquals(million(30), assessment.getGapToMinimum());
+        assertEquals("LOW", assessment.getConfidence());
+        assertEquals(List.of("API integration", "Production deployment"), assessment.getFactors());
+    }
+
+    @Test
+    void normalizeBudgetAssessment_shouldClassifyAllBusinessBudgetBands() {
+        List<BigDecimal> businessBudgets = List.of(
+                million(70),
+                million(90),
+                million(100),
+                million(130)
+        );
+        List<String> expectedStatuses = List.of("TOO_LOW", "LOW", "SUITABLE", "HIGH");
+
+        for (int i = 0; i < businessBudgets.size(); i++) {
+            GenerateSowResponse response = GenerateSowResponse.builder()
+                    .budgetAssessment(BudgetAssessmentDto.builder()
+                            .estimatedMin(million(80))
+                            .recommendedBudget(million(100))
+                            .estimatedMax(million(120))
+                            .confidence("MEDIUM")
+                            .build())
+                    .milestones(List.of(MilestoneDto.builder().budget(million(100)).build()))
+                    .build();
+
+            service.normalizeBudgetAssessment(response, businessBudgets.get(i));
+
+            assertEquals(expectedStatuses.get(i), response.getBudgetAssessment().getStatus());
+            assertEquals(i < 3, response.getBudgetAssessment().getRequiresBusinessConfirmation());
+        }
+    }
+
+    @Test
+    void generateSow_whenProviderUsesBareMillionAmounts_shouldScaleToFullVndBeforeComparison() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(restTemplate, openAiProperties, ragRetrievalService);
+        GenerateSowRequest request = buildRequest();
+        request.setBudget(million(50));
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse("""
+                        {
+                          "needMoreInfo": false,
+                          "questions": [],
+                          "budgetAssessment": {
+                            "currency": "VND",
+                            "estimatedMin": 120,
+                            "recommendedBudget": 140,
+                            "estimatedMax": 160,
+                            "confidence": "MEDIUM",
+                            "factors": ["Hai he thong tich hop", "Trien khai production"]
+                          },
+                          "sow": {
+                            "title": "AI support bot",
+                            "overview": "Build bot",
+                            "objectives": ["Tu dong tra loi"],
+                            "scopeOfWork": ["RAG", "Order API"],
+                            "deliverables": ["Bot API"],
+                            "assumptions": [],
+                            "outOfScope": []
+                          },
+                          "milestones": [
+                            {
+                              "name": "Discovery",
+                              "description": "Analyze",
+                              "duration": 4,
+                              "durationUnit": "tuan",
+                              "budget": 40,
+                              "acceptanceCriteria": ["Thiet ke duoc duyet"]
+                            },
+                            {
+                              "name": "Build",
+                              "description": "Implement",
+                              "duration": 6,
+                              "durationUnit": "tuan",
+                              "budget": 100,
+                              "acceptanceCriteria": ["Bot hoat dong"]
+                            }
+                          ]
+                        }
+                        """)));
+
+        GenerateSowResponse response = localService.generateSow(request);
+
+        BudgetAssessmentDto assessment = response.getBudgetAssessment();
+        assertEquals(million(50), assessment.getBusinessBudget());
+        assertEquals(million(120), assessment.getEstimatedMin());
+        assertEquals(million(140), assessment.getRecommendedBudget());
+        assertEquals(million(160), assessment.getEstimatedMax());
+        assertEquals("TOO_LOW", assessment.getStatus());
+        assertEquals(million(70), assessment.getGapToMinimum());
+        assertEquals("LOW", assessment.getConfidence());
+        assertEquals("AI_ADVISORY", assessment.getSource());
+        assertEquals(million(50), response.getMilestones().stream()
+                .map(MilestoneDto::getBudget).reduce(BigDecimal.ZERO, BigDecimal::add));
+        assertEquals(million(140), response.getMilestones().stream()
+                .map(MilestoneDto::getRecommendedBudget).reduce(BigDecimal.ZERO, BigDecimal::add));
+        assertEquals(million(40), response.getMilestones().get(0).getRecommendedBudget());
+        assertEquals(million(100), response.getMilestones().get(1).getRecommendedBudget());
+    }
+
+    @Test
     void normalizeMilestoneDuration_whenTotalIsDifferent_shouldScaleAndMatchInputDuration() {
         GenerateSowResponse response = GenerateSowResponse.builder()
                 .milestones(List.of(
@@ -476,6 +854,22 @@ class AiSowGenerationServiceTest {
         assertEquals(3, response.getMilestones().get(1).getDuration());
         assertEquals(4, response.getMilestones().get(2).getDuration());
         assertEquals("tuần", response.getMilestones().get(2).getDurationUnit());
+    }
+
+    @Test
+    void normalizeMilestoneDuration_whenMilestoneCountExceedsDuration_shouldReject() {
+        GenerateSowResponse response = GenerateSowResponse.builder()
+                .milestones(List.of(
+                        MilestoneDto.builder().duration(1).durationUnit("week").build(),
+                        MilestoneDto.builder().duration(1).durationUnit("week").build()
+                ))
+                .build();
+
+        AppException exception = assertThrows(
+                AppException.class,
+                () -> service.normalizeMilestoneDuration(response, 1, "week"));
+
+        assertTrue(exception.getMessage().contains("So milestone vuot qua tong duration"));
     }
 
     @Test
@@ -829,7 +1223,62 @@ class AiSowGenerationServiceTest {
 
         // Dung 2 lan goi AI roi dung, khong retry vo tan
         verify(restTemplate, times(2)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class));
-        assertTrue(ex.getMessage().contains("AI response thieu thong tin sow hoac milestones sau recovery"));
+        assertTrue(ex.getMessage().contains("AI response khong dat rang buoc sau recovery"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void generateSow_whenMilestoneCountExceedsDuration_shouldRecoverWithExactLimit() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(
+                restTemplate,
+                openAiProperties,
+                ragRetrievalService);
+        GenerateSowRequest request = buildRequest();
+        request.setDuration(1);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(generatedDraftWithMilestones(2))))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(generatedDraftWithMilestones(1))));
+
+        GenerateSowResponse response = localService.generateSow(request);
+
+        assertEquals(1, response.getMilestones().size());
+        assertEquals(1, response.getMilestones().get(0).getDuration());
+        assertEquals(1, response.getMilestones().stream()
+                .map(MilestoneDto::getDuration)
+                .reduce(0, Integer::sum));
+
+        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate, times(2))
+                .exchange(anyString(), eq(HttpMethod.POST), requestCaptor.capture(), eq(Map.class));
+        Map<String, Object> retryBody = (Map<String, Object>) requestCaptor.getAllValues().get(1).getBody();
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) retryBody.get("messages");
+        assertTrue(messages.get(1).get("content").toString().contains("So milestone 2 vuot gioi han 1"));
+    }
+
+    @Test
+    void generateSow_whenRecoveryStillExceedsDuration_shouldRejectInvalidDraft() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        OpenAiProperties openAiProperties = new OpenAiProperties();
+        openAiProperties.setApiKey("test-key");
+        AiSowGenerationService localService = new AiSowGenerationService(
+                restTemplate,
+                openAiProperties,
+                ragRetrievalService);
+        GenerateSowRequest request = buildRequest();
+        request.setDuration(1);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(buildOpenAiResponse(generatedDraftWithMilestones(2))));
+
+        AppException exception = assertThrows(AppException.class, () -> localService.generateSow(request));
+
+        verify(restTemplate, times(2))
+                .exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Map.class));
+        assertTrue(exception.getMessage().contains("So milestone 2 vuot gioi han 1"));
     }
 
     @Test
@@ -839,6 +1288,63 @@ class AiSowGenerationServiceTest {
         String context = ragService.retrieveContext(buildRequest());
 
         assertTrue(context.contains("For RAG customer support chatbot projects"));
+    }
+
+    @Test
+    void ragKnowledge_shouldProvidePlanningDimensionsWithoutFixedMilestoneTemplates() {
+        FileBasedSowRagRetrievalService ragService = new FileBasedSowRagRetrievalService();
+        List<GenerateSowRequest> requests = List.of(
+                buildRagRequest("Customer support chatbot", "Tra cuu don hang va chuyen tiep nhan vien"),
+                buildRagRequest("Visual quality inspection", "Camera defect detection tren day chuyen"),
+                buildRagRequest("Executive dashboard", "KPI analytics cho ban dieu hanh"),
+                buildRagRequest("Warehouse ingestion", "ETL data pipeline tu nhieu nguon"),
+                buildRagRequest("Contract test suite", "API testing Swagger Postman automation test"),
+                buildRagRequest("Document classification", "Phan loai tai lieu bang machine learning")
+        );
+
+        List<String> contexts = requests.stream()
+                .map(ragService::retrieveContext)
+                .toList();
+
+        assertEquals(6, contexts.stream().distinct().count());
+        for (String context : contexts) {
+            assertTrue(context.contains("Candidate planning dimensions, not predefined milestones"));
+            assertTrue(context.contains("Do not use a fixed phase count or fixed phase percentages"));
+            assertFalse(context.contains("Recommended milestones"));
+            assertFalse(context.contains("% budget"));
+        }
+    }
+
+    private String generatedDraftWithMilestones(int milestoneCount) {
+        List<String> milestones = new java.util.ArrayList<>();
+        for (int i = 1; i <= milestoneCount; i++) {
+            milestones.add("""
+                    {
+                      "name": "Milestone %s",
+                      "description": "Deliver outcome %s",
+                      "duration": 1,
+                      "durationUnit": "tuan",
+                      "budget": 100,
+                      "acceptanceCriteria": ["API response is verified by an automated passing test"]
+                    }
+                    """.formatted(i, i));
+        }
+        return """
+                {
+                  "needMoreInfo": false,
+                  "questions": [],
+                  "sow": {
+                    "title": "AI support bot",
+                    "overview": "Build bot",
+                    "objectives": ["Answer customer questions"],
+                    "scopeOfWork": ["Develop requested bot"],
+                    "deliverables": ["Bot API"],
+                    "assumptions": [],
+                    "outOfScope": []
+                  },
+                  "milestones": [%s]
+                }
+                """.formatted(String.join(",", milestones));
     }
 
     private GenerateSowRequest buildRequest() {
@@ -853,6 +1359,13 @@ class AiSowGenerationServiceTest {
                 .build();
     }
 
+    private GenerateSowRequest buildRagRequest(String title, String requirement) {
+        return GenerateSowRequest.builder()
+                .projectTitle(title)
+                .rawRequirement(requirement)
+                .build();
+    }
+
     private Map<String, Object> buildOpenAiResponse(String content) {
         Map<String, Object> message = new LinkedHashMap<>();
         message.put("content", content);
@@ -863,5 +1376,16 @@ class AiSowGenerationServiceTest {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("choices", List.of(choice));
         return response;
+    }
+
+    private MilestoneBudgetReferenceDto reference(int milestoneIndex, long referenceBudget) {
+        return MilestoneBudgetReferenceDto.builder()
+                .milestoneIndex(milestoneIndex)
+                .referenceBudget(BigDecimal.valueOf(referenceBudget))
+                .build();
+    }
+
+    private BigDecimal million(long value) {
+        return BigDecimal.valueOf(value).multiply(BigDecimal.valueOf(1_000_000));
     }
 }

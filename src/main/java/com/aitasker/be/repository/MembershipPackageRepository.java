@@ -17,4 +17,9 @@ public interface MembershipPackageRepository extends JpaRepository<MembershipPac
 
     // Note: Ham `findByPackageIdAndIsActiveTrue` truy cap hoac truy van du lieu phuc vu tang service.
     Optional<MembershipPackageEntity> findByPackageIdAndIsActiveTrue(Long packageId);
+
+    // Note: Ham `findByPackageCodeIgnoreCase` truy cap goi membership theo ma khong phan biet hoa thuong.
+    Optional<MembershipPackageEntity> findByPackageCodeIgnoreCase(String packageCode);
+
+    List<MembershipPackageEntity> findByIsActiveTrueOrderByRoleTypeAscPriceAscPackageNameAsc();
 }

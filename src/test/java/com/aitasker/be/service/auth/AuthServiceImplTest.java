@@ -151,8 +151,8 @@ class AuthServiceImplTest {
         testAccount.setLastFailedLoginAt(LocalDateTime.now().minusMinutes(10));
 
         mockCorrectPassword();
-        when(jwtService.generateAccessToken(anyString(), anyString())).thenReturn("access-token");
-        when(jwtService.generateRefreshToken(anyString())).thenReturn("refresh-token");
+        when(jwtService.generateAccessToken(anyString(), anyString(), anyInt())).thenReturn("access-token");
+        when(jwtService.generateRefreshToken(anyString(), anyInt())).thenReturn("refresh-token");
 
         AuthResponse response = authService.login(loginRequest);
 
@@ -163,6 +163,7 @@ class AuthServiceImplTest {
         assertEquals(0, saved.getLockoutCount());
         assertNull(saved.getLockedUntil());
         assertNull(saved.getLastFailedLoginAt());
+        assertEquals(1, saved.getActiveTokenVersion());
         assertNotNull(response.getAccessToken());
     }
 
@@ -205,7 +206,8 @@ class AuthServiceImplTest {
         when(jwtService.extractUsername("refresh-token")).thenReturn("test@mail.com");
         when(jwtService.isTokenValid("refresh-token", "test@mail.com")).thenReturn(true);
         when(jwtService.isRefreshToken("refresh-token")).thenReturn(true);
-        when(jwtService.generateAccessToken("test@mail.com", "BUSINESS")).thenReturn("new-access-token");
+        when(jwtService.extractTokenVersion("refresh-token")).thenReturn(0);
+        when(jwtService.generateAccessToken("test@mail.com", "BUSINESS", 0)).thenReturn("new-access-token");
 
         AuthResponse response = authService.refreshToken(req);
 
@@ -214,6 +216,24 @@ class AuthServiceImplTest {
         assertEquals("BUSINESS", response.getRole());
         assertEquals("Approved", response.getAccountStatus());
         verify(jwtService, never()).generateRefreshToken(anyString());
+    }
+
+    @Test
+    void refreshToken_withStaleTokenVersion_shouldReject() {
+        testAccount.setActiveTokenVersion(2);
+        RefreshTokenRequest req = new RefreshTokenRequest();
+        req.setRefreshToken("refresh-token");
+
+        when(jwtService.extractUsername("refresh-token")).thenReturn("test@mail.com");
+        when(jwtService.isTokenValid("refresh-token", "test@mail.com")).thenReturn(true);
+        when(jwtService.isRefreshToken("refresh-token")).thenReturn(true);
+        when(jwtService.extractTokenVersion("refresh-token")).thenReturn(1);
+
+        UnauthorizedException ex = assertThrows(UnauthorizedException.class,
+                () -> authService.refreshToken(req));
+
+        assertEquals("Phien dang nhap da het hieu luc", ex.getMessage());
+        verify(jwtService, never()).generateAccessToken(anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -228,7 +248,7 @@ class AuthServiceImplTest {
         UnauthorizedException ex = assertThrows(UnauthorizedException.class,
                 () -> authService.refreshToken(req));
         assertEquals("Refresh token khong hop le", ex.getMessage());
-        verify(jwtService, never()).generateAccessToken(anyString(), anyString());
+        verify(jwtService, never()).generateAccessToken(anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -245,7 +265,7 @@ class AuthServiceImplTest {
         UnauthorizedException ex = assertThrows(UnauthorizedException.class,
                 () -> authService.refreshToken(req));
         assertEquals("Tai khoan da bi khoa, vui long dat lai mat khau", ex.getMessage());
-        verify(jwtService, never()).generateAccessToken(anyString(), anyString());
+        verify(jwtService, never()).generateAccessToken(anyString(), anyString(), anyInt());
     }
 
     @Test

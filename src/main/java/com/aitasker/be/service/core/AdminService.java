@@ -12,6 +12,7 @@ import com.aitasker.be.dto.admin.AccountResponse;
 import com.aitasker.be.dto.admin.AuditLogResponse;
 import com.aitasker.be.dto.admin.StaffRequest;
 import com.aitasker.be.dto.admin.StaffResponse;
+import com.aitasker.be.dto.admin.SystemSettingRequest;
 import com.aitasker.be.entity.*;
 import com.aitasker.be.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,15 @@ import java.util.Map;
 // Note: Annotation này giúp Lombok sinh constructor cho các dependency final.
 @RequiredArgsConstructor
 public class AdminService {
+    private static final List<String> SUPPORTED_SYSTEM_SETTINGS = List.of(
+            MilestoneReviewSlaDuration.SETTING_KEY,
+            "dispute_staff_max_active_cases",
+            "credit.job_post.price_vnd",
+            "credit.proposal.price_vnd",
+            "contract.deposit.business_percentage",
+            "contract.deposit.expert_percentage"
+    );
+
     private final AccessService accessService;
     private final ContractRepository contractRepository;
     private final DisputeRepository disputeRepository;
@@ -101,7 +111,35 @@ public class AdminService {
     // Note: Hàm `listSettings` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public List<SystemSettingEntity> listSettings() {
         accessService.requireRole("ADMIN");
-        return systemSettingRepository.findAll();
+        return systemSettingRepository.findAllById(SUPPORTED_SYSTEM_SETTINGS).stream()
+                .sorted(java.util.Comparator.comparing(SystemSettingEntity::getSettingKey))
+                .toList();
+    }
+
+    @Transactional
+    public SystemSettingEntity createSetting(SystemSettingRequest request) {
+        accessService.requireRole("ADMIN");
+        validateSettingRequest(request, true);
+        String key = normalizeSettingKey(request.getSettingKey());
+        requireSupportedSettingKey(key);
+        validateSettingValue(key, request.getSettingValue());
+        if (systemSettingRepository.existsById(key)) {
+            throw new AppException("SYSTEM SETTING DA TON TAI");
+        }
+        AccountEntity actor = accessService.currentAccount();
+        SystemSettingEntity setting = SystemSettingEntity.builder()
+                .settingKey(key)
+                .settingValue(request.getSettingValue().trim())
+                .valueType(MilestoneReviewSlaDuration.SETTING_KEY.equals(key)
+                        ? "STRING" : normalizeValueType(request.getValueType()))
+                .description(request.getDescription())
+                .isActive(MilestoneReviewSlaDuration.SETTING_KEY.equals(key)
+                        || request.getIsActive() == null || request.getIsActive())
+                .updatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId())
+                .build();
+        SystemSettingEntity saved = systemSettingRepository.save(setting);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", key, actor.getAccountId());
+        return saved;
     }
 
     // Note: Hàm `listAuditLogs` chỉ cho admin lấy danh sách audit log và lọc theo nhóm role nội bộ/bên ngoài.
@@ -114,14 +152,70 @@ public class AdminService {
     // Note: Hàm `updateSetting` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
     public SystemSettingEntity updateSetting(String key, String value, Boolean isActive) {
         accessService.requireRole("ADMIN");
-        SystemSettingEntity setting = systemSettingRepository.findById(key).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
+        String normalizedKey = normalizeSettingKey(key);
+        requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                && Boolean.FALSE.equals(isActive)) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
+        SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey).orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
         // CHI CHO PHEP CAP NHAT GIA TRI/CO HIEU LUC, KHONG CHO DOI VALUE_TYPE TRANH VO HOP DONG DU LIEU.
-        if (value != null && !value.isBlank()) setting.setSettingValue(value);
+        if (value != null && !value.isBlank()) {
+            validateSettingValue(normalizedKey, value);
+            setting.setSettingValue(value.trim());
+        }
         if (isActive != null) setting.setIsActive(isActive);
         AccountEntity actor = accessService.currentAccount();
         setting.setUpdatedByRoleId(actor.getRole().getRoleId());
         SystemSettingEntity saved = systemSettingRepository.save(setting);
-        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", key, actor.getAccountId());
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", normalizedKey, actor.getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public SystemSettingEntity updateSetting(String key, SystemSettingRequest request) {
+        accessService.requireRole("ADMIN");
+        if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
+        String normalizedKey = normalizeSettingKey(key);
+        requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                && Boolean.FALSE.equals(request.getIsActive())) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
+        SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
+        if (request.getSettingValue() != null && !request.getSettingValue().isBlank()) {
+            validateSettingValue(normalizedKey, request.getSettingValue());
+            setting.setSettingValue(request.getSettingValue().trim());
+        }
+        if (request.getValueType() != null && !request.getValueType().isBlank()) {
+            setting.setValueType(MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)
+                    ? "STRING" : normalizeValueType(request.getValueType()));
+        }
+        if (request.getDescription() != null) setting.setDescription(request.getDescription());
+        if (request.getIsActive() != null) setting.setIsActive(request.getIsActive());
+        AccountEntity actor = accessService.currentAccount();
+        setting.setUpdatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId());
+        SystemSettingEntity saved = systemSettingRepository.save(setting);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", normalizedKey, actor.getAccountId());
+        return saved;
+    }
+
+    @Transactional
+    public SystemSettingEntity deleteSetting(String key) {
+        accessService.requireRole("ADMIN");
+        String normalizedKey = normalizeSettingKey(key);
+        requireSupportedSettingKey(normalizedKey);
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(normalizedKey)) {
+            throw new AppException("SLA TU DONG KHONG THE TAT");
+        }
+        SystemSettingEntity setting = systemSettingRepository.findById(normalizedKey)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY SYSTEM SETTING"));
+        setting.setIsActive(false);
+        AccountEntity actor = accessService.currentAccount();
+        setting.setUpdatedByRoleId(actor.getRole() == null ? null : actor.getRole().getRoleId());
+        SystemSettingEntity saved = systemSettingRepository.save(setting);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_SYSTEM_SETTING, "system_settings", normalizedKey, actor.getAccountId());
         return saved;
     }
 
@@ -136,6 +230,15 @@ public class AdminService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `createStaff` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    public StaffResponse currentStaff() {
+        accessService.requireRole("STAFF");
+        AccountEntity actor = accessService.currentAccount();
+        StaffEntity staff = staffRepository.findByAccountId(actor.getAccountId())
+                .orElseThrow(() -> new NotFoundException("CHUA CO STAFF PROFILE"));
+        return toStaffResponse(staff);
+    }
+
+    @Transactional
     public StaffResponse createStaff(StaffRequest request) {
         accessService.requireRole("ADMIN");
         if (request.getAccountId() == null) throw new AppException("ACCOUNT ID KHONG DUOC DE TRONG");
@@ -389,6 +492,60 @@ public class AdminService {
     }
 
     // Note: Hàm `trimToNull` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    private void validateSettingRequest(SystemSettingRequest request, boolean creating) {
+        if (request == null) throw new AppException("BODY REQUEST KHONG HOP LE");
+        if (creating && (request.getSettingKey() == null || request.getSettingKey().isBlank())) {
+            throw new AppException("SETTING KEY KHONG DUOC DE TRONG");
+        }
+        if (creating && (request.getSettingValue() == null || request.getSettingValue().isBlank())) {
+            throw new AppException("SETTING VALUE KHONG DUOC DE TRONG");
+        }
+        if (creating && (request.getValueType() == null || request.getValueType().isBlank())) {
+            throw new AppException("VALUE TYPE KHONG DUOC DE TRONG");
+        }
+    }
+
+    private String normalizeSettingKey(String key) {
+        if (key == null || key.isBlank()) throw new AppException("SETTING KEY KHONG DUOC DE TRONG");
+        return key.trim();
+    }
+
+    private void requireSupportedSettingKey(String key) {
+        if (!SUPPORTED_SYSTEM_SETTINGS.contains(key)) {
+            throw new AppException("SYSTEM SETTING KHONG DUOC HO TRO");
+        }
+    }
+
+    private void validateSettingValue(String key, String value) {
+        if (value == null || value.isBlank()) throw new AppException("SETTING VALUE KHONG DUOC DE TRONG");
+        if (MilestoneReviewSlaDuration.SETTING_KEY.equals(key)) {
+            MilestoneReviewSlaDuration.parse(value);
+            return;
+        }
+        try {
+            BigDecimal numeric = new BigDecimal(value.trim());
+            if (key.startsWith("contract.deposit.")) {
+                if (numeric.signum() <= 0 || numeric.compareTo(new BigDecimal("100")) > 0) {
+                    throw new AppException("TY LE KY QUY PHAI LON HON 0 VA KHONG VUOT QUA 100");
+                }
+            } else if (key.startsWith("credit.") && numeric.signum() <= 0) {
+                throw new AppException("GIA CREDIT PHAI LON HON 0");
+            }
+        } catch (NumberFormatException ex) {
+            throw new AppException("SETTING VALUE KHONG DUNG DINH DANG SO");
+        }
+    }
+
+    private String normalizeValueType(String valueType) {
+        String normalized = trimToNull(valueType);
+        if (normalized == null) throw new AppException("VALUE TYPE KHONG DUOC DE TRONG");
+        String upper = normalized.toUpperCase();
+        for (String allowed : List.of("STRING", "INT", "DECIMAL", "BOOLEAN", "JSON")) {
+            if (allowed.equals(upper)) return upper;
+        }
+        throw new AppException("VALUE TYPE KHONG HOP LE");
+    }
+
     private String trimToNull(String value) {
         if (value == null) return null;
         String trimmed = value.trim();
@@ -421,6 +578,10 @@ public class AdminService {
     private StaffResponse toStaffResponse(StaffEntity staff) {
         AccountEntity account = accountRepository.findById(staff.getAccountId()).orElse(null);
         StaffResponse response = StaffResponse.from(staff, account);
+        response.setActiveTickets(disputeRepository.countByAssignedStaffIdAndStatusIn(
+                staff.getStaffId(),
+                List.of(DisputeEntity.STATUS_STAFF_REVIEWING)
+        ));
         List<StaffDomainEntity> domainMappings = staffDomainRepository.findByIdStaffId(staff.getStaffId());
         List<StaffSkillEntity> skillMappings = staffSkillRepository.findByIdStaffId(staff.getStaffId());
         if (!domainMappings.isEmpty()) {

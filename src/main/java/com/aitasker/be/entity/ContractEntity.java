@@ -44,6 +44,7 @@ public class ContractEntity {
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "proposal_id") private Integer proposalId;
     @Column(name = "contract_title", length = 255) private String contractTitle;
+    @Column(name = "contract_scope") private String contractScope;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.
     @Column(name = "total_budget", nullable = false) private BigDecimal totalBudget;
     // Note: Annotation này cấu hình cột database tương ứng với field entity.

@@ -1,4 +1,4 @@
-﻿# Huong dan test API Back-end bang Swagger
+# Huong dan test API Back-end bang Swagger
 
 Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow trong Swagger UI.
 
@@ -16,6 +16,26 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 | EXPERT | `expert@aitasker.local` | `12345678` |
 | ADMIN | `admin@aitasker.local` | `12345678` |
 | STAFF | `staff@aitasker.local` | `12345678` |
+
+Bo du lieu V67 co dung 31 tai khoan: 1 Admin, 10 Business, 10 Expert va 10
+Staff. Bon tai khoan tren la tai khoan noi bo duoc giu nguyen thong tin dang
+nhap; 27 tai khoan con lai cung dung mat khau `12345678` va co email theo vai
+tro/ten ro rang. `staff@aitasker.local` chi co domain noi bo `PROFILE_REVIEW`
+(`Profile Review`).
+
+Du lieu nghiep vu mau de kiem tra nhanh:
+
+| Nhom | ID mau | Trang thai / muc dich |
+| --- | --- | --- |
+| Job | `1001`-`1010` | Co du `DRAFT`, `OPEN`, `IN_PROGRESS`, `CLOSED`; moi job co SoW va 3 milestone |
+| Proposal | `3001`-`3012` | Co `Pending`, `Accepted`, `Rejected`; proposal milestone khop dung job va bid |
+| Contract | `4001`-`4006` | Co `DRAFT`, `ACTIVE`, `COMPLETED`, `CLOSED` va snapshot 3 milestone |
+| Catalog | `1`-`30` moi bang | 30 domain, 30 skill, 30 technology; khong gan `PROFILE_REVIEW` cho job |
+| Wallet | 31 vi | Co top-up, membership revenue, contract deposit, milestone escrow/release/refund lien ket |
+
+Chi tiet mapping va quy tac doi soat nam tai
+`docs/product/demo-data-rebuild.md`. OpenAPI route/schema khong thay doi trong
+V67; thay doi nay chi lam sach va dong bo du lieu test.
 
 ## Milestone Dispute Smoke Flow
 
@@ -600,17 +620,62 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### POST `/api/jobs/generate-sow`
 - OperationId: `generateSow`
 - Auth: Bearer JWT
-- Giai thich: Generate SoW
+- Giai thich: Generate SoW, danh gia khoang ngan sach AI tham khao va tra ca phan bo theo budget Business/de xuat. Business van la nguoi chot gia.
 - Params: Khong co.
 - Body raw:
 ```json
-{ "schema": "GenerateSowRequest" }
+{
+  "projectTitle": "RAG customer support bot",
+  "rawRequirement": "Chatbot tra loi san pham, tra cuu don hang va chuyen tiep nhan vien",
+  "budget": 50000000,
+  "duration": 10,
+  "durationUnit": "WEEK",
+  "supportFields": ["Generative AI Applications"],
+  "requiredSkills": ["RAG", "API Integration"]
+}
 ```
+- Response can kiem tra:
+  - `budgetAssessment.businessBudget` bang dung budget request.
+  - `budgetAssessment.estimatedMin <= recommendedBudget <= estimatedMax`.
+  - `budgetAssessment.status` thuoc `TOO_LOW|LOW|SUITABLE|HIGH`.
+  - Tong `milestones[].budget` bang `businessBudget`.
+  - Tong `milestones[].recommendedBudget` bang `recommendedBudget`.
+  - `requiresBusinessConfirmation=false` only for `HIGH`; otherwise `true`.
+    Backend never overwrites the Business amount.
+  - Bare AI values `80/100/130` are normalized to full VND
+    `80000000/100000000/130000000` before status comparison.
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/jobs/reallocate-sow-budget`
+- OperationId: `reallocateSowBudget`
+- Auth: Bearer JWT
+- Giai thich: Chia lai milestone theo gia tuy chinh do Business chot; khong goi AI, khong tao Job va khong ghi database.
+- Params: Khong co.
+- Body raw:
+```json
+{
+  "selectedBudget": 110000000,
+  "milestones": [
+    { "milestoneIndex": 0, "referenceBudget": 40000000 },
+    { "milestoneIndex": 1, "referenceBudget": 100000000 }
+  ]
+}
+```
+- Response can kiem tra:
+  - `currency=VND`.
+  - `allocationTotal` bang chinh xac `selectedBudget`.
+  - Ket qua sap xep theo `milestoneIndex`, khong phu thuoc thu tu request.
+  - Frontend map `allocations[].fundsAllocated` vao milestone cung index.
+  - `milestoneIndex` phai duy nhat; budget/reference phai la so VND nguyen duong.
+- Ma phan hoi thuong gap:
+  - `200`: Phan bo thanh cong.
+  - `400`: Budget/reference khong hop le, milestones rong/qua 50, hoac trung `milestoneIndex`.
+  - `401`/`403`: Sai token, het han token hoac sai quyen truy cap.
+  - `500`: Loi he thong; doi chieu log backend.
 
 ### PATCH `/api/v1/jobs/{jobId}/status`
 - OperationId: `updateJobStatus`
@@ -1217,14 +1282,25 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### POST `/api/v1/milestones/{milestoneId}/reject`
 - OperationId: `rejectMilestone`
 - Auth: Bearer JWT
-- Giai thich: Operation rejectMilestone.
+- Giai thich: Business tu choi final deliverable, gui ly do tong va co the gui cac acceptance criteria khong dat kem ly do rieng.
 - Params:
   - `milestoneId` (path, required, integer)
-  - `reason` (query, optional, string)
-- Body raw: Khong co.
+  - `reason` (query, optional, string, compatibility fallback neu client cu chua gui body)
+- Body raw:
+```json
+{
+  "reason": "San pham chua du dieu kien nghiem thu.",
+  "failedCriteria": [
+    {
+      "criteriaId": 12,
+      "reason": "OTP het han nhung he thong van cho xac thuc."
+    }
+  ]
+}
+```
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
-  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `400`: Reason rong, criteria khong thuoc milestone, hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
@@ -1260,18 +1336,61 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### POST `/api/v1/milestones/{milestoneId}/deliverables`
 - OperationId: `submitMilestoneDeliverable`
 - Auth: Bearer JWT
-- Giai thich: Operation submitMilestoneDeliverable.
+- Giai thich: Expert nop san pham lan dau hoac nop lai truoc deadline cua contract milestone; qua han tra `MILESTONE_DA_QUA_HAN_NOP_SAN_PHAM`.
 - Params:
   - `milestoneId` (path, required, integer)
 - Body raw:
 ```json
-{ "schema": "DeliverableEntity" }
+{
+  "sourceCodeUrl": "https://github.com/expert/project",
+  "sourceCodeFileUrl": "milestone-source-code/milestones/10/accounts/99/source.zip",
+  "demoLink": "https://demo.example.com",
+  "submissionNotes": "Release v1.0"
+}
 ```
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
-  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `400`: Validation loi, milestone qua deadline, hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/milestones/{milestoneId}/source-code-file`
+- OperationId: `uploadMilestoneSourceCode`
+- Auth: Bearer JWT (approved assigned EXPERT)
+- Giai thich: Upload source code ZIP truoc deadline, toi da 50 MB; tra ve Firebase storage path de gan vao `sourceCodeFileUrl`.
+- Params:
+  - `milestoneId` (path, required, integer)
+- Body: `multipart/form-data`, key `file`, chi nhan `.zip`.
+- Ma phan hoi thuong gap:
+  - `200`: Upload thanh cong, `data` la storage path.
+  - `400`: File rong, sai dinh dang, qua 50 MB, milestone qua deadline, hoac contract/milestone sai trang thai.
+  - `401`/`403`: Sai token, sai role, Expert khong thuoc contract.
+  - `500`: Firebase chua cau hinh hoac upload that bai.
+
+### POST `/api/v1/contracts/{contractId}/milestones/{milestoneId}/user-guide-file`
+- OperationId: `uploadContractMilestoneUserGuide`
+- Auth: Bearer JWT (chuyên gia đã được duyệt và được gán vào hợp đồng)
+- Giải thích: Tải tệp hướng dẫn sử dụng cho sản phẩm cuối của cột mốc cuối cùng. Hai bên phải ký NDA; cột mốc trực tiếp và cột mốc snapshot đều phải ở trạng thái `IN_PROGRESS`.
+- Params:
+  - `contractId` (path, required, integer)
+  - `milestoneId` (path, required, integer)
+- Body: `multipart/form-data`, key `file`, chỉ nhận `.pdf` hoặc `.docx`.
+- Mã phản hồi thường gặp:
+  - `200`: Tải thành công, `data` là đường dẫn lưu trữ.
+  - `400`: Tệp rỗng, sai định dạng, không phải cột mốc cuối, sai trạng thái hoặc chưa đủ chữ ký NDA.
+  - `401`/`403`: Sai token, sai vai trò hoặc chuyên gia không thuộc hợp đồng.
+
+### GET `/api/v1/contracts/{contractId}/summary`
+- OperationId: `getProjectSummary`
+- Auth: Bearer JWT (hai bên hợp đồng hoặc nhân sự vận hành được phép)
+- Giải thích: Trả dữ liệu tổng kết chỉ khi hợp đồng hoàn thành theo luồng thành công, mọi cột mốc có sản phẩm được duyệt và sản phẩm cuối có tệp hướng dẫn.
+- Params:
+  - `contractId` (path, required, integer)
+- Body raw: Không có.
+- Mã phản hồi thường gặp:
+  - `200`: Trả `ProjectSummaryResponse` gồm dự án, hợp đồng, các bên, lĩnh vực và kết quả bàn giao từng cột mốc.
+  - `400`: Hợp đồng chưa đủ điều kiện tổng kết hoặc thiếu sản phẩm/tệp hướng dẫn.
+  - `401`/`403`: Không phải người tham gia hoặc nhân sự vận hành hợp lệ.
 
 ### GET `/api/v1/milestones/{milestoneId}/criteria`
 - OperationId: `listCriteria`
@@ -1533,7 +1652,15 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `milestoneId` (path, required, integer)
 - Body raw:
 ```json
-{ "schema": "ProgressReportRequest" }
+{
+  "content": "Da hoan thanh API va giao dien chinh",
+  "percentComplete": 70,
+  "attachmentUrl": "https://docs.example.com/report",
+  "sourceCodeUrl": "https://github.com/expert/project",
+  "sourceCodeFileUrl": "milestone-source-code/milestones/10/accounts/99/source.zip",
+  "demoLink": "https://demo.example.com",
+  "submissionNotes": "Checkpoint lan 1"
+}
 ```
 - Ma phan hoi thuong gap:
   - `200`: Thanh cong theo message/schema tren Swagger.
@@ -1781,19 +1908,6 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
-### POST `/api/v1/contracts/{contractId}/milestones/sla-auto-approve`
-- OperationId: `autoApproveReviewSla`
-- Auth: Bearer JWT
-- Giai thich: Operation autoApproveReviewSla.
-- Params:
-  - `contractId` (path, required, integer)
-- Body raw: Khong co.
-- Ma phan hoi thuong gap:
-  - `200`: Thanh cong theo message/schema tren Swagger.
-  - `400`: Validation loi hoac vi pham business rule/state transition.
-  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
-  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
-
 ### POST `/api/v1/contracts/{contractId}/milestones/check-overdue`
 - OperationId: `checkOverdue`
 - Auth: Bearer JWT
@@ -2022,6 +2136,20 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### DELETE `/api/v1/technologies/{technologyId}`
+- OperationId: `deleteTechnology`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa technology bang `isActive=false`, khong xoa vat ly.
+- Params:
+  - `technologyId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Technology duoc deactivate.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay technology.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ### PATCH `/api/v1/skills/{skillId}`
 - OperationId: `updateSkill`
 - Auth: Bearer JWT
@@ -2038,6 +2166,20 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### DELETE `/api/v1/skills/{skillId}`
+- OperationId: `deleteSkill`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa skill bang `isActive=false`, khong xoa vat ly.
+- Params:
+  - `skillId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Skill duoc deactivate.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay skill.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ### PATCH `/api/v1/domains/{domainId}`
 - OperationId: `updateDomain`
 - Auth: Bearer JWT
@@ -2052,6 +2194,20 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `200`: Thanh cong theo message/schema tren Swagger.
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### DELETE `/api/v1/domains/{domainId}`
+- OperationId: `deleteDomain`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa domain bang `isActive=false`, khong xoa vat ly. Domain noi bo `PROFILE_REVIEW` van bi an voi user khong phai admin.
+- Params:
+  - `domainId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Domain duoc deactivate.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay domain.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
 ## AI & Matching Flow
@@ -2189,6 +2345,134 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### POST `/api/v1/admin/settings`
+- OperationId: `createSetting`
+- Auth: Bearer JWT
+- Giai thich: Admin tao system setting moi. `valueType` hop le: `STRING`, `INT`, `DECIMAL`, `BOOLEAN`, `JSON`.
+- Params: Khong co.
+- Body raw:
+```json
+{
+  "settingKey": "approval.sla_days",
+  "settingValue": "3",
+  "valueType": "INT",
+  "description": "So ngay SLA xet duyet",
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Setting duoc tao.
+  - `400`: Thieu key/value/valueType, sai valueType, hoac key da ton tai.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### PUT `/api/v1/admin/settings/{key}`
+- OperationId: `updateSettingBody`
+- Auth: Bearer JWT
+- Giai thich: Admin cap nhat setting bang request body; dung khi can doi value, valueType, description hoac isActive.
+- Params:
+  - `key` (path, required, string)
+- Body raw:
+```json
+{
+  "settingValue": "3",
+  "valueType": "INT",
+  "description": "So ngay SLA xet duyet",
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Setting duoc cap nhat.
+  - `400`: Sai valueType hoac body khong hop le.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay setting.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### DELETE `/api/v1/admin/settings/{key}`
+- OperationId: `deleteSetting`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa setting bang `isActive=false`, khong xoa vat ly.
+- Params:
+  - `key` (path, required, string)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Setting duoc deactivate.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay setting.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/membership/packages`
+- OperationId: `listMembershipPackagesForAdmin`
+- Auth: Bearer JWT
+- Giai thich: Admin xem tat ca package membership; them `activeOnly=true` de chi lay package dang active.
+- Params:
+  - `activeOnly` (query, optional, boolean)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve danh sach package.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### POST `/api/v1/admin/membership/packages`
+- OperationId: `createMembershipPackage`
+- Auth: Bearer JWT
+- Giai thich: Admin tao package membership cho `BUSINESS` hoac `EXPERT`.
+- Params: Khong co.
+- Body raw:
+```json
+{
+  "roleType": "BUSINESS",
+  "packageCode": "BUSINESS_STARTER",
+  "packageName": "Business Starter",
+  "price": 99000,
+  "badgeDurationDays": 30,
+  "jobPostQuota": 5,
+  "proposalQuota": 0,
+  "recommendVisibility": false,
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Package duoc tao.
+  - `400`: Thieu truong bat buoc, role/price/quota khong hop le, hoac packageCode da ton tai.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### PATCH `/api/v1/admin/membership/packages/{packageId}`
+- OperationId: `updateMembershipPackage`
+- Auth: Bearer JWT
+- Giai thich: Admin cap nhat tung phan package membership.
+- Params:
+  - `packageId` (path, required, integer)
+- Body raw:
+```json
+{
+  "packageName": "Business Starter Plus",
+  "price": 149000,
+  "jobPostQuota": 9,
+  "isActive": true
+}
+```
+- Ma phan hoi thuong gap:
+  - `200`: Package duoc cap nhat.
+  - `400`: Du lieu khong hop le hoac packageCode trung.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay package.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### DELETE `/api/v1/admin/membership/packages/{packageId}`
+- OperationId: `deleteMembershipPackage`
+- Auth: Bearer JWT
+- Giai thich: Admin vo hieu hoa package bang `isActive=false`, cac lich su mua goi cu van duoc giu.
+- Params:
+  - `packageId` (path, required, integer)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Package duoc deactivate.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `404`: Khong tim thay package.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ### DELETE `/api/v1/admin/accounts/{accountId}`
 - OperationId: `deactivateAccount`
 - Auth: Bearer JWT
@@ -2261,7 +2545,31 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
 ### GET `/api/v1/admin/wallet/transactions`
 - OperationId: `platformWalletTransactions`
 - Auth: Bearer JWT
-- Giai thich: Operation platformWalletTransactions.
+- Giai thich: Compatibility alias for platform-wide user activity wallet history. Use this when Admin wants to review user-originated wallet actions across the platform, not the platform wallet's own ledger.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/wallet/platform-ledger`
+- OperationId: `platformWalletLedger`
+- Auth: Bearer JWT
+- Giai thich: Admin reads only the platform/Admin wallet ledger rows, including platform balance-changing rows such as platform revenue credits.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Thanh cong theo message/schema tren Swagger.
+  - `400`: Validation loi hoac vi pham business rule/state transition.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/wallet/user-activity-transactions`
+- OperationId: `platformUserActivityTransactions`
+- Auth: Bearer JWT
+- Giai thich: Admin reads platform-wide user activity wallet history, grouped/filtered so internal transfer legs do not appear as duplicate business events.
 - Params: Khong co.
 - Body raw: Khong co.
 - Ma phan hoi thuong gap:
@@ -2352,6 +2660,114 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
 
+### GET `/api/v1/admin/dashboard/summary`
+- OperationId: `summary`
+- Auth: Bearer JWT
+- Giai thich: Tra ve card tong quan cho admin dashboard: user, profile backlog, job/proposal, contract, dispute, membership, wallet va withdrawal.
+- Params: Khong co.
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardSummaryResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/revenue`
+- OperationId: `revenue`
+- Auth: Bearer JWT
+- Giai thich: Tra ve series doanh thu/gross movement theo ky va breakdown theo transaction type.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardSeriesResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/contracts`
+- OperationId: `contracts`
+- Auth: Bearer JWT
+- Giai thich: Tra ve contract status breakdown va trend hop dong tao moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardContractsResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/users`
+- OperationId: `users`
+- Auth: Bearer JWT
+- Giai thich: Tra ve user role/status breakdown, pending profile reviews va trend user moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardUsersResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/jobs-proposals`
+- OperationId: `jobsProposals`
+- Auth: Bearer JWT
+- Giai thich: Tra ve funnel job/proposal, acceptance rate va trend job/proposal tao moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardJobsProposalsResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/disputes`
+- OperationId: `disputes`
+- Auth: Bearer JWT
+- Giai thich: Tra ve dispute status breakdown, open/resolved count, overdue SLA count va trend dispute tao moi.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardDisputesResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/membership`
+- OperationId: `membership`
+- Auth: Bearer JWT
+- Giai thich: Tra ve membership purchase trend, total revenue va package breakdown.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+  - `groupBy` (query, optional, `day|week|month`)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardMembershipResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
+### GET `/api/v1/admin/dashboard/finance-breakdown`
+- OperationId: `financeBreakdown`
+- Auth: Bearer JWT
+- Giai thich: Tra ve so du vi he thong, gross transaction volume, withdrawal totals va transaction/withdrawal breakdown.
+- Params:
+  - `from` (query, optional, date)
+  - `to` (query, optional, date)
+- Body raw: Khong co.
+- Ma phan hoi thuong gap:
+  - `200`: Tra ve `DashboardFinanceBreakdownResponse`.
+  - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
+  - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+
 ## System & Test Flow
 
 - Muc tieu flow: Health check va endpoint test ky thuat.
@@ -2379,3 +2795,83 @@ Tai lieu nay duoc dong bo tu runtime OpenAPI hien tai. Test theo thu tu flow tro
   - `400`: Validation loi hoac vi pham business rule/state transition.
   - `401`/`403`: Sai token, het han token, sai role, ownership hoac participant/operator guard.
   - `500`: Loi he thong hoac du lieu nen bat thuong; doi chieu log backend.
+## US-068 Editable Marketplace And Contract Change APIs
+
+### PUT `/api/v1/proposals/{proposalId}`
+- Auth: Bearer JWT Expert.
+- Use when the owning Expert updates a `Pending` or `Accepted` proposal before any contract exists.
+- Sample body:
+```json
+{
+  "technicalSolution": "Updated architecture and delivery approach",
+  "proposalDescription": "Updated implementation plan",
+  "bidAmount": 15000000,
+  "proposalFileUrl": "proposal-files/experts/5/revised.pdf",
+  "proposalMilestone": [
+    { "name": "Design", "budget": 5000000 },
+    { "name": "Delivery", "budget": 10000000 }
+  ]
+}
+```
+
+### POST `/api/v1/jobs/{jobId}/milestones`
+- Auth: Bearer JWT Business.
+- Preferred alias for creating a milestone under a Business-owned `DRAFT` or editable `OPEN` job.
+
+### PATCH `/api/v1/jobs/{jobId}/milestones/{milestoneId}`
+- Auth: Bearer JWT Business.
+- Preferred alias for updating a milestone and ensuring the milestone belongs to the given job.
+
+### POST `/api/v1/contracts/{contractId}/change-requests`
+- Auth: Bearer JWT Business or Expert participant.
+- Allowed while contract is `DRAFT`, `PENDING`, or `ACTIVE`.
+- Sample body:
+```json
+{
+  "changeType": "SCOPE",
+  "changeSummary": "Add deployment handover and extend timeline",
+  "proposedBudget": 18000000,
+  "proposedTimelineDays": 21,
+  "proposedScope": "Include deployment handover, documentation, and one training session",
+  "proposedMilestones": [
+    {
+      "contractMilestoneId": 12,
+      "milestoneName": "Final delivery and handover",
+      "finalBudget": 18000000,
+      "orderIndex": 1,
+      "duration": 3,
+      "durationUnit": "WEEK",
+      "criteriaSnapshot": "Deployment guide accepted\nTraining session completed",
+      "deliverableExpectation": "Source code, deployment guide, and demo"
+    }
+  ]
+}
+```
+
+### GET `/api/v1/contracts/{contractId}/change-requests`
+- Auth: Bearer JWT participant/Admin/Staff.
+- Lists change requests newest first.
+
+### POST `/api/v1/contracts/{contractId}/change-requests/{requestId}/accept`
+- Auth: Bearer JWT counterparty only.
+- Applies pending budget/timeline/scope/milestone changes, records review note, audit log, and notification.
+- Sample body:
+```json
+{ "reviewNote": "Approved because added handover scope is clear" }
+```
+
+### POST `/api/v1/contracts/{contractId}/change-requests/{requestId}/reject`
+- Auth: Bearer JWT counterparty only.
+- Rejects without applying contract changes.
+- Sample body:
+```json
+{ "reviewNote": "Budget increase is not accepted" }
+```
+
+### Preferred Contract-Scoped Milestone Aliases
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deliverables`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/source-code-file`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/approve`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/reject`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/disputes`
+- Each alias verifies the milestone belongs to the contract before delegating to the existing behavior.

@@ -1,5 +1,6 @@
 package com.aitasker.be.service.core;
 
+import com.aitasker.be.dto.admin.MembershipPackageRequest;
 import com.aitasker.be.dto.payment.CreditPurchaseRequest;
 import com.aitasker.be.dto.payment.PaymentActionResponse;
 import com.aitasker.be.dto.payment.QuotaResponse;
@@ -15,7 +16,12 @@ import com.aitasker.be.entity.ExpertProfileEntity;
 import com.aitasker.be.entity.MembershipPackageEntity;
 import com.aitasker.be.entity.MembershipPurchaseEntity;
 import com.aitasker.be.entity.MilestoneEntity;
+import com.aitasker.be.entity.PaymentOrderEntity;
+import com.aitasker.be.entity.PaymentProvider;
+import com.aitasker.be.entity.PaymentStatus;
 import com.aitasker.be.entity.RoleEntity;
+import com.aitasker.be.entity.SystemWalletEntity;
+import com.aitasker.be.entity.SystemSettingEntity;
 import com.aitasker.be.entity.UserQuotaEntity;
 import com.aitasker.be.entity.WalletTransactionEntity;
 import com.aitasker.be.entity.WithdrawalRequestEntity;
@@ -31,6 +37,7 @@ import com.aitasker.be.repository.MilestoneRepository;
 import com.aitasker.be.repository.PaymentOrderRepository;
 import com.aitasker.be.repository.QuotaUsageLogRepository;
 import com.aitasker.be.repository.SystemSettingRepository;
+import com.aitasker.be.repository.SystemWalletRepository;
 import com.aitasker.be.repository.UserQuotaRepository;
 import com.aitasker.be.repository.WalletTransactionRepository;
 import com.aitasker.be.repository.WithdrawalRequestRepository;
@@ -39,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -74,12 +82,125 @@ class PaymentWalletServiceTest {
     @Mock private JobRepository jobRepository;
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private PaymentOrderRepository paymentOrderRepository;
+    @Mock private SystemWalletRepository systemWalletRepository;
     @Mock private WithdrawalRequestRepository withdrawalRequestRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private AccountRepository accountRepository;
     @Mock private NotificationService notificationService;
 
     @InjectMocks private PaymentWalletService paymentWalletService;
+
+    @Test
+    void getCreditPrices_shouldReturnActiveConfiguredValues() {
+        when(systemSettingRepository.findById("credit.job_post.price_vnd")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingKey("credit.job_post.price_vnd")
+                        .settingValue("500").isActive(true).build()));
+        when(systemSettingRepository.findById("credit.proposal.price_vnd")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingKey("credit.proposal.price_vnd")
+                        .settingValue("750").isActive(true).build()));
+
+        var prices = paymentWalletService.getCreditPrices();
+
+        assertEquals(new BigDecimal("500"), prices.getJobPostPriceVnd());
+        assertEquals(new BigDecimal("750"), prices.getProposalPriceVnd());
+        verify(accessService).requireRole("BUSINESS", "EXPERT", "ADMIN");
+    }
+
+    @Test
+    void getContractDepositRates_shouldReturnBothConfiguredPercentages() {
+        when(systemSettingRepository.findById("contract.deposit.business_percentage")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingValue("25").isActive(true).build()));
+        when(systemSettingRepository.findById("contract.deposit.expert_percentage")).thenReturn(Optional.of(
+                SystemSettingEntity.builder().settingValue("15").isActive(true).build()));
+
+        var rates = paymentWalletService.getContractDepositRates();
+
+        assertEquals(new BigDecimal("25"), rates.getBusinessPercentage());
+        assertEquals(new BigDecimal("15"), rates.getExpertPercentage());
+        verify(accessService).requireRole("BUSINESS", "EXPERT", "ADMIN", "STAFF");
+    }
+
+    @Test
+    void listMembershipPackagesForAdmin_shouldUseActiveOnlyQuery() {
+        MembershipPackageEntity active = packageEntity(1L, "BUSINESS_PLUS", "Business Plus", 30);
+        when(membershipPackageRepository.findByIsActiveTrueOrderByRoleTypeAscPriceAscPackageNameAsc())
+                .thenReturn(List.of(active));
+
+        List<MembershipPackageEntity> result = paymentWalletService.listMembershipPackagesForAdmin(true);
+
+        assertEquals(List.of(active), result);
+        verify(accessService).requireRole("ADMIN");
+    }
+
+    @Test
+    void createMembershipPackage_shouldPersistNormalizedPackage() {
+        MembershipPackageRequest request = new MembershipPackageRequest();
+        request.setRoleType("business");
+        request.setPackageCode("business starter");
+        request.setPackageName("Business Starter");
+        request.setPrice(new BigDecimal("99000"));
+        request.setBadgeDurationDays(30);
+        request.setJobPostQuota(5);
+        request.setProposalQuota(0);
+        request.setRecommendVisibility(true);
+
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(membershipPackageRepository.findByPackageCodeIgnoreCase("BUSINESS_STARTER")).thenReturn(Optional.empty());
+        when(membershipPackageRepository.save(any(MembershipPackageEntity.class))).thenAnswer(invocation -> {
+            MembershipPackageEntity entity = invocation.getArgument(0);
+            entity.setPackageId(55L);
+            return entity;
+        });
+
+        MembershipPackageEntity saved = paymentWalletService.createMembershipPackage(request);
+
+        assertEquals(Long.valueOf(55), saved.getPackageId());
+        assertEquals("BUSINESS", saved.getRoleType());
+        assertEquals("BUSINESS_STARTER", saved.getPackageCode());
+        assertEquals(new BigDecimal("99000"), saved.getPrice());
+        assertEquals(Boolean.TRUE, saved.getRecommendVisibility());
+        assertEquals(Boolean.TRUE, saved.getIsActive());
+        verify(accessService).requireRole("ADMIN");
+        verify(auditLogService).record("MEMBERSHIP_PACKAGE_CREATED", "membership_packages", "55", 1);
+    }
+
+    @Test
+    void updateMembershipPackage_shouldUpdateMutableFields() {
+        MembershipPackageEntity entity = packageEntity(55L, "BUSINESS_STARTER", "Business Starter", 30);
+        MembershipPackageRequest request = new MembershipPackageRequest();
+        request.setPackageName("Business Starter Plus");
+        request.setPrice(new BigDecimal("149000"));
+        request.setJobPostQuota(9);
+        request.setIsActive(false);
+
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(membershipPackageRepository.findById(55L)).thenReturn(Optional.of(entity));
+        when(membershipPackageRepository.save(any(MembershipPackageEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MembershipPackageEntity saved = paymentWalletService.updateMembershipPackage(55L, request);
+
+        assertEquals("Business Starter Plus", saved.getPackageName());
+        assertEquals(new BigDecimal("149000"), saved.getPrice());
+        assertEquals(Integer.valueOf(9), saved.getJobPostQuota());
+        assertEquals(Boolean.FALSE, saved.getIsActive());
+        verify(accessService).requireRole("ADMIN");
+        verify(auditLogService).record("MEMBERSHIP_PACKAGE_UPDATED", "membership_packages", "55", 1);
+    }
+
+    @Test
+    void deleteMembershipPackage_shouldDeactivatePackage() {
+        MembershipPackageEntity entity = packageEntity(55L, "BUSINESS_STARTER", "Business Starter", 30);
+
+        when(accessService.currentAccount()).thenReturn(adminAccount());
+        when(membershipPackageRepository.findById(55L)).thenReturn(Optional.of(entity));
+        when(membershipPackageRepository.save(any(MembershipPackageEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MembershipPackageEntity saved = paymentWalletService.deleteMembershipPackage(55L);
+
+        assertEquals(Boolean.FALSE, saved.getIsActive());
+        verify(accessService).requireRole("ADMIN");
+        verify(auditLogService).record("MEMBERSHIP_PACKAGE_DELETED", "membership_packages", "55", 1);
+    }
 
     @Test
     void ensureQuotaForAccount_shouldGrantInitialExpertProposalCredits() {
@@ -170,6 +291,92 @@ class PaymentWalletServiceTest {
     }
 
     @Test
+    void purchaseMembership_shouldPostPurchaserDebitAndPlatformRevenueCredit() {
+        AccountEntity business = businessAccount();
+        MembershipPackageEntity membershipPackage = packageEntity(
+                1L, "BUSINESS_PLUS", "Business Plus", 30);
+        membershipPackage.setPrice(new BigDecimal("500"));
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(business);
+        when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L))
+                .thenReturn(Optional.of(membershipPackage));
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("1000"));
+        stubPlatformPurchaseDebit(100L);
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> {
+            MembershipPurchaseEntity purchase = invocation.getArgument(0);
+            purchase.setPurchaseId(20L);
+            return purchase;
+        });
+
+        PaymentActionResponse<MembershipPurchaseEntity> response = paymentWalletService.purchaseMembership(1L);
+
+        assertTrue(response.isCompleted());
+        assertEquals(new BigDecimal("500"), response.getData().getAmount());
+        verifyPlatformRevenuePosting(10, new BigDecimal("500"), "MEMBERSHIP_PURCHASE");
+    }
+
+    @Test
+    void purchaseJobPostCredits_shouldPostPurchaserDebitAndPlatformRevenueCredit() {
+        AccountEntity business = businessAccount();
+        CreditPurchaseRequest request = new CreditPurchaseRequest();
+        request.setQuantity(2);
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(10)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(business);
+        when(systemSettingRepository.findById("credit.job_post.price_vnd")).thenReturn(Optional.empty());
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("1000"));
+        stubPlatformPurchaseDebit(101L);
+        when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentActionResponse<UserQuotaEntity> response = paymentWalletService.purchaseJobPostCredits(request);
+
+        assertTrue(response.isCompleted());
+        assertEquals(2, response.getData().getJobPostQuotaBalance());
+        verifyPlatformRevenuePosting(10, new BigDecimal("400"), "CREDIT_PURCHASE");
+    }
+
+    @Test
+    void purchaseProposalCredits_shouldPostPurchaserDebitAndPlatformRevenueCredit() {
+        AccountEntity expert = AccountEntity.builder()
+                .accountId(11)
+                .role(RoleEntity.builder().roleName("EXPERT").build())
+                .status("Approved")
+                .build();
+        CreditPurchaseRequest request = new CreditPurchaseRequest();
+        request.setQuantity(3);
+        UserQuotaEntity quota = UserQuotaEntity.builder()
+                .accountId(11)
+                .jobPostQuotaBalance(0)
+                .proposalQuotaBalance(0)
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(expert);
+        when(systemSettingRepository.findById("credit.proposal.price_vnd")).thenReturn(Optional.empty());
+        when(walletLedgerService.availableBalance(11)).thenReturn(new BigDecimal("1000"));
+        stubPlatformPurchaseDebit(102L);
+        when(userQuotaRepository.findByAccountIdForUpdate(11)).thenReturn(Optional.of(quota));
+        when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentActionResponse<UserQuotaEntity> response = paymentWalletService.purchaseProposalCredits(request);
+
+        assertTrue(response.isCompleted());
+        assertEquals(3, response.getData().getProposalQuotaBalance());
+        verifyPlatformRevenuePosting(11, new BigDecimal("300"), "CREDIT_PURCHASE");
+    }
+
+    @Test
     void purchaseMembership_shouldKeepPremiumActiveWhenLowerTierIsBoughtBeforePremiumExpires() {
         AccountEntity business = businessAccount();
         UserQuotaEntity quota = UserQuotaEntity.builder()
@@ -184,8 +391,7 @@ class PaymentWalletServiceTest {
         when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L)).thenReturn(Optional.of(premium));
         when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(2L)).thenReturn(Optional.of(plus));
         when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("3000000"));
-        when(walletLedgerService.debitAvailable(any(), any(), any(), any(), any(), any()))
-                .thenReturn(WalletTransactionEntity.builder().id(100L).build());
+        stubPlatformPurchaseDebit(100L);
         when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
         when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> {
@@ -201,6 +407,7 @@ class PaymentWalletServiceTest {
         assertNotNull(premiumExpiredAt);
         assertEquals(premiumExpiredAt, quota.getPremiumExpiredAt());
         assertTrue(quota.getPremiumExpiredAt().isAfter(LocalDateTime.now()));
+        verify(systemWalletService, org.mockito.Mockito.times(2)).syncWallet();
     }
 
     @Test
@@ -216,8 +423,7 @@ class PaymentWalletServiceTest {
         when(accessService.currentAccount()).thenReturn(business);
         when(membershipPackageRepository.findByPackageIdAndIsActiveTrue(1L)).thenReturn(Optional.of(premium));
         when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("3000000"));
-        when(walletLedgerService.debitAvailable(any(), any(), any(), any(), any(), any()))
-                .thenReturn(WalletTransactionEntity.builder().id(100L).build());
+        stubPlatformPurchaseDebit(100L);
         when(userQuotaRepository.findByAccountIdForUpdate(10)).thenReturn(Optional.of(quota));
         when(userQuotaRepository.save(any(UserQuotaEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(membershipPurchaseRepository.save(any(MembershipPurchaseEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -775,6 +981,112 @@ class PaymentWalletServiceTest {
     }
 
     @Test
+    void listCurrentWalletTransactions_shouldExposeReconciliationFieldsForTopup() {
+        AccountEntity businessAccount = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Nova Retail")
+                .email("finance@nova.test")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        WalletTransactionEntity tx = WalletTransactionEntity.builder()
+                .id(200L)
+                .systemWalletId(5L)
+                .accountId(10)
+                .paymentOrderId(77L)
+                .transactionType("TOPUP")
+                .direction("CREDIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("300000"))
+                .balanceBefore(new BigDecimal("100000"))
+                .balanceAfter(new BigDecimal("400000"))
+                .status("POSTED")
+                .referenceType("PAYMENT_ORDER")
+                .referenceId(77L)
+                .operationKey("TOPUP:77")
+                .operationLeg(WalletLedgerService.LEG_AVAILABLE_CREDIT)
+                .metadata("{\"source\":\"PAYOS_SYNC\"}")
+                .description("Top up wallet")
+                .createdAt(LocalDateTime.of(2026, 7, 21, 9, 0))
+                .build();
+        PaymentOrderEntity paymentOrder = PaymentOrderEntity.builder()
+                .id(77L)
+                .provider(PaymentProvider.PAYOS)
+                .providerOrderCode(90077L)
+                .providerTransactionNo("BANK-TXN-77")
+                .providerPaymentLinkId("plink_77")
+                .status(PaymentStatus.PAID)
+                .build();
+        SystemWalletEntity wallet = SystemWalletEntity.builder()
+                .systemWalletId(5L)
+                .accountId(10)
+                .walletType("BUSINESS")
+                .currency("VND")
+                .build();
+
+        when(accessService.currentAccount()).thenReturn(businessAccount);
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(10)).thenReturn(List.of(tx));
+        when(systemWalletRepository.findById(5L)).thenReturn(Optional.of(wallet));
+        when(paymentOrderRepository.findById(77L)).thenReturn(Optional.of(paymentOrder));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listCurrentWalletTransactions();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals("USER_WALLET", item.getHistoryScope());
+        assertEquals("TOPUP", item.getTransactionCategory());
+        assertEquals(5L, item.getSystemWalletId());
+        assertEquals("BUSINESS", item.getWalletType());
+        assertEquals("BUSINESS", item.getActorRole());
+        assertEquals("VND", item.getCurrency());
+        assertEquals(new BigDecimal("300000"), item.getGrossAmount());
+        assertEquals(BigDecimal.ZERO, item.getFeeAmount());
+        assertEquals(new BigDecimal("300000"), item.getNetAmount());
+        assertEquals("PAYOS", item.getPaymentProvider());
+        assertEquals(90077L, item.getProviderOrderCode());
+        assertEquals("BANK-TXN-77", item.getProviderTransactionNo());
+        assertEquals("plink_77", item.getProviderPaymentLinkId());
+        assertEquals("PayOS", item.getSenderName());
+        assertEquals("BANK-TXN-77", item.getSenderAccount());
+        assertEquals("Cổng thanh toán", item.getSenderRoleLabel());
+        assertEquals("Nova Retail", item.getReceiverName());
+        assertEquals("finance@nova.test", item.getReceiverAccount());
+        assertEquals("Doanh nghiệp", item.getReceiverRoleLabel());
+        assertEquals("{\"source\":\"PAYOS_SYNC\"}", item.getMetadata());
+        assertFalse(item.getPlatformBalanceChanging());
+    }
+
+    @Test
+    void payContractDeposit_shouldUseConfiguredRateAndFinalMilestoneBudget() {
+        AccountEntity account = AccountEntity.builder().accountId(10)
+                .role(RoleEntity.builder().roleName("BUSINESS").build()).status("Approved").build();
+        BusinessProfileEntity business = BusinessProfileEntity.builder().businessId(20).accountId(10).build();
+        ContractEntity contract = ContractEntity.builder().contractId(30).businessId(20)
+                .status("PENDING").totalBudget(new BigDecimal("1000000")).build();
+        ContractMilestoneEntity milestone = ContractMilestoneEntity.builder().contractId(30)
+                .originalBudget(new BigDecimal("1000000")).finalBudget(new BigDecimal("1200000")).build();
+        SystemSettingEntity rate = SystemSettingEntity.builder()
+                .settingKey("contract.deposit.business_percentage").settingValue("25").isActive(true).build();
+
+        when(accessService.currentAccount()).thenReturn(account);
+        when(businessProfileRepository.findByAccountId(10)).thenReturn(Optional.of(business));
+        when(contractRepository.findById(30)).thenReturn(Optional.of(contract));
+        when(systemSettingRepository.findById("contract.deposit.business_percentage")).thenReturn(Optional.of(rate));
+        when(contractMilestoneRepository.findByContractIdOrderByOrderIndexAsc(30)).thenReturn(List.of(milestone));
+        when(contractDepositRepository.findByContractIdAndOwnerRoleForUpdate(30, "BUSINESS")).thenReturn(Optional.empty());
+        when(walletLedgerService.availableBalance(10)).thenReturn(new BigDecimal("500000"));
+        when(walletLedgerService.holdEscrowFromAvailable(any(), any(), any(), any(), any(), any(), any(WalletLedgerService.WalletOperationContext.class)))
+                .thenReturn(WalletTransactionEntity.builder().id(70L).build());
+        when(contractDepositRepository.save(any(ContractDepositEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentActionResponse<ContractDepositEntity> response = paymentWalletService.payContractDeposit(30);
+
+        assertTrue(response.isCompleted());
+        assertEquals(new BigDecimal("25"), response.getData().getRequiredPercentage());
+        assertEquals(new BigDecimal("300000.00"), response.getData().getRequiredAmount());
+        assertEquals(new BigDecimal("300000.00"), response.getData().getDepositAmount());
+    }
+
+    @Test
     void listPlatformWalletTransactions_shouldReturnVietnameseBusinessEventsForAdmin() {
         AccountEntity businessAccount = AccountEntity.builder()
                 .accountId(10)
@@ -822,6 +1134,16 @@ class PaymentWalletServiceTest {
                 .referenceId(1L)
                 .description("Premium Business")
                 .build();
+        WalletTransactionEntity platformRevenueCredit = WalletTransactionEntity.builder()
+                .id(61L)
+                .accountId(1)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("CREDIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("500000"))
+                .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                .description("Premium Business")
+                .build();
         WithdrawalRequestEntity withdrawal = WithdrawalRequestEntity.builder()
                 .withdrawalId(90L)
                 .accountId(11)
@@ -841,7 +1163,8 @@ class PaymentWalletServiceTest {
         MembershipPackageEntity membershipPackage = packageEntity(1L, "BUSINESS_PREMIUM", "Premium Business", 30);
 
         when(walletTransactionRepository.findAllByOrderByCreatedAtDesc())
-                .thenReturn(List.of(skippedWithdrawDebit, withdrawHold, creditPurchase, membershipPurchase));
+                .thenReturn(List.of(skippedWithdrawDebit, withdrawHold, creditPurchase, membershipPurchase,
+                        platformRevenueCredit));
         when(accountRepository.findById(10)).thenReturn(Optional.of(businessAccount));
         when(accountRepository.findById(11)).thenReturn(Optional.of(expertAccount));
         when(withdrawalRequestRepository.findByHoldTransactionId(40L)).thenReturn(Optional.of(withdrawal));
@@ -854,17 +1177,129 @@ class PaymentWalletServiceTest {
         assertEquals("Chuyên gia E đã tạo yêu cầu rút tiền", history.get(0).getTitle());
         assertEquals("Hệ thống đã tạm giữ 5000000 VND cho yêu cầu rút tiền của Chuyên gia E. Ngân hàng: Vietcombank, chủ tài khoản: Nguyen Van E.",
                 history.get(0).getDescription());
-        assertEquals("Doanh nghiệp A đã mua 10 lượt đăng job", history.get(1).getTitle());
-        assertEquals("Doanh nghiệp A thanh toán 100000 VND để mua 10 lượt đăng job.", history.get(1).getDescription());
+        assertEquals("Doanh nghiệp A đã mua 10 lượt đăng dự án", history.get(1).getTitle());
+        assertEquals("Doanh nghiệp A thanh toán 100000 VNĐ để mua 10 lượt đăng dự án.", history.get(1).getDescription());
         assertEquals("Doanh nghiệp A đã mua gói Premium Business", history.get(2).getTitle());
-        assertEquals("Doanh nghiệp A thanh toán 500000 VND để mua gói Premium Business. Thời hạn từ 2026-06-27T00:00 đến 2026-07-27T00:00.",
+        assertEquals("Doanh nghiệp A thanh toán 500000 VND để mua gói Premium Business. Thời hạn từ 27/06/2026 đến 27/07/2026.",
                 history.get(2).getDescription());
+    }
+
+    @Test
+    void listPlatformWalletLedger_shouldReturnOnlyPlatformWalletLedgerRows() {
+        AccountEntity admin = adminAccount();
+        admin.setFullName("Admin System");
+        AccountEntity purchaser = AccountEntity.builder()
+                .accountId(10)
+                .fullName("Doanh nghiệp A")
+                .email("billing@business-a.test")
+                .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .build();
+        SystemWalletEntity platformWallet = SystemWalletEntity.builder()
+                .systemWalletId(1L)
+                .accountId(1)
+                .walletType("ADMIN_SYSTEM")
+                .currency("VND")
+                .build();
+        WalletTransactionEntity purchaserDebit = WalletTransactionEntity.builder()
+                .id(60L)
+                .accountId(10)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("DEBIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("500000"))
+                .operationKey("MEMBERSHIP_PURCHASE:abc")
+                .operationLeg(WalletLedgerService.LEG_PURCHASER_AVAILABLE_DEBIT)
+                .description("Premium Business")
+                .build();
+        WalletTransactionEntity platformRevenueCredit = WalletTransactionEntity.builder()
+                .id(61L)
+                .systemWalletId(1L)
+                .accountId(1)
+                .transactionType("MEMBERSHIP_PURCHASE")
+                .direction("CREDIT")
+                .balanceType("AVAILABLE")
+                .amount(new BigDecimal("500000"))
+                .balanceBefore(new BigDecimal("1000000"))
+                .balanceAfter(new BigDecimal("1500000"))
+                .status("POSTED")
+                .operationKey("MEMBERSHIP_PURCHASE:abc")
+                .operationLeg(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT)
+                .description("Premium Business")
+                .createdAt(LocalDateTime.of(2026, 7, 21, 10, 0))
+                .build();
+
+        when(accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN"))
+                .thenReturn(Optional.of(admin));
+        when(walletTransactionRepository.findByAccountIdOrderByCreatedAtDesc(1))
+                .thenReturn(List.of(platformRevenueCredit));
+        when(systemWalletRepository.findById(1L)).thenReturn(Optional.of(platformWallet));
+        when(walletTransactionRepository.findByOperationKeyOrderByCreatedAtAscIdAsc("MEMBERSHIP_PURCHASE:abc"))
+                .thenReturn(List.of(purchaserDebit, platformRevenueCredit));
+        when(accountRepository.findById(10)).thenReturn(Optional.of(purchaser));
+
+        List<WalletTransactionHistoryResponse> history = paymentWalletService.listPlatformWalletLedger();
+
+        assertEquals(1, history.size());
+        WalletTransactionHistoryResponse item = history.get(0);
+        assertEquals("PLATFORM_WALLET", item.getHistoryScope());
+        assertEquals("REVENUE", item.getTransactionCategory());
+        assertEquals(Boolean.TRUE, item.getPlatformBalanceChanging());
+        assertEquals(1, item.getAccountId());
+        assertEquals("ADMIN_SYSTEM", item.getWalletType());
+        assertEquals("ADMIN", item.getWalletOwnerRole());
+        assertEquals("Doanh nghiệp A", item.getCounterpartyName());
+        assertEquals(Integer.valueOf(10), item.getCounterpartyAccountId());
+        assertEquals("BUSINESS", item.getCounterpartyRole());
+        assertEquals("Doanh nghiệp A", item.getSenderName());
+        assertEquals("billing@business-a.test", item.getSenderAccount());
+        assertEquals("Doanh nghiệp", item.getSenderRoleLabel());
+        assertEquals("Admin System", item.getReceiverName());
+        assertEquals("platform@aitasker.test", item.getReceiverAccount());
+        assertEquals("Nội bộ", item.getReceiverRoleLabel());
+        assertTrue(item.getTitle().contains("Nền tảng ghi nhận doanh thu"));
     }
 
     private AccountEntity businessAccount() {
         return AccountEntity.builder()
                 .accountId(10)
                 .role(RoleEntity.builder().roleName("BUSINESS").build())
+                .status("Approved")
+                .build();
+    }
+
+    private void stubPlatformPurchaseDebit(Long transactionId) {
+        when(accountRepository.findFirstByRoleRoleNameOrderByAccountIdAsc("ADMIN"))
+                .thenReturn(Optional.of(adminAccount()));
+        when(walletLedgerService.debitAvailable(
+                any(), any(), any(), any(), any(), any(),
+                any(WalletLedgerService.WalletOperationContext.class)))
+                .thenReturn(WalletTransactionEntity.builder().id(transactionId).build());
+    }
+
+    private void verifyPlatformRevenuePosting(Integer purchaserAccountId, BigDecimal amount, String transactionType) {
+        ArgumentCaptor<WalletLedgerService.WalletOperationContext> debitContext =
+                ArgumentCaptor.forClass(WalletLedgerService.WalletOperationContext.class);
+        ArgumentCaptor<WalletLedgerService.WalletOperationContext> creditContext =
+                ArgumentCaptor.forClass(WalletLedgerService.WalletOperationContext.class);
+
+        verify(walletLedgerService).debitAvailable(
+                eq(purchaserAccountId), eq(amount), eq(transactionType), any(), any(), any(), debitContext.capture());
+        verify(walletLedgerService).creditPlatformRevenue(
+                eq(1), eq(amount), eq(transactionType), any(), any(), any(), creditContext.capture());
+
+        assertNotNull(debitContext.getValue().operationKey());
+        assertEquals(debitContext.getValue().operationKey(), creditContext.getValue().operationKey());
+        assertEquals(WalletLedgerService.LEG_PURCHASER_AVAILABLE_DEBIT,
+                debitContext.getValue().operationLeg());
+        assertEquals(WalletLedgerService.LEG_PLATFORM_REVENUE_CREDIT,
+                creditContext.getValue().operationLeg());
+    }
+
+    private AccountEntity adminAccount() {
+        return AccountEntity.builder()
+                .accountId(1)
+                .email("platform@aitasker.test")
+                .role(RoleEntity.builder().roleName("ADMIN").build())
                 .status("Approved")
                 .build();
     }

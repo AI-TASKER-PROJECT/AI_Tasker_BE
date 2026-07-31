@@ -56,6 +56,15 @@ public class AuditLogResponse {
                 .build();
     }
 
+    public AuditLogResponse markAsSystemActor() {
+        this.actorAccountId = null;
+        this.actor = "Hệ thống tự động";
+        this.actorEmail = null;
+        this.actorRole = null;
+        this.actorGroup = "INTERNAL";
+        return this;
+    }
+
     // Note: Hàm `attachEntityInfo` gắn tên đối tượng và tài khoản sở hữu để admin đọc audit log dễ hiểu hơn mã kỹ thuật.
     public AuditLogResponse attachEntityInfo(String displayName, AccountEntity owner) {
         return attachEntityInfo(displayName, displayName, owner);

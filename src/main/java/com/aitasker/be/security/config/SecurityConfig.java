@@ -103,9 +103,13 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/v1/jobs",
                                 "/api/v1/domains",
-                                "/api/v1/skills"
+                                "/api/v1/skills",
+                                "/api/v1/technologies"
                         ).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+")).permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+/domains")).permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+/skills")).permitAll()
+                        .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+/technologies")).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/jobs/\\d+/milestones")).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/\\d+")).permitAll()
                         .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/api/v1/profiles/business/by-job/\\d+")).permitAll()

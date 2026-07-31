@@ -61,6 +61,7 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `createJob` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 1: Tạo Job nháp cho doanh nghiệp sau khi kiểm tra quyền và quota.
     public JobEntity createJob(JobEntity input) {
         accessService.requireRole("BUSINESS");
         // VALIDATE CAC TRUONG BAT BUOC CUA JOB DE DUNG VOI BR DANG TUYEN BAI TOAN.
@@ -87,36 +88,56 @@ public class MarketplaceService {
     }
 
     @Transactional
+    // Chức năng 2: Cập nhật nội dung Job nháp hoặc Job đã public trước khi có hợp đồng.
     public JobEntity updateDraftJob(Integer jobId, JobEntity input) {
         accessService.requireRole("BUSINESS");
         if (input == null) throw new AppException("JOB UPDATE BODY KHONG DUOC DE TRONG");
         JobEntity job = jobRepository.findById(jobId).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
+        String previousStatus = job.getStatus();
         BusinessProfileEntity business = currentApprovedBusiness();
         if (!business.getBusinessId().equals(job.getBusinessId())) {
             throw new AppException("BAN KHONG CO QUYEN THAO TAC JOB NAY");
         }
-        if (!"DRAFT".equalsIgnoreCase(job.getStatus())) {
-            throw new AppException("JOB KHONG O TRANG THAI DRAFT");
+        if (!List.of("DRAFT", "OPEN").contains(previousStatus)) {
+            throw new AppException("JOB KHONG O TRANG THAI CHO PHEP CAP NHAT");
         }
         if (contractRepository.findByJobId(jobId).isPresent()) {
-            throw new AppException("JOB DA CO CONTRACT, KHONG DUOC CHINH MILESTONE");
+            throw new AppException("JOB DA CO CONTRACT, KHONG DUOC CAP NHAT TRUC TIEP");
         }
         if (input.getTitle() != null && !input.getTitle().isBlank()) job.setTitle(input.getTitle());
         if (input.getRawRequirements() != null && !input.getRawRequirements().isBlank()) job.setRawRequirements(input.getRawRequirements());
         if (input.getBudget() != null && input.getBudget().signum() > 0) job.setBudget(input.getBudget());
+        if (input.getPlannedDurationValue() != null || (input.getPlannedDurationUnit() != null && !input.getPlannedDurationUnit().isBlank())) {
+            job.setPlannedDurationValue(input.getPlannedDurationValue());
+            job.setPlannedDurationUnit(input.getPlannedDurationUnit());
+            validateAndNormalizeJobDuration(job);
+        }
+        validateMilestoneDurationsWithinJob(job, input.getMilestones());
         JobEntity saved = jobRepository.save(job);
         upsertSow(saved.getJobId(), input.getSow());
         replaceDraftMilestones(saved, input.getMilestones());
-        auditLogService.record(AuditLogService.ACTION_UPDATE_JOB_DRAFT, "jobs", String.valueOf(saved.getJobId()), accessService.currentAccount().getAccountId());
+        replaceJobDomains(saved.getJobId(), input.getDomainIds());
+        replaceJobSkills(saved.getJobId(), input.getSkills());
+        replaceJobTechnologies(saved.getJobId(), input.getTechnologyIds());
+        Integer actorAccountId = accessService.currentAccount().getAccountId();
+        auditLogService.record("OPEN".equalsIgnoreCase(previousStatus)
+                        ? AuditLogService.ACTION_UPDATE_JOB_OPEN
+                        : AuditLogService.ACTION_UPDATE_JOB_DRAFT,
+                "jobs", String.valueOf(saved.getJobId()), actorAccountId);
+        if ("OPEN".equalsIgnoreCase(previousStatus)) {
+            notifyJobUpdatedExperts(saved, actorAccountId);
+        }
         return attachJobDetails(saved);
     }
 
     // Note: Hàm `listJobs` chỉ lấy job OPEN để marketplace không làm lộ job nháp của doanh nghiệp.
+    // Chức năng 3: Lấy danh sách Job để hiển thị marketplace và cơ hội cho chuyên gia.
     public List<JobEntity> listJobs() {
         return attachJobDetails(jobRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc("OPEN"));
     }
 
     // Note: Hàm `listMyJobs` lấy toàn bộ job của business hiện tại, bao gồm DRAFT để doanh nghiệp kiểm tra trước khi public.
+    // Chức năng 4: Lấy danh sách Job thuộc doanh nghiệp hiện tại.
     public List<JobEntity> listMyJobs() {
         accessService.requireRole("BUSINESS");
         BusinessProfileEntity business = currentApprovedBusiness();
@@ -124,6 +145,7 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `getJob` kiểm soát quyền xem chi tiết job theo trạng thái public hoặc quyền sở hữu job nháp.
+    // Chức năng 5: Lấy chi tiết Job kèm domain, skill, technology, SOW và milestone.
     public JobEntity getJob(Integer id) {
         JobEntity job = jobRepository.findById(id).orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB"));
         if ("OPEN".equalsIgnoreCase(job.getStatus())) return attachJobDetails(job);
@@ -140,6 +162,7 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `submitProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 6: Chuyên gia nộp proposal cho Job đang mở và tiêu thụ quota proposal.
     public ProposalEntity submitProposal(ProposalRequest request) {
         accessService.requireRole("EXPERT");
         // CHI CHO EXPERT DA KYC APPROVED NOP PROPOSAL CHO JOB DA MO CONG KHAI.
@@ -184,6 +207,7 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `uploadProposalFile` upload file proposal của chuyên gia lên Firebase và trả path để gán vào proposal.
+    // Chức năng 7: Upload file đính kèm proposal và trả về đường dẫn lưu trữ.
     public String uploadProposalFile(MultipartFile file) {
         accessService.requireRole("EXPERT");
         ExpertProfileEntity expert = currentApprovedExpert();
@@ -191,6 +215,7 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `listProposalsByJob` lấy proposal theo job và chỉ cho doanh nghiệp sở hữu job xem danh sách này.
+    // Chức năng 8: Lấy danh sách proposal của một Job cho doanh nghiệp quản lý.
     public List<ProposalEntity> listProposalsByJob(Integer jobId) {
         accessService.requireRole("BUSINESS");
         requireBusinessOwnedJob(jobId);
@@ -198,15 +223,69 @@ public class MarketplaceService {
     }
 
     // Note: Hàm `listMyProposals` lấy các proposal của expert hiện tại để chuyên gia theo dõi trạng thái sau khi nộp.
+    // Chức năng 9: Lấy danh sách proposal mà chuyên gia hiện tại đã gửi.
     public List<ProposalEntity> listMyProposals() {
         accessService.requireRole("EXPERT");
         Integer expertId = currentApprovedExpert().getExpertId();
         return proposalRepository.findByExpertIdOrderByCreatedAtDesc(expertId);
     }
 
+    @Transactional
+    public ProposalEntity updateProposal(Integer proposalId, ProposalRequest request) {
+        accessService.requireRole("EXPERT");
+        if (request == null) throw new AppException("PROPOSAL UPDATE BODY KHONG DUOC DE TRONG");
+        AccountEntity actor = accessService.currentAccount();
+        ExpertProfileEntity expert = currentApprovedExpert();
+        ProposalEntity proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY PROPOSAL"));
+        if (!expert.getExpertId().equals(proposal.getExpertId())) {
+            throw new AppException("BAN KHONG CO QUYEN CAP NHAT PROPOSAL NAY");
+        }
+        if (!List.of("Pending", "Accepted").contains(proposal.getStatus())) {
+            throw new AppException("PROPOSAL KHONG O TRANG THAI CHO PHEP CAP NHAT");
+        }
+        if (contractRepository.existsByProposalId(proposalId)) {
+            throw new AppException("PROPOSAL DA DUOC TAO CONTRACT, KHONG DUOC CAP NHAT");
+        }
+        JobEntity job = jobRepository.findById(proposal.getJobId())
+                .orElseThrow(() -> new NotFoundException("KHONG TIM THAY JOB CUA PROPOSAL"));
+        if (!"OPEN".equalsIgnoreCase(job.getStatus())) {
+            throw new AppException("JOB KHONG O TRANG THAI CHO PHEP CAP NHAT PROPOSAL");
+        }
+        if (request.getTechnicalSolution() != null && !request.getTechnicalSolution().isBlank()) {
+            proposal.setTechnicalSolution(request.getTechnicalSolution());
+        }
+        if (request.getProposalDescription() != null && !request.getProposalDescription().isBlank()) {
+            proposal.setProposalDescription(request.getProposalDescription());
+        }
+        if (request.getProposalFileUrl() != null) {
+            proposal.setProposalFileUrl(request.getProposalFileUrl().isBlank() ? null : request.getProposalFileUrl());
+        }
+        if (request.getBidAmount() != null) {
+            if (request.getBidAmount().signum() <= 0) throw new AppException("BID AMOUNT PHAI LON HON 0");
+            proposal.setBidAmount(request.getBidAmount());
+        }
+        if (request.proposalMilestoneText() != null) {
+            proposal.assignProposalMilestone(normalizeProposalMilestone(
+                    request.proposalMilestoneText(), job, proposal.getBidAmount()));
+        }
+        ProposalEntity saved = proposalRepository.save(proposal);
+        auditLogService.record(AuditLogService.ACTION_UPDATE_PROPOSAL, "proposals", String.valueOf(proposalId), actor.getAccountId());
+        businessProfileRepository.findById(job.getBusinessId())
+                .ifPresent(business -> notificationService.notifyProposalUpdated(
+                        business.getAccountId(),
+                        actor.getAccountId(),
+                        job.getJobId(),
+                        saved.getProposalId(),
+                        job.getTitle()
+                ));
+        return saved;
+    }
+
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `updateJobStatus` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 10: Cập nhật trạng thái Job, bao gồm publish Job sang OPEN.
     public JobEntity updateJobStatus(Integer jobId, String status) {
         accessService.requireRole("BUSINESS");
         AccountEntity actor = accessService.currentAccount();
@@ -237,6 +316,7 @@ public class MarketplaceService {
     // Note: Annotation này đảm bảo các thao tác database trong hàm chạy cùng một transaction.
     @Transactional
     // Note: Hàm `reviewProposal` xử lý nghiệp vụ chính, kiểm tra điều kiện và phối hợp repository/service liên quan.
+    // Chức năng 11: Doanh nghiệp chấp nhận hoặc từ chối proposal của chuyên gia.
     public ProposalEntity reviewProposal(Integer proposalId, String status) {
         accessService.requireRole("BUSINESS");
         // CHI CHO PHEP DOANH NGHIEP PHE DUYET HOAC TU CHOI PROPOSAL.
@@ -363,6 +443,24 @@ public class MarketplaceService {
             replaceMilestoneCriteria(saved.getMilestoneId(), milestone.getAcceptanceCriteria());
             defaultOrderIndex++;
         }
+    }
+
+    private void replaceJobDomains(Integer jobId, List<Integer> domainIds) {
+        if (domainIds == null) return;
+        jobDomainRepository.deleteByIdJobId(jobId);
+        saveJobDomains(jobId, domainIds);
+    }
+
+    private void replaceJobSkills(Integer jobId, List<JobSkillAssignmentRequest> assignments) {
+        if (assignments == null) return;
+        jobSkillRepository.deleteByIdJobId(jobId);
+        saveJobSkills(jobId, assignments);
+    }
+
+    private void replaceJobTechnologies(Integer jobId, List<Integer> technologyIds) {
+        if (technologyIds == null) return;
+        jobTechnologyRepository.deleteByIdJobId(jobId);
+        saveJobTechnologies(jobId, technologyIds);
     }
 
     // Note: Hàm `saveJobDomains` lưu các lĩnh vực business chọn ngay lúc tạo job.
@@ -617,6 +715,20 @@ public class MarketplaceService {
             throw new AppException(fieldName.toUpperCase() + " PHAI LON HON 0");
         }
         return budget;
+    }
+
+    private void notifyJobUpdatedExperts(JobEntity job, Integer actorAccountId) {
+        proposalRepository.findByJobId(job.getJobId()).stream()
+                .map(ProposalEntity::getExpertId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(expertId -> expertProfileRepository.findById(expertId)
+                        .ifPresent(expert -> notificationService.notifyJobUpdated(
+                                expert.getAccountId(),
+                                actorAccountId,
+                                job.getJobId(),
+                                job.getTitle()
+                        )));
     }
 
     private BusinessProfileEntity currentApprovedBusiness() {
