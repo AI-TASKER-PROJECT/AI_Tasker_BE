@@ -66,6 +66,9 @@ Tài liệu mô tả nhanh các bảng dữ liệu cốt lõi, mục đích sử
 
 ### Deliverables
 - Mục đích: Sản phẩm bàn giao cho milestone.
+- Cột nổi bật: `user_guide_file_url` lưu đường dẫn tệp PDF/DOCX hướng dẫn sử
+  dụng; chỉ sản phẩm đã duyệt của cột mốc cuối cùng có giá trị, các cột mốc khác
+  để `NULL`.
 - Quan hệ chính: `milestone_id -> Milestones.milestone_id`.
 
 ### Transactions

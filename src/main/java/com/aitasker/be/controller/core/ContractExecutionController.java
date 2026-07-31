@@ -13,6 +13,7 @@ import com.aitasker.be.dto.core.ContractChangeReviewRequest;
 import com.aitasker.be.dto.core.ContractMilestoneViewResponse;
 import com.aitasker.be.dto.core.ProgressReportFeedbackRequest;
 import com.aitasker.be.dto.core.ProgressReportRequest;
+import com.aitasker.be.dto.core.ProjectSummaryResponse;
 import com.aitasker.be.dto.core.RejectedMilestoneTerminationRequest;
 import com.aitasker.be.dto.core.RejectMilestoneRequest;
 import com.aitasker.be.dto.core.ImmediateTerminationRequest;
@@ -230,6 +231,21 @@ public class ContractExecutionController {
         return ResponseEntity.ok(ApiResponse.success(
                 "UPLOAD CONTRACT MILESTONE SOURCE CODE SUCCESS",
                 service.uploadMilestoneSourceCode(contractId, milestoneId, file)
+        ));
+    }
+
+    @PostMapping(value = "/contracts/{contractId}/milestones/{milestoneId}/user-guide-file",
+            consumes = "multipart/form-data")
+    @Operation(summary = "Tải tệp hướng dẫn sử dụng cho cột mốc cuối",
+            description = "Chuyên gia tải tệp PDF hoặc DOCX hướng dẫn doanh nghiệp sử dụng sản phẩm hoàn thiện. Chỉ cột mốc cuối cùng của hợp đồng được phép có tệp này.")
+    public ResponseEntity<ApiResponse<String>> uploadContractMilestoneUserGuide(
+            @PathVariable Integer contractId,
+            @PathVariable Integer milestoneId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Tải tệp hướng dẫn sử dụng thành công",
+                service.uploadMilestoneUserGuide(contractId, milestoneId, file)
         ));
     }
 
@@ -509,6 +525,16 @@ public class ContractExecutionController {
 
     @GetMapping("/contracts/{contractId}")
     public ResponseEntity<ApiResponse<Object>> getContract(@PathVariable Integer contractId) { return ResponseEntity.ok(ApiResponse.success("GET CONTRACT SUCCESS", service.getContract(contractId))); }
+
+    @GetMapping("/contracts/{contractId}/summary")
+    @Operation(summary = "Lấy trang tổng kết dự án đã hoàn thành",
+            description = "Chỉ trả dữ liệu khi hợp đồng kết thúc theo luồng thành công và toàn bộ cột mốc đã hoàn thành.")
+    public ResponseEntity<ApiResponse<ProjectSummaryResponse>> getProjectSummary(@PathVariable Integer contractId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Lấy thông tin tổng kết dự án thành công",
+                service.getProjectSummary(contractId)
+        ));
+    }
 
     // Note: Annotation nÃ y khai bÃ¡o API Ä‘á»c dá»¯ liá»‡u báº±ng HTTP GET.
     @GetMapping("/contracts/{contractId}/milestones")

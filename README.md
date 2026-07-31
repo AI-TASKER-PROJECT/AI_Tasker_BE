@@ -61,6 +61,9 @@ Swagger/OpenAPI:
   seed demo cu bang 31 tai khoan lien ket (1 Admin, 10 Business, 10 Expert, 10
   Staff), 90 catalog item chia deu cho domain/skill/technology, va bo du lieu
   job/proposal/contract/wallet/audit/notification co the doi soat.
+- Da bo sung migration `V70__project_summary_user_guide_and_seed_integrity.sql`
+  de luu tep huong dan PDF/DOCX cua cot moc cuoi, chuan hoa du lieu seed va tao
+  thong bao trang tong ket cho cac hop dong mau hoan thanh dung luong.
 - KHONG SUA migration cu, chi THEM migration moi.
 - Da chuyen seed demo account sang migration dung convention: `V9__seed_demo_account.sql`.
 - `V7_seed_demo_account.sql` la FILE LEGACY TEN CU (KHONG DUNG CONVENTION FLYWAY), duoc GIU LAI de tham chieu lich su commit, KHONG tham gia migrate.
@@ -107,6 +110,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
 - Contract/Execution/Finance/Dispute:
   - `GET /api/v1/contracts`
   - `GET /api/v1/contracts/{contractId}`
+  - `GET /api/v1/contracts/{contractId}/summary` (chi co sau khi tat ca cot moc hoan thanh theo happy case)
   - `POST /api/v1/contracts/from-proposals/{proposalId}`
   - `POST /api/v1/contracts/{contractId}/sign`
   - `POST /api/v1/contracts/{contractId}/nda-sign`
@@ -132,6 +136,7 @@ Test context da duoc khoa cau hinh local docker, khong phu thuoc Supabase.
   - `POST /api/v1/milestones/{milestoneId}/deliverables`
   - `GET /api/v1/milestones/{milestoneId}/deliverables`
   - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/source-code-file` (preferred contract-scoped alias)
+  - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/user-guide-file` (multipart PDF/DOCX, chi cot moc cuoi)
   - `POST /api/v1/milestones/{milestoneId}/source-code-file` (multipart ZIP, tối đa 50 MB)
   - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
   - `GET /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`

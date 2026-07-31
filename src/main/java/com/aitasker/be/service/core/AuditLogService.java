@@ -31,62 +31,63 @@ public class AuditLogService {
     public static final String ACTION_CREATE_ACCOUNT = "Tạo tài khoản";
     public static final String ACTION_UPDATE_ACCOUNT = "Cập nhật tài khoản";
     public static final String ACTION_CHANGE_ACCOUNT_STATUS = "Đổi trạng thái tài khoản";
-    public static final String ACTION_CREATE_STAFF_PROFILE = "Tạo hồ sơ staff";
-    public static final String ACTION_UPDATE_STAFF_PROFILE = "Cập nhật hồ sơ staff";
+    public static final String ACTION_CREATE_STAFF_PROFILE = "Tạo hồ sơ nhân viên";
+    public static final String ACTION_UPDATE_STAFF_PROFILE = "Cập nhật hồ sơ nhân viên";
     public static final String ACTION_UPDATE_SYSTEM_SETTING = "Cập nhật cài đặt hệ thống";
     public static final String ACTION_UPSERT_BUSINESS_PROFILE = "Cập nhật hồ sơ doanh nghiệp";
     public static final String ACTION_UPSERT_EXPERT_PROFILE = "Cập nhật hồ sơ chuyên gia";
     public static final String ACTION_UPLOAD_BUSINESS_LICENSE = "Tải giấy phép kinh doanh";
     public static final String ACTION_UPLOAD_EXPERT_CERTIFICATE = "Tải chứng chỉ chuyên gia";
-    public static final String ACTION_UPLOAD_EXPERT_PORTFOLIO_FILE = "Tải file portfolio chuyên gia";
-    public static final String ACTION_UPSERT_PORTFOLIO = "Cập nhật portfolio chuyên gia";
-    public static final String ACTION_CREATE_JOB_DRAFT = "Tạo job nháp";
-    public static final String ACTION_UPDATE_JOB_DRAFT = "Cập nhật job nháp";
-    public static final String ACTION_UPDATE_JOB_OPEN = "Cập nhật job đã public";
-    public static final String ACTION_CHANGE_JOB_STATUS = "Đổi trạng thái job";
-    public static final String ACTION_SUBMIT_PROPOSAL = "Gửi proposal";
-    public static final String ACTION_UPDATE_PROPOSAL = "Cập nhật proposal";
-    public static final String ACTION_REVIEW_PROPOSAL = "Duyệt proposal";
+    public static final String ACTION_UPLOAD_EXPERT_PORTFOLIO_FILE = "Tải tệp hồ sơ năng lực chuyên gia";
+    public static final String ACTION_UPSERT_PORTFOLIO = "Cập nhật hồ sơ năng lực chuyên gia";
+    public static final String ACTION_CREATE_JOB_DRAFT = "Tạo dự án nháp";
+    public static final String ACTION_UPDATE_JOB_DRAFT = "Cập nhật dự án nháp";
+    public static final String ACTION_UPDATE_JOB_OPEN = "Cập nhật dự án đã đăng";
+    public static final String ACTION_CHANGE_JOB_STATUS = "Đổi trạng thái dự án";
+    public static final String ACTION_SUBMIT_PROPOSAL = "Gửi bản đề xuất";
+    public static final String ACTION_UPDATE_PROPOSAL = "Cập nhật bản đề xuất";
+    public static final String ACTION_REVIEW_PROPOSAL = "Duyệt bản đề xuất";
     public static final String ACTION_CREATE_CONTRACT_DRAFT = "Tạo hợp đồng nháp";
     public static final String ACTION_REQUEST_CONTRACT_CHANGE = "Yêu cầu chỉnh sửa hợp đồng";
     public static final String ACTION_ACCEPT_CONTRACT_CHANGE = "Chấp nhận yêu cầu chỉnh sửa hợp đồng";
     public static final String ACTION_REJECT_CONTRACT_CHANGE = "Từ chối yêu cầu chỉnh sửa hợp đồng";
     public static final String ACTION_ACCEPT_CONTRACT = "Xác nhận hợp đồng";
-    public static final String ACTION_SIGN_NDA = "Ký NDA";
+    public static final String ACTION_SIGN_NDA = "Ký thỏa thuận bảo mật (NDA)";
     public static final String ACTION_REJECT_CONTRACT = "Từ chối hợp đồng";
     public static final String ACTION_ACTIVATE_CONTRACT = "Kích hoạt hợp đồng";
     public static final String ACTION_COMPLETE_CONTRACT = "Hoàn tất hợp đồng";
     public static final String ACTION_TERMINATE_CONTRACT = "Chấm dứt hợp đồng";
-    public static final String ACTION_CREATE_MILESTONE = "Tạo milestone";
-    public static final String ACTION_UPDATE_MILESTONE = "Cập nhật milestone";
-    public static final String ACTION_COMPLETE_MILESTONE = "Hoàn tất milestone";
+    public static final String ACTION_CREATE_MILESTONE = "Tạo cột mốc";
+    public static final String ACTION_UPDATE_MILESTONE = "Cập nhật cột mốc";
+    public static final String ACTION_COMPLETE_MILESTONE = "Hoàn tất cột mốc";
     public static final String ACTION_CREATE_ACCEPTANCE_CRITERIA = "Tạo tiêu chí nghiệm thu";
     public static final String ACTION_UPDATE_ACCEPTANCE_CRITERIA = "Cập nhật tiêu chí nghiệm thu";
     public static final String ACTION_DELETE_ACCEPTANCE_CRITERIA = "Xóa tiêu chí nghiệm thu";
     public static final String ACTION_SUBMIT_DELIVERABLE = "Nộp sản phẩm bàn giao";
     public static final String ACTION_SUBMIT_PROGRESS_REPORT = "Nộp báo cáo tiến độ";
-    public static final String ACTION_UPLOAD_MILESTONE_SOURCE_CODE = "Tải file source code milestone";
+    public static final String ACTION_UPLOAD_MILESTONE_SOURCE_CODE = "Tải tệp mã nguồn cột mốc";
+    public static final String ACTION_UPLOAD_MILESTONE_USER_GUIDE = "Tải tệp hướng dẫn sử dụng sản phẩm";
     public static final String ACTION_CREATE_TRANSACTION = "Tạo giao dịch";
     public static final String ACTION_UPDATE_TRANSACTION_STATUS = "Cập nhật trạng thái giao dịch";
     public static final String ACTION_CREATE_DISPUTE = "Tạo tranh chấp";
     public static final String ACTION_ASSIGN_DISPUTE = "Phân công tranh chấp";
     public static final String ACTION_RESOLVE_DISPUTE = "Xử lý tranh chấp";
-    public static final String ACTION_RECORD_DEMO_TESTING = "Ghi nhận demo testing";
+    public static final String ACTION_RECORD_DEMO_TESTING = "Ghi nhận kiểm thử bản chạy thử";
     public static final String ACTION_ISSUE_TECHNICAL_REPORT = "Gửi báo cáo kỹ thuật";
-    public static final String ACTION_RUN_SLA_AUTO_APPROVE = "Chạy tự động duyệt SLA";
-    public static final String ACTION_PROCESS_PAYMENT_WEBHOOK = "Xử lý webhook thanh toán";
+    public static final String ACTION_RUN_SLA_AUTO_APPROVE = "Chạy tự động duyệt theo thời hạn";
+    public static final String ACTION_PROCESS_PAYMENT_WEBHOOK = "Xử lý thông báo thanh toán";
     public static final String ACTION_CREATE_REVIEW = "Gửi đánh giá";
     // Note: Cac action tieng Viet cho luong milestone escrow / dispute / termination v2 (Flow 4 & 5).
-    public static final String ACTION_DEPOSIT_MILESTONE_ESCROW = "Ký quỹ milestone";
-    public static final String ACTION_START_MILESTONE = "Bắt đầu milestone";
-    public static final String ACTION_APPROVE_MILESTONE = "Duyệt milestone";
-    public static final String ACTION_REJECT_MILESTONE = "Từ chối sản phẩm milestone";
+    public static final String ACTION_DEPOSIT_MILESTONE_ESCROW = "Ký quỹ cột mốc";
+    public static final String ACTION_START_MILESTONE = "Bắt đầu cột mốc";
+    public static final String ACTION_APPROVE_MILESTONE = "Duyệt cột mốc";
+    public static final String ACTION_REJECT_MILESTONE = "Từ chối sản phẩm cột mốc";
     public static final String ACTION_ESCALATE_DISPUTE = "Yêu cầu can thiệp tranh chấp";
     public static final String ACTION_STAFF_DECIDE_DISPUTE = "Ra quyết định tranh chấp";
     public static final String ACTION_EXECUTE_DISPUTE_SETTLEMENT = "Thực thi quyết toán tranh chấp";
     public static final String ACTION_CANCEL_DISPUTE = "Hủy tranh chấp";
     public static final String ACTION_REQUEST_TERMINATION = "Yêu cầu chấm dứt hợp đồng";
-    public static final String ACTION_ASSIGN_TERMINATION_STAFF = "Phân công staff xử lý chấm dứt";
+    public static final String ACTION_ASSIGN_TERMINATION_STAFF = "Phân công nhân viên xử lý chấm dứt";
     public static final String ACTION_REJECT_TERMINATION = "Từ chối chấm dứt hợp đồng";
     public static final String ACTION_APPROVE_TERMINATION = "Duyệt chấm dứt hợp đồng";
     public static final String ACTION_SUBMIT_PARTIAL_EVIDENCE = "Nộp bằng chứng công việc khi chấm dứt";
@@ -102,11 +103,11 @@ public class AuditLogService {
     public static final String ACTION_REQUEST_PROGRESS_REPORT = "Yêu cầu báo cáo tiến độ";
     public static final String ACTION_ACKNOWLEDGE_PROGRESS_REPORT = "Xác nhận báo cáo tiến độ";
     public static final String ACTION_EXPIRE_PROGRESS_REPORT_REQUEST = "Yêu cầu báo cáo tiến độ hết hạn";
-    public static final String ACTION_MARK_MILESTONE_OVERDUE = "Đánh dấu milestone quá hạn";
+    public static final String ACTION_MARK_MILESTONE_OVERDUE = "Đánh dấu cột mốc quá hạn";
     public static final String ACTION_AUTO_APPROVE_MILESTONE_REVIEW_SLA =
             "Hệ thống tự động duyệt và giải ngân cột mốc khi hết hạn nghiệm thu";
     public static final String ACTION_AUTO_ASSIGN_DISPUTE = "Tự động phân công tranh chấp";
-    public static final String ACTION_ESCALATE_DISPUTE_SLA = "Escalate SLA xử lý tranh chấp";
+    public static final String ACTION_ESCALATE_DISPUTE_SLA = "Chuyển cấp tranh chấp quá hạn xử lý";
     public static final String ACTION_ACCEPT_TERMINATION_BY_EXPERT = "Chuyên gia chấp nhận chấm dứt";
     public static final String ACTION_DISPUTE_TERMINATION_BY_EXPERT = "Chuyên gia tranh chấp yêu cầu chấm dứt";
     public static final String ACTION_EXPIRE_TERMINATION_RESPONSE = "Hết hạn phản hồi yêu cầu chấm dứt";
@@ -117,7 +118,7 @@ public class AuditLogService {
     public static final String ACTION_RECORD_PROGRESS_REPORT_FEEDBACK = "Ghi nhận phản hồi báo cáo tiến độ";
     public static final String ACTION_PURCHASE_MEMBERSHIP = "Mua gói thành viên";
     public static final String ACTION_PURCHASE_CREDIT = "Mua lượt sử dụng";
-    public static final String ACTION_CONSUME_QUOTA = "Sử dụng quota";
+    public static final String ACTION_CONSUME_QUOTA = "Sử dụng lượt đăng";
     public static final String ACTION_APPROVE_WITHDRAWAL = "Duyệt yêu cầu rút tiền";
     public static final String ACTION_CREATE_WITHDRAWAL = "Tạo yêu cầu rút tiền";
     public static final String ACTION_PAY_CONTRACT_DEPOSIT = "Trả tiền ký quỹ hợp đồng";
@@ -129,16 +130,16 @@ public class AuditLogService {
     public static final String ACTION_CANCEL_CONTRACT_DRAFT_BY_BUSINESS = "Doanh nghiệp hủy hợp đồng nháp";
     public static final String ACTION_CREATE_PAYOS_PAYMENT_REQUEST = "Tạo yêu cầu thanh toán";
     public static final String ACTION_SYNC_PAYOS_PAYMENT_STATUS = "Đồng bộ trạng thái thanh toán";
-    public static final String ACTION_GENERATE_AI_SOW = "Tạo bản mô tả công việc bằng AI";
+    public static final String ACTION_GENERATE_AI_SOW = "Tạo bản mô tả công việc bằng trí tuệ nhân tạo";
     public static final String ACTION_ASK_CHATBOT = "Gửi câu hỏi đến chatbot";
     public static final String ACTION_CREATE_AI_EXPERT_RECOMMENDATIONS = "Tạo danh sách chuyên gia được AI gợi ý";
     public static final String ACTION_SELECT_AI_EXPERT_RECOMMENDATION = "Chọn chuyên gia được AI gợi ý";
     public static final String ACTION_MARK_NOTIFICATION_READ = "Đánh dấu thông báo đã đọc";
     public static final String ACTION_MARK_ALL_NOTIFICATIONS_READ = "Đánh dấu tất cả thông báo đã đọc";
-    public static final String ACTION_UPDATE_JOB_SKILLS = "Cập nhật kỹ năng cho job";
-    public static final String ACTION_UPDATE_JOB_DOMAINS = "Cập nhật lĩnh vực cho job";
-    public static final String ACTION_UPDATE_JOB_TECHNOLOGIES = "Cập nhật công nghệ cho job";
-    public static final String ACTION_UPLOAD_PROPOSAL_FILE = "Tải tệp proposal";
+    public static final String ACTION_UPDATE_JOB_SKILLS = "Cập nhật kỹ năng cho dự án";
+    public static final String ACTION_UPDATE_JOB_DOMAINS = "Cập nhật lĩnh vực cho dự án";
+    public static final String ACTION_UPDATE_JOB_TECHNOLOGIES = "Cập nhật công nghệ cho dự án";
+    public static final String ACTION_UPLOAD_PROPOSAL_FILE = "Tải tệp bản đề xuất";
 
     public static final String REQUEST_ATTRIBUTE_LOGGED = "aitasker.audit.logged";
 
@@ -232,14 +233,14 @@ public class AuditLogService {
                     .orElseGet(() -> response.attachEntityInfo("Hồ sơ chuyên gia", "Hồ sơ chuyên gia", null));
             case "portfolios" -> {
                 AccountEntity owner = expertOwnerByPortfolioId(id);
-                yield response.attachEntityInfo("Portfolio của " + displayAccount(owner), "Portfolio", owner);
+                yield response.attachEntityInfo("Hồ sơ năng lực của " + displayAccount(owner), "Hồ sơ năng lực", owner);
             }
             case "jobs" -> jobRepository.findById(id)
-                    .map(job -> response.attachEntityInfo("Job: " + job.getTitle(), "Job", businessOwnerByBusinessId(job.getBusinessId())))
-                    .orElseGet(() -> response.attachEntityInfo("Job", "Job", null));
+                    .map(job -> response.attachEntityInfo("Dự án: " + job.getTitle(), "Dự án", businessOwnerByBusinessId(job.getBusinessId())))
+                    .orElseGet(() -> response.attachEntityInfo("Dự án", "Dự án", null));
             case "proposals" -> proposalRepository.findById(id)
-                    .map(proposal -> response.attachEntityInfo(proposalDisplay(proposal), "Proposal", expertOwnerByExpertId(proposal.getExpertId())))
-                    .orElseGet(() -> response.attachEntityInfo("Proposal", "Proposal", null));
+                    .map(proposal -> response.attachEntityInfo(proposalDisplay(proposal), "Bản đề xuất", expertOwnerByExpertId(proposal.getExpertId())))
+                    .orElseGet(() -> response.attachEntityInfo("Bản đề xuất", "Bản đề xuất", null));
             case "contracts" -> contractRepository.findById(id)
                     .map(contract -> response.attachEntityInfo(contractDisplay(contract), "Hợp đồng", businessOwnerByBusinessId(contract.getBusinessId())))
                     .orElseGet(() -> response.attachEntityInfo("Hợp đồng", "Hợp đồng", null));
@@ -258,9 +259,9 @@ public class AuditLogService {
             case "staffs" -> staffRepository.findById(id)
                     .map(staff -> {
                         AccountEntity owner = accountById(staff.getAccountId());
-                        return response.attachEntityInfo("Hồ sơ staff của " + displayAccount(owner), "Hồ sơ staff", owner);
+                        return response.attachEntityInfo("Hồ sơ nhân viên của " + displayAccount(owner), "Hồ sơ nhân viên", owner);
                     })
-                    .orElseGet(() -> response.attachEntityInfo("Hồ sơ staff", "Hồ sơ staff", null));
+                    .orElseGet(() -> response.attachEntityInfo("Hồ sơ nhân viên", "Hồ sơ nhân viên", null));
             case "reviews" -> reviewRepository.findById(id)
                     .map(review -> {
                         AccountEntity reviewee = accountById(review.getRevieweeId());
@@ -268,7 +269,7 @@ public class AuditLogService {
                     })
                     .orElseGet(() -> response.attachEntityInfo("Đánh giá", "Đánh giá", null));
             case "system_settings" -> response.attachEntityInfo("Cài đặt hệ thống: " + log.getEntityId(), "Cài đặt hệ thống", null);
-            case "milestone_progress_reports" -> response.attachEntityInfo("Báo cáo tiến độ milestone", "Báo cáo tiến độ", null);
+            case "milestone_progress_reports" -> response.attachEntityInfo("Báo cáo tiến độ cột mốc", "Báo cáo tiến độ", null);
             case "milestone_progress_report_requests" -> response.attachEntityInfo("Yêu cầu báo cáo tiến độ", "Yêu cầu báo cáo", null);
             case "case_attachments" -> response.attachEntityInfo("Tệp đính kèm hồ sơ", "Tệp đính kèm", null);
             case "membership_packages" -> membershipPackageRepository.findById(Long.valueOf(id))
@@ -320,11 +321,11 @@ public class AuditLogService {
             Integer expertId = secondNumber(uri);
             String expertName = expertName(expertId);
             String jobTitle = jobTitle(jobId);
-            return response.attachEntityInfo(expertName + " được chọn cho job " + jobTitle, "Chuyên gia được chọn", businessOwnerByJobId(jobId));
+            return response.attachEntityInfo(expertName + " được chọn cho dự án " + jobTitle, "Chuyên gia được chọn", businessOwnerByJobId(jobId));
         }
         if (uri.matches("^/api/jobs/\\d+/expert-recommendations$")) {
             Integer jobId = firstNumber(uri);
-            return response.attachEntityInfo("Danh sách chuyên gia gợi ý cho job " + jobTitle(jobId), "Danh sách chuyên gia gợi ý", businessOwnerByJobId(jobId));
+            return response.attachEntityInfo("Danh sách chuyên gia gợi ý cho dự án " + jobTitle(jobId), "Danh sách chuyên gia gợi ý", businessOwnerByJobId(jobId));
         }
         if (uri.matches("^/api/payments/payos/\\d+/sync$")) {
             Long orderCode = firstLong(uri);
@@ -347,14 +348,14 @@ public class AuditLogService {
                     .orElseGet(() -> response.attachEntityInfo("Hồ sơ doanh nghiệp của " + displayAccount(actor), "Hồ sơ doanh nghiệp", actor));
         }
         if ("/api/v1/proposals/file".equals(uri)) {
-            return response.attachEntityInfo("Proposal của " + displayAccount(actor), "Proposal", actor);
+            return response.attachEntityInfo("Bản đề xuất của " + displayAccount(actor), "Bản đề xuất", actor);
         }
         return null;
     }
 
     private String normalizeAction(String action) {
         String normalized = normalizeRawAction(action);
-        if (normalized == null || normalized.isBlank()) throw new AppException("AUDIT ACTION KHONG HOP LE");
+        if (normalized == null || normalized.isBlank()) throw new AppException("Thao tác nhật ký kiểm toán không hợp lệ");
         return normalized.length() <= 100 ? normalized : normalized.substring(0, 100);
     }
 
@@ -388,7 +389,7 @@ public class AuditLogService {
             case "UPDATE_JOB_DRAFT" -> ACTION_UPDATE_JOB_DRAFT;
             case "UPDATE_JOB_OPEN" -> ACTION_UPDATE_JOB_OPEN;
             case "CHANGE_JOB_STATUS" -> ACTION_CHANGE_JOB_STATUS;
-            case "SUBMIT_PROPOSAL" -> ACTION_SUBMIT_PROPOSAL;
+            case "SUBMIT_PROPOSAL", "Gửi proposal" -> ACTION_SUBMIT_PROPOSAL;
             case "UPDATE_PROPOSAL" -> ACTION_UPDATE_PROPOSAL;
             case "REVIEW_PROPOSAL" -> ACTION_REVIEW_PROPOSAL;
             case "CREATE_CONTRACT_DRAFT" -> ACTION_CREATE_CONTRACT_DRAFT;
@@ -410,6 +411,7 @@ public class AuditLogService {
             case "SUBMIT_DELIVERABLE" -> ACTION_SUBMIT_DELIVERABLE;
             case "SUBMIT_PROGRESS_REPORT" -> ACTION_SUBMIT_PROGRESS_REPORT;
             case "UPLOAD_MILESTONE_SOURCE_CODE" -> ACTION_UPLOAD_MILESTONE_SOURCE_CODE;
+            case "UPLOAD_MILESTONE_USER_GUIDE" -> ACTION_UPLOAD_MILESTONE_USER_GUIDE;
             case "CREATE_TRANSACTION" -> ACTION_CREATE_TRANSACTION;
             case "UPDATE_TRANSACTION_STATUS" -> ACTION_UPDATE_TRANSACTION_STATUS;
             case "CREATE_DISPUTE" -> ACTION_CREATE_DISPUTE;
@@ -549,6 +551,7 @@ public class AuditLogService {
             case ACTION_SUBMIT_DELIVERABLE -> "SUBMIT_DELIVERABLE";
             case ACTION_SUBMIT_PROGRESS_REPORT -> "SUBMIT_PROGRESS_REPORT";
             case ACTION_UPLOAD_MILESTONE_SOURCE_CODE -> "UPLOAD_MILESTONE_SOURCE_CODE";
+            case ACTION_UPLOAD_MILESTONE_USER_GUIDE -> "UPLOAD_MILESTONE_USER_GUIDE";
             case ACTION_CREATE_TRANSACTION -> "CREATE_TRANSACTION";
             case ACTION_UPDATE_TRANSACTION_STATUS -> "UPDATE_TRANSACTION_STATUS";
             case ACTION_CREATE_DISPUTE -> "CREATE_DISPUTE";
@@ -735,7 +738,7 @@ public class AuditLogService {
     private String proposalDisplay(ProposalEntity proposal) {
         String expert = expertName(proposal.getExpertId());
         String job = jobTitle(proposal.getJobId());
-        return "Proposal của " + expert + " cho job " + job;
+        return "Bản đề xuất của " + expert + " cho dự án " + job;
     }
 
     private String contractDisplay(ContractEntity contract) {
@@ -757,8 +760,8 @@ public class AuditLogService {
                     .map(StaffEntity::getAccountId)
                     .map(this::accountById)
                     .map(this::displayAccount)
-                    .orElse("staff");
-            return display + " - staff phụ trách: " + staffName;
+                    .orElse("nhân viên");
+            return display + " - nhân viên phụ trách: " + staffName;
         }
         return display;
     }
@@ -773,7 +776,7 @@ public class AuditLogService {
     private String paymentOrderDisplay(PaymentOrderEntity order) {
         AccountEntity owner = accountByLongId(order.getAccountId());
         if (order.getJobId() != null) {
-            return "Thanh toán cho job " + jobTitle(order.getJobId().intValue());
+            return "Thanh toán cho dự án " + jobTitle(order.getJobId().intValue());
         }
         return "Thanh toán của " + displayAccount(owner);
     }
@@ -804,7 +807,7 @@ public class AuditLogService {
     }
 
     private String cleanEntityFallback(String entityName) {
-        if (entityName == null || entityName.isBlank()) return "Đối tượng audit";
+        if (entityName == null || entityName.isBlank()) return "Đối tượng kiểm toán";
         return switch (entityName) {
             case "membership_purchases" -> "Gói thành viên";
             case "quota_usage_logs" -> "Lượt sử dụng quota";
@@ -813,7 +816,7 @@ public class AuditLogService {
             case "contract_deposits" -> "Ký quỹ hợp đồng";
             case "notifications" -> "Thông báo";
             case "profiles" -> "Hồ sơ người dùng";
-            default -> entityName.startsWith("/api/") ? "Thao tác hệ thống" : entityName.replace('_', ' ');
+            default -> "Đối tượng hệ thống";
         };
     }
 

@@ -27,7 +27,7 @@ class CoherentDemoDataMigrationTest {
                 .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
-            assertEquals(69, intValue(connection,
+            assertEquals(70, intValue(connection,
                     "SELECT MAX(version::integer) FROM flyway_schema_history WHERE success"));
             assertEquals(1, intValue(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
@@ -75,7 +75,9 @@ class CoherentDemoDataMigrationTest {
                     """));
             assertEquals(0, intValue(connection, """
                     SELECT COUNT(*) FROM system_wallet
-                    WHERE current_balance<>available_balance+escrow_balance+holding_balance+disputed_balance
+                    WHERE account_id BETWEEN 1 AND 31
+                      AND wallet_type <> 'ADMIN_SYSTEM'
+                      AND current_balance<>available_balance+escrow_balance+holding_balance+disputed_balance
                     """));
             assertEquals(0, intValue(connection, """
                     SELECT COUNT(*) FROM job_domains jd

@@ -1116,9 +1116,9 @@ public class PaymentWalletService {
         String description = cleanLedgerDescription(tx);
         String title = actorName + " đã mua lượt sử dụng";
         if (safe(tx.getDescription()).contains("job-post")) {
-            title = actorName + " đã mua " + creditQuantity(tx) + " lượt đăng job";
+            title = actorName + " đã mua " + creditQuantity(tx) + " lượt đăng dự án";
         } else if (safe(tx.getDescription()).contains("proposal")) {
-            title = actorName + " đã mua " + creditQuantity(tx) + " lượt nộp proposal";
+            title = actorName + " đã mua " + creditQuantity(tx) + " lượt nộp bản đề xuất";
         }
         return builder.title(title).description(description).build();
     }
@@ -1184,9 +1184,9 @@ public class PaymentWalletService {
         String adminNote = withdrawal
                 .map(item -> item.getAdminNote() == null || item.getAdminNote().isBlank() ? "" : " Lý do: " + item.getAdminNote().trim() + ".")
                 .orElse("");
-        String adminName = withdrawal
-                .map(item -> item.getAdminId() == null ? "Admin" : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
-                .orElse("Admin");
+            String adminName = withdrawal
+                    .map(item -> item.getAdminId() == null ? "Quản trị viên" : displayAccount(accountRepository.findById(item.getAdminId()).orElse(null), item.getAdminId()))
+                    .orElse("Quản trị viên");
         return switch (safe(tx.getTransactionType())) {
             case "WITHDRAW_APPROVED" -> builder
                     .title("Yêu cầu rút tiền của " + requesterName + " đã được duyệt")
@@ -1317,7 +1317,7 @@ public class PaymentWalletService {
             AccountEntity currentActor
     ) {
         String actorName = displayAccount(currentActor, tx.getAccountId());
-        String adminName = withdrawal.getAdminId() == null ? "Admin"
+        String adminName = withdrawal.getAdminId() == null ? "Quản trị viên"
                 : displayAccount(accountRepository.findById(withdrawal.getAdminId()).orElse(null), withdrawal.getAdminId());
         String bankText = " Ngân hàng: " + withdrawal.getBankName()
                 + ", chủ tài khoản: " + withdrawal.getBankAccountHolder() + ".";
@@ -2035,12 +2035,12 @@ public class PaymentWalletService {
         if (description.startsWith("Buy job-post credits:")) {
             String quantity = description.substring("Buy job-post credits:".length()).trim();
             return displayAccount(accountRepository.findById(tx.getAccountId()).orElse(null), tx.getAccountId())
-                    + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua " + quantity + " lượt đăng job.";
+                    + " thanh toán " + formatAmount(tx.getAmount()) + " VNĐ để mua " + quantity + " lượt đăng dự án.";
         }
         if (description.startsWith("Buy proposal credits:")) {
             String quantity = description.substring("Buy proposal credits:".length()).trim();
             return displayAccount(accountRepository.findById(tx.getAccountId()).orElse(null), tx.getAccountId())
-                    + " thanh toán " + formatAmount(tx.getAmount()) + " VND để mua " + quantity + " lượt nộp proposal.";
+                    + " thanh toán " + formatAmount(tx.getAmount()) + " VNĐ để mua " + quantity + " lượt nộp bản đề xuất.";
         }
         if ("Contract security deposit".equals(description)) {
             return "Ký quỹ bảo đảm thực hiện hợp đồng.";
@@ -2049,7 +2049,7 @@ public class PaymentWalletService {
             return "Hoàn tiền ký quỹ hợp đồng.";
         }
         if ("Admin resolved contract security deposit".equals(description)) {
-            return "Admin xử lý giữ lại tiền ký quỹ hợp đồng.";
+            return "Quản trị viên xử lý giữ lại tiền ký quỹ hợp đồng.";
         }
         if ("Withdrawal request".equals(description)) {
             return "Tạo yêu cầu rút tiền.";
@@ -2066,7 +2066,7 @@ public class PaymentWalletService {
     private String detailAdminNote(Optional<ContractDepositEntity> deposit) {
         return deposit.map(ContractDepositEntity::getAdminNote)
                 .filter(note -> !note.isBlank())
-                .map(note -> " Ghi chú admin: " + note.trim() + ".")
+                .map(note -> " Ghi chú quản trị viên: " + note.trim() + ".")
                 .orElse(".");
     }
 
@@ -2075,7 +2075,7 @@ public class PaymentWalletService {
                 .map(ContractDepositEntity::getAdminId)
                 .filter(Objects::nonNull)
                 .map(adminId -> displayAccount(accountRepository.findById(adminId).orElse(null), adminId))
-                .orElse("Admin");
+                .orElse("Quản trị viên");
     }
 
     private boolean isPlatformHistoryEventRow(WalletTransactionEntity tx) {

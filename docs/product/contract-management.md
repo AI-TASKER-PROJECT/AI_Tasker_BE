@@ -82,6 +82,10 @@ Alternate exits:
   both are allowed. `demoLink` remains a separate runnable-product URL. Source
   archives are uploaded first through the milestone-scoped authenticated route,
   accept ZIP only, and are capped at 50 MB.
+- The final contract milestone also requires a usage guide uploaded through the
+  contract-scoped route. The guide accepts PDF or DOCX only, is stored on the
+  final approved deliverable, and requires both NDA signatures plus matching
+  `IN_PROGRESS` live/snapshot milestone state.
 - The owning business can deposit milestone escrow only from `PENDING`; a
   successful deposit automatically moves both milestone records to
   `IN_PROGRESS` and starts the execution timeline. The Expert start endpoint is
@@ -117,6 +121,12 @@ Alternate exits:
   before Staff review; Admin can cancel invalid active disputes.
 - When every contract milestone is `COMPLETED`, the system moves the contract
   to `COMPLETED` and the job to `CLOSED`.
+- A project summary is available only for this successful all-milestone path.
+  It returns contract/project/participant/domain data, immutable acceptance
+  criteria snapshots, and the latest approved deliverable for every milestone.
+  Every completed milestone must have an approved deliverable and the last one
+  must have its usage guide. Both participants receive a
+  `PROJECT_SUMMARY_READY` notification linking to the summary.
 - Final deliverable submission snapshots `reviewStartedAt` and `reviewDueAt`
   from the active `milestone_review_sla_duration` value. The backend scheduler
   automatically approves a due `UNDER_REVIEW` milestone only when the contract
@@ -166,6 +176,7 @@ Alternate exits:
 - `POST /api/v1/contracts/{contractId}/reject`
 - `POST /api/v1/contracts/{contractId}/cancel-draft`
 - `GET /api/v1/contracts/{contractId}/milestones`
+- `GET /api/v1/contracts/{contractId}/summary`
 - `POST /api/v1/contracts/{contractId}/change-requests`
 - `GET /api/v1/contracts/{contractId}/change-requests`
 - `POST /api/v1/contracts/{contractId}/change-requests/{requestId}/accept`
@@ -189,6 +200,7 @@ Alternate exits:
 - `POST /api/v1/milestones/{milestoneId}/source-code-file`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deliverables`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/source-code-file`
+- `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/user-guide-file`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/deposit`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-reports`
 - `POST /api/v1/contracts/{contractId}/milestones/{milestoneId}/progress-report-request`

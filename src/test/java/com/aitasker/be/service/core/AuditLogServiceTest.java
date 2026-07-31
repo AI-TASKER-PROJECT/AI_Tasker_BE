@@ -138,7 +138,7 @@ class AuditLogServiceTest {
         AuditLogResponse response = auditLogService.listForAdmin(null).get(0);
 
         assertEquals("Tạo danh sách chuyên gia được AI gợi ý", response.getAction());
-        assertEquals("Danh sách chuyên gia gợi ý cho job Nâng cấp CRM AI", response.getEntityDisplayName());
+        assertEquals("Danh sách chuyên gia gợi ý cho dự án Nâng cấp CRM AI", response.getEntityDisplayName());
         assertEquals("Danh sách chuyên gia gợi ý", response.getEntityName());
         assertNull(response.getEntityId());
         assertEquals("/api/jobs/1/expert-recommendations", response.getRawEntityName());
@@ -178,9 +178,9 @@ class AuditLogServiceTest {
 
         AuditLogResponse response = auditLogService.listForAdmin(null).get(0);
 
-        assertEquals("Gửi proposal", response.getAction());
-        assertEquals("Proposal của Nguyễn Văn A cho job Nâng cấp CRM AI", response.getEntityDisplayName());
-        assertEquals("Proposal", response.getEntityName());
+        assertEquals("Gửi bản đề xuất", response.getAction());
+        assertEquals("Bản đề xuất của Nguyễn Văn A cho dự án Nâng cấp CRM AI", response.getEntityDisplayName());
+        assertEquals("Bản đề xuất", response.getEntityName());
         assertNull(response.getEntityId());
     }
 
@@ -297,7 +297,7 @@ class AuditLogServiceTest {
         AuditLogResponse response = auditLogService.listForAdmin(null).get(0);
 
         assertEquals("Tự động phân công tranh chấp", response.getAction());
-        assertEquals("Tranh chấp giữa Nova Retail và Expert AI - staff phụ trách: Staff Reviewer", response.getEntityDisplayName());
+        assertEquals("Tranh chấp giữa Nova Retail và Expert AI - nhân viên phụ trách: Staff Reviewer", response.getEntityDisplayName());
         assertEquals("Nova Retail", response.getEntityOwner());
         assertEquals("BUSINESS", response.getEntityOwnerRole());
         assertEquals("Staff Reviewer", response.getActor());
