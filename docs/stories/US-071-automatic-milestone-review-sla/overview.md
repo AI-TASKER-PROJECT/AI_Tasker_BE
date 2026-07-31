@@ -41,4 +41,3 @@ visibility. The frontend never performs settlement based on its own timer.
 - Change execution-deadline or progress-report SLA behavior.
 - Change dispute, termination, deposit-rate, or manual Business review rules.
 - Add manual Admin approval or settlement controls.
-

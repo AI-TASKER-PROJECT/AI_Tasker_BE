@@ -55,4 +55,3 @@ Pause for human confirmation if:
 - A change to dispute or termination semantics becomes necessary.
 - Migration would delete or rewrite historical finance records.
 - Required validation must be weakened.
-

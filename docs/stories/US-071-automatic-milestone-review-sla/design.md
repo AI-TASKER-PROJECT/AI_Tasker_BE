@@ -62,4 +62,3 @@
    configuration would retroactively shorten or extend active reviews.
 3. Keep the Admin manual trigger. Rejected because the requested workflow must
    be automatic and Admin is configuration-only for review SLA.
-
